@@ -20,6 +20,7 @@ function getEnvCanisterVars(): Record<string, string | undefined> {
 }
 
 export function DebugBanner() {
+  return null;//
   const canisterId = resolveCanisterId();
   const actorStatus = getBackendActor() ? "connected" : "null - auth will fail";
   const isLocal =
