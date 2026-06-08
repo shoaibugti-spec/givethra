@@ -1,0 +1,28 @@
+{
+  "overview": "Givethra is a global trust-based humanitarian platform connecting verified people who need help with people who want to help, with full identity verification and transparent case management.",
+  "features": [
+    "Complete profile editor with photo, bio, and personal details",
+    "My Profile page with trust score, verification badges, and stats",
+    "Full wallet system with Support Credits, purchase history, and receipts",
+    "My Requests with 5-tab status tracking for Help Seekers",
+    "My Supports tracking for Heroes showing all supported cases",
+    "My Cases view with documents, video appeal, and support progress",
+    "Real notification center with mark-as-read and delete",
+    "Privacy controls including data download and account deletion requests",
+    "Security center with KYC status, devices, and active sessions",
+    "Google Account Security page replacing Change Password",
+    "Settings for language, theme, currency, timezone, and accessibility",
+    "Logout confirmation dialog"
+  ],
+  "category": "humanitarian-platform",
+  "tags": [
+    "humanitarian",
+    "verified-help",
+    "trust",
+    "transparency",
+    "kyc",
+    "wallet",
+    "profile-system"
+  ],
+  "last_updated": "2026-06-07T12:18:53.548Z"
+}

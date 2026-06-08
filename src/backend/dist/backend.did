@@ -1,0 +1,464 @@
+type http_request_result = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type http_header = 
+ record {
+   name: text;
+   value: text;
+ };
+type _ImmutableObjectStorageRefillResult = 
+ record {
+   success: opt bool;
+   topped_up_amount: opt nat;
+ };
+type _ImmutableObjectStorageRefillInformation = record {
+                                                  proposed_top_up_amount:
+                                                   opt nat;};
+type _ImmutableObjectStorageCreateCertificateResult = 
+ record {
+   blob_hash: text;
+   method: text;
+ };
+type VerificationStatus = 
+ variant {
+   DocumentsSubmitted;
+   InstitutionVerified;
+   Unverified;
+ };
+type UserSettingsPublic = 
+ record {
+   currencyDisplay: text;
+   emailNotifications: bool;
+   highContrast: bool;
+   inAppNotifications: bool;
+   language: text;
+   largerText: bool;
+   reducedAnimations: bool;
+   theme: text;
+   timezone: text;
+   weeklyDigest: bool;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserPublic = 
+ record {
+   avatarRef: opt FileRef;
+   bio: text;
+   city: text;
+   country: Country;
+   createdAt: Timestamp;
+   email: text;
+   fullName: text;
+   id: UserId;
+   isActive: bool;
+   kycStatus: KycStatus;
+   lastLoginAt: int;
+   phoneNumber: text;
+   preferredLanguage: text;
+   role: Role;
+   timezone: text;
+ };
+type UserId = principal;
+type USDCents = nat;
+type TransformationOutput = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type TransformationInput = 
+ record {
+   context: blob;
+   response: http_request_result;
+ };
+type Timestamp = int;
+type SupportProofPublic = 
+ record {
+   adminNote: opt text;
+   caseId: nat;
+   createdAt: Timestamp;
+   files: vec FileRef;
+   heroId: UserId;
+   id: nat;
+   referenceNumber: opt text;
+   status: ReviewStatus;
+ };
+type StripeSessionStatus = 
+ variant {
+   completed: record {
+                response: text;
+                userPrincipal: opt text;
+              };
+   failed: record {error: text;};
+ };
+type StripeConfiguration = 
+ record {
+   allowedCountries: vec text;
+   secretKey: text;
+ };
+type ShoppingItem = 
+ record {
+   currency: text;
+   priceInCents: nat;
+   productDescription: text;
+   productName: text;
+   quantity: nat;
+ };
+type Role = 
+ variant {
+   Admin;
+   HelpSeeker;
+   Hero;
+ };
+type ReviewStatus = 
+ variant {
+   Approved;
+   Completed;
+   Rejected;
+   Submitted;
+   UnderReview;
+ };
+type Result = 
+ variant {
+   err: Error;
+   ok;
+ };
+type ProudHeart = 
+ record {
+   awardedAt: Timestamp;
+   caseId: nat;
+   fromHelpSeeker: UserId;
+   toHero: UserId;
+ };
+type PrivacySettingsPublic = 
+ record {
+   activityVisibility: bool;
+   caseUpdatesEnabled: bool;
+   countryVisibility: bool;
+   emailNotificationsEnabled: bool;
+   inAppNotificationsEnabled: bool;
+   profileVisibility: text;
+ };
+type PlatformStats = 
+ record {
+   totalCases: nat;
+   totalCompletedCases: nat;
+   totalHeroes: nat;
+   totalSupportDistributed: nat;
+ };
+type PaymentStatus = 
+ variant {
+   Confirmed;
+   Failed;
+   Pending;
+ };
+type PaymentPublic = 
+ record {
+   amountCents: USDCents;
+   caseId: opt nat;
+   createdAt: Timestamp;
+   feeType: FeeType;
+   id: nat;
+   paidBy: UserId;
+   status: PaymentStatus;
+   stripeSessionId: text;
+ };
+type PageRequest = 
+ record {
+   limit: nat;
+   offset: nat;
+ };
+type NotificationType = 
+ variant {
+   CaseApproved;
+   CaseRejected;
+   NewMessage;
+   ProudHeartReceived;
+   SupportSubmitted;
+   UnlockPurchased;
+   VerificationUpdate;
+ };
+type NotificationPublic = 
+ record {
+   createdAt: Timestamp;
+   id: nat;
+   isRead: bool;
+   message: text;
+   notifType: NotificationType;
+   relatedCaseId: opt nat;
+   relatedUserId: opt UserId;
+   title: text;
+   userId: UserId;
+ };
+type MessagePublic = 
+ record {
+   caseId: opt nat;
+   content: text;
+   conversationId: nat;
+   createdAt: Timestamp;
+   id: nat;
+   isRead: bool;
+   receiverId: UserId;
+   senderId: UserId;
+ };
+type LoginDevice = 
+ record {
+   deviceName: text;
+   id: text;
+   ipAddress: text;
+   lastAccess: int;
+   os: text;
+ };
+type KycStatus = 
+ variant {
+   Approved;
+   Pending;
+   Rejected;
+   UnderReview;
+ };
+type HeroStatsPublic = 
+ record {
+   achievements: vec Achievement;
+   casesCompleted: nat;
+   casesSupported: nat;
+   peopleHelped: nat;
+   proudHeartCount: nat;
+ };
+type HelpSeekerStatsPublic = 
+ record {
+   requestsApproved: nat;
+   requestsCompleted: nat;
+   requestsSubmitted: nat;
+ };
+type FileRef = 
+ record {
+   fileName: text;
+   mimeType: text;
+   storageId: text;
+ };
+type FeeType = 
+ variant {
+   ListingFee;
+   UnlockFee;
+ };
+type Error = 
+ variant {
+   AmbiguousAttribute: record {
+                         field: text;
+                         sources: vec text;
+                       };
+   FrontendOriginMismatch: record {
+                             expected: vec text;
+                             got: text;
+                           };
+   FrontendOriginsNotConfigured;
+   MalformedCandid;
+   MissingField: text;
+   MixedSsoSources: record {
+                      otherKeys: vec text;
+                      ssoKeys: vec text;
+                    };
+   NoAttributes;
+   Stale: record {ageNs: nat;};
+   UnknownNonce;
+   UntrustedSsoSource: record {domain: text;};
+ };
+type CreditTxnKind = 
+ variant {
+   AdminGrant;
+   Purchase;
+   SpentOnCase;
+   SpentOnUnlock;
+ };
+type CreditTransaction = 
+ record {
+   amount: int;
+   createdAt: Timestamp;
+   id: nat;
+   kind: CreditTxnKind;
+   note: opt text;
+   userId: UserId;
+ };
+type Country = text;
+type ConversationPublic = 
+ record {
+   caseId: opt nat;
+   id: nat;
+   lastMessageAt: opt Timestamp;
+   lastMessageContent: opt text;
+   participantIds: vec UserId;
+   unreadCount: nat;
+ };
+type City = text;
+type Category = 
+ variant {
+   Books;
+   DebtRelief;
+   DisabilitySupport;
+   Education;
+   EmergencyNeeds;
+   Employment;
+   Food;
+   Housing;
+   Medical;
+   Medicines;
+   Orphans;
+   Other;
+   SchoolFees;
+   Surgery;
+   Transportation;
+   Uniform;
+   UniversityFees;
+   Utilities;
+   Widows;
+ };
+type CaseSummary = 
+ record {
+   amountNeeded: USDCents;
+   category: Category;
+   city: City;
+   country: Country;
+   createdAt: Timestamp;
+   deadline: Timestamp;
+   id: nat;
+   title: text;
+   verificationStatus: VerificationStatus;
+ };
+type CasePublic = 
+ record {
+   adminNote: opt text;
+   amountNeeded: USDCents;
+   category: Category;
+   city: City;
+   country: Country;
+   createdAt: Timestamp;
+   createdBy: UserId;
+   deadline: Timestamp;
+   description: text;
+   documents: vec FileRef;
+   id: nat;
+   isPublic: bool;
+   title: text;
+   verificationStatus: VerificationStatus;
+ };
+type Achievement = 
+ variant {
+   CommunityHero;
+   EducationHero;
+   FiftyPeopleHelped;
+   FirstSupport;
+   MedicalHero;
+   TenPeopleHelped;
+   TrustedHero;
+ };
+service : {
+  _immutableObjectStorageBlobsAreLive: (hashes: vec blob) -> (vec bool) query;
+  _immutableObjectStorageBlobsToDelete: () -> (vec blob) query;
+  _immutableObjectStorageConfirmBlobDeletion: (blobs: vec blob) -> ();
+  _immutableObjectStorageCreateCertificate: (blobHash: text) ->
+   (_ImmutableObjectStorageCreateCertificateResult);
+  _immutableObjectStorageRefillCashier: (refillInformation:
+   opt _ImmutableObjectStorageRefillInformation) ->
+   (_ImmutableObjectStorageRefillResult);
+  _immutableObjectStorageUpdateGatewayPrincipals: () -> ();
+  _initialize_access_control: () -> ();
+  _internet_identity_sign_in_finish: () -> (Result);
+  _internet_identity_sign_in_start: () -> (blob);
+  addCaseDocument: (caseId: nat, fileRef: FileRef) -> ();
+  adminGrantCredits: (userId: UserId, amount: nat, note: opt text) -> ();
+  adminUpdateKycStatus: (userId: UserId, status: KycStatus) -> (UserPublic);
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  awardProudHeart: (caseId: nat, heroId: UserId) -> ();
+  banUser: (userId: UserId) -> ();
+  computeAchievements: (heroId: UserId) -> (vec Achievement) query;
+  confirmCreditPurchase: (stripeSessionId: text, creditAmount: nat) -> ();
+  /// Confirm listing fee after Stripe session completes; records payment + wallet entry
+  confirmListingFee: (stripeSessionId: text, caseId: opt nat) ->
+   (PaymentPublic);
+  /// Confirm unlock fee after Stripe session completes
+  confirmUnlockFee: (stripeSessionId: text, caseId: nat) -> (PaymentPublic);
+  createCase: (title: text, description: text, category: Category, country:
+   Country, city: City, amountNeeded: USDCents, deadline: Timestamp) -> (
+   nat);
+  createCheckoutSession: (items: vec ShoppingItem, successUrl: text,
+   cancelUrl: text) -> (text);
+  createCreditPurchaseSession: (amount: nat, successUrl: text, cancelUrl:
+   text) -> (text);
+  /// Create a Stripe checkout session for the $1 listing fee
+  createListingFeeSession: (successUrl: text, cancelUrl: text) -> (text);
+  /// Create a Stripe checkout session for the $2 unlock fee
+  createUnlockFeeSession: (caseId: nat, successUrl: text, cancelUrl: 
+   text) -> (text);
+  dismissNotification: (notifId: nat) -> (bool);
+  getAllCases: () -> (vec CasePublic) query;
+  getAllProofs: () -> (vec SupportProofPublic) query;
+  getAllUsers: () -> (vec UserPublic) query;
+  getCallerUserProfile: () -> (opt UserPublic) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getCaseDetail: (id: nat) -> (opt CasePublic) query;
+  getCaseSummary: (id: nat) -> (opt CaseSummary) query;
+  getConversationMessages: (conversationId: nat) -> (vec MessagePublic);
+  getHelpSeekerStats: (userId: UserId) -> (opt HelpSeekerStatsPublic) query;
+  getHeroStats: (userId: UserId) -> (opt HeroStatsPublic) query;
+  getLoginDevices: () -> (vec LoginDevice) query;
+  getMyConversations: () -> (vec ConversationPublic) query;
+  getMyNotifications: () -> (vec NotificationPublic) query;
+  /// Confirm unlock fee after Stripe session completes
+  getMyProofs: () -> (vec SupportProofPublic) query;
+  getMySupportedCases: () -> (vec CaseSummary) query;
+  getMyTrustScore: () -> (nat) query;
+  getPendingPayments: () -> (vec PaymentPublic) query;
+  getPlatformStats: () -> (PlatformStats) query;
+  getPrivacySettings: () -> (opt PrivacySettingsPublic) query;
+  getProofsForCase: (caseId: nat) -> (vec SupportProofPublic) query;
+  getProudHeartsForHero: (heroId: UserId) -> (vec ProudHeart) query;
+  getStripeSessionStatus: (sessionId: text) -> (StripeSessionStatus);
+  getTransactionHistory: () -> (vec CreditTransaction) query;
+  getUnreadMessageCount: () -> (nat) query;
+  getUnreadNotificationCount: () -> (nat) query;
+  getUser: (id: UserId) -> (opt UserPublic) query;
+  getUserSettings: () -> (opt UserSettingsPublic) query;
+  getWallet: () -> (int) query;
+  isCallerAdmin: () -> (bool) query;
+  isStripeConfigured: () -> (bool) query;
+  isUnlocked: (caseId: nat) -> (bool) query;
+  listCases: (category: opt Category, page: PageRequest) ->
+   (vec CaseSummary) query;
+  logoutAllOtherDevices: () -> (nat);
+  markNotificationAsRead: (notifId: nat) -> (bool);
+  registerUser: (fullName: text, email: text, role: Role) -> (UserPublic);
+  requestAccountDeletion: () -> (text);
+  requestDataDownload: () -> (text);
+  sendMessage: (receiverId: UserId, caseId: opt nat, content: text) ->
+   (MessagePublic);
+  setStripeConfiguration: (config: StripeConfiguration) -> ();
+  submitProof: (caseId: nat, files: vec FileRef, referenceNumber:
+   opt text) -> (nat);
+  suspendUser: (userId: UserId) -> ();
+  switchRole: (newRole: Role) -> (UserPublic);
+  transform: (input: TransformationInput) -> (TransformationOutput) query;
+  unlockCase: (caseId: nat) -> ();
+  updatePrivacySettings: (profileVisibility: text, countryVisibility: 
+   bool, activityVisibility: bool, emailNotificationsEnabled: bool,
+   inAppNotificationsEnabled: bool, caseUpdatesEnabled: bool) ->
+   (PrivacySettingsPublic);
+  updateProofStatus: (proofId: nat, status: ReviewStatus, adminNote:
+   opt text) -> ();
+  updateUserProfile: (fullName: text, country: Country, avatarRef:
+   opt FileRef) -> (UserPublic);
+  updateUserProfileExtended: (fullName: text, country: Country, city: 
+   text, phoneNumber: text, bio: text, preferredLanguage: text, timezone:
+   text, avatarRef: opt FileRef) -> (UserPublic);
+  updateUserSettings: (language: text, theme: text, currencyDisplay: 
+   text, timezone: text, emailNotifications: bool, inAppNotifications: 
+   bool, weeklyDigest: bool, highContrast: bool, largerText: bool,
+   reducedAnimations: bool) -> (UserSettingsPublic);
+  updateVerificationStatus: (caseId: nat, status: VerificationStatus) -> ();
+}
