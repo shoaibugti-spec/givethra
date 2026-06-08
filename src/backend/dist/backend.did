@@ -49,23 +49,26 @@ type UserRole =
  };
 type UserPublic = 
  record {
+   authMethod: AuthMethod;
    avatarRef: opt FileRef;
    bio: text;
    city: text;
    country: Country;
    createdAt: Timestamp;
-   email: text;
+   email: opt text;
    fullName: text;
    id: UserId;
    isActive: bool;
+   isEmailVerified: bool;
+   isPhoneVerified: bool;
    kycStatus: KycStatus;
    lastLoginAt: int;
-   phoneNumber: text;
+   phoneNumber: opt text;
    preferredLanguage: text;
    role: Role;
    timezone: text;
  };
-type UserId = principal;
+type UserId = text;
 type USDCents = nat;
 type TransformationOutput = 
  record {
@@ -116,6 +119,7 @@ type Role =
    Admin;
    HelpSeeker;
    Hero;
+   SuperAdmin;
  };
 type ReviewStatus = 
  variant {
@@ -136,6 +140,15 @@ type ProudHeart =
    caseId: nat;
    fromHelpSeeker: UserId;
    toHero: UserId;
+ };
+type ProfileUpdate = 
+ record {
+   bio: opt text;
+   city: opt text;
+   country: opt text;
+   fullName: opt text;
+   preferredLanguage: opt text;
+   timezone: opt text;
  };
 type PrivacySettingsPublic = 
  record {
@@ -178,10 +191,17 @@ type PageRequest =
 type NotificationType = 
  variant {
    CaseApproved;
+   CaseCompleted;
    CaseRejected;
+   CreditsAdded;
+   KycApproved;
+   KycPending;
+   KycRejected;
    NewMessage;
    ProudHeartReceived;
+   SupportReceived;
    SupportSubmitted;
+   SystemAnnouncement;
    UnlockPurchased;
    VerificationUpdate;
  };
@@ -348,6 +368,12 @@ type CasePublic =
    title: text;
    verificationStatus: VerificationStatus;
  };
+type AuthMethod = 
+ variant {
+   email;
+   google;
+   phone;
+ };
 type Achievement = 
  variant {
    CommunityHero;
@@ -384,9 +410,9 @@ service : {
    (PaymentPublic);
   /// Confirm unlock fee after Stripe session completes
   confirmUnlockFee: (stripeSessionId: text, caseId: nat) -> (PaymentPublic);
-  createCase: (title: text, description: text, category: Category, country:
-   Country, city: City, amountNeeded: USDCents, deadline: Timestamp) -> (
-   nat);
+  createCase: (userId: UserId, title: text, description: text, category:
+   Category, country: Country, city: City, amountNeeded: USDCents, deadline:
+   Timestamp) -> (nat);
   createCheckoutSession: (items: vec ShoppingItem, successUrl: text,
    cancelUrl: text) -> (text);
   createCreditPurchaseSession: (amount: nat, successUrl: text, cancelUrl:
@@ -402,21 +428,26 @@ service : {
   getAllUsers: () -> (vec UserPublic) query;
   getCallerUserProfile: () -> (opt UserPublic) query;
   getCallerUserRole: () -> (UserRole) query;
-  getCaseDetail: (id: nat) -> (opt CasePublic) query;
+  getCaseDetail: (id: nat, userId: UserId) -> (opt CasePublic) query;
   getCaseSummary: (id: nat) -> (opt CaseSummary) query;
   getConversationMessages: (conversationId: nat) -> (vec MessagePublic);
+  getCurrentUser: (userId: UserId) ->
+   (variant {
+      err: text;
+      ok: UserPublic;
+    }) query;
   getHelpSeekerStats: (userId: UserId) -> (opt HelpSeekerStatsPublic) query;
   getHeroStats: (userId: UserId) -> (opt HeroStatsPublic) query;
   getLoginDevices: () -> (vec LoginDevice) query;
   getMyConversations: () -> (vec ConversationPublic) query;
   getMyNotifications: () -> (vec NotificationPublic) query;
-  /// Confirm unlock fee after Stripe session completes
-  getMyProofs: () -> (vec SupportProofPublic) query;
-  getMySupportedCases: () -> (vec CaseSummary) query;
+  getMyProofs: (userId: UserId) -> (vec SupportProofPublic) query;
+  getMySupportedCases: (userId: UserId) -> (vec CaseSummary) query;
   getMyTrustScore: () -> (nat) query;
   getPendingPayments: () -> (vec PaymentPublic) query;
   getPlatformStats: () -> (PlatformStats) query;
   getPrivacySettings: () -> (opt PrivacySettingsPublic) query;
+  /// Confirm listing fee after Stripe session completes; records payment + wallet entry
   getProofsForCase: (caseId: nat) -> (vec SupportProofPublic) query;
   getProudHeartsForHero: (heroId: UserId) -> (vec ProudHeart) query;
   getStripeSessionStatus: (sessionId: text) -> (StripeSessionStatus);
@@ -428,23 +459,55 @@ service : {
   getWallet: () -> (int) query;
   isCallerAdmin: () -> (bool) query;
   isStripeConfigured: () -> (bool) query;
-  isUnlocked: (caseId: nat) -> (bool) query;
+  isUnlocked: (caseId: nat, userId: UserId) -> (bool) query;
   listCases: (category: opt Category, page: PageRequest) ->
    (vec CaseSummary) query;
+  loginWithEmail: (email: text, password: text) ->
+   (variant {
+      err: text;
+      ok: UserPublic;
+    });
+  loginWithGoogle: (googleId: text) -> (variant {
+                                          err: text;
+                                          ok: UserPublic;
+                                        });
   logoutAllOtherDevices: () -> (nat);
+  logoutUser: (userId: UserId) -> (variant {
+                                     err: text;
+                                     ok;
+                                   });
   markNotificationAsRead: (notifId: nat) -> (bool);
-  registerUser: (fullName: text, email: text, role: Role) -> (UserPublic);
+  registerUser: (userId: UserId, fullName: text, email: opt text, role:
+   Role) -> (UserPublic);
+  registerWithEmail: (email: text, fullName: text, password: text) ->
+   (variant {
+      err: text;
+      ok: text;
+    });
+  registerWithGoogle: (googleId: text, fullName: text, email: text, photoUrl:
+   opt FileRef) -> (variant {
+                      err: text;
+                      ok: UserPublic;
+                    });
   requestAccountDeletion: () -> (text);
   requestDataDownload: () -> (text);
+  sendEmailOtp: (email: text) -> (variant {
+                                    err: text;
+                                    ok: text;
+                                  });
   sendMessage: (receiverId: UserId, caseId: opt nat, content: text) ->
    (MessagePublic);
+  sendPhoneOtp: (phoneNumber: text) -> (variant {
+                                          err: text;
+                                          ok: text;
+                                        });
   setStripeConfiguration: (config: StripeConfiguration) -> ();
-  submitProof: (caseId: nat, files: vec FileRef, referenceNumber:
-   opt text) -> (nat);
+  submitProof: (caseId: nat, userId: UserId, files: vec FileRef,
+   referenceNumber: opt text) -> (nat);
   suspendUser: (userId: UserId) -> ();
   switchRole: (newRole: Role) -> (UserPublic);
   transform: (input: TransformationInput) -> (TransformationOutput) query;
-  unlockCase: (caseId: nat) -> ();
+  unlockCase: (caseId: nat, userId: UserId) -> ();
   updatePrivacySettings: (profileVisibility: text, countryVisibility: 
    bool, activityVisibility: bool, emailNotificationsEnabled: bool,
    inAppNotificationsEnabled: bool, caseUpdatesEnabled: bool) ->
@@ -453,6 +516,11 @@ service : {
    opt text) -> ();
   updateUserProfile: (fullName: text, country: Country, avatarRef:
    opt FileRef) -> (UserPublic);
+  updateUserProfileById: (userId: UserId, updates: ProfileUpdate) ->
+   (variant {
+      err: text;
+      ok: UserPublic;
+    });
   updateUserProfileExtended: (fullName: text, country: Country, city: 
    text, phoneNumber: text, bio: text, preferredLanguage: text, timezone:
    text, avatarRef: opt FileRef) -> (UserPublic);
@@ -461,4 +529,14 @@ service : {
    bool, weeklyDigest: bool, highContrast: bool, largerText: bool,
    reducedAnimations: bool) -> (UserSettingsPublic);
   updateVerificationStatus: (caseId: nat, status: VerificationStatus) -> ();
+  verifyEmailOtp: (email: text, otpCode: text) ->
+   (variant {
+      err: text;
+      ok: UserPublic;
+    });
+  verifyPhoneOtp: (phoneNumber: text, otpCode: text) ->
+   (variant {
+      err: text;
+      ok: UserPublic;
+    });
 }

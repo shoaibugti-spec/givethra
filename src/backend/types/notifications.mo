@@ -5,11 +5,18 @@ module {
   public type NotificationType = {
     #CaseApproved;
     #CaseRejected;
+    #CaseCompleted;
     #VerificationUpdate;
     #ProudHeartReceived;
     #UnlockPurchased;
     #SupportSubmitted;
     #NewMessage;
+    #CreditsAdded;
+    #KycApproved;
+    #KycRejected;
+    #KycPending;
+    #SupportReceived;
+    #SystemAnnouncement;
   };
 
   /// A notification record (stored in actor state)

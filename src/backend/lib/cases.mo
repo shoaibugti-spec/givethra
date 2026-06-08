@@ -104,7 +104,7 @@ module {
       case (?x) x;
       case null Runtime.trap("Case not found");
     };
-    if (not Principal.equal(c.createdBy, caller)) {
+    if (c.createdBy != caller) {
       Runtime.trap("Unauthorized: not case owner");
     };
     c.documents := c.documents.concat([fileRef]);

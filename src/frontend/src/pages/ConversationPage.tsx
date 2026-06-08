@@ -1,12 +1,12 @@
 import type { MessagePublic, UserPublic } from "@/backend";
-import { createActor } from "@/backend";
+
 import Layout from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBackendActor } from "@/hooks/useBackend";
+import { getBackendActor } from "@/lib/actor";
 import { cn } from "@/lib/utils";
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
@@ -15,14 +15,14 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 function useConversationMessages(conversationId: bigint) {
-  const { actor, isFetching } = useActor(createActor);
+  const actor = getBackendActor();
   return useQuery<MessagePublic[]>({
     queryKey: ["conversation-messages", String(conversationId)],
     queryFn: async () => {
       if (!actor) return [];
       return actor.getConversationMessages(conversationId);
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
     refetchInterval: 10_000,
   });
 }

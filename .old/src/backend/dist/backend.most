@@ -14,6 +14,16 @@ type Achievement__156725597 =
     #TenPeopleHelped;
     #TrustedHero
   };
+type Achievement__197498786 =
+  {
+    #CommunityHero;
+    #EducationHero;
+    #FiftyPeopleHelped;
+    #FirstSupport;
+    #MedicalHero;
+    #TenPeopleHelped;
+    #TrustedHero
+  };
 type Achievement__445217360 =
   {
     #CommunityHero;
@@ -54,9 +64,12 @@ type Achievement__944492053 =
     #TenPeopleHelped;
     #TrustedHero
   };
+type AuthMethod__440486970 = {#email; #google; #phone};
+type AuthMethod__941912783 = {#email; #google; #phone};
 type CaseState__127408710 = {var nextCaseId : Nat; var nextProofId : Nat};
 type CaseState__151454369 = {var nextCaseId : Nat; var nextProofId : Nat};
 type CaseState__477309456 = {var nextCaseId : Nat; var nextProofId : Nat};
+type CaseState__593706806 = {var nextCaseId : Nat; var nextProofId : Nat};
 type CaseState__764442058 = {var nextCaseId : Nat; var nextProofId : Nat};
 type CaseUnlock__505124385 =
   {
@@ -239,6 +252,28 @@ type Category__581356193 =
     #Utilities;
     #Widows
   };
+type Category__640801735 =
+  {
+    #Books;
+    #DebtRelief;
+    #DisabilitySupport;
+    #Education;
+    #EmergencyNeeds;
+    #Employment;
+    #Food;
+    #Housing;
+    #Medical;
+    #Medicines;
+    #Orphans;
+    #Other;
+    #SchoolFees;
+    #Surgery;
+    #Transportation;
+    #Uniform;
+    #UniversityFees;
+    #Utilities;
+    #Widows
+  };
 type Category__644361216 =
   {
     #Books;
@@ -288,6 +323,7 @@ type City__589193452 = Text;
 type City__854196687 = Text;
 type City__862097819 = Text;
 type City__871666169 = Text;
+type City__956127233 = Text;
 type Conversation__105033385 =
   {
     caseId : ?Nat;
@@ -328,8 +364,10 @@ type Country__394186858 = Text;
 type Country__416059019 = Text;
 type Country__725964590 = Text;
 type Country__733006911 = Text;
+type Country__765535358 = Text;
 type Country__823230688 = Text;
 type CreditState__1057620125 = {var nextCreditTxnId : Nat};
+type CreditState__191404652 = {var nextCreditTxnId : Nat};
 type CreditState__408832953 = {var nextCreditTxnId : Nat};
 type CreditTransaction__491869707 =
   {
@@ -364,8 +402,11 @@ type CreditTxnKind__512813317 =
   {#AdminGrant; #Purchase; #SpentOnCase; #SpentOnUnlock};
 type CreditTxnKind__772397570 =
   {#AdminGrant; #Purchase; #SpentOnCase; #SpentOnUnlock};
+type CreditTxnKind__855152225 =
+  {#AdminGrant; #Purchase; #SpentOnCase; #SpentOnUnlock};
 type Data__80296667<K, V> =
   {var count : Nat__1040412405; kvs : [var ?(K, V)]};
+type FeeType__346099925 = {#ListingFee; #UnlockFee};
 type FeeType__4305961 = {#ListingFee; #UnlockFee};
 type FeeType__553529187 = {#ListingFee; #UnlockFee};
 type FeeType__705696306 = {#ListingFee; #UnlockFee};
@@ -379,8 +420,16 @@ type FileRef__644856529 =
   {fileName : Text; mimeType : Text; storageId : Text};
 type FileRef__715101902 =
   {fileName : Text; mimeType : Text; storageId : Text};
+type FileRef__937338468 =
+  {fileName : Text; mimeType : Text; storageId : Text};
 type FileRef__939992998 =
   {fileName : Text; mimeType : Text; storageId : Text};
+type HelpSeekerStats__102570205 =
+  {
+    var requestsApproved : Nat;
+    var requestsCompleted : Nat;
+    var requestsSubmitted : Nat
+  };
 type HelpSeekerStats__163488740 =
   {
     var requestsApproved : Nat;
@@ -414,6 +463,14 @@ type HelpSeekerStats__895218245 =
 type HeroStats__312962782 =
   {
     var achievements : [Achievement__156725597];
+    var casesCompleted : Nat;
+    var casesSupported : Nat;
+    var peopleHelped : Nat;
+    var proudHeartCount : Nat
+  };
+type HeroStats__373152933 =
+  {
+    var achievements : [Achievement__197498786];
     var casesCompleted : Nat;
     var casesSupported : Nat;
     var peopleHelped : Nat;
@@ -454,6 +511,7 @@ type HeroStats__86579237 =
 type Internal__41346355<K, V> =
   {children : [var ?Node__1000929467<K, V>]; data : Data__80296667<K, V>};
 type KycStatus__310129812 = {#Approved; #Pending; #Rejected; #UnderReview};
+type KycStatus__474907264 = {#Approved; #Pending; #Rejected; #UnderReview};
 type KycStatus__654636070 = {#Approved; #Pending; #Rejected; #UnderReview};
 type KycStatus__689774085 = {#Approved; #Pending; #Rejected; #UnderReview};
 type Leaf__712614010<K, V> = {data : Data__80296667<K, V>};
@@ -464,6 +522,14 @@ type List__529703492<T> =
     var elementIndex : Nat__1040412405
   };
 type List__560604548<T> = List__529703492<T>;
+type LoginDevice__1033252313 =
+  {
+    deviceName : Text;
+    id : Text;
+    ipAddress : Text;
+    lastAccess : Int;
+    os : Text
+  };
 type LoginDevice__320594380 =
   {
     deviceName : Text;
@@ -533,6 +599,8 @@ type MsgState__663236910 =
 type MsgState__731117625 =
   {var nextConversationId : Nat; var nextMessageId : Nat};
 type MsgState__778646366 =
+  {var nextConversationId : Nat; var nextMessageId : Nat};
+type MsgState__895969254 =
   {var nextConversationId : Nat; var nextMessageId : Nat};
 type Nat__1040412405 = Nat__920180692;
 type Nat__920180692 = Nat;
@@ -623,6 +691,146 @@ type NewActor__800600893 =
     users : Map__222667396<UserId__433619004, User__322217677>;
     wallets : List__560604548<WalletEntry__411977840>
   };
+type NewActor__826441296 =
+  {
+    accessControlState : AccessControlState__836714403;
+    authEmailIndex : Map__222667396<Text, NewUserId__975201618>;
+    authGoogleIndex : Map__222667396<Text, NewUserId__975201618>;
+    authPhoneIndex : Map__222667396<Text, NewUserId__975201618>;
+    caseState : CaseState__593706806;
+    cases : Map__222667396<Nat, NewCase__532105131>;
+    conversations : List__560604548<NewConversation__416081706>;
+    creditState : CreditState__191404652;
+    creditTransactions : List__560604548<NewCreditTransaction__730151999>;
+    helpSeekerStats :
+      Map__222667396<NewUserId__975201618, HelpSeekerStats__102570205>;
+    heroStats : Map__222667396<NewUserId__975201618, HeroStats__373152933>;
+    messages : List__560604548<NewMessage__318595476>;
+    msgState : MsgState__895969254;
+    nextUserId : {var id : Nat};
+    notifState : NotifState__383774530;
+    notifications : List__560604548<NewNotification__168554876>;
+    paymentState : PaymentState__307830287;
+    payments : List__560604548<NewPayment__694638409>;
+    proofs : List__560604548<NewSupportProof__591432758>;
+    proudHearts : List__560604548<NewProudHeart__613016465>;
+    stripeConfig : StripeConfig__178775829;
+    unlocks : Map__222667396<Text, NewCaseUnlock__151111919>;
+    users : Map__222667396<NewUserId__975201618, NewUser__467704562>;
+    wallets : List__560604548<NewWalletEntry__318021608>
+  };
+type NewCaseUnlock__151111919 =
+  {
+    caseId : Nat;
+    heroId : NewUserId__975201618;
+    unlockedAt : Timestamp__86868646
+  };
+type NewCase__532105131 =
+  {
+    var adminNote : ?Text;
+    var amountNeeded : USDCents__626635564;
+    category : Category__640801735;
+    city : City__956127233;
+    country : Country__765535358;
+    createdAt : Timestamp__86868646;
+    createdBy : NewUserId__975201618;
+    deadline : Timestamp__86868646;
+    var description : Text;
+    var documents : [FileRef__937338468];
+    id : Nat;
+    var isPublic : Bool;
+    var title : Text;
+    var verificationStatus : VerificationStatus__408360771
+  };
+type NewConversation__416081706 =
+  {
+    caseId : ?Nat;
+    id : Nat;
+    var lastMessageAt : ?Timestamp__86868646;
+    var lastMessageContent : ?Text;
+    participantIds : [NewUserId__975201618];
+    var unreadCount : Nat
+  };
+type NewCreditTransaction__730151999 =
+  {
+    amount : Int;
+    createdAt : Timestamp__86868646;
+    id : Nat;
+    kind : CreditTxnKind__855152225;
+    note : ?Text;
+    userId : NewUserId__975201618
+  };
+type NewMessage__318595476 =
+  {
+    caseId : ?Nat;
+    content : Text;
+    conversationId : Nat;
+    createdAt : Timestamp__86868646;
+    id : Nat;
+    var isRead : Bool;
+    receiverId : NewUserId__975201618;
+    senderId : NewUserId__975201618
+  };
+type NewNotificationType__766016792 =
+  {
+    #CaseApproved;
+    #CaseCompleted;
+    #CaseRejected;
+    #CreditsAdded;
+    #KycApproved;
+    #KycPending;
+    #KycRejected;
+    #NewMessage;
+    #ProudHeartReceived;
+    #SupportReceived;
+    #SupportSubmitted;
+    #SystemAnnouncement;
+    #UnlockPurchased;
+    #VerificationUpdate
+  };
+type NewNotification__168554876 =
+  {
+    createdAt : Timestamp__86868646;
+    id : Nat;
+    var isRead : Bool;
+    message : Text;
+    notifType : NewNotificationType__766016792;
+    relatedCaseId : ?Nat;
+    relatedUserId : ?NewUserId__975201618;
+    title : Text;
+    userId : NewUserId__975201618
+  };
+type NewPayment__694638409 =
+  {
+    amountCents : USDCents__626635564;
+    caseId : ?Nat;
+    createdAt : Timestamp__86868646;
+    feeType : FeeType__346099925;
+    id : Nat;
+    paidBy : NewUserId__975201618;
+    var status : PaymentStatus__1062206557;
+    stripeSessionId : Text
+  };
+type NewProudHeart__613016465 =
+  {
+    awardedAt : Timestamp__86868646;
+    caseId : Nat;
+    fromHelpSeeker : NewUserId__975201618;
+    toHero : NewUserId__975201618
+  };
+type NewRole__173420552 = {#Admin; #HelpSeeker; #Hero; #SuperAdmin};
+type NewSupportProof__591432758 =
+  {
+    var adminNote : ?Text;
+    caseId : Nat;
+    createdAt : Timestamp__86868646;
+    var files : [FileRef__937338468];
+    heroId : NewUserId__975201618;
+    id : Nat;
+    var referenceNumber : ?Text;
+    var status : ReviewStatus__754236275
+  };
+type NewUserId__975201618 = Text;
 type NewUser__352658755 =
   {
     var avatarRef : ?FileRef__644856529;
@@ -644,8 +852,48 @@ type NewUser__352658755 =
     var settings : ?UserSettings__334857944;
     var timezone : Text
   };
+type NewUser__467704562 =
+  {
+    var authMethod : AuthMethod__440486970;
+    var avatarRef : ?FileRef__937338468;
+    var bio : Text;
+    var city : Text;
+    var country : Country__765535358;
+    createdAt : Timestamp__86868646;
+    var email : ?Text;
+    var emailOtpCode : ?Text;
+    var emailOtpExpiry : ?Int;
+    var fullName : Text;
+    var googleId : ?Text;
+    id : NewUserId__975201618;
+    var isActive : Bool;
+    var isEmailVerified : Bool;
+    var isPhoneVerified : Bool;
+    var kycStatus : KycStatus__474907264;
+    var lastLoginAt : Int;
+    var loginDevices : [LoginDevice__1033252313];
+    var passwordHash : ?Text;
+    var phoneNumber : ?Text;
+    var phoneOtpCode : ?Text;
+    var phoneOtpExpiry : ?Int;
+    var preferredLanguage : Text;
+    var privacySettings : ?PrivacySettings__9644450;
+    var role : NewRole__173420552;
+    var settings : ?UserSettings__892639985;
+    var timezone : Text
+  };
+type NewWalletEntry__318021608 =
+  {
+    amountCents : USDCents__626635564;
+    createdAt : Timestamp__86868646;
+    feeType : FeeType__346099925;
+    id : Nat;
+    paymentId : Nat;
+    userId : NewUserId__975201618
+  };
 type Node__1000929467<K, V> =
   {#internal : Internal__41346355<K, V>; #leaf : Leaf__712614010<K, V>};
+type NotifState__383774530 = {var nextNotifId : Nat};
 type NotifState__705873631 = {var nextNotifId : Nat};
 type NotifState__76255498 = {var nextNotifId : Nat};
 type NotifState__828794483 = {var nextNotifId : Nat};
@@ -672,10 +920,17 @@ type NotificationType__804566138 =
 type NotificationType__908192046 =
   {
     #CaseApproved;
+    #CaseCompleted;
     #CaseRejected;
+    #CreditsAdded;
+    #KycApproved;
+    #KycPending;
+    #KycRejected;
     #NewMessage;
     #ProudHeartReceived;
+    #SupportReceived;
     #SupportSubmitted;
+    #SystemAnnouncement;
     #UnlockPurchased;
     #VerificationUpdate
   };
@@ -777,6 +1032,30 @@ type OldActor__46248794 =
     users : Map__222667396<UserId__874900064, User__731114663>;
     wallets : List__560604548<WalletEntry__928553246>
   };
+type OldActor__739961336 =
+  {
+    accessControlState : AccessControlState__836714403;
+    caseState : CaseState__593706806;
+    cases : Map__222667396<Nat, OldCase__643211284>;
+    conversations : List__560604548<OldConversation__960722882>;
+    creditState : CreditState__191404652;
+    creditTransactions : List__560604548<OldCreditTransaction__312585576>;
+    helpSeekerStats :
+      Map__222667396<OldUserId__716621641, HelpSeekerStats__102570205>;
+    heroStats : Map__222667396<OldUserId__716621641, HeroStats__373152933>;
+    messages : List__560604548<OldMessage__587764480>;
+    msgState : MsgState__895969254;
+    notifState : NotifState__383774530;
+    notifications : List__560604548<OldNotification__1037404970>;
+    paymentState : PaymentState__307830287;
+    payments : List__560604548<OldPayment__453894254>;
+    proofs : List__560604548<OldSupportProof__410016195>;
+    proudHearts : List__560604548<OldProudHeart__646871141>;
+    stripeConfig : StripeConfig__178775829;
+    unlocks : Map__222667396<Text, OldCaseUnlock__10384523>;
+    users : Map__222667396<OldUserId__716621641, OldUser__253874848>;
+    wallets : List__560604548<OldWalletEntry__141130201>
+  };
 type OldActor__936740728 =
   {
     accessControlState : AccessControlState__836714403;
@@ -801,6 +1080,132 @@ type OldActor__936740728 =
     users : Map__222667396<UserId__380294217, OldUser__480371244>;
     wallets : List__560604548<WalletEntry__378821411>
   };
+type OldCaseUnlock__10384523 =
+  {
+    caseId : Nat;
+    heroId : OldUserId__716621641;
+    unlockedAt : Timestamp__86868646
+  };
+type OldCase__643211284 =
+  {
+    var adminNote : ?Text;
+    var amountNeeded : USDCents__626635564;
+    category : Category__640801735;
+    city : City__956127233;
+    country : Country__765535358;
+    createdAt : Timestamp__86868646;
+    createdBy : OldUserId__716621641;
+    deadline : Timestamp__86868646;
+    var description : Text;
+    var documents : [FileRef__937338468];
+    id : Nat;
+    var isPublic : Bool;
+    var title : Text;
+    var verificationStatus : VerificationStatus__408360771
+  };
+type OldConversation__960722882 =
+  {
+    caseId : ?Nat;
+    id : Nat;
+    var lastMessageAt : ?Timestamp__86868646;
+    var lastMessageContent : ?Text;
+    participantIds : [OldUserId__716621641];
+    var unreadCount : Nat
+  };
+type OldCreditTransaction__312585576 =
+  {
+    amount : Int;
+    createdAt : Timestamp__86868646;
+    id : Nat;
+    kind : CreditTxnKind__855152225;
+    note : ?Text;
+    userId : OldUserId__716621641
+  };
+type OldMessage__587764480 =
+  {
+    caseId : ?Nat;
+    content : Text;
+    conversationId : Nat;
+    createdAt : Timestamp__86868646;
+    id : Nat;
+    var isRead : Bool;
+    receiverId : OldUserId__716621641;
+    senderId : OldUserId__716621641
+  };
+type OldNotificationType__987341920 =
+  {
+    #CaseApproved;
+    #CaseRejected;
+    #NewMessage;
+    #ProudHeartReceived;
+    #SupportSubmitted;
+    #UnlockPurchased;
+    #VerificationUpdate
+  };
+type OldNotification__1037404970 =
+  {
+    createdAt : Timestamp__86868646;
+    id : Nat;
+    var isRead : Bool;
+    message : Text;
+    notifType : OldNotificationType__987341920;
+    relatedCaseId : ?Nat;
+    relatedUserId : ?OldUserId__716621641;
+    title : Text;
+    userId : OldUserId__716621641
+  };
+type OldPayment__453894254 =
+  {
+    amountCents : USDCents__626635564;
+    caseId : ?Nat;
+    createdAt : Timestamp__86868646;
+    feeType : FeeType__346099925;
+    id : Nat;
+    paidBy : OldUserId__716621641;
+    var status : PaymentStatus__1062206557;
+    stripeSessionId : Text
+  };
+type OldProudHeart__646871141 =
+  {
+    awardedAt : Timestamp__86868646;
+    caseId : Nat;
+    fromHelpSeeker : OldUserId__716621641;
+    toHero : OldUserId__716621641
+  };
+type OldRole__537812221 = {#Admin; #HelpSeeker; #Hero};
+type OldSupportProof__410016195 =
+  {
+    var adminNote : ?Text;
+    caseId : Nat;
+    createdAt : Timestamp__86868646;
+    var files : [FileRef__937338468];
+    heroId : OldUserId__716621641;
+    id : Nat;
+    var referenceNumber : ?Text;
+    var status : ReviewStatus__754236275
+  };
+type OldUserId__716621641 = Principal;
+type OldUser__253874848 =
+  {
+    var avatarRef : ?FileRef__937338468;
+    var bio : Text;
+    var city : Text;
+    var country : Country__765535358;
+    createdAt : Timestamp__86868646;
+    var email : Text;
+    var fullName : Text;
+    id : OldUserId__716621641;
+    var isActive : Bool;
+    var kycStatus : KycStatus__474907264;
+    var lastLoginAt : Int;
+    var loginDevices : [LoginDevice__1033252313];
+    var phoneNumber : Text;
+    var preferredLanguage : Text;
+    var privacySettings : ?PrivacySettings__9644450;
+    var role : OldRole__537812221;
+    var settings : ?UserSettings__892639985;
+    var timezone : Text
+  };
 type OldUser__262834944 =
   {
     var avatarRef : ?FileRef__715101902;
@@ -824,7 +1229,18 @@ type OldUser__480371244 =
     var kycStatus : KycStatus__689774085;
     var role : Role__715555071
   };
+type OldWalletEntry__141130201 =
+  {
+    amountCents : USDCents__626635564;
+    createdAt : Timestamp__86868646;
+    feeType : FeeType__346099925;
+    id : Nat;
+    paymentId : Nat;
+    userId : OldUserId__716621641
+  };
 type PaymentState__240212054 =
+  {var nextPaymentId : Nat; var nextWalletId : Nat};
+type PaymentState__307830287 =
   {var nextPaymentId : Nat; var nextWalletId : Nat};
 type PaymentState__670846067 =
   {var nextPaymentId : Nat; var nextWalletId : Nat};
@@ -832,6 +1248,7 @@ type PaymentState__698265574 =
   {var nextPaymentId : Nat; var nextWalletId : Nat};
 type PaymentState__983233504 =
   {var nextPaymentId : Nat; var nextWalletId : Nat};
+type PaymentStatus__1062206557 = {#Confirmed; #Failed; #Pending};
 type PaymentStatus__293368000 = {#Confirmed; #Failed; #Pending};
 type PaymentStatus__296016569 = {#Confirmed; #Failed; #Pending};
 type PaymentStatus__361588009 = {#Confirmed; #Failed; #Pending};
@@ -910,6 +1327,15 @@ type PrivacySettings__462577421 =
     var inAppNotificationsEnabled : Bool;
     var profileVisibility : Text
   };
+type PrivacySettings__9644450 =
+  {
+    var activityVisibility : Bool;
+    var caseUpdatesEnabled : Bool;
+    var countryVisibility : Bool;
+    var emailNotificationsEnabled : Bool;
+    var inAppNotificationsEnabled : Bool;
+    var profileVisibility : Text
+  };
 type ProudHeart__178329562 =
   {
     awardedAt : Timestamp__301639476;
@@ -953,17 +1379,23 @@ type ReviewStatus__386089990 =
   {#Approved; #Completed; #Rejected; #Submitted; #UnderReview};
 type ReviewStatus__578557119 =
   {#Approved; #Completed; #Rejected; #Submitted; #UnderReview};
+type ReviewStatus__754236275 =
+  {#Approved; #Completed; #Rejected; #Submitted; #UnderReview};
 type ReviewStatus__763925257 =
   {#Approved; #Completed; #Rejected; #Submitted; #UnderReview};
-type Role__300349085 = {#Admin; #HelpSeeker; #Hero};
+type Role__300349085 = {#Admin; #HelpSeeker; #Hero; #SuperAdmin};
 type Role__419301182 = {#Admin; #HelpSeeker; #Hero};
 type Role__466002561 = {#Admin; #HelpSeeker; #Hero};
 type Role__686437258 = {#Admin; #HelpSeeker; #Hero};
 type Role__715555071 = {#Admin; #HelpSeeker; #Hero};
+type StripeConfig__178775829 =
+  {var config : ?StripeConfiguration__1010775864};
 type StripeConfig__286287939 = {var config : ?StripeConfiguration__771479845};
 type StripeConfig__312039541 = {var config : ?StripeConfiguration__365408090};
 type StripeConfig__607330215 = {var config : ?StripeConfiguration__689598317};
 type StripeConfig__724571318 = {var config : ?StripeConfiguration__897178508};
+type StripeConfiguration__1010775864 =
+  {allowedCountries : [Text]; secretKey : Text};
 type StripeConfiguration__365408090 =
   {allowedCountries : [Text]; secretKey : Text};
 type StripeConfiguration__689598317 =
@@ -1032,14 +1464,16 @@ type SupportProof__948418455 =
 type Timestamp__280411521 = Int;
 type Timestamp__301639476 = Int;
 type Timestamp__706012084 = Int;
+type Timestamp__86868646 = Int;
 type Timestamp__870971998 = Int;
 type Timestamp__882485170 = Int;
 type USDCents__373774274 = Nat;
 type USDCents__550869670 = Nat;
 type USDCents__55524812 = Nat;
+type USDCents__626635564 = Nat;
 type USDCents__822336009 = Nat;
 type USDCents__951099481 = Nat;
-type UserId__158757552 = Principal;
+type UserId__158757552 = Text;
 type UserId__380294217 = Principal;
 type UserId__405479026 = Principal;
 type UserId__433619004 = Principal;
@@ -1059,6 +1493,19 @@ type UserSettings__334857944 =
     var weeklyDigest : Bool
   };
 type UserSettings__834796851 =
+  {
+    var currencyDisplay : Text;
+    var emailNotifications : Bool;
+    var highContrast : Bool;
+    var inAppNotifications : Bool;
+    var language : Text;
+    var largerText : Bool;
+    var reducedAnimations : Bool;
+    var theme : Text;
+    var timezone : Text;
+    var weeklyDigest : Bool
+  };
+type UserSettings__892639985 =
   {
     var currencyDisplay : Text;
     var emailNotifications : Bool;
@@ -1107,19 +1554,28 @@ type User__731114663 =
   };
 type User__98118558 =
   {
+    var authMethod : AuthMethod__941912783;
     var avatarRef : ?FileRef__939992998;
     var bio : Text;
     var city : Text;
     var country : Country__725964590;
     createdAt : Timestamp__301639476;
-    var email : Text;
+    var email : ?Text;
+    var emailOtpCode : ?Text;
+    var emailOtpExpiry : ?Int;
     var fullName : Text;
+    var googleId : ?Text;
     id : UserId__158757552;
     var isActive : Bool;
+    var isEmailVerified : Bool;
+    var isPhoneVerified : Bool;
     var kycStatus : KycStatus__310129812;
     var lastLoginAt : Int;
     var loginDevices : [LoginDevice__435301925];
-    var phoneNumber : Text;
+    var passwordHash : ?Text;
+    var phoneNumber : ?Text;
+    var phoneOtpCode : ?Text;
+    var phoneOtpExpiry : ?Int;
     var preferredLanguage : Text;
     var privacySettings : ?PrivacySettings__462577421;
     var role : Role__300349085;
@@ -1127,6 +1583,8 @@ type User__98118558 =
     var timezone : Text
   };
 type VerificationStatus__319622290 =
+  {#DocumentsSubmitted; #InstitutionVerified; #Unverified};
+type VerificationStatus__408360771 =
   {#DocumentsSubmitted; #InstitutionVerified; #Unverified};
 type VerificationStatus__457126270 =
   {#DocumentsSubmitted; #InstitutionVerified; #Unverified};
@@ -1188,13 +1646,30 @@ type WalletEntry__928553246 =
   "20260606_120000_AddSupportCredits" :
     (old : OldActor__382426519) -> NewActor__800600893;
   "20260607_000000_AddUserProfileFields" :
-    (old : OldActor__936740728) -> NewActor__588258741
+    (old : OldActor__936740728) -> NewActor__588258741;
+  "20260609_000000_MigrateAll" :
+    (old : OldActor__739961336) -> NewActor__826441296
 }
 actor  {
   stable accessControlState :
     {
       var adminAssigned : Bool;
       userRoles : Map__222667396<Principal, UserRole__686137147>
+    };
+  stable authEmailIndex :
+    {
+      var root : Node__1000929467<Text, UserId__158757552>;
+      var size : Nat__1040412405
+    };
+  stable authGoogleIndex :
+    {
+      var root : Node__1000929467<Text, UserId__158757552>;
+      var size : Nat__1040412405
+    };
+  stable authPhoneIndex :
+    {
+      var root : Node__1000929467<Text, UserId__158757552>;
+      var size : Nat__1040412405
     };
   stable caseState : {var nextCaseId : Nat; var nextProofId : Nat};
   stable cases :
@@ -1233,6 +1708,7 @@ actor  {
       var elementIndex : Nat__1040412405
     };
   stable msgState : {var nextConversationId : Nat; var nextMessageId : Nat};
+  stable nextUserId : {var id : Nat};
   stable notifState : {var nextNotifId : Nat};
   stable notifications :
     {

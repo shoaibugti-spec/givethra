@@ -1,4 +1,5 @@
 import BottomNav from "@/components/BottomNav";
+import { DebugBanner } from "@/components/DebugBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Layout from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -138,6 +139,12 @@ const GoogleAccountSecurityPage = lazy(() =>
 );
 const SettingsPage = lazy(() =>
   import("@/pages/SettingsPage").catch(() => ({
+    default: () => <div>Failed to load page</div>,
+  })),
+);
+
+const VerifyEmailPage = lazy(() =>
+  import("@/pages/VerifyEmailPage").catch(() => ({
     default: () => <div>Failed to load page</div>,
   })),
 );
@@ -414,6 +421,16 @@ const settingsRoute = createRoute({
   ),
 });
 
+const verifyEmailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/verify-email",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <VerifyEmailPage />
+    </Suspense>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   signUpRoute,
@@ -440,6 +457,7 @@ const routeTree = rootRoute.addChildren([
   securityRoute,
   googleAccountSecurityRoute,
   settingsRoute,
+  verifyEmailRoute,
 ]);
 
 const router = createRouter({ routeTree });
@@ -518,6 +536,7 @@ function AppShell() {
 export default function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <DebugBanner />
       <AuthProvider>
         <AppShell />
         <Toaster richColors position="top-right" />

@@ -135,7 +135,7 @@ export default function MySupportsPage() {
   useEffect(() => {
     if (!actor || isFetching) return;
     setLoading(true);
-    Promise.all([actor.getMySupportedCases(), actor.getMyProofs()])
+    Promise.all([actor.getMySupportedCases(""), actor.getMyProofs("")])
       .then(([cases, proofs]) => {
         const proofMap = new Map<string, SupportProofPublic>();
         for (const p of proofs) {

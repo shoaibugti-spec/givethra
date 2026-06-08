@@ -20,6 +20,13 @@ module {
     #Rejected;
   };
 
+  /// Authentication method variants
+  public type AuthMethod = {
+    #google;
+    #phone;
+    #email;
+  };
+
   /// User settings (preferences)
   public type UserSettings = {
     var language             : Text;
@@ -81,11 +88,11 @@ module {
   public type User = {
     id                  : Common.UserId;
     var fullName         : Text;
-    var email            : Text;
+    var email            : ?Text;
     var role             : Common.Role;
     var country          : Common.Country;
     var city             : Text;
-    var phoneNumber      : Text;
+    var phoneNumber      : ?Text;
     var bio              : Text;
     var preferredLanguage : Text;
     var timezone         : Text;
@@ -97,17 +104,27 @@ module {
     var privacySettings  : ?PrivacySettings;
     var loginDevices     : [LoginDevice];
     var lastLoginAt      : Int;
+    // Auth fields
+    var authMethod       : AuthMethod;
+    var googleId         : ?Text;
+    var passwordHash     : ?Text;
+    var phoneOtpCode     : ?Text;
+    var phoneOtpExpiry   : ?Int;
+    var emailOtpCode     : ?Text;
+    var emailOtpExpiry   : ?Int;
+    var isPhoneVerified  : Bool;
+    var isEmailVerified  : Bool;
   };
 
   /// Shared (API-boundary) user record — no var fields
   public type UserPublic = {
     id               : Common.UserId;
     fullName         : Text;
-    email            : Text;
+    email            : ?Text;
     role             : Common.Role;
     country          : Common.Country;
     city             : Text;
-    phoneNumber      : Text;
+    phoneNumber      : ?Text;
     bio              : Text;
     preferredLanguage : Text;
     timezone         : Text;
@@ -116,6 +133,9 @@ module {
     isActive         : Bool;
     kycStatus        : KycStatus;
     lastLoginAt      : Int;
+    isPhoneVerified  : Bool;
+    isEmailVerified  : Bool;
+    authMethod       : AuthMethod;
   };
 
   /// Hero profile stats (stored per Hero principal)

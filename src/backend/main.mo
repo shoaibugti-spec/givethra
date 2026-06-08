@@ -21,6 +21,8 @@ import MsgLib "lib/messages";
 import NotificationsMixin "mixins/notifications-api";
 import MessagesMixin "mixins/messages-api";
 import Int "mo:core/Int";
+import AuthMixin "mixins/auth-api";
+
 
 actor {
 
@@ -58,6 +60,10 @@ actor {
   let msgState      : MsgLib.MsgState;
 
   // ── Shared counters (wrapped in records so mixins can mutate) ───────────────
+  let nextUserId   : { var id : Nat };
+  let authGoogleIndex : Map.Map<Text, Common.UserId>;
+  let authPhoneIndex  : Map.Map<Text, Common.UserId>;
+  let authEmailIndex  : Map.Map<Text, Common.UserId>;
   let caseState    : { var nextCaseId : Nat; var nextProofId : Nat };
   let paymentState : { var nextPaymentId : Nat; var nextWalletId : Nat };
   let stripeConfig : { var config : ?Stripe.StripeConfiguration };
@@ -169,12 +175,12 @@ actor {
         switch (existing) {
           case null {
             ignore PaymentLib.createPending(
-              payments, paymentState, caller, #ListingFee, caseId, stripeSessionId, 100,
+              payments, paymentState, caller.toText(), #ListingFee, caseId, stripeSessionId, 100,
             );
           };
           case (?_) {};
         };
-        PaymentLib.confirmBySessionId(payments, wallets, paymentState, stripeSessionId, caller);
+        PaymentLib.confirmBySessionId(payments, wallets, paymentState, stripeSessionId, caller.toText());
       };
     };
   };
@@ -199,12 +205,12 @@ actor {
         switch (existing) {
           case null {
             ignore PaymentLib.createPending(
-              payments, paymentState, caller, #UnlockFee, ?caseId, stripeSessionId, 200,
+              payments, paymentState, caller.toText(), #UnlockFee, ?caseId, stripeSessionId, 200,
             );
           };
           case (?_) {};
         };
-        PaymentLib.confirmBySessionId(payments, wallets, paymentState, stripeSessionId, caller);
+        PaymentLib.confirmBySessionId(payments, wallets, paymentState, stripeSessionId, caller.toText());
       };
     };
   };
@@ -251,6 +257,16 @@ actor {
     accessControlState,
     notifications,
     notifState,
+  );
+
+  include AuthMixin(
+    users,
+    heroStats,
+    helpSeekerStats,
+    authGoogleIndex,
+    authPhoneIndex,
+    authEmailIndex,
+    nextUserId,
   );
 
   include MessagesMixin(

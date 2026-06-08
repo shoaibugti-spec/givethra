@@ -1,8 +1,6 @@
-import Time "mo:core/Time";
-
 module {
-  /// Platform-wide principal alias
-  public type UserId = Principal;
+  /// Text-based user ID (UUID-style string)
+  public type UserId = Text;
 
   /// Nanosecond timestamp (Time.now() returns Int)
   public type Timestamp = Int;
@@ -21,6 +19,7 @@ module {
     #Hero;
     #HelpSeeker;
     #Admin;
+    #SuperAdmin;
   };
 
   /// Generic status variants used across domains

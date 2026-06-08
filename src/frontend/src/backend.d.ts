@@ -31,12 +31,15 @@ export interface UserPublic {
     city: string;
     createdAt: Timestamp;
     role: Role;
+    authMethod: AuthMethod;
     fullName: string;
     isActive: boolean;
-    email: string;
+    email?: string;
     kycStatus: KycStatus;
     avatarRef?: FileRef;
-    phoneNumber: string;
+    isPhoneVerified: boolean;
+    phoneNumber?: string;
+    isEmailVerified: boolean;
 }
 export interface SupportProofPublic {
     id: bigint;
@@ -138,6 +141,14 @@ export interface MessagePublic {
     caseId?: bigint;
     senderId: UserId;
 }
+export interface ProfileUpdate {
+    bio?: string;
+    timezone?: string;
+    preferredLanguage?: string;
+    country?: string;
+    city?: string;
+    fullName?: string;
+}
 export interface PaymentPublic {
     id: bigint;
     status: PaymentStatus;
@@ -220,7 +231,7 @@ export interface http_request_result {
     body: Uint8Array;
     headers: Array<http_header>;
 }
-export type UserId = Principal;
+export type UserId = string;
 export interface ShoppingItem {
     productName: string;
     currency: string;
@@ -274,6 +285,11 @@ export enum Achievement {
     CommunityHero = "CommunityHero",
     FiftyPeopleHelped = "FiftyPeopleHelped"
 }
+export enum AuthMethod {
+    google = "google",
+    email = "email",
+    phone = "phone"
+}
 export enum Category {
     Surgery = "Surgery",
     Orphans = "Orphans",
@@ -313,11 +329,18 @@ export enum KycStatus {
 }
 export enum NotificationType {
     CaseApproved = "CaseApproved",
+    KycPending = "KycPending",
     VerificationUpdate = "VerificationUpdate",
     CaseRejected = "CaseRejected",
     SupportSubmitted = "SupportSubmitted",
+    SupportReceived = "SupportReceived",
+    SystemAnnouncement = "SystemAnnouncement",
     UnlockPurchased = "UnlockPurchased",
+    KycApproved = "KycApproved",
+    KycRejected = "KycRejected",
     NewMessage = "NewMessage",
+    CreditsAdded = "CreditsAdded",
+    CaseCompleted = "CaseCompleted",
     ProudHeartReceived = "ProudHeartReceived"
 }
 export enum PaymentStatus {
@@ -335,6 +358,7 @@ export enum ReviewStatus {
 export enum Role {
     Hero = "Hero",
     HelpSeeker = "HelpSeeker",
+    SuperAdmin = "SuperAdmin",
     Admin = "Admin"
 }
 export enum UserRole {
@@ -364,7 +388,7 @@ export interface backendInterface {
      * / Confirm unlock fee after Stripe session completes
      */
     confirmUnlockFee(stripeSessionId: string, caseId: bigint): Promise<PaymentPublic>;
-    createCase(title: string, description: string, category: Category, country: Country, city: City, amountNeeded: USDCents, deadline: Timestamp): Promise<bigint>;
+    createCase(userId: UserId, title: string, description: string, category: Category, country: Country, city: City, amountNeeded: USDCents, deadline: Timestamp): Promise<bigint>;
     createCheckoutSession(items: Array<ShoppingItem>, successUrl: string, cancelUrl: string): Promise<string>;
     createCreditPurchaseSession(amount: bigint, successUrl: string, cancelUrl: string): Promise<string>;
     /**
@@ -381,23 +405,30 @@ export interface backendInterface {
     getAllUsers(): Promise<Array<UserPublic>>;
     getCallerUserProfile(): Promise<UserPublic | null>;
     getCallerUserRole(): Promise<UserRole>;
-    getCaseDetail(id: bigint): Promise<CasePublic | null>;
+    getCaseDetail(id: bigint, userId: UserId): Promise<CasePublic | null>;
     getCaseSummary(id: bigint): Promise<CaseSummary | null>;
     getConversationMessages(conversationId: bigint): Promise<Array<MessagePublic>>;
+    getCurrentUser(userId: UserId): Promise<{
+        __kind__: "ok";
+        ok: UserPublic;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     getHelpSeekerStats(userId: UserId): Promise<HelpSeekerStatsPublic | null>;
     getHeroStats(userId: UserId): Promise<HeroStatsPublic | null>;
     getLoginDevices(): Promise<Array<LoginDevice>>;
     getMyConversations(): Promise<Array<ConversationPublic>>;
     getMyNotifications(): Promise<Array<NotificationPublic>>;
-    /**
-     * / Confirm unlock fee after Stripe session completes
-     */
-    getMyProofs(): Promise<Array<SupportProofPublic>>;
-    getMySupportedCases(): Promise<Array<CaseSummary>>;
+    getMyProofs(userId: UserId): Promise<Array<SupportProofPublic>>;
+    getMySupportedCases(userId: UserId): Promise<Array<CaseSummary>>;
     getMyTrustScore(): Promise<bigint>;
     getPendingPayments(): Promise<Array<PaymentPublic>>;
     getPlatformStats(): Promise<PlatformStats>;
     getPrivacySettings(): Promise<PrivacySettingsPublic | null>;
+    /**
+     * / Confirm listing fee after Stripe session completes; records payment + wallet entry
+     */
     getProofsForCase(caseId: bigint): Promise<Array<SupportProofPublic>>;
     getProudHeartsForHero(heroId: UserId): Promise<Array<ProudHeart>>;
     getStripeSessionStatus(sessionId: string): Promise<StripeSessionStatus>;
@@ -409,24 +440,94 @@ export interface backendInterface {
     getWallet(): Promise<bigint>;
     isCallerAdmin(): Promise<boolean>;
     isStripeConfigured(): Promise<boolean>;
-    isUnlocked(caseId: bigint): Promise<boolean>;
+    isUnlocked(caseId: bigint, userId: UserId): Promise<boolean>;
     listCases(category: Category | null, page: PageRequest): Promise<Array<CaseSummary>>;
+    loginWithEmail(email: string, password: string): Promise<{
+        __kind__: "ok";
+        ok: UserPublic;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    loginWithGoogle(googleId: string): Promise<{
+        __kind__: "ok";
+        ok: UserPublic;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     logoutAllOtherDevices(): Promise<bigint>;
+    logoutUser(userId: UserId): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     markNotificationAsRead(notifId: bigint): Promise<boolean>;
-    registerUser(fullName: string, email: string, role: Role): Promise<UserPublic>;
+    registerUser(userId: UserId, fullName: string, email: string | null, role: Role): Promise<UserPublic>;
+    registerWithEmail(email: string, fullName: string, password: string): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    registerWithGoogle(googleId: string, fullName: string, email: string, photoUrl: FileRef | null): Promise<{
+        __kind__: "ok";
+        ok: UserPublic;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     requestAccountDeletion(): Promise<string>;
     requestDataDownload(): Promise<string>;
+    sendEmailOtp(email: string): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     sendMessage(receiverId: UserId, caseId: bigint | null, content: string): Promise<MessagePublic>;
+    sendPhoneOtp(phoneNumber: string): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     setStripeConfiguration(config: StripeConfiguration): Promise<void>;
-    submitProof(caseId: bigint, files: Array<FileRef>, referenceNumber: string | null): Promise<bigint>;
+    submitProof(caseId: bigint, userId: UserId, files: Array<FileRef>, referenceNumber: string | null): Promise<bigint>;
     suspendUser(userId: UserId): Promise<void>;
     switchRole(newRole: Role): Promise<UserPublic>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
-    unlockCase(caseId: bigint): Promise<void>;
+    unlockCase(caseId: bigint, userId: UserId): Promise<void>;
     updatePrivacySettings(profileVisibility: string, countryVisibility: boolean, activityVisibility: boolean, emailNotificationsEnabled: boolean, inAppNotificationsEnabled: boolean, caseUpdatesEnabled: boolean): Promise<PrivacySettingsPublic>;
     updateProofStatus(proofId: bigint, status: ReviewStatus, adminNote: string | null): Promise<void>;
     updateUserProfile(fullName: string, country: Country, avatarRef: FileRef | null): Promise<UserPublic>;
+    updateUserProfileById(userId: UserId, updates: ProfileUpdate): Promise<{
+        __kind__: "ok";
+        ok: UserPublic;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     updateUserProfileExtended(fullName: string, country: Country, city: string, phoneNumber: string, bio: string, preferredLanguage: string, timezone: string, avatarRef: FileRef | null): Promise<UserPublic>;
     updateUserSettings(language: string, theme: string, currencyDisplay: string, timezone: string, emailNotifications: boolean, inAppNotifications: boolean, weeklyDigest: boolean, highContrast: boolean, largerText: boolean, reducedAnimations: boolean): Promise<UserSettingsPublic>;
     updateVerificationStatus(caseId: bigint, status: VerificationStatus): Promise<void>;
+    verifyEmailOtp(email: string, otpCode: string): Promise<{
+        __kind__: "ok";
+        ok: UserPublic;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    verifyPhoneOtp(phoneNumber: string, otpCode: string): Promise<{
+        __kind__: "ok";
+        ok: UserPublic;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
 }

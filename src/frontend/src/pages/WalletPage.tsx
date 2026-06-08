@@ -1,4 +1,4 @@
-import { CreditTxnKind, createActor } from "@/backend";
+import { CreditTxnKind } from "@/backend";
 import type { CreditTransaction } from "@/backend";
 import Layout from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActor } from "@caffeineai/core-infrastructure";
+import { getBackendActor } from "@/lib/actor";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -158,7 +158,7 @@ function EmptyTransactions({ label }: { label: string }) {
 export default function WalletPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const { actor, isFetching } = useActor(createActor);
+  const actor = getBackendActor();
   const [creditsToBuy, setCreditsToBuy] = useState(5);
 
   const {
@@ -171,7 +171,7 @@ export default function WalletPage() {
       if (!actor) return BigInt(0);
       return actor.getWallet();
     },
-    enabled: !!actor && !isFetching && isAuthenticated,
+    enabled: !!actor && isAuthenticated,
   });
 
   const {
@@ -184,7 +184,7 @@ export default function WalletPage() {
       if (!actor) return [];
       return actor.getTransactionHistory();
     },
-    enabled: !!actor && !isFetching && isAuthenticated,
+    enabled: !!actor && isAuthenticated,
   });
 
   const purchaseMutation = useMutation({

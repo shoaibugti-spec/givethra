@@ -93,7 +93,7 @@ export default function MyCasesPage() {
       // getMySupportedCases returns cases the user has a proof for;
       // for a Help Seeker this also shows their own submitted cases
       actor
-        .getMySupportedCases()
+        .getMySupportedCases("")
         .catch((): CaseSummary[] => []),
       actor.getCallerUserProfile().catch(() => null),
     ])

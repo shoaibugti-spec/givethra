@@ -1,4 +1,3 @@
-import { InternetIdentityProvider } from "@caffeineai/core-infrastructure";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -43,9 +42,7 @@ try {
   ReactDOM.createRoot(mountTarget).render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <InternetIdentityProvider>
-          <App />
-        </InternetIdentityProvider>
+        <App />
       </QueryClientProvider>
     </ErrorBoundary>,
   );

@@ -39,9 +39,12 @@ export default function CaseDetailPage() {
     if (!actor || isFetching) return;
     const caseId = BigInt(id);
     setLoading(true);
+    const guestUserId = "";
     Promise.all([
-      actor.getCaseDetail(caseId),
-      isAuthenticated ? actor.isUnlocked(caseId) : Promise.resolve(false),
+      actor.getCaseDetail(caseId, guestUserId),
+      isAuthenticated
+        ? actor.isUnlocked(caseId, guestUserId)
+        : Promise.resolve(false),
     ])
       .then(([detail, isUnl]) => {
         setCaseData(detail ?? null);
@@ -72,7 +75,7 @@ export default function CaseDetailPage() {
     if (!actor) return;
     setSubmittingProof(true);
     try {
-      await actor.submitProof(BigInt(id), [], proofRef || null);
+      await actor.submitProof(BigInt(id), "", [], proofRef || null);
       toast.success("Proof submitted! The admin will review it shortly.");
       setShowProofForm(false);
       setProofRef("");

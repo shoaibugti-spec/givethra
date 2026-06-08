@@ -1,7 +1,6 @@
 import Map "mo:core/Map";
 import List "mo:core/List";
 import Runtime "mo:core/Runtime";
-import Principal "mo:core/Principal";
 import Stripe "mo:caffeineai-stripe/stripe";
 import AccessControl "mo:caffeineai-authorization/access-control";
 import Common "../types/common";
@@ -35,12 +34,12 @@ mixin (
 
   /// Get the caller's current Support Credit balance
   public query ({ caller }) func getWallet() : async Int {
-    PaymentLib.getSupportCreditBalance(creditTransactions, caller);
+    PaymentLib.getSupportCreditBalance(creditTransactions, caller.toText());
   };
 
   /// Get the caller's Support Credit transaction history
   public query ({ caller }) func getTransactionHistory() : async [PaymentsT.CreditTransaction] {
-    PaymentLib.getCreditTransactions(creditTransactions, caller);
+    PaymentLib.getCreditTransactions(creditTransactions, caller.toText());
   };
 
   /// Admin: grant Support Credits to a user
@@ -64,7 +63,7 @@ mixin (
       Runtime.trap("Unauthorized");
     };
     // Verify KYC
-    switch (users.get(caller)) {
+    switch (users.get(caller.toText())) {
       case (?u) {
         if (u.kycStatus != #Approved) {
           Runtime.trap("KYC verification required to purchase Support Credits.");
@@ -80,20 +79,21 @@ mixin (
     // Idempotent: don't double-credit
     let alreadyCredited = switch (payments.find(func(p) {
       p.stripeSessionId == stripeSessionId and
-      Principal.equal(p.paidBy, caller) and
+      p.paidBy == caller.toText() and
       p.status == #Confirmed
     })) { case (?_) true; case null false };
     if (not alreadyCredited) {
       Runtime.trap("Payment not confirmed. Complete Stripe checkout first.");
     };
     // Check if credits already granted for this session
+    let callerIdText = caller.toText();
     let alreadyGranted = creditTransactions.find(func(t) {
-      Principal.equal(t.userId, caller) and
+      t.userId == callerIdText and
       t.note == ?("stripe:" # stripeSessionId)
     }) != null;
     if (not alreadyGranted) {
       PaymentLib.addSupportCredits(
-        creditTransactions, creditState, caller, creditAmount, #Purchase,
+        creditTransactions, creditState, callerIdText, creditAmount, #Purchase,
         ?("stripe:" # stripeSessionId),
       );
     };
@@ -110,7 +110,7 @@ mixin (
       Runtime.trap("Unauthorized");
     };
     // Verify KYC
-    switch (users.get(caller)) {
+    switch (users.get(caller.toText())) {
       case (?u) {
         if (u.kycStatus != #Approved) {
           Runtime.trap("KYC verification required to purchase Support Credits.");

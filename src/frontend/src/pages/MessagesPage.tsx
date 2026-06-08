@@ -1,31 +1,31 @@
 import type { ConversationPublic, UserPublic } from "@/backend";
-import { createActor } from "@/backend";
+
 import Layout from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBackendActor } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
 import { ChevronRight, MessageCircle, User } from "lucide-react";
 
 function useConversations() {
-  const { actor, isFetching } = useActor(createActor);
+  const actor = getBackendActor();
   return useQuery<ConversationPublic[]>({
     queryKey: ["my-conversations"],
     queryFn: async () => {
       if (!actor) return [];
       return actor.getMyConversations();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
   });
 }
 
 // unused hook intentionally removed – kept imports for type use only
 import type { UserPublic as _UserPublic } from "@/backend";
+import { getBackendActor } from "@/lib/actor";
 
 function formatTimestamp(ts?: bigint): string {
   if (!ts) return "";

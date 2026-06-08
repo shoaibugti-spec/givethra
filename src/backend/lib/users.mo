@@ -3,7 +3,6 @@ import Map "mo:core/Map";
 import List "mo:core/List";
 import Set "mo:core/Set";
 import Runtime "mo:core/Runtime";
-import Principal "mo:core/Principal";
 import Common "../types/common";
 import Users "../types/users";
 import Cases "../types/cases";
@@ -29,6 +28,9 @@ module {
       isActive         = u.isActive;
       kycStatus        = u.kycStatus;
       lastLoginAt      = u.lastLoginAt;
+      isPhoneVerified  = u.isPhoneVerified;
+      isEmailVerified  = u.isEmailVerified;
+      authMethod       = u.authMethod;
     };
   };
 
@@ -108,43 +110,75 @@ module {
     };
   };
 
+  /// Create a brand-new user record with the given Text ID
+  public func createUser(
+    users      : Map.Map<Common.UserId, Users.User>,
+    userId     : Common.UserId,
+    fullName   : Text,
+    email      : ?Text,
+    role       : Common.Role,
+    authMethod : Users.AuthMethod,
+  ) : Users.User {
+    let user : Users.User = {
+      id                   = userId;
+      var fullName          = fullName;
+      var email             = email;
+      var role              = role;
+      var country           = "";
+      var city              = "";
+      var phoneNumber       = null;
+      var bio               = "";
+      var preferredLanguage = "";
+      var timezone          = "";
+      var avatarRef         = null;
+      createdAt             = Time.now();
+      var isActive          = true;
+      var kycStatus         = #Pending;
+      var settings          = null;
+      var privacySettings   = null;
+      var loginDevices      = [];
+      var lastLoginAt       = Time.now();
+      var authMethod        = authMethod;
+      var googleId          = null;
+      var passwordHash      = null;
+      var phoneOtpCode      = null;
+      var phoneOtpExpiry    = null;
+      var emailOtpCode      = null;
+      var emailOtpExpiry    = null;
+      var isPhoneVerified   = false;
+      var isEmailVerified   = false;
+    };
+    users.add(userId, user);
+    user;
+  };
+
   /// Register or update a user; return existing or new user
   public func registerUser(
     users     : Map.Map<Common.UserId, Users.User>,
-    caller    : Common.UserId,
+    userId    : Common.UserId,
     fullName  : Text,
-    email     : Text,
+    email     : ?Text,
     role      : Common.Role,
   ) : Users.UserPublic {
-    switch (users.get(caller)) {
+    switch (users.get(userId)) {
       case (?existing) {
-        // Already registered — return current profile
         toPublic(existing);
       };
       case null {
-        let user : Users.User = {
-          id                   = caller;
-          var fullName          = fullName;
-          var email             = email;
-          var role              = role;
-          var country           = "";
-          var city              = "";
-          var phoneNumber       = "";
-          var bio               = "";
-          var preferredLanguage = "";
-          var timezone          = "";
-          var avatarRef         = null;
-          createdAt             = Time.now();
-          var isActive          = true;
-          var kycStatus         = #Pending;
-          var settings          = null;
-          var privacySettings   = null;
-          var loginDevices      = [];
-          var lastLoginAt       = Time.now();
-        };
-        users.add(caller, user);
+        let user = createUser(users, userId, fullName, email, role, #email);
         toPublic(user);
       };
+    };
+  };
+
+  /// Get user by Text ID
+  public func getUserById(
+    users  : Map.Map<Common.UserId, Users.User>,
+    userId : Common.UserId,
+  ) : ?Users.UserPublic {
+    switch (users.get(userId)) {
+      case (?u) ?toPublic(u);
+      case null null;
     };
   };
 
@@ -186,7 +220,7 @@ module {
     user.fullName          := fullName;
     user.country           := country;
     user.city              := city;
-    user.phoneNumber       := phoneNumber;
+    user.phoneNumber       := ?phoneNumber;
     user.bio               := bio;
     user.preferredLanguage := preferredLanguage;
     user.timezone          := timezone;
@@ -335,18 +369,15 @@ module {
     proofs : List.List<Cases.SupportProof>,
   ) : Nat {
     var score : Nat = 0;
-    // KYC bonus
     if (user.kycStatus == #Approved) { score += 50 };
-    // Approved proof bonus (max 30)
     var approvedCount : Nat = 0;
     proofs.forEach(func(p) {
-      if (Principal.equal(p.heroId, user.id) and p.status == #Approved) {
+      if (p.heroId == user.id and p.status == #Approved) {
         approvedCount += 1;
       };
     });
     let proofBonus = if (approvedCount * 10 > 30) 30 else approvedCount * 10;
     score += proofBonus;
-    // Account age bonus (+1 per 10 days, max 20)
     let nowNs   = Time.now();
     let ageNs   = nowNs - user.createdAt;
     let ageDays = ageNs / 86_400_000_000_000;
@@ -385,7 +416,7 @@ module {
     result.toArray();
   };
 
-  /// Count distinct categories a hero has supported (for CommunityHero)
+  /// Count distinct categories a hero has supported
   public func countDistinctCategories(
     proofs : List.List<Cases.SupportProof>,
     cases  : Map.Map<Nat, Cases.Case>,
@@ -393,11 +424,9 @@ module {
   ) : Nat {
     let cats : Set.Set<Text> = Set.empty();
     proofs.forEach(func(p) {
-      if (Principal.equal(p.heroId, heroId) and p.status == #Approved) {
+      if (p.heroId == heroId and p.status == #Approved) {
         switch (cases.get(p.caseId)) {
-          case (?c) {
-            cats.add(debug_show(c.category));
-          };
+          case (?c) cats.add(debug_show(c.category));
           case null {};
         };
       };
@@ -405,7 +434,7 @@ module {
     cats.size();
   };
 
-  /// Count distinct help seekers a hero has helped (approved proofs)
+  /// Count distinct help seekers a hero has helped
   public func countDistinctHelpSeekers(
     proofs : List.List<Cases.SupportProof>,
     cases  : Map.Map<Nat, Cases.Case>,
@@ -413,11 +442,9 @@ module {
   ) : Nat {
     let seekers : Set.Set<Text> = Set.empty();
     proofs.forEach(func(p) {
-      if (Principal.equal(p.heroId, heroId) and p.status == #Approved) {
+      if (p.heroId == heroId and p.status == #Approved) {
         switch (cases.get(p.caseId)) {
-          case (?c) {
-            seekers.add(c.createdBy.toText());
-          };
+          case (?c) seekers.add(c.createdBy);
           case null {};
         };
       };
@@ -425,7 +452,7 @@ module {
     seekers.size();
   };
 
-  /// Count education/medical category completions for a hero
+  /// Count category completions for a hero
   public func countCategoryCompletions(
     proofs    : List.List<Cases.SupportProof>,
     cases     : Map.Map<Nat, Cases.Case>,
@@ -434,11 +461,9 @@ module {
   ) : Nat {
     var count = 0;
     proofs.forEach(func(p) {
-      if (Principal.equal(p.heroId, heroId) and p.status == #Approved) {
+      if (p.heroId == heroId and p.status == #Approved) {
         switch (cases.get(p.caseId)) {
-          case (?c) {
-            if (c.category == category) count += 1;
-          };
+          case (?c) if (c.category == category) count += 1;
           case null {};
         };
       };

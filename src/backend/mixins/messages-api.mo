@@ -18,7 +18,7 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    MsgLib.getConversationsForUser(conversations, messages, caller);
+    MsgLib.getConversationsForUser(conversations, messages, caller.toText());
   };
 
   /// Get all messages in a conversation (caller must be a participant)
@@ -26,7 +26,7 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    MsgLib.getMessages(messages, conversationId, caller);
+    MsgLib.getMessages(messages, conversationId, caller.toText());
   };
 
   /// Send a message to another user (optionally tied to a case)
@@ -38,7 +38,7 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    MsgLib.send(messages, conversations, msgState, caller, receiverId, caseId, content);
+    MsgLib.send(messages, conversations, msgState, caller.toText(), receiverId, caseId, content);
   };
 
   /// Get total unread message count for the calling user
@@ -46,6 +46,6 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    MsgLib.countUnread(messages, caller);
+    MsgLib.countUnread(messages, caller.toText());
   };
 };

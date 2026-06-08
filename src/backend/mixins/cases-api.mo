@@ -2,7 +2,6 @@ import Time "mo:core/Time";
 import Map "mo:core/Map";
 import List "mo:core/List";
 import Runtime "mo:core/Runtime";
-import Principal "mo:core/Principal";
 import AccessControl "mo:caffeineai-authorization/access-control";
 import Common "../types/common";
 import CasesT "../types/cases";
@@ -25,8 +24,10 @@ mixin (
   creditState        : { var nextCreditTxnId : Nat },
 ) {
 
-  /// Create a new help request case (HelpSeeker only; listing fee must be confirmed)
+  /// Create a new help request case
+  /// userId is the Text ID of the authenticated HelpSeeker
   public shared ({ caller }) func createCase(
+    userId       : Common.UserId,
     title        : Text,
     description  : Text,
     category     : CasesT.Category,
@@ -38,29 +39,23 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    // KYC must be approved
-    switch (users.get(caller)) {
+    switch (users.get(userId)) {
       case (?u) {
-        if (u.kycStatus != #Approved) {
-          Runtime.trap("KYC verification required to submit a case.");
-        };
+        if (u.kycStatus != #Approved) Runtime.trap("KYC verification required to submit a case.");
       };
       case null { Runtime.trap("User profile not found.") };
     };
-    // Deduct 1 Support Credit
     PaymentLib.deductSupportCredits(
-      creditTransactions, creditState, caller, 1, #SpentOnCase,
-      ?"Case submission fee",
+      creditTransactions, creditState, userId, 1, #SpentOnCase, ?"Case submission fee",
     );
     let caseId = CaseLib.createCase(
-      cases, caseState, caller,
+      cases, caseState, userId,
       title, description, category, country, city, amountNeeded, deadline,
     );
-    // Init help seeker stats if needed
-    switch (helpSeekerStats.get(caller)) {
+    switch (helpSeekerStats.get(userId)) {
       case (?s) { s.requestsSubmitted += 1 };
       case null {
-        helpSeekerStats.add(caller, {
+        helpSeekerStats.add(userId, {
           var requestsSubmitted = 1;
           var requestsApproved  = 0;
           var requestsCompleted = 0;
@@ -87,13 +82,11 @@ mixin (
   };
 
   /// Full case detail — only unlocked heroes or admin
-  public query ({ caller }) func getCaseDetail(id : Nat) : async ?CasesT.CasePublic {
+  public query ({ caller }) func getCaseDetail(id : Nat, userId : Common.UserId) : async ?CasesT.CasePublic {
     let isAdmin = AccessControl.isAdmin(accessControlState, caller);
-    let unlockKey = Nat.toText(id) # ":" # caller.toText();
+    let unlockKey = Nat.toText(id) # ":" # userId;
     let unlocked = unlocks.containsKey(unlockKey);
-    if (not isAdmin and not unlocked) {
-      Runtime.trap("Unauthorized: unlock the case first");
-    };
+    if (not isAdmin and not unlocked) Runtime.trap("Unauthorized: unlock the case first");
     switch (cases.get(id)) {
       case (?c) ?CaseLib.toPublic(c);
       case null null;
@@ -108,34 +101,28 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    CaseLib.addDocument(cases, caller, caseId, fileRef);
+    CaseLib.addDocument(cases, caller.toText(), caseId, fileRef);
   };
 
   /// Unlock a case — hero must have paid the unlock fee
-  public shared ({ caller }) func unlockCase(caseId : Nat) : async () {
+  public shared ({ caller }) func unlockCase(caseId : Nat, userId : Common.UserId) : async () {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    // KYC must be approved
-    switch (users.get(caller)) {
+    switch (users.get(userId)) {
       case (?u) {
-        if (u.kycStatus != #Approved) {
-          Runtime.trap("KYC verification required to unlock a case.");
-        };
+        if (u.kycStatus != #Approved) Runtime.trap("KYC verification required to unlock a case.");
       };
       case null { Runtime.trap("User profile not found.") };
     };
-    // Deduct 2 Support Credits
     PaymentLib.deductSupportCredits(
-      creditTransactions, creditState, caller, 2, #SpentOnUnlock,
-      ?"Case unlock fee",
+      creditTransactions, creditState, userId, 2, #SpentOnUnlock, ?"Case unlock fee",
     );
-    CaseLib.unlock(unlocks, caseId, caller);
-    // Init hero stats if needed
-    switch (heroStats.get(caller)) {
+    CaseLib.unlock(unlocks, caseId, userId);
+    switch (heroStats.get(userId)) {
       case (?s) { s.casesSupported += 1 };
       case null {
-        heroStats.add(caller, {
+        heroStats.add(userId, {
           var proudHeartCount = 0;
           var peopleHelped    = 0;
           var casesSupported  = 1;
@@ -146,27 +133,26 @@ mixin (
     };
   };
 
-  /// Query whether current caller has unlocked a case
-  public query ({ caller }) func isUnlocked(caseId : Nat) : async Bool {
-    let unlockKey = Nat.toText(caseId) # ":" # caller.toText();
+  /// Query whether a user has unlocked a case
+  public query ({ caller }) func isUnlocked(caseId : Nat, userId : Common.UserId) : async Bool {
+    ignore caller;
+    let unlockKey = Nat.toText(caseId) # ":" # userId;
     unlocks.containsKey(unlockKey);
   };
 
   /// Submit support proof for a case
   public shared ({ caller }) func submitProof(
     caseId          : Nat,
+    userId          : Common.UserId,
     files           : [Common.FileRef],
     referenceNumber : ?Text,
   ) : async Nat {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    // Must have unlocked the case
-    let unlockKey = Nat.toText(caseId) # ":" # caller.toText();
-    if (not unlocks.containsKey(unlockKey)) {
-      Runtime.trap("Must unlock case before submitting proof");
-    };
-    CaseLib.submitProof(proofs, caseState, caller, caseId, files, referenceNumber);
+    let unlockKey = Nat.toText(caseId) # ":" # userId;
+    if (not unlocks.containsKey(unlockKey)) Runtime.trap("Must unlock case before submitting proof");
+    CaseLib.submitProof(proofs, caseState, userId, caseId, files, referenceNumber);
   };
 
   /// Admin: get all proofs for a case
@@ -179,20 +165,21 @@ mixin (
           .toArray();
   };
 
-  /// Hero: get my own proofs
-  public query ({ caller }) func getMyProofs() : async [CasesT.SupportProofPublic] {
-    proofs.filter(func(p) { Principal.equal(p.heroId, caller) })
+  /// Hero: get own proofs by userId
+  public query ({ caller }) func getMyProofs(userId : Common.UserId) : async [CasesT.SupportProofPublic] {
+    ignore caller;
+    proofs.filter(func(p) { p.heroId == userId })
           .map<CasesT.SupportProof, CasesT.SupportProofPublic>(func(p) { CaseLib.proofToPublic(p) })
           .toArray();
   };
 
-  /// Hero: get cases where caller has submitted a support proof
-  public query ({ caller }) func getMySupportedCases() : async [CasesT.CaseSummary] {
+  /// Hero: get cases where user has submitted a support proof
+  public query ({ caller }) func getMySupportedCases(userId : Common.UserId) : async [CasesT.CaseSummary] {
+    ignore caller;
     let result : List.List<CasesT.CaseSummary> = List.empty();
-    // Collect distinct caseIds from caller's proofs
     let seen : Map.Map<Nat, Bool> = Map.empty();
     proofs.forEach(func(p) {
-      if (Principal.equal(p.heroId, caller)) {
+      if (p.heroId == userId) {
         if (not seen.containsKey(p.caseId)) {
           seen.add(p.caseId, true);
           switch (cases.get(p.caseId)) {

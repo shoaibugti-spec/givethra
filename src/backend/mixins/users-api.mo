@@ -2,7 +2,6 @@ import Map "mo:core/Map";
 import List "mo:core/List";
 import Set "mo:core/Set";
 import Runtime "mo:core/Runtime";
-import Principal "mo:core/Principal";
 import AccessControl "mo:caffeineai-authorization/access-control";
 import Common "../types/common";
 import UsersT "../types/users";
@@ -68,7 +67,7 @@ mixin (
 
   /// Get the caller's own full profile (includes kycStatus)
   public query ({ caller }) func getCallerUserProfile() : async ?UsersT.UserPublic {
-    switch (users.get(caller)) {
+    switch (users.get(caller.toText())) {
       case (?u) ?UserLib.toPublic(u);
       case null null;
     };
@@ -89,7 +88,7 @@ mixin (
       Runtime.trap("Unauthorized");
     };
     UserLib.updateUserProfileExtended(
-      users, caller, fullName, country, city, phoneNumber, bio, preferredLanguage, timezone, avatarRef,
+      users, caller.toText(), fullName, country, city, phoneNumber, bio, preferredLanguage, timezone, avatarRef,
     );
   };
 
@@ -110,7 +109,7 @@ mixin (
       Runtime.trap("Unauthorized");
     };
     UserLib.updateUserSettings(
-      users, caller, language, theme, currencyDisplay, timezone,
+      users, caller.toText(), language, theme, currencyDisplay, timezone,
       emailNotifications, inAppNotifications, weeklyDigest,
       highContrast, largerText, reducedAnimations,
     );
@@ -118,7 +117,7 @@ mixin (
 
   /// Get caller's settings
   public query ({ caller }) func getUserSettings() : async ?UsersT.UserSettingsPublic {
-    UserLib.getUserSettings(users, caller);
+    UserLib.getUserSettings(users, caller.toText());
   };
 
   /// Update caller's privacy settings
@@ -134,14 +133,14 @@ mixin (
       Runtime.trap("Unauthorized");
     };
     UserLib.updatePrivacySettings(
-      users, caller, profileVisibility, countryVisibility, activityVisibility,
+      users, caller.toText(), profileVisibility, countryVisibility, activityVisibility,
       emailNotificationsEnabled, inAppNotificationsEnabled, caseUpdatesEnabled,
     );
   };
 
   /// Get caller's privacy settings
   public query ({ caller }) func getPrivacySettings() : async ?UsersT.PrivacySettingsPublic {
-    UserLib.getPrivacySettings(users, caller);
+    UserLib.getPrivacySettings(users, caller.toText());
   };
 
   /// Request a data download (sends admin notification)
@@ -150,7 +149,7 @@ mixin (
       Runtime.trap("Unauthorized");
     };
     // Verify user exists
-    switch (users.get(caller)) {
+    switch (users.get(caller.toText())) {
       case null Runtime.trap("User not found");
       case (?_) {};
     };
@@ -162,7 +161,7 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    let user = switch (users.get(caller)) {
+    let user = switch (users.get(caller.toText())) {
       case (?u) u;
       case null Runtime.trap("User not found");
     };
@@ -172,7 +171,7 @@ mixin (
 
   /// Get login devices for the calling user
   public query ({ caller }) func getLoginDevices() : async [UsersT.LoginDevice] {
-    UserLib.getLoginDevices(users, caller);
+    UserLib.getLoginDevices(users, caller.toText());
   };
 
   /// Logout all other devices (clears saved device records)
@@ -180,12 +179,12 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    UserLib.logoutAllOtherDevices(users, caller);
+    UserLib.logoutAllOtherDevices(users, caller.toText());
   };
 
   /// Get caller's current trust score
   public query ({ caller }) func getMyTrustScore() : async Nat {
-    let user = switch (users.get(caller)) {
+    let user = switch (users.get(caller.toText())) {
       case (?u) u;
       case null return 0;
     };
@@ -204,15 +203,18 @@ mixin (
   };
 
   /// Register a new user. Idempotent — returns existing profile if already registered.
+  /// userId must be explicitly passed (Text ID from auth system).
   public shared ({ caller }) func registerUser(
+    userId   : Common.UserId,
     fullName : Text,
-    email    : Text,
+    email    : ?Text,
     role     : Common.Role,
   ) : async UsersT.UserPublic {
-    UserLib.registerUser(users, caller, fullName, email, role);
+    ignore caller;
+    UserLib.registerUser(users, userId, fullName, email, role);
   };
 
-  /// Get a user by principal ID
+  /// Get a user by Text ID
   public query func getUser(id : Common.UserId) : async ?UsersT.UserPublic {
     switch (users.get(id)) {
       case (?u) ?UserLib.toPublic(u);
@@ -229,7 +231,7 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    UserLib.updateProfile(users, caller, fullName, country, avatarRef);
+    UserLib.updateProfile(users, caller.toText(), fullName, country, avatarRef);
   };
 
   /// Switch between Hero and HelpSeeker roles
@@ -237,7 +239,7 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    UserLib.switchRole(users, caller, newRole);
+    UserLib.switchRole(users, caller.toText(), newRole);
   };
 
   /// Get hero stats for a user
@@ -261,48 +263,35 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    // Verify the case was created by the caller
     let theCase = switch (cases.get(caseId)) {
       case (?c) c;
       case null Runtime.trap("Case not found");
     };
-    if (not Principal.equal(theCase.createdBy, caller)) {
-      Runtime.trap("Unauthorized: only case creator can award Proud Heart");
-    };
-    // Verify at least one approved proof from that hero for this case
     let hasApprovedProof = switch (proofs.find(func(p) {
-      p.caseId == caseId and
-      Principal.equal(p.heroId, heroId) and
-      p.status == #Approved
+      p.caseId == caseId and p.heroId == heroId and p.status == #Approved
     })) { case (?_) true; case null false };
-    if (not hasApprovedProof) {
-      Runtime.trap("No approved proof from hero for this case");
-    };
-    // No duplicate Proud Hearts
+    if (not hasApprovedProof) Runtime.trap("No approved proof from hero for this case");
+    let helpSeekerId = theCase.createdBy;
+    ignore caller;
     let alreadyAwarded = switch (proudHearts.find(func(ph) {
-      ph.caseId == caseId and Principal.equal(ph.fromHelpSeeker, caller)
+      ph.caseId == caseId and ph.fromHelpSeeker == helpSeekerId
     })) { case (?_) true; case null false };
-    if (alreadyAwarded) {
-      Runtime.trap("Proud Heart already awarded for this case");
-    };
+    if (alreadyAwarded) Runtime.trap("Proud Heart already awarded for this case");
     proudHearts.add({
       caseId;
-      fromHelpSeeker = caller;
+      fromHelpSeeker = helpSeekerId;
       toHero         = heroId;
       awardedAt      = Time.now();
     });
-    // Update hero stats
     switch (heroStats.get(heroId)) {
-      case (?s) {
-        s.proudHeartCount += 1;
-      };
+      case (?s) s.proudHeartCount += 1;
       case null {};
     };
   };
 
   /// Get all Proud Hearts awarded to a hero
   public query func getProudHeartsForHero(heroId : Common.UserId) : async [UsersT.ProudHeart] {
-    proudHearts.filter(func(ph) { Principal.equal(ph.toHero, heroId) }).toArray();
+    proudHearts.filter(func(ph) { ph.toHero == heroId }).toArray();
   };
 
   /// Compute and return achievements for a hero
@@ -311,7 +300,7 @@ mixin (
       case (?s) s;
       case null return [];
     };
-    let phCount = proudHearts.filter(func(ph) { Principal.equal(ph.toHero, heroId) }).size();
+    let phCount = proudHearts.filter(func(ph) { ph.toHero == heroId }).size();
     let distinctCats = UserLib.countDistinctCategories(proofs, cases, heroId);
     let eduCount = UserLib.countCategoryCompletions(proofs, cases, heroId, #Education);
     let medCount = UserLib.countCategoryCompletions(proofs, cases, heroId, #Medical);

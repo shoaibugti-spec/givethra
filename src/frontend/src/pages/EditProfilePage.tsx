@@ -1,4 +1,3 @@
-import { createActor } from "@/backend";
 import type { FileRef, UserPublic } from "@/backend";
 import Layout from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -18,7 +17,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActor } from "@caffeineai/core-infrastructure";
+import { getBackendActor } from "@/lib/actor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -285,7 +284,7 @@ export default function EditProfilePage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { actor, isFetching } = useActor(createActor);
+  const actor = getBackendActor();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: profile, isLoading: profileLoading } =
@@ -295,7 +294,7 @@ export default function EditProfilePage() {
         if (!actor) return null;
         return actor.getCallerUserProfile();
       },
-      enabled: !!actor && !isFetching && isAuthenticated,
+      enabled: !!actor && isAuthenticated,
     });
 
   const [form, setForm] = useState<FormState>({

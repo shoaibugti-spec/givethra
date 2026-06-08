@@ -46,7 +46,7 @@ export const FileRef = IDL.Record({
   'fileName' : IDL.Text,
   'storageId' : IDL.Text,
 });
-export const UserId = IDL.Principal;
+export const UserId = IDL.Text;
 export const KycStatus = IDL.Variant({
   'UnderReview' : IDL.Null,
   'Approved' : IDL.Null,
@@ -58,7 +58,13 @@ export const Timestamp = IDL.Int;
 export const Role = IDL.Variant({
   'Hero' : IDL.Null,
   'HelpSeeker' : IDL.Null,
+  'SuperAdmin' : IDL.Null,
   'Admin' : IDL.Null,
+});
+export const AuthMethod = IDL.Variant({
+  'google' : IDL.Null,
+  'email' : IDL.Null,
+  'phone' : IDL.Null,
 });
 export const UserPublic = IDL.Record({
   'id' : UserId,
@@ -70,12 +76,15 @@ export const UserPublic = IDL.Record({
   'city' : IDL.Text,
   'createdAt' : Timestamp,
   'role' : Role,
+  'authMethod' : AuthMethod,
   'fullName' : IDL.Text,
   'isActive' : IDL.Bool,
-  'email' : IDL.Text,
+  'email' : IDL.Opt(IDL.Text),
   'kycStatus' : KycStatus,
   'avatarRef' : IDL.Opt(FileRef),
-  'phoneNumber' : IDL.Text,
+  'isPhoneVerified' : IDL.Bool,
+  'phoneNumber' : IDL.Opt(IDL.Text),
+  'isEmailVerified' : IDL.Bool,
 });
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
@@ -228,11 +237,18 @@ export const ConversationPublic = IDL.Record({
 });
 export const NotificationType = IDL.Variant({
   'CaseApproved' : IDL.Null,
+  'KycPending' : IDL.Null,
   'VerificationUpdate' : IDL.Null,
   'CaseRejected' : IDL.Null,
   'SupportSubmitted' : IDL.Null,
+  'SupportReceived' : IDL.Null,
+  'SystemAnnouncement' : IDL.Null,
   'UnlockPurchased' : IDL.Null,
+  'KycApproved' : IDL.Null,
+  'KycRejected' : IDL.Null,
   'NewMessage' : IDL.Null,
+  'CreditsAdded' : IDL.Null,
+  'CaseCompleted' : IDL.Null,
   'ProudHeartReceived' : IDL.Null,
 });
 export const NotificationPublic = IDL.Record({
@@ -325,6 +341,14 @@ export const TransformationOutput = IDL.Record({
   'body' : IDL.Vec(IDL.Nat8),
   'headers' : IDL.Vec(http_header),
 });
+export const ProfileUpdate = IDL.Record({
+  'bio' : IDL.Opt(IDL.Text),
+  'timezone' : IDL.Opt(IDL.Text),
+  'preferredLanguage' : IDL.Opt(IDL.Text),
+  'country' : IDL.Opt(IDL.Text),
+  'city' : IDL.Opt(IDL.Text),
+  'fullName' : IDL.Opt(IDL.Text),
+});
 
 export const idlService = IDL.Service({
   '_immutableObjectStorageBlobsAreLive' : IDL.Func(
@@ -371,7 +395,16 @@ export const idlService = IDL.Service({
     ),
   'confirmUnlockFee' : IDL.Func([IDL.Text, IDL.Nat], [PaymentPublic], []),
   'createCase' : IDL.Func(
-      [IDL.Text, IDL.Text, Category, Country, City, USDCents, Timestamp],
+      [
+        UserId,
+        IDL.Text,
+        IDL.Text,
+        Category,
+        Country,
+        City,
+        USDCents,
+        Timestamp,
+      ],
       [IDL.Nat],
       [],
     ),
@@ -397,9 +430,18 @@ export const idlService = IDL.Service({
   'getAllUsers' : IDL.Func([], [IDL.Vec(UserPublic)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserPublic)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-  'getCaseDetail' : IDL.Func([IDL.Nat], [IDL.Opt(CasePublic)], ['query']),
+  'getCaseDetail' : IDL.Func(
+      [IDL.Nat, UserId],
+      [IDL.Opt(CasePublic)],
+      ['query'],
+    ),
   'getCaseSummary' : IDL.Func([IDL.Nat], [IDL.Opt(CaseSummary)], ['query']),
   'getConversationMessages' : IDL.Func([IDL.Nat], [IDL.Vec(MessagePublic)], []),
+  'getCurrentUser' : IDL.Func(
+      [UserId],
+      [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+      ['query'],
+    ),
   'getHelpSeekerStats' : IDL.Func(
       [UserId],
       [IDL.Opt(HelpSeekerStatsPublic)],
@@ -409,8 +451,8 @@ export const idlService = IDL.Service({
   'getLoginDevices' : IDL.Func([], [IDL.Vec(LoginDevice)], ['query']),
   'getMyConversations' : IDL.Func([], [IDL.Vec(ConversationPublic)], ['query']),
   'getMyNotifications' : IDL.Func([], [IDL.Vec(NotificationPublic)], ['query']),
-  'getMyProofs' : IDL.Func([], [IDL.Vec(SupportProofPublic)], ['query']),
-  'getMySupportedCases' : IDL.Func([], [IDL.Vec(CaseSummary)], ['query']),
+  'getMyProofs' : IDL.Func([UserId], [IDL.Vec(SupportProofPublic)], ['query']),
+  'getMySupportedCases' : IDL.Func([UserId], [IDL.Vec(CaseSummary)], ['query']),
   'getMyTrustScore' : IDL.Func([], [IDL.Nat], ['query']),
   'getPendingPayments' : IDL.Func([], [IDL.Vec(PaymentPublic)], ['query']),
   'getPlatformStats' : IDL.Func([], [PlatformStats], ['query']),
@@ -442,25 +484,64 @@ export const idlService = IDL.Service({
   'getWallet' : IDL.Func([], [IDL.Int], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
-  'isUnlocked' : IDL.Func([IDL.Nat], [IDL.Bool], ['query']),
+  'isUnlocked' : IDL.Func([IDL.Nat, UserId], [IDL.Bool], ['query']),
   'listCases' : IDL.Func(
       [IDL.Opt(Category), PageRequest],
       [IDL.Vec(CaseSummary)],
       ['query'],
     ),
+  'loginWithEmail' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+      [],
+    ),
+  'loginWithGoogle' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+      [],
+    ),
   'logoutAllOtherDevices' : IDL.Func([], [IDL.Nat], []),
+  'logoutUser' : IDL.Func(
+      [UserId],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'markNotificationAsRead' : IDL.Func([IDL.Nat], [IDL.Bool], []),
-  'registerUser' : IDL.Func([IDL.Text, IDL.Text, Role], [UserPublic], []),
+  'registerUser' : IDL.Func(
+      [UserId, IDL.Text, IDL.Opt(IDL.Text), Role],
+      [UserPublic],
+      [],
+    ),
+  'registerWithEmail' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
+  'registerWithGoogle' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Opt(FileRef)],
+      [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+      [],
+    ),
   'requestAccountDeletion' : IDL.Func([], [IDL.Text], []),
   'requestDataDownload' : IDL.Func([], [IDL.Text], []),
+  'sendEmailOtp' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'sendMessage' : IDL.Func(
       [UserId, IDL.Opt(IDL.Nat), IDL.Text],
       [MessagePublic],
       [],
     ),
+  'sendPhoneOtp' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'setStripeConfiguration' : IDL.Func([StripeConfiguration], [], []),
   'submitProof' : IDL.Func(
-      [IDL.Nat, IDL.Vec(FileRef), IDL.Opt(IDL.Text)],
+      [IDL.Nat, UserId, IDL.Vec(FileRef), IDL.Opt(IDL.Text)],
       [IDL.Nat],
       [],
     ),
@@ -471,7 +552,7 @@ export const idlService = IDL.Service({
       [TransformationOutput],
       ['query'],
     ),
-  'unlockCase' : IDL.Func([IDL.Nat], [], []),
+  'unlockCase' : IDL.Func([IDL.Nat, UserId], [], []),
   'updatePrivacySettings' : IDL.Func(
       [IDL.Text, IDL.Bool, IDL.Bool, IDL.Bool, IDL.Bool, IDL.Bool],
       [PrivacySettingsPublic],
@@ -485,6 +566,11 @@ export const idlService = IDL.Service({
   'updateUserProfile' : IDL.Func(
       [IDL.Text, Country, IDL.Opt(FileRef)],
       [UserPublic],
+      [],
+    ),
+  'updateUserProfileById' : IDL.Func(
+      [UserId, ProfileUpdate],
+      [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
       [],
     ),
   'updateUserProfileExtended' : IDL.Func(
@@ -518,6 +604,16 @@ export const idlService = IDL.Service({
       [],
     ),
   'updateVerificationStatus' : IDL.Func([IDL.Nat, VerificationStatus], [], []),
+  'verifyEmailOtp' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+      [],
+    ),
+  'verifyPhoneOtp' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+      [],
+    ),
 });
 
 export const idlInitArgs = [];
@@ -561,7 +657,7 @@ export const idlFactory = ({ IDL }) => {
     'fileName' : IDL.Text,
     'storageId' : IDL.Text,
   });
-  const UserId = IDL.Principal;
+  const UserId = IDL.Text;
   const KycStatus = IDL.Variant({
     'UnderReview' : IDL.Null,
     'Approved' : IDL.Null,
@@ -573,7 +669,13 @@ export const idlFactory = ({ IDL }) => {
   const Role = IDL.Variant({
     'Hero' : IDL.Null,
     'HelpSeeker' : IDL.Null,
+    'SuperAdmin' : IDL.Null,
     'Admin' : IDL.Null,
+  });
+  const AuthMethod = IDL.Variant({
+    'google' : IDL.Null,
+    'email' : IDL.Null,
+    'phone' : IDL.Null,
   });
   const UserPublic = IDL.Record({
     'id' : UserId,
@@ -585,12 +687,15 @@ export const idlFactory = ({ IDL }) => {
     'city' : IDL.Text,
     'createdAt' : Timestamp,
     'role' : Role,
+    'authMethod' : AuthMethod,
     'fullName' : IDL.Text,
     'isActive' : IDL.Bool,
-    'email' : IDL.Text,
+    'email' : IDL.Opt(IDL.Text),
     'kycStatus' : KycStatus,
     'avatarRef' : IDL.Opt(FileRef),
-    'phoneNumber' : IDL.Text,
+    'isPhoneVerified' : IDL.Bool,
+    'phoneNumber' : IDL.Opt(IDL.Text),
+    'isEmailVerified' : IDL.Bool,
   });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
@@ -743,11 +848,18 @@ export const idlFactory = ({ IDL }) => {
   });
   const NotificationType = IDL.Variant({
     'CaseApproved' : IDL.Null,
+    'KycPending' : IDL.Null,
     'VerificationUpdate' : IDL.Null,
     'CaseRejected' : IDL.Null,
     'SupportSubmitted' : IDL.Null,
+    'SupportReceived' : IDL.Null,
+    'SystemAnnouncement' : IDL.Null,
     'UnlockPurchased' : IDL.Null,
+    'KycApproved' : IDL.Null,
+    'KycRejected' : IDL.Null,
     'NewMessage' : IDL.Null,
+    'CreditsAdded' : IDL.Null,
+    'CaseCompleted' : IDL.Null,
     'ProudHeartReceived' : IDL.Null,
   });
   const NotificationPublic = IDL.Record({
@@ -834,6 +946,14 @@ export const idlFactory = ({ IDL }) => {
     'body' : IDL.Vec(IDL.Nat8),
     'headers' : IDL.Vec(http_header),
   });
+  const ProfileUpdate = IDL.Record({
+    'bio' : IDL.Opt(IDL.Text),
+    'timezone' : IDL.Opt(IDL.Text),
+    'preferredLanguage' : IDL.Opt(IDL.Text),
+    'country' : IDL.Opt(IDL.Text),
+    'city' : IDL.Opt(IDL.Text),
+    'fullName' : IDL.Opt(IDL.Text),
+  });
   
   return IDL.Service({
     '_immutableObjectStorageBlobsAreLive' : IDL.Func(
@@ -888,7 +1008,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'confirmUnlockFee' : IDL.Func([IDL.Text, IDL.Nat], [PaymentPublic], []),
     'createCase' : IDL.Func(
-        [IDL.Text, IDL.Text, Category, Country, City, USDCents, Timestamp],
+        [
+          UserId,
+          IDL.Text,
+          IDL.Text,
+          Category,
+          Country,
+          City,
+          USDCents,
+          Timestamp,
+        ],
         [IDL.Nat],
         [],
       ),
@@ -914,12 +1043,21 @@ export const idlFactory = ({ IDL }) => {
     'getAllUsers' : IDL.Func([], [IDL.Vec(UserPublic)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserPublic)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-    'getCaseDetail' : IDL.Func([IDL.Nat], [IDL.Opt(CasePublic)], ['query']),
+    'getCaseDetail' : IDL.Func(
+        [IDL.Nat, UserId],
+        [IDL.Opt(CasePublic)],
+        ['query'],
+      ),
     'getCaseSummary' : IDL.Func([IDL.Nat], [IDL.Opt(CaseSummary)], ['query']),
     'getConversationMessages' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(MessagePublic)],
         [],
+      ),
+    'getCurrentUser' : IDL.Func(
+        [UserId],
+        [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+        ['query'],
       ),
     'getHelpSeekerStats' : IDL.Func(
         [UserId],
@@ -938,8 +1076,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(NotificationPublic)],
         ['query'],
       ),
-    'getMyProofs' : IDL.Func([], [IDL.Vec(SupportProofPublic)], ['query']),
-    'getMySupportedCases' : IDL.Func([], [IDL.Vec(CaseSummary)], ['query']),
+    'getMyProofs' : IDL.Func(
+        [UserId],
+        [IDL.Vec(SupportProofPublic)],
+        ['query'],
+      ),
+    'getMySupportedCases' : IDL.Func(
+        [UserId],
+        [IDL.Vec(CaseSummary)],
+        ['query'],
+      ),
     'getMyTrustScore' : IDL.Func([], [IDL.Nat], ['query']),
     'getPendingPayments' : IDL.Func([], [IDL.Vec(PaymentPublic)], ['query']),
     'getPlatformStats' : IDL.Func([], [PlatformStats], ['query']),
@@ -971,25 +1117,64 @@ export const idlFactory = ({ IDL }) => {
     'getWallet' : IDL.Func([], [IDL.Int], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
-    'isUnlocked' : IDL.Func([IDL.Nat], [IDL.Bool], ['query']),
+    'isUnlocked' : IDL.Func([IDL.Nat, UserId], [IDL.Bool], ['query']),
     'listCases' : IDL.Func(
         [IDL.Opt(Category), PageRequest],
         [IDL.Vec(CaseSummary)],
         ['query'],
       ),
+    'loginWithEmail' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+        [],
+      ),
+    'loginWithGoogle' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+        [],
+      ),
     'logoutAllOtherDevices' : IDL.Func([], [IDL.Nat], []),
+    'logoutUser' : IDL.Func(
+        [UserId],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'markNotificationAsRead' : IDL.Func([IDL.Nat], [IDL.Bool], []),
-    'registerUser' : IDL.Func([IDL.Text, IDL.Text, Role], [UserPublic], []),
+    'registerUser' : IDL.Func(
+        [UserId, IDL.Text, IDL.Opt(IDL.Text), Role],
+        [UserPublic],
+        [],
+      ),
+    'registerWithEmail' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
+    'registerWithGoogle' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Opt(FileRef)],
+        [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+        [],
+      ),
     'requestAccountDeletion' : IDL.Func([], [IDL.Text], []),
     'requestDataDownload' : IDL.Func([], [IDL.Text], []),
+    'sendEmailOtp' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'sendMessage' : IDL.Func(
         [UserId, IDL.Opt(IDL.Nat), IDL.Text],
         [MessagePublic],
         [],
       ),
+    'sendPhoneOtp' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'setStripeConfiguration' : IDL.Func([StripeConfiguration], [], []),
     'submitProof' : IDL.Func(
-        [IDL.Nat, IDL.Vec(FileRef), IDL.Opt(IDL.Text)],
+        [IDL.Nat, UserId, IDL.Vec(FileRef), IDL.Opt(IDL.Text)],
         [IDL.Nat],
         [],
       ),
@@ -1000,7 +1185,7 @@ export const idlFactory = ({ IDL }) => {
         [TransformationOutput],
         ['query'],
       ),
-    'unlockCase' : IDL.Func([IDL.Nat], [], []),
+    'unlockCase' : IDL.Func([IDL.Nat, UserId], [], []),
     'updatePrivacySettings' : IDL.Func(
         [IDL.Text, IDL.Bool, IDL.Bool, IDL.Bool, IDL.Bool, IDL.Bool],
         [PrivacySettingsPublic],
@@ -1014,6 +1199,11 @@ export const idlFactory = ({ IDL }) => {
     'updateUserProfile' : IDL.Func(
         [IDL.Text, Country, IDL.Opt(FileRef)],
         [UserPublic],
+        [],
+      ),
+    'updateUserProfileById' : IDL.Func(
+        [UserId, ProfileUpdate],
+        [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
         [],
       ),
     'updateUserProfileExtended' : IDL.Func(
@@ -1049,6 +1239,16 @@ export const idlFactory = ({ IDL }) => {
     'updateVerificationStatus' : IDL.Func(
         [IDL.Nat, VerificationStatus],
         [],
+        [],
+      ),
+    'verifyEmailOtp' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
+        [],
+      ),
+    'verifyPhoneOtp' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : UserPublic, 'err' : IDL.Text })],
         [],
       ),
   });

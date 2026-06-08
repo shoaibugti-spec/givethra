@@ -1,13 +1,12 @@
-import { createActor } from "@/backend";
-import { useActor } from "@caffeineai/core-infrastructure";
+import { getBackendActor } from "@/lib/actor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function useBackendActor() {
-  return useActor(createActor);
+  return { actor: getBackendActor(), isFetching: false };
 }
 
 export function useGetCallerProfile() {
-  const { actor, isFetching: actorFetching } = useActor(createActor);
+  const actor = getBackendActor();
   const query = useQuery<unknown>({
     queryKey: ["callerProfile"],
     queryFn: async () => {
@@ -16,7 +15,7 @@ export function useGetCallerProfile() {
       // return null so KYC gating defaults to "not approved".
       return null;
     },
-    enabled: !!actor && !actorFetching,
+    enabled: !!actor,
   });
-  return { ...query, isLoading: actorFetching || query.isLoading };
+  return { ...query, isLoading: query.isLoading };
 }

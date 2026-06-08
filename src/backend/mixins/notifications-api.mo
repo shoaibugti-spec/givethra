@@ -16,7 +16,7 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    NotifLib.getForUser(notifications, caller);
+    NotifLib.getForUser(notifications, caller.toText());
   };
 
   /// Mark a notification as read
@@ -24,7 +24,7 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    NotifLib.markAsRead(notifications, notifId, caller);
+    NotifLib.markAsRead(notifications, notifId, caller.toText());
   };
 
   /// Dismiss (delete) a notification
@@ -32,7 +32,7 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    NotifLib.dismiss(notifications, notifId, caller);
+    NotifLib.dismiss(notifications, notifId, caller.toText());
   };
 
   /// Get unread notification count for the calling user
@@ -40,6 +40,6 @@ mixin (
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized");
     };
-    NotifLib.countUnread(notifications, caller);
+    NotifLib.countUnread(notifications, caller.toText());
   };
 };

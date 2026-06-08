@@ -1,10 +1,9 @@
-import { createActor } from "@/backend";
 import type { NotificationPublic } from "@/backend";
 import { NotificationType } from "@/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useActor } from "@caffeineai/core-infrastructure";
+import { getBackendActor } from "@/lib/actor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -24,20 +23,20 @@ import { useState } from "react";
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
 function useNotifications() {
-  const { actor, isFetching } = useActor(createActor);
+  const actor = getBackendActor();
   return useQuery<NotificationPublic[]>({
     queryKey: ["notifications"],
     queryFn: async () => {
       if (!actor) return [];
       return actor.getMyNotifications();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor,
     refetchInterval: 30_000,
   });
 }
 
 function useMarkAsRead() {
-  const { actor } = useActor(createActor);
+  const actor = getBackendActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (notifId: bigint) => {
@@ -49,7 +48,7 @@ function useMarkAsRead() {
 }
 
 function useDismissNotification() {
-  const { actor } = useActor(createActor);
+  const actor = getBackendActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (notifId: bigint) => {
@@ -107,6 +106,48 @@ const NOTIF_CONFIG: Record<
     color: "text-teal-500",
     bgColor: "bg-teal-500/10",
     label: "Support",
+  },
+  [NotificationType.KycApproved]: {
+    icon: ShieldCheck,
+    color: "text-green-500",
+    bgColor: "bg-green-500/10",
+    label: "KYC Approved",
+  },
+  [NotificationType.KycRejected]: {
+    icon: AlertCircle,
+    color: "text-destructive",
+    bgColor: "bg-destructive/10",
+    label: "KYC Rejected",
+  },
+  [NotificationType.KycPending]: {
+    icon: ShieldCheck,
+    color: "text-amber-500",
+    bgColor: "bg-amber-500/10",
+    label: "KYC Pending",
+  },
+  [NotificationType.CreditsAdded]: {
+    icon: CreditCard,
+    color: "text-green-500",
+    bgColor: "bg-green-500/10",
+    label: "Credits Added",
+  },
+  [NotificationType.SupportReceived]: {
+    icon: Heart,
+    color: "text-teal-500",
+    bgColor: "bg-teal-500/10",
+    label: "Support Received",
+  },
+  [NotificationType.SystemAnnouncement]: {
+    icon: Bell,
+    color: "text-primary",
+    bgColor: "bg-primary/10",
+    label: "Announcement",
+  },
+  [NotificationType.CaseCompleted]: {
+    icon: CheckCheck,
+    color: "text-green-500",
+    bgColor: "bg-green-500/10",
+    label: "Case Completed",
   },
 };
 
@@ -287,7 +328,7 @@ export default function NotificationsPage() {
   const markRead = useMarkAsRead();
   const dismiss = useDismissNotification();
   const qc = useQueryClient();
-  const { actor } = useActor(createActor);
+  const actor = getBackendActor();
   const [selectedTab, setSelectedTab] = useState("all");
 
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;

@@ -2,7 +2,6 @@ import Time "mo:core/Time";
 import Map "mo:core/Map";
 import List "mo:core/List";
 import Runtime "mo:core/Runtime";
-import Principal "mo:core/Principal";
 import Common "../types/common";
 import PaymentsT "../types/payments";
 
@@ -59,7 +58,7 @@ module {
       case (?p) p;
       case null Runtime.trap("Payment record not found");
     };
-    if (not Principal.equal(payment.paidBy, caller)) {
+    if (payment.paidBy != caller) {
       Runtime.trap("Unauthorized: payment belongs to another user");
     };
     if (payment.status == #Confirmed) {
@@ -88,7 +87,7 @@ module {
     caseId   : ?Nat,
   ) : Bool {
     switch (payments.find(func(p) {
-      Principal.equal(p.paidBy, caller) and
+      p.paidBy == caller and
       p.feeType == #ListingFee and
       p.status  == #Confirmed and
       p.caseId  == caseId
@@ -102,7 +101,7 @@ module {
     caseId   : Nat,
   ) : Bool {
     switch (payments.find(func(p) {
-      Principal.equal(p.paidBy, caller) and
+      p.paidBy == caller and
       p.feeType == #UnlockFee and
       p.status  == #Confirmed and
       p.caseId  == ?caseId
@@ -117,7 +116,7 @@ module {
   ) : Int {
     var bal : Int = 0;
     txns.forEach(func(t) {
-      if (Principal.equal(t.userId, userId)) {
+      if (t.userId == userId) {
         bal += t.amount;
       };
     });
@@ -175,6 +174,6 @@ module {
     txns   : List.List<PaymentsT.CreditTransaction>,
     userId : Common.UserId,
   ) : [PaymentsT.CreditTransaction] {
-    txns.filter(func(t) { Principal.equal(t.userId, userId) }).toArray();
+    txns.filter(func(t) { t.userId == userId }).toArray();
   };
 };

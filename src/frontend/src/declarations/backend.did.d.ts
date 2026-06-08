@@ -17,6 +17,9 @@ export type Achievement = { 'TrustedHero' : null } |
   { 'MedicalHero' : null } |
   { 'CommunityHero' : null } |
   { 'FiftyPeopleHelped' : null };
+export type AuthMethod = { 'google' : null } |
+  { 'email' : null } |
+  { 'phone' : null };
 export interface CasePublic {
   'id' : bigint,
   'title' : string,
@@ -152,11 +155,18 @@ export interface NotificationPublic {
   'message' : string,
 }
 export type NotificationType = { 'CaseApproved' : null } |
+  { 'KycPending' : null } |
   { 'VerificationUpdate' : null } |
   { 'CaseRejected' : null } |
   { 'SupportSubmitted' : null } |
+  { 'SupportReceived' : null } |
+  { 'SystemAnnouncement' : null } |
   { 'UnlockPurchased' : null } |
+  { 'KycApproved' : null } |
+  { 'KycRejected' : null } |
   { 'NewMessage' : null } |
+  { 'CreditsAdded' : null } |
+  { 'CaseCompleted' : null } |
   { 'ProudHeartReceived' : null };
 export interface PageRequest { 'offset' : bigint, 'limit' : bigint }
 export interface PaymentPublic {
@@ -186,6 +196,14 @@ export interface PrivacySettingsPublic {
   'activityVisibility' : boolean,
   'caseUpdatesEnabled' : boolean,
 }
+export interface ProfileUpdate {
+  'bio' : [] | [string],
+  'timezone' : [] | [string],
+  'preferredLanguage' : [] | [string],
+  'country' : [] | [string],
+  'city' : [] | [string],
+  'fullName' : [] | [string],
+}
 export interface ProudHeart {
   'fromHelpSeeker' : UserId,
   'toHero' : UserId,
@@ -201,6 +219,7 @@ export type ReviewStatus = { 'UnderReview' : null } |
   { 'Completed' : null };
 export type Role = { 'Hero' : null } |
   { 'HelpSeeker' : null } |
+  { 'SuperAdmin' : null } |
   { 'Admin' : null };
 export interface ShoppingItem {
   'productName' : string,
@@ -238,7 +257,7 @@ export interface TransformationOutput {
   'headers' : Array<http_header>,
 }
 export type USDCents = bigint;
-export type UserId = Principal;
+export type UserId = string;
 export interface UserPublic {
   'id' : UserId,
   'bio' : string,
@@ -249,12 +268,15 @@ export interface UserPublic {
   'city' : string,
   'createdAt' : Timestamp,
   'role' : Role,
+  'authMethod' : AuthMethod,
   'fullName' : string,
   'isActive' : boolean,
-  'email' : string,
+  'email' : [] | [string],
   'kycStatus' : KycStatus,
   'avatarRef' : [] | [FileRef],
-  'phoneNumber' : string,
+  'isPhoneVerified' : boolean,
+  'phoneNumber' : [] | [string],
+  'isEmailVerified' : boolean,
 }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
@@ -330,7 +352,7 @@ export interface _SERVICE {
    */
   'confirmUnlockFee' : ActorMethod<[string, bigint], PaymentPublic>,
   'createCase' : ActorMethod<
-    [string, string, Category, Country, City, USDCents, Timestamp],
+    [UserId, string, string, Category, Country, City, USDCents, Timestamp],
     bigint
   >,
   'createCheckoutSession' : ActorMethod<
@@ -352,23 +374,28 @@ export interface _SERVICE {
   'getAllUsers' : ActorMethod<[], Array<UserPublic>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserPublic]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
-  'getCaseDetail' : ActorMethod<[bigint], [] | [CasePublic]>,
+  'getCaseDetail' : ActorMethod<[bigint, UserId], [] | [CasePublic]>,
   'getCaseSummary' : ActorMethod<[bigint], [] | [CaseSummary]>,
   'getConversationMessages' : ActorMethod<[bigint], Array<MessagePublic>>,
+  'getCurrentUser' : ActorMethod<
+    [UserId],
+    { 'ok' : UserPublic } |
+      { 'err' : string }
+  >,
   'getHelpSeekerStats' : ActorMethod<[UserId], [] | [HelpSeekerStatsPublic]>,
   'getHeroStats' : ActorMethod<[UserId], [] | [HeroStatsPublic]>,
   'getLoginDevices' : ActorMethod<[], Array<LoginDevice>>,
   'getMyConversations' : ActorMethod<[], Array<ConversationPublic>>,
   'getMyNotifications' : ActorMethod<[], Array<NotificationPublic>>,
-  /**
-   * / Confirm unlock fee after Stripe session completes
-   */
-  'getMyProofs' : ActorMethod<[], Array<SupportProofPublic>>,
-  'getMySupportedCases' : ActorMethod<[], Array<CaseSummary>>,
+  'getMyProofs' : ActorMethod<[UserId], Array<SupportProofPublic>>,
+  'getMySupportedCases' : ActorMethod<[UserId], Array<CaseSummary>>,
   'getMyTrustScore' : ActorMethod<[], bigint>,
   'getPendingPayments' : ActorMethod<[], Array<PaymentPublic>>,
   'getPlatformStats' : ActorMethod<[], PlatformStats>,
   'getPrivacySettings' : ActorMethod<[], [] | [PrivacySettingsPublic]>,
+  /**
+   * / Confirm listing fee after Stripe session completes; records payment + wallet entry
+   */
   'getProofsForCase' : ActorMethod<[bigint], Array<SupportProofPublic>>,
   'getProudHeartsForHero' : ActorMethod<[UserId], Array<ProudHeart>>,
   'getStripeSessionStatus' : ActorMethod<[string], StripeSessionStatus>,
@@ -380,20 +407,57 @@ export interface _SERVICE {
   'getWallet' : ActorMethod<[], bigint>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isStripeConfigured' : ActorMethod<[], boolean>,
-  'isUnlocked' : ActorMethod<[bigint], boolean>,
+  'isUnlocked' : ActorMethod<[bigint, UserId], boolean>,
   'listCases' : ActorMethod<[[] | [Category], PageRequest], Array<CaseSummary>>,
+  'loginWithEmail' : ActorMethod<
+    [string, string],
+    { 'ok' : UserPublic } |
+      { 'err' : string }
+  >,
+  'loginWithGoogle' : ActorMethod<
+    [string],
+    { 'ok' : UserPublic } |
+      { 'err' : string }
+  >,
   'logoutAllOtherDevices' : ActorMethod<[], bigint>,
+  'logoutUser' : ActorMethod<[UserId], { 'ok' : null } | { 'err' : string }>,
   'markNotificationAsRead' : ActorMethod<[bigint], boolean>,
-  'registerUser' : ActorMethod<[string, string, Role], UserPublic>,
+  'registerUser' : ActorMethod<
+    [UserId, string, [] | [string], Role],
+    UserPublic
+  >,
+  'registerWithEmail' : ActorMethod<
+    [string, string, string],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
+  'registerWithGoogle' : ActorMethod<
+    [string, string, string, [] | [FileRef]],
+    { 'ok' : UserPublic } |
+      { 'err' : string }
+  >,
   'requestAccountDeletion' : ActorMethod<[], string>,
   'requestDataDownload' : ActorMethod<[], string>,
+  'sendEmailOtp' : ActorMethod<
+    [string],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   'sendMessage' : ActorMethod<[UserId, [] | [bigint], string], MessagePublic>,
+  'sendPhoneOtp' : ActorMethod<
+    [string],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   'setStripeConfiguration' : ActorMethod<[StripeConfiguration], undefined>,
-  'submitProof' : ActorMethod<[bigint, Array<FileRef>, [] | [string]], bigint>,
+  'submitProof' : ActorMethod<
+    [bigint, UserId, Array<FileRef>, [] | [string]],
+    bigint
+  >,
   'suspendUser' : ActorMethod<[UserId], undefined>,
   'switchRole' : ActorMethod<[Role], UserPublic>,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
-  'unlockCase' : ActorMethod<[bigint], undefined>,
+  'unlockCase' : ActorMethod<[bigint, UserId], undefined>,
   'updatePrivacySettings' : ActorMethod<
     [string, boolean, boolean, boolean, boolean, boolean],
     PrivacySettingsPublic
@@ -405,6 +469,11 @@ export interface _SERVICE {
   'updateUserProfile' : ActorMethod<
     [string, Country, [] | [FileRef]],
     UserPublic
+  >,
+  'updateUserProfileById' : ActorMethod<
+    [UserId, ProfileUpdate],
+    { 'ok' : UserPublic } |
+      { 'err' : string }
   >,
   'updateUserProfileExtended' : ActorMethod<
     [string, Country, string, string, string, string, string, [] | [FileRef]],
@@ -428,6 +497,16 @@ export interface _SERVICE {
   'updateVerificationStatus' : ActorMethod<
     [bigint, VerificationStatus],
     undefined
+  >,
+  'verifyEmailOtp' : ActorMethod<
+    [string, string],
+    { 'ok' : UserPublic } |
+      { 'err' : string }
+  >,
+  'verifyPhoneOtp' : ActorMethod<
+    [string, string],
+    { 'ok' : UserPublic } |
+      { 'err' : string }
   >,
 }
 export declare const idlService: IDL.ServiceClass;

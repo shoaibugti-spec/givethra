@@ -103,6 +103,7 @@ export default function SubmitRequestPage() {
         BigInt(new Date(deadline).getTime()) * BigInt(1_000_000);
       const amountCents = BigInt(Math.round(Number(amount) * 100));
       const id = await actor.createCase(
+        "",
         title,
         description,
         category,
