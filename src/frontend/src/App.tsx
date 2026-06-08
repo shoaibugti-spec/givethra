@@ -1,5 +1,4 @@
 import BottomNav from "@/components/BottomNav";
-import { DebugBanner } from "@/components/DebugBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Layout from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -536,7 +535,6 @@ function AppShell() {
 export default function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <DebugBanner />
       <AuthProvider>
         <AppShell />
         <Toaster richColors position="top-right" />
