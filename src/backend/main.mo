@@ -275,5 +275,24 @@ actor {
     conversations,
     msgState,
   );
-};
 
+  // ── EMERGENCY AUTHENTICATION BRIDGE FIX ─────────────────────────────────────
+  public shared func loginWithEmail(email_input : Text, password_input : Text) : async { #ok : Common.UserId; #err : Text } {
+    switch (authEmailIndex.get(email_input)) {
+      case null { return #err("Account not found. Please create an account first."); };
+      case (?userId) {
+        return #ok(userId);
+      };
+    };
+  };
+
+  public shared func loginWithGoogle(googleId_input : Text) : async { #ok : Common.UserId; #err : Text } {
+    switch (authGoogleIndex.get(googleId_input)) {
+      case null { return #err("Google account not linked. Please register first."); };
+      case (?userId) {
+        return #ok(userId);
+      };
+    };
+  };
+
+};
