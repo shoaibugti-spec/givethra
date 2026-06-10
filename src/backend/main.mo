@@ -22,6 +22,19 @@ import NotificationsMixin "mixins/notifications-api";
 import MessagesMixin "mixins/messages-api";
 import Int "mo:core/Int";
 import AuthMixin "mixins/auth-api";
+import Principal "mo:base/Principal";
+
+// ── Helper Functions ────────────────────────────────────────────────────────
+
+/// Map caller Principal to unified UserId
+func userId(caller : Principal) : Common.UserId { caller };
+
+/// Security gate: verify user role
+func requireUser(accessControlState : AccessControl.AccessControlState, caller : Principal) {
+  if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+    Runtime.trap("Unauthorized: user role required");
+  };
+};
 
 
 actor {
@@ -30,21 +43,21 @@ actor {
   let accessControlState : AccessControl.AccessControlState;
   include MixinAuthorization(accessControlState, null);
 
-  // ── Object Storage ─────────────────────────────────────────────────────────
+  // ── Object Storage ──────────────────────────────────────────────────────────
   include MixinObjectStorage();
 
-  // ── Users ──────────────────────────────────────────────────────────────────
+  // ── Users ────────────────────────────────────────────────────────────────────
   let users        : Map.Map<Common.UserId, UsersT.User>;
   let heroStats    : Map.Map<Common.UserId, UsersT.HeroStats>;
   let helpSeekerStats : Map.Map<Common.UserId, UsersT.HelpSeekerStats>;
   let proudHearts  : List.List<UsersT.ProudHeart>;
 
-  // ── Cases ──────────────────────────────────────────────────────────────────
+  // ── Cases ────────────────────────────────────────────────────────────────────
   let cases    : Map.Map<Nat, CasesT.Case>;
   let unlocks  : Map.Map<Text, CasesT.CaseUnlock>;
   let proofs   : List.List<CasesT.SupportProof>;
 
-  // ── Payments ───────────────────────────────────────────────────────────────
+  // ── Payments ─────────────────────────────────────────────────────────────────
   let payments            : List.List<PaymentsT.Payment>;
   let wallets             : List.List<PaymentsT.WalletEntry>;
   let creditTransactions  : List.List<PaymentsT.CreditTransaction>;
@@ -175,12 +188,12 @@ actor {
         switch (existing) {
           case null {
             ignore PaymentLib.createPending(
-              payments, paymentState, caller.toText(), #ListingFee, caseId, stripeSessionId, 100,
+              payments, paymentState, userId(caller), #ListingFee, caseId, stripeSessionId, 100,
             );
           };
           case (?_) {};
         };
-        PaymentLib.confirmBySessionId(payments, wallets, paymentState, stripeSessionId, caller.toText());
+        PaymentLib.confirmBySessionId(payments, wallets, paymentState, stripeSessionId, userId(caller));
       };
     };
   };
@@ -205,12 +218,12 @@ actor {
         switch (existing) {
           case null {
             ignore PaymentLib.createPending(
-              payments, paymentState, caller.toText(), #UnlockFee, ?caseId, stripeSessionId, 200,
+              payments, paymentState, userId(caller), #UnlockFee, ?caseId, stripeSessionId, 200,
             );
           };
           case (?_) {};
         };
-        PaymentLib.confirmBySessionId(payments, wallets, paymentState, stripeSessionId, caller.toText());
+        PaymentLib.confirmBySessionId(payments, wallets, paymentState, stripeSessionId, userId(caller));
       };
     };
   };
