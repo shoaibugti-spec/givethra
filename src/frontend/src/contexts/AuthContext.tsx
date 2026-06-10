@@ -132,7 +132,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsInitializing(false));
   }, [actor]);
 
-  const storeSession = useCallback((uid: string, profile: UserPublic) => {
+  const storeSession = useCallback((profile: UserPublic) => {
+    // Extract userId from the returned UserPublic profile (Principal-based ID)
+    const uid = profile.id;
     safeLocalSet(SESSION_KEY, uid);
     setUserId(uid);
     setUser(profile);
@@ -199,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const canisterWinKeys = Object.keys(win).filter(
           (k) => k.startsWith("__CANISTER") || k.startsWith("__ENV"),
         );
-        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__CANISTER* keys=${JSON.stringify(canisterWinKeys)}\n  actor=null after 5 attempts.`;
+        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__C[...]`;
         console.error("[Auth] loginWithGoogle FAILED:", msg);
         throw new Error(msg);
       }
@@ -209,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const loginResult = await retry(() => act.loginWithGoogle(googleId));
         if (loginResult.__kind__ === "ok") {
           const profile = loginResult.ok;
-          storeSession(profile.id, profile);
+          storeSession(profile);
           return;
         }
         // Not registered yet — register automatically, also with retry
@@ -218,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
         if (regResult.__kind__ === "ok") {
           const profile = regResult.ok;
-          storeSession(profile.id, profile);
+          storeSession(profile);
         } else {
           throw new Error(regResult.err);
         }
@@ -259,7 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const canisterWinKeys = Object.keys(win).filter(
           (k) => k.startsWith("__CANISTER") || k.startsWith("__ENV"),
         );
-        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__CANISTER* keys=${JSON.stringify(canisterWinKeys)}\n  actor=null after 5 attempts.`;
+        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__C[...]`;
         console.error("[Auth] loginWithPhone FAILED:", msg);
         throw new Error(msg);
       }
@@ -268,7 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const result = await act.verifyPhoneOtp(phone, otp);
         if (result.__kind__ === "ok") {
           const profile = result.ok;
-          storeSession(profile.id, profile);
+          storeSession(profile);
         } else {
           throw new Error(result.err);
         }
@@ -308,7 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const canisterWinKeys = Object.keys(win).filter(
           (k) => k.startsWith("__CANISTER") || k.startsWith("__ENV"),
         );
-        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__CANISTER* keys=${JSON.stringify(canisterWinKeys)}\n  actor=null after 5 attempts.`;
+        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__C[...]`;
         console.error("[Auth] registerEmail FAILED:", msg);
         throw new Error(msg);
       }
@@ -364,7 +366,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const canisterWinKeys = Object.keys(win).filter(
           (k) => k.startsWith("__CANISTER") || k.startsWith("__ENV"),
         );
-        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__CANISTER* keys=${JSON.stringify(canisterWinKeys)}\n  actor=null after 5 attempts.`;
+        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__C[...]`;
         console.error("[Auth] verifyEmailOtp FAILED:", msg);
         throw new Error(msg);
       }
@@ -373,7 +375,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const result = await act.verifyEmailOtp(email, code);
         if (result.__kind__ === "ok") {
           const profile = result.ok;
-          storeSession(profile.id, profile);
+          storeSession(profile);
           setPendingVerification(null);
           try {
             sessionStorage.removeItem("pending_verify_email");
@@ -417,7 +419,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const canisterWinKeys = Object.keys(win).filter(
           (k) => k.startsWith("__CANISTER") || k.startsWith("__ENV"),
         );
-        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__CANISTER* keys=${JSON.stringify(canisterWinKeys)}\n  actor=null after 5 attempts.`;
+        const msg = `Backend connection unavailable.\n  canisterId=${cid ?? "undefined"}\n  import.meta.env.CANISTER_ID_BACKEND=${import.meta.env.CANISTER_ID_BACKEND ?? "undefined"}\n  window.__C[...]`;
         console.error("[Auth] loginEmail FAILED:", msg);
         throw new Error(msg);
       }
@@ -426,7 +428,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const result = await act.loginWithEmail(email, password);
         if (result.__kind__ === "ok") {
           const profile = result.ok;
-          storeSession(profile.id, profile);
+          storeSession(profile);
         } else {
           throw new Error(result.err);
         }
