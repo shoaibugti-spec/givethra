@@ -1,5 +1,4 @@
 import Map "mo:core/Map";
-import Nat "mo:core/Nat";
 import Time "mo:core/Time";
 import Int "mo:core/Int";
 import Common "../types/common";
@@ -13,17 +12,10 @@ mixin (
   authGoogleIndex : Map.Map<Text, Common.UserId>,
   authPhoneIndex  : Map.Map<Text, Common.UserId>,
   authEmailIndex  : Map.Map<Text, Common.UserId>,
-  nextUserId      : { var id : Nat },
 ) {
 
 
   // ── Internal helpers ─────────────────────────────────────────────────────
-
-  func generateUserId() : Common.UserId {
-    let id = nextUserId.id;
-    nextUserId.id += 1;
-    "usr_" # id.toText();
-  };
 
   func generateOtp() : Text {
     let t = Int.abs(Time.now());
@@ -121,7 +113,7 @@ mixin (
 
   // ── Google Auth ─────────────────────────────────────────────────────────
 
-  public shared func registerWithGoogle(
+  public shared ({ caller }) func registerWithGoogle(
     googleId : Text,
     fullName : Text,
     email    : Text,
@@ -137,10 +129,14 @@ mixin (
       case null {};
     };
     switch (authEmailIndex.get(email)) {
-      case (?_) { return #err("Email already registered") };
+      case (?existingId) {
+        if (existingId != caller) {
+          return #err("Email already registered");
+        };
+      };
       case null {};
     };
-    let userId = generateUserId();
+    let userId = caller;
     let user   = makeUser(userId, fullName, ?email, null, #google, ?googleId, null, true, false);
     switch (photoUrl) {
       case (?ref) { user.avatarRef := ?ref };
@@ -173,7 +169,7 @@ mixin (
 
   // ── Phone Auth ───────────────────────────────────────────────────────────
 
-  public shared func sendPhoneOtp(
+  public shared ({ caller }) func sendPhoneOtp(
     phoneNumber : Text,
   ) : async { #ok : Text; #err : Text } {
     let otpCode = generateOtp();
@@ -189,7 +185,7 @@ mixin (
         };
       };
       case null {
-        let userId = generateUserId();
+        let userId = caller;
         let user   = makeUser(userId, "", null, ?phoneNumber, #phone, null, null, false, false);
         user.phoneOtpCode   := ?otpCode;
         user.phoneOtpExpiry := ?expiry;
@@ -236,18 +232,22 @@ mixin (
 
   // ── Email Auth ───────────────────────────────────────────────────────────
 
-  public shared func registerWithEmail(
+  public shared ({ caller }) func registerWithEmail(
     email    : Text,
     fullName : Text,
     password : Text,
   ) : async { #ok : Text; #err : Text } {
     switch (authEmailIndex.get(email)) {
-      case (?_) { return #err("Email already registered") };
+      case (?existingId) {
+        if (existingId != caller) {
+          return #err("Email already registered");
+        };
+      };
       case null {};
     };
     let otpCode = generateOtp();
     let expiry  = Time.now() + 600_000_000_000;
-    let userId  = generateUserId();
+    let userId  = caller;
     let user    = makeUser(userId, fullName, ?email, null, #email, null, ?password, false, false);
     user.emailOtpCode   := ?otpCode;
     user.emailOtpExpiry := ?expiry;
