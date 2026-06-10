@@ -43,21 +43,21 @@ actor {
   let accessControlState : AccessControl.AccessControlState;
   include MixinAuthorization(accessControlState, null);
 
-  // ── Object Storage ──────────────────────────────────────────────────────────
+  // ── Object Storage ─────────────────────────────────────────────────────────
   include MixinObjectStorage();
 
-  // ── Users ────────────────────────────────────────────────────────────────────
+  // ── Users ─────────────────────────────────────────────────────────────────
   let users        : Map.Map<Common.UserId, UsersT.User>;
   let heroStats    : Map.Map<Common.UserId, UsersT.HeroStats>;
   let helpSeekerStats : Map.Map<Common.UserId, UsersT.HelpSeekerStats>;
   let proudHearts  : List.List<UsersT.ProudHeart>;
 
-  // ── Cases ────────────────────────────────────────────────────────────────────
+  // ── Cases ─────────────────────────────────────────────────────────────────
   let cases    : Map.Map<Nat, CasesT.Case>;
   let unlocks  : Map.Map<Text, CasesT.CaseUnlock>;
   let proofs   : List.List<CasesT.SupportProof>;
 
-  // ── Payments ─────────────────────────────────────────────────────────────────
+  // ── Payments ───────────────────────────────────────────────────────────────
   let payments            : List.List<PaymentsT.Payment>;
   let wallets             : List.List<PaymentsT.WalletEntry>;
   let creditTransactions  : List.List<PaymentsT.CreditTransaction>;
@@ -73,7 +73,6 @@ actor {
   let msgState      : MsgLib.MsgState;
 
   // ── Shared counters (wrapped in records so mixins can mutate) ───────────────
-  let nextUserId   : { var id : Nat };
   let authGoogleIndex : Map.Map<Text, Common.UserId>;
   let authPhoneIndex  : Map.Map<Text, Common.UserId>;
   let authEmailIndex  : Map.Map<Text, Common.UserId>;
@@ -279,7 +278,6 @@ actor {
     authGoogleIndex,
     authPhoneIndex,
     authEmailIndex,
-    nextUserId,
   );
 
   include MessagesMixin(
