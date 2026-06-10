@@ -1,4 +1,4 @@
-import type { FileRef, UserPublic } from "@/backend";
+import type { FileRef, ProfileUpdate, UserPublic } from "@/backend";
 import Layout from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -281,7 +281,7 @@ function ProfilePreview({
 }
 
 export default function EditProfilePage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, userId } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const actor = getBackendActor();
@@ -328,16 +328,27 @@ export default function EditProfilePage() {
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateUserProfileExtended(
-        form.fullName,
-        form.country,
-        form.city,
-        form.phoneNumber,
-        form.bio,
-        form.preferredLanguage,
-        form.timezone,
-        form.avatarRef ?? null,
-      );
+      if (!userId) throw new Error("User not authenticated");
+
+      // Build the ProfileUpdate object with only the changed/provided fields
+      const updates: ProfileUpdate = {
+        fullName: form.fullName,
+        country: form.country,
+        city: form.city,
+        phoneNumber: form.phoneNumber,
+        bio: form.bio,
+        preferredLanguage: form.preferredLanguage,
+        timezone: form.timezone,
+      };
+
+      // Call the new Principal-based backend method that infers caller identity
+      const result = await actor.updateUserProfileById(userId, updates);
+      
+      if (result.__kind__ === "err") {
+        throw new Error(result.err);
+      }
+      
+      return result.ok;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["callerProfile"] });
