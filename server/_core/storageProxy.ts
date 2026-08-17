@@ -1,5 +1,15 @@
 import type { Express } from "express";
 import { ENV } from "./env";
+import { sdk } from "./sdk";
+
+function getGivethraFilePolicy(key: string) {
+  const match = /^givethra\/(\d+)\/(avatar|cover|kyc|case)\//.exec(key);
+  if (!match) return null;
+  return {
+    userId: Number(match[1]),
+    isPublic: match[2] === "avatar" || match[2] === "cover",
+  };
+}
 
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*", async (req, res) => {
@@ -7,6 +17,20 @@ export function registerStorageProxy(app: Express) {
     if (!key) {
       res.status(400).send("Missing storage key");
       return;
+    }
+
+    const policy = getGivethraFilePolicy(key);
+    if (policy && !policy.isPublic) {
+      try {
+        const user = await sdk.authenticateRequest(req as any);
+        if (user.id !== policy.userId && user.role !== "admin") {
+          res.status(403).send("You are not allowed to access this file");
+          return;
+        }
+      } catch {
+        res.status(401).send("Authentication is required to access this file");
+        return;
+      }
     }
 
     if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
