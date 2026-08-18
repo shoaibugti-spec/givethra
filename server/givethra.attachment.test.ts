@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 
 describe("Case Attachment Normalization", () => {
-  it("should correctly aggregate supporting caseFiles with selfieUrl and videoUrl", () => {
+  it("should correctly aggregate multiple supporting caseFiles (Bill, Agreement, ID) with selfieUrl and videoUrl", () => {
     const record = {
-      id: 101,
+      id: 202,
       selfieUrl: "https://example.com/selfie.jpg",
       selfieKey: "selfie_key",
       videoUrl: "https://example.com/video.mp4",
@@ -12,7 +12,9 @@ describe("Case Attachment Normalization", () => {
     };
 
     const files = [
-      { id: 1, caseId: 101, fileName: "Electricity Bill", mimeType: "image/png", storageKey: "bill_key", storageUrl: "https://example.com/bill.png", createdAt: Date.now() }
+      { id: 1, caseId: 202, fileName: "Electricity Bill", mimeType: "image/png", storageKey: "bill_key", storageUrl: "https://example.com/bill.png", createdAt: Date.now() },
+      { id: 2, caseId: 202, fileName: "Rental Agreement", mimeType: "application/pdf", storageKey: "agreement_key", storageUrl: "https://example.com/agreement.pdf", createdAt: Date.now() },
+      { id: 3, caseId: 202, fileName: "Landlord CNIC", mimeType: "image/jpeg", storageKey: "cnic_key", storageUrl: "https://example.com/cnic.jpg", createdAt: Date.now() },
     ];
 
     const augmented = [...files];
@@ -23,9 +25,13 @@ describe("Case Attachment Normalization", () => {
       augmented.push({ id: -2, caseId: record.id, fileName: "Video Appeal", mimeType: "video/mp4", storageKey: record.videoKey || "", storageUrl: record.videoUrl, createdAt: record.submittedAt });
     }
 
-    expect(augmented.length).toBe(3);
-    expect(augmented.map(f => f.fileName)).toContain("Electricity Bill");
-    expect(augmented.map(f => f.fileName)).toContain("Selfie Appeal");
-    expect(augmented.map(f => f.fileName)).toContain("Video Appeal");
+    expect(augmented.length).toBe(5);
+    expect(augmented.map(f => f.fileName)).toEqual([
+      "Electricity Bill",
+      "Rental Agreement",
+      "Landlord CNIC",
+      "Selfie Appeal",
+      "Video Appeal",
+    ]);
   });
 });
