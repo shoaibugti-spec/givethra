@@ -184,9 +184,6 @@ export const givethraRouter = router({
         title: z.string().trim().min(5).max(180),
         category: z.enum(CASE_CATEGORIES),
         description: z.string().trim().min(40).max(12000),
-        targetAmount: z.number().int().min(500).max(1000000).default(6000),
-        expiryDate: z.string().trim().max(50).optional(),
-        location: z.string().trim().max(160).optional(),
         selfie: uploadInput.optional(),
         video: uploadInput.optional(),
         documents: z.array(uploadInput).min(1).max(5),
@@ -206,9 +203,6 @@ export const givethraRouter = router({
           title: input.title,
           category: input.category,
           description: input.description,
-          targetAmount: input.targetAmount,
-          expiryDate: input.expiryDate ?? "8/23/2026",
-          location: input.location ?? "Karachi, Pakistan",
           selfieKey: selfie?.key,
           selfieUrl: selfie?.url,
           videoKey: video?.key,
@@ -285,7 +279,17 @@ export const givethraRouter = router({
       const records = await db.select().from(cases).where(input?.state ? eq(cases.status, input.state) : undefined).orderBy(desc(cases.submittedAt));
       const ids = records.map(record => record.id);
       const files = ids.length ? await db.select().from(caseFiles).where(inArray(caseFiles.caseId, ids)) : [];
-      return records.map(record => ({ ...record, files: files.filter(file => file.caseId === record.id) }));
+      return records.map(record => {
+        const itemFiles = files.filter(file => file.caseId === record.id);
+        const augmented = [...itemFiles];
+        if (record.selfieUrl && !augmented.some(f => f.storageUrl === record.selfieUrl)) {
+          augmented.push({ id: -1, caseId: record.id, fileName: "Selfie Appeal", mimeType: "image/jpeg", storageKey: record.selfieKey || "", storageUrl: record.selfieUrl, createdAt: record.submittedAt });
+        }
+        if (record.videoUrl && !augmented.some(f => f.storageUrl === record.videoUrl)) {
+          augmented.push({ id: -2, caseId: record.id, fileName: "Video Appeal", mimeType: "video/mp4", storageKey: record.videoKey || "", storageUrl: record.videoUrl, createdAt: record.submittedAt });
+        }
+        return { ...record, files: augmented };
+      });
     }),
     reviewCase: adminProcedure.input(z.object({ id: z.number().int().positive(), status: reviewStatus, note: z.string().trim().max(2000).optional() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
