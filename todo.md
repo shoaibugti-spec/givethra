@@ -22,8 +22,8 @@
 - [x] Run migrations, production build, tests, and desktop/mobile visual verification.
 - [x] Save a release checkpoint and provide the Google OAuth configuration steps required before publishing.
 
-- [ ] Audit Submit Case fields (category, title, description, amount, expiry date, supporting files/videos)
-- [ ] Audit backend Worker and D1 schema / storage handling for case submission and attachments
-- [ ] Audit AdminDashboard case inspection view for missing attachments, category info, amounts, and dates
-- [ ] Implement robust payload handling and UI enhancements for case submission & admin review
-- [ ] Run build, verify tests, and create stable checkpoint
+- [x] Audit Submit Case fields (category, title, description, amount, expiry date, supporting files/videos)
+- [x] Audit backend Worker and D1 schema / storage handling for case submission and attachments
+- [x] Audit AdminDashboard case inspection view for missing attachments, category info, amounts, and dates
+- [x] Implement robust payload handling and UI enhancements for case submission & admin review
+- [x] Run build, verify tests, and create stable checkpoint
