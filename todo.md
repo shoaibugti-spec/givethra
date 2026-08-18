@@ -20,4 +20,10 @@
 - [x] Add real-database Vitest coverage for successful KYC/case review transitions and persisted user notification rows.
 - [x] Add isolated server coverage for owner-notification dispatch on new KYC and case submissions.
 - [x] Run migrations, production build, tests, and desktop/mobile visual verification.
-- [ ] Save a release checkpoint and provide the Google OAuth configuration steps required before publishing.
+- [x] Save a release checkpoint and provide the Google OAuth configuration steps required before publishing.
+
+- [ ] Audit Submit Case fields (category, title, description, amount, expiry date, supporting files/videos)
+- [ ] Audit backend Worker and D1 schema / storage handling for case submission and attachments
+- [ ] Audit AdminDashboard case inspection view for missing attachments, category info, amounts, and dates
+- [ ] Implement robust payload handling and UI enhancements for case submission & admin review
+- [ ] Run build, verify tests, and create stable checkpoint
