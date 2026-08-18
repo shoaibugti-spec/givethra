@@ -27,3 +27,9 @@
 - [x] Audit AdminDashboard case inspection view for missing attachments, category info, amounts, and dates
 - [x] Implement robust payload handling and UI enhancements for case submission & admin review
 - [x] Run build, verify tests, and create stable checkpoint
+
+- [x] Audit and map all 4 steps of SubmitCasePage in client/src/pages/GivethraPages.tsx
+- [x] Ensure all 4-step fields, document slots, selfie, and video are captured and sent in tRPC mutation
+- [x] Expand database schema and D1 migration for all case step attributes (e.g. category, amount, location, bills/identity/medical proof files)
+- [x] Upgrade Admin review queue to display every step detail, all attached documents, selfie, and video player
+- [x] Run test suite, build, and save stable checkpoint
