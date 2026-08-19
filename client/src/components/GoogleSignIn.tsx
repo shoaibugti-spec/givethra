@@ -9,7 +9,6 @@ type GoogleIdentityApi = {
         callback: (response: { credential?: string }) => void;
         auto_select?: boolean;
         cancel_on_tap_outside?: boolean;
-        prompt_parent_id?: string;
       }) => void;
       renderButton: (element: HTMLElement, options: Record<string, string | number | boolean>) => void;
       prompt: (momentListener?: (notification: { isNotDisplayed: () => boolean; isSkippedMoment: () => boolean }) => void) => void;
@@ -82,14 +81,13 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
         width: compact ? 230 : 276,
       });
 
-      // Prompt account selector explicitly if button popup is blocked or cached
       googleIdentity()?.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          console.log("[GoogleSignIn] Prompt skipped or suppressed, using rendered button click handler");
+          console.log("[GoogleSignIn] Prompt suppressed, using rendered button");
         }
       });
     } catch (err) {
-      console.warn("[GoogleSignIn] Initialization warning", err);
+      console.warn("[GoogleSignIn] Init warning", err);
     }
   }, [clientId, compact, ready]);
 
@@ -106,28 +104,28 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
         </span>
       ) : null}
       {error ? (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-center">
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-center w-full">
           <p className="text-sm text-rose-700 font-medium">{error}</p>
           <button
-            onClick={() => {
-              setError("");
-              window.location.reload();
-            }}
+            onClick={() => { setError(""); window.location.reload(); }}
             className="mt-2 text-xs text-emerald-800 underline font-semibold hover:text-emerald-900"
           >
             Click here to refresh sign-in
           </button>
         </div>
       ) : null}
-      {!ready ? (
-        <span className="flex items-center gap-2 text-xs text-slate-500">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Loading secure Google Account Chooser…
-        </span>
-      ) : (
-        <span className="flex items-center gap-1.5 text-xs text-slate-500">
-          <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Select any Google account to sign in or create workspace
-        </span>
-      )}
+
+      <div className="flex flex-col items-center gap-1.5 w-full mt-1">
+        {!ready ? (
+          <span className="flex items-center gap-2 text-xs text-slate-500">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Loading secure Google Account Chooser…
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-xs text-slate-500">
+            <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Select any Google account to sign in or create workspace
+          </span>
+        )}
+      </div>
     </div>
   );
 }
