@@ -30,3 +30,9 @@
 - [x] Verify D1 database records post-18 August 2026 cutoff
 - [x] Audit Google OAuth sign-in and session fallback logic
 - [x] Run test suite and production build verification
+
+## Supabase User Migration Recovery & Authentication Audit
+- [ ] Inspect existing auth database schema and OAuth token / session user mapping in D1
+- [ ] Add graceful fallback / auto-provisioning for legacy emails previously registered in Supabase
+- [ ] Verify case submission & KYC lookup resilience for migrated accounts
+- [ ] Run test suite and production build verification
