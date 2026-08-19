@@ -37,35 +37,46 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const handleCredential = async (credential: string) => {
+  const handleCredentialWithRetry = async (credential: string, retries = 2) => {
     if (!credential) return;
     setError("");
     setLoading(true);
 
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 12000); // 12s timeout to avoid infinite loading on bad mobile network
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 12000);
 
-    try {
-      const response = await fetch("/api/auth/google", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
-        signal: controller.signal,
-      });
-      window.clearTimeout(timeoutId);
+      try {
+        const response = await fetch("/api/auth/google", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential }),
+          signal: controller.signal,
+        });
+        window.clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || "Sign-in could not be completed. Please try again.");
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Sign-in could not be completed. Please try again.");
+        }
+
+        window.location.assign("/dashboard");
+        return;
+      } catch (cause) {
+        window.clearTimeout(timeoutId);
+        const msg = cause instanceof Error ? cause.message : "Sign-in network error.";
+        const isNetworkOrTimeout = msg.includes("aborted") || msg.includes("Failed to fetch") || msg.includes("NetworkError");
+
+        if (attempt === retries || !isNetworkOrTimeout) {
+          setError(msg.includes("aborted") ? "Connection timed out. Please check your network and try again." : msg);
+          setLoading(false);
+          return;
+        }
+
+        // Wait before retry with backoff
+        await new Promise((resolve) => window.setTimeout(resolve, 1000 * (attempt + 1)));
       }
-
-      window.location.assign("/dashboard");
-    } catch (cause) {
-      window.clearTimeout(timeoutId);
-      const msg = cause instanceof Error ? cause.message : "Sign-in network error.";
-      setError(msg.includes("aborted") ? "Connection timed out. Please check your network and try again." : msg);
-      setLoading(false);
     }
   };
 
@@ -74,7 +85,7 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
 
     const credentialCallback = (response: { credential?: string }) => {
       if (response.credential) {
-        handleCredential(response.credential);
+        handleCredentialWithRetry(response.credential);
       }
     };
 
@@ -108,12 +119,10 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
       setError("Google client ID is missing.");
       return;
     }
-    // Direct Google OAuth authorization code / token URL fallback guaranteed to open on mobile
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email%20profile&prompt=select_account`;
     window.location.href = authUrl;
   };
 
-  // Handle direct OAuth redirect hash token return
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes("access_token=")) {
@@ -122,7 +131,7 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
       if (accessToken) {
         setLoading(true);
         window.history.replaceState(null, "", window.location.pathname);
-        handleCredential(accessToken);
+        handleCredentialWithRetry(accessToken);
       }
     }
   }, []);
