@@ -22,13 +22,33 @@ export function GivethraShell({ children }: { children: ReactNode }) {
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
   );
 
+  const playNotificationChime = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.3);
+    } catch {
+      // Ignore audio autoplay restrictions if unmuted interaction is pending
+    }
+  };
+
   const requestNotificationPermission = async () => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
     const perm = await Notification.requestPermission();
     setNotifPermission(perm);
     if (perm === "granted") {
+      playNotificationChime();
       new Notification("Givethra Notifications Enabled", {
-        body: "You will now receive browser notifications for KYC, case reviews and support replies.",
+        body: "You will now receive foreground browser notifications and audio chimes for updates.",
       });
     }
   };

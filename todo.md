@@ -15,3 +15,8 @@
 - [x] Audit wrangler configuration, D1 database bindings (`givethra-auth`), and R2 object storage bindings (`givethra-user-uploads`)
 - [x] Build and validate production worker script (`worker.js`)
 - [x] Deploy Givethra worker script and bindings to Cloudflare production successfully
+
+## Foreground Notifications & Sound
+- [ ] Keep Givethra on simple foreground notifications without Stripe or complex background workers
+- [ ] Add lightweight Web Audio sound effect on notification arrival
+- [ ] Verify clean tests and production builds
