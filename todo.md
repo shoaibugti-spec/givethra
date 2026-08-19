@@ -32,7 +32,7 @@
 - [x] Run test suite and production build verification
 
 ## Supabase User Migration Recovery & Authentication Audit
-- [ ] Inspect existing auth database schema and OAuth token / session user mapping in D1
-- [ ] Add graceful fallback / auto-provisioning for legacy emails previously registered in Supabase
-- [ ] Verify case submission & KYC lookup resilience for migrated accounts
-- [ ] Run test suite and production build verification
+- [x] Inspect existing auth database schema and OAuth token / session user mapping in D1
+- [x] Add graceful fallback / auto-provisioning for legacy emails previously registered in Supabase
+- [x] Verify case submission & KYC lookup resilience for migrated accounts
+- [x] Run test suite and production build verification
