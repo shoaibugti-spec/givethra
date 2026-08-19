@@ -44,7 +44,10 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ credential: response.credential }),
         });
-        if (!result.ok) throw new Error("Your Google account could not be signed in. Please try again.");
+        if (!result.ok) {
+          const errData = await result.json().catch(() => ({}));
+          throw new Error(errData.error || "Your Google account could not be signed in. Please try again.");
+        }
         window.location.assign("/dashboard");
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "Google sign-in did not complete.");

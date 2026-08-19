@@ -46,7 +46,7 @@ async function verifyGoogleCredential(credential: string) {
 function sendAuthError(res: Response, error: unknown) {
   const message = error instanceof Error ? error.message : "Unable to verify Google sign-in";
   console.warn("[GoogleAuth]", message);
-  return res.status(401).json({ error: "Google sign-in could not be verified" });
+  return res.status(401).json({ error: message });
 }
 
 export function registerGoogleAuthRoutes(app: Express) {
