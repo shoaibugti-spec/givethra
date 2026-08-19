@@ -20,3 +20,8 @@
 - [x] Keep Givethra on simple foreground notifications without Stripe or complex background workers
 - [x] Add lightweight Web Audio sound effect on notification arrival
 - [x] Verify clean tests and production builds
+
+## Background Web Push Notifications (Admin Broadcast & User Alerts)
+- [ ] Implement browser service worker and push subscription storage
+- [ ] Update notification broadcast endpoint to trigger web push events
+- [ ] Verify clean build and production test passing

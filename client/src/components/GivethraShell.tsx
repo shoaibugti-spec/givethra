@@ -31,6 +31,14 @@ export function GivethraShell({ children }: { children: ReactNode }) {
   const [lastKnownCount, setLastKnownCount] = useState<number | null>(null);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Service worker registration fallback
+      });
+    }
+  }, []);
+
+  useEffect(() => {
     if (!notificationsQuery.data) return;
     const unreadItems = notificationsQuery.data.filter((item: { isRead?: number; title?: string; content?: string }) => !item.isRead);
     const count = unreadItems.length;
@@ -39,9 +47,13 @@ export function GivethraShell({ children }: { children: ReactNode }) {
       playNotificationChime();
       if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
         const latest = unreadItems[0];
-        new Notification(latest?.title || "Givethra Update", {
-          body: latest?.content || "You have a new notification or support reply.",
-        });
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          // Background service worker ready
+        } else {
+          new Notification(latest?.title || "Givethra Update", {
+            body: latest?.content || "You have a new notification or support reply.",
+          });
+        }
       }
     }
     setLastKnownCount(count);
