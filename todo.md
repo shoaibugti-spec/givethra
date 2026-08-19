@@ -25,3 +25,8 @@
 - [ ] Implement browser service worker and push subscription storage
 - [ ] Update notification broadcast endpoint to trigger web push events
 - [ ] Verify clean build and production test passing
+
+## Post-Cleanup Authentication & Data Audit
+- [ ] Verify D1 database records post-18 August 2026 cutoff
+- [ ] Audit Google OAuth sign-in and session fallback logic
+- [ ] Run test suite and production build verification
