@@ -44,3 +44,9 @@
 - [x] Ensure Google Sign-In script is properly injected in index.html with correct client ID and callback support
 - [x] Add explicit prompt/chooser options to Google Identity configuration so account selector popup reliably appears
 - [x] Run test suite and production build verification
+
+## Mobile Google Sign-In Loop Diagnosis & Permanent Fix
+- [x] Investigate why mobile sign-in freezes with a loading spinner instead of opening Google account chooser
+- [x] Inspect button initialization, click handling, and popup/redirect blocking behavior on mobile viewports
+- [x] Provide a robust, direct Google OAuth redirect fallback alongside the Google Identity button so mobile users never get stuck in a loading loop
+- [x] Run test suite and production build verification

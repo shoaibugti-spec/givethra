@@ -18,13 +18,32 @@ type GoogleClaims = {
 };
 
 function isVerifiedEmail(value: GoogleClaims["email_verified"]) {
-  return value === true || value === "true";
+  return value === true || value === "true" || value === undefined; // Google userinfo or token response
 }
 
 async function verifyGoogleCredential(credential: string) {
   const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
   if (!clientId) throw new Error("Google sign-in is not configured");
 
+  // If credential is an OAuth access token (starts with ya29 or short string)
+  if (credential.startsWith("ya29.") || credential.length < 100) {
+    const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${encodeURIComponent(credential)}`);
+    if (!response.ok) {
+      throw new Error("Failed to verify Google access token");
+    }
+    const data = (await response.json()) as { sub?: string; email?: string; email_verified?: boolean | string; name?: string; picture?: string };
+    if (!data.sub || !data.email) {
+      throw new Error("Google did not return verified user information");
+    }
+    return {
+      sub: data.sub,
+      email: data.email.toLowerCase(),
+      name: data.name?.trim() || data.email.split("@")[0],
+      picture: data.picture,
+    };
+  }
+
+  // Verify as JWT ID token
   const { payload } = await jwtVerify<GoogleClaims>(credential, googleJwks, {
     algorithms: ["RS256"],
     audience: clientId,
