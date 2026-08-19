@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Bell, FilePlus2, FolderHeart, Headphones, LayoutDashboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 
 const items = [
