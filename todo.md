@@ -36,3 +36,10 @@
 - [x] Add graceful fallback / auto-provisioning for legacy emails previously registered in Supabase
 - [x] Verify case submission & KYC lookup resilience for migrated accounts
 - [x] Run test suite and production build verification
+
+## Google Sign-In Failure Diagnosis & Repair
+- [ ] Inspect frontend startLogin implementation in client/_core/hooks/useAuth.ts or equivalent
+- [ ] Inspect backend OAuth token exchange and cookie configuration in server/_core/oauth.ts
+- [ ] Check if OAuth portal redirect URLs or client credentials match Cloudflare domain / environment
+- [ ] Fix any origin/cookie/state mismatch blocking Google sign-in
+- [ ] Run test suite, compile production build, and verify zero errors
