@@ -18,6 +18,21 @@ export function GivethraShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const navigation = user?.role === "admin" ? [...items, { href: "/admin", label: "Admin review", icon: ShieldCheck }] : items;
 
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
+  );
+
+  const requestNotificationPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    const perm = await Notification.requestPermission();
+    setNotifPermission(perm);
+    if (perm === "granted") {
+      new Notification("Givethra Notifications Enabled", {
+        body: "You will now receive browser notifications for KYC, case reviews and support replies.",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f8f8f5] text-slate-900">
       <header className="sticky top-0 z-30 border-b border-stone-200/80 bg-[#f8f8f5]/90 backdrop-blur-xl">
@@ -27,6 +42,15 @@ export function GivethraShell({ children }: { children: ReactNode }) {
             Givethra
           </Link>
           <div className="flex items-center gap-3 text-sm">
+            {notifPermission !== "granted" && "Notification" in window && (
+              <button
+                onClick={requestNotificationPermission}
+                className="hidden items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-200 sm:inline-flex"
+                title="Enable browser notifications"
+              >
+                <Bell className="h-3.5 w-3.5" /> Enable Notifications
+              </button>
+            )}
             <span className="hidden text-slate-500 sm:block">{user?.email}</span>
             <button onClick={() => void logout()} className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-3.5 py-2 font-medium text-slate-700 transition hover:border-emerald-800 hover:text-emerald-900 active:scale-[.97]">
               <LogOut className="h-3.5 w-3.5" /> Sign out
