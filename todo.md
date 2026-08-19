@@ -39,3 +39,9 @@
 
 ## Google Sign-In Failure Diagnosis & Repair
 - [x] Finalize test suite and run pnpm test && pnpm build verification
+
+## Google Account Chooser & Login Repair
+- [ ] Ensure Google Sign-In script is properly injected in index.html with correct client ID and callback support
+- [ ] Add explicit prompt/chooser options to Google Identity configuration so account selector popup reliably appears
+- [ ] Provide fallback direct auth redirect or sign-in link if One Tap / Google button fails to render
+- [ ] Run test suite and production build verification
