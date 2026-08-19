@@ -1,7 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Bell, FilePlus2, FolderHeart, Headphones, LayoutDashboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 const items = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -21,6 +22,30 @@ export function GivethraShell({ children }: { children: ReactNode }) {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
   );
+
+  const notificationsQuery = trpc.givethra.notifications.mine.useQuery(undefined, {
+    enabled: !!user,
+    refetchInterval: 10000, // Poll every 10 seconds for new updates
+  });
+
+  const [lastKnownCount, setLastKnownCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!notificationsQuery.data) return;
+    const unreadItems = notificationsQuery.data.filter((item: { isRead?: number; title?: string; content?: string }) => !item.isRead);
+    const count = unreadItems.length;
+
+    if (lastKnownCount !== null && count > lastKnownCount) {
+      playNotificationChime();
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        const latest = unreadItems[0];
+        new Notification(latest?.title || "Givethra Update", {
+          body: latest?.content || "You have a new notification or support reply.",
+        });
+      }
+    }
+    setLastKnownCount(count);
+  }, [notificationsQuery.data, lastKnownCount]);
 
   const playNotificationChime = () => {
     try {

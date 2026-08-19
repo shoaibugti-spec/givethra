@@ -17,6 +17,6 @@
 - [x] Deploy Givethra worker script and bindings to Cloudflare production successfully
 
 ## Foreground Notifications & Sound
-- [ ] Keep Givethra on simple foreground notifications without Stripe or complex background workers
-- [ ] Add lightweight Web Audio sound effect on notification arrival
-- [ ] Verify clean tests and production builds
+- [x] Keep Givethra on simple foreground notifications without Stripe or complex background workers
+- [x] Add lightweight Web Audio sound effect on notification arrival
+- [x] Verify clean tests and production builds
