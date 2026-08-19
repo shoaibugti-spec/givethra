@@ -30,9 +30,37 @@ export function GivethraShell({ children }: { children: ReactNode }) {
 
   const [lastKnownCount, setLastKnownCount] = useState<number | null>(null);
 
+  const savePushMutation = trpc.givethra.notifications.savePushSubscription.useMutation();
+
   useEffect(() => {
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
+      navigator.serviceWorker.register("/sw.js").then(async (registration) => {
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            const existingSub = await registration.pushManager.getSubscription();
+            if (!existingSub) {
+              // Note: using test public VAPID key or auto-subscribing when supported
+              const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nks8W4"
+              }).catch(() => null);
+              if (subscription) {
+                const json = subscription.toJSON();
+                if (json.endpoint && json.keys?.p256dh && json.keys?.auth) {
+                  savePushMutation.mutate({
+                    endpoint: json.endpoint,
+                    p256dh: json.keys.p256dh,
+                    auth: json.keys.auth,
+                  });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          // Push subscription setup error ignored gracefully
+        }
+      }).catch(() => {
         // Service worker registration fallback
       });
     }

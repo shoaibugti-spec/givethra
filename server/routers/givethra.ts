@@ -7,6 +7,7 @@ import {
   kycSubmissions,
   notifications,
   profiles,
+  pushSubscriptions,
   supportMessages,
   users,
 } from "../../drizzle/schema";
@@ -228,6 +229,21 @@ export const givethraRouter = router({
     mine: protectedProcedure.query(async ({ ctx }) => {
       const db = await requireDb();
       return db.select().from(notifications).where(eq(notifications.userId, ctx.user.id)).orderBy(desc(notifications.createdAt));
+    }),
+    savePushSubscription: protectedProcedure.input(z.object({
+      endpoint: z.string().min(1),
+      p256dh: z.string().min(1),
+      auth: z.string().min(1),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.userId, ctx.user.id), eq(pushSubscriptions.endpoint, input.endpoint)));
+      await db.insert(pushSubscriptions).values({
+        userId: ctx.user.id,
+        endpoint: input.endpoint,
+        p256dh: input.p256dh,
+        auth: input.auth,
+      });
+      return { success: true };
     }),
     markRead: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();

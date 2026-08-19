@@ -130,3 +130,16 @@ export const supportMessages = mysqlTable(
   },
   table => [index("support_messages_user_created_index").on(table.userId, table.createdAt)],
 );
+
+export const pushSubscriptions = mysqlTable(
+  "push_subscriptions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    endpoint: text("endpoint").notNull(),
+    p256dh: varchar("p256dh", { length: 255 }).notNull(),
+    auth: varchar("auth", { length: 255 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("push_subscriptions_user_index").on(table.userId)],
+);

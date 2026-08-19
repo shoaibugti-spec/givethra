@@ -15,6 +15,13 @@
       "when": 1786974951990,
       "tag": "0001_optimal_ultimatum",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787153825340,
+      "tag": "0002_last_mother_askani",
+      "breakpoints": true
     }
   ]
 }
