@@ -50,3 +50,9 @@
 - [x] Inspect button initialization, click handling, and popup/redirect blocking behavior on mobile viewports
 - [x] Provide a robust, direct Google OAuth redirect fallback alongside the Google Identity button so mobile users never get stuck in a loading loop
 - [x] Run test suite and production build verification
+
+## Production Google Sign-In "Failed to Fetch" & Missing Option Permanent Fix
+- [ ] Investigate network/CORS or fetch failure in `/api/auth/google` under production domain/mobile networks
+- [ ] Implement robust timeout, error catching, and retry logic on frontend fetch calls to prevent "Failed to fetch" freezes
+- [ ] Ensure Google button and manual account chooser trigger are foolproof across all mobile and desktop browsers
+- [ ] Run test suite and production build verification

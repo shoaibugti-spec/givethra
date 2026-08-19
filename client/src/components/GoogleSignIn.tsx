@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, ShieldCheck, UserCheck, LogIn } from "lucide-react";
+import { Loader2, ShieldCheck, UserCheck, LogIn, AlertCircle } from "lucide-react";
 
 type GoogleIdentityApi = {
   accounts: {
@@ -33,7 +33,7 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
         setReady(true);
         window.clearInterval(timer);
       }
-    }, 80);
+    }, 50);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -41,20 +41,30 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
     if (!credential) return;
     setError("");
     setLoading(true);
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 12000); // 12s timeout to avoid infinite loading on bad mobile network
+
     try {
-      const result = await fetch("/api/auth/google", {
+      const response = await fetch("/api/auth/google", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential }),
+        signal: controller.signal,
       });
-      if (!result.ok) {
-        const errData = await result.json().catch(() => ({}));
-        throw new Error(errData.error || "Your Google account could not be signed in. Please try again.");
+      window.clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Sign-in could not be completed. Please try again.");
       }
+
       window.location.assign("/dashboard");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Google sign-in did not complete.");
+      window.clearTimeout(timeoutId);
+      const msg = cause instanceof Error ? cause.message : "Sign-in network error.";
+      setError(msg.includes("aborted") ? "Connection timed out. Please check your network and try again." : msg);
       setLoading(false);
     }
   };
@@ -87,31 +97,23 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
         width: compact ? 230 : 276,
       });
     } catch (err) {
-      console.warn("[GoogleSignIn] Init warning", err);
+      console.warn("[GoogleSignIn] Button render warning", err);
     }
   }, [clientId, compact, ready]);
 
-  const triggerAccountChooser = () => {
+  const triggerDirectOAuth = () => {
     setError("");
-    try {
-      const gsi = googleIdentity();
-      if (gsi?.accounts.id) {
-        gsi.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            const redirectUri = window.location.origin;
-            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId || "")}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email%20profile&prompt=select_account`;
-            window.location.href = authUrl;
-          }
-        });
-      } else {
-        const redirectUri = window.location.origin;
-        window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId || "")}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email%20profile&prompt=select_account`;
-      }
-    } catch (err) {
-      console.warn("[GoogleSignIn] Prompt invocation error", err);
+    const redirectUri = window.location.origin;
+    if (!clientId) {
+      setError("Google client ID is missing.");
+      return;
     }
+    // Direct Google OAuth authorization code / token URL fallback guaranteed to open on mobile
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email%20profile&prompt=select_account`;
+    window.location.href = authUrl;
   };
 
+  // Handle direct OAuth redirect hash token return
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes("access_token=")) {
@@ -126,7 +128,7 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
   }, []);
 
   if (!clientId) {
-    return <p className="text-sm text-rose-700">Google sign-in client ID is missing. Please check configuration.</p>;
+    return <p className="text-sm text-rose-700">Google sign-in client ID is not configured.</p>;
   }
 
   return (
@@ -135,38 +137,41 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
 
       <button
         type="button"
-        onClick={triggerAccountChooser}
-        className="w-full max-w-[276px] py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full text-sm font-semibold shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+        onClick={triggerDirectOAuth}
+        className="w-full max-w-[276px] py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full text-sm font-semibold shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
       >
-        <LogIn className="h-4 w-4" /> Choose Google Account & Sign In
+        <LogIn className="h-4 w-4" /> Select Google Account & Sign In
       </button>
 
       {loading ? (
-        <span className="flex items-center gap-2 text-sm text-emerald-700 font-medium animate-pulse">
-          <Loader2 className="h-4 w-4 animate-spin" /> Verifying Google account and opening session…
-        </span>
+        <div className="flex items-center gap-2 text-sm text-emerald-700 font-medium py-1 animate-pulse">
+          <Loader2 className="h-4 w-4 animate-spin" /> Verifying account & opening session…
+        </div>
       ) : null}
 
       {error ? (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-center w-full">
-          <p className="text-sm text-rose-700 font-medium">{error}</p>
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-center w-full shadow-sm">
+          <div className="flex items-center justify-center gap-1.5 text-rose-800 font-medium text-xs mb-1">
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" /> Sign-in notice
+          </div>
+          <p className="text-xs text-rose-700">{error}</p>
           <button
             onClick={() => { setError(""); window.location.reload(); }}
-            className="mt-2 text-xs text-emerald-800 underline font-semibold hover:text-emerald-900"
+            className="mt-2 text-xs text-emerald-800 underline font-semibold hover:text-emerald-900 cursor-pointer"
           >
-            Click here to refresh sign-in
+            Refresh page & try again
           </button>
         </div>
       ) : null}
 
-      <div className="flex flex-col items-center gap-1.5 w-full mt-1">
+      <div className="flex flex-col items-center gap-1 w-full mt-0.5">
         {!ready ? (
-          <span className="flex items-center gap-2 text-xs text-slate-500">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Initializing secure Google Sign-In…
+          <span className="flex items-center gap-1.5 text-xs text-slate-500">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Loading secure Google gateway…
           </span>
         ) : (
           <span className="flex items-center gap-1.5 text-xs text-slate-500">
-            <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Tap above to select any Google account instantly
+            <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> Tap above for instant 1-tap or email selection
           </span>
         )}
       </div>
