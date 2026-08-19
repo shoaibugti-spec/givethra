@@ -22,11 +22,11 @@
 - [x] Verify clean tests and production builds
 
 ## Background Web Push Notifications (Admin Broadcast & User Alerts)
-- [ ] Implement browser service worker and push subscription storage
-- [ ] Update notification broadcast endpoint to trigger web push events
-- [ ] Verify clean build and production test passing
+- [x] Implement browser service worker and push subscription storage
+- [x] Update notification broadcast endpoint to trigger web push events
+- [x] Verify clean build and production test passing
 
 ## Post-Cleanup Authentication & Data Audit
-- [ ] Verify D1 database records post-18 August 2026 cutoff
-- [ ] Audit Google OAuth sign-in and session fallback logic
-- [ ] Run test suite and production build verification
+- [x] Verify D1 database records post-18 August 2026 cutoff
+- [x] Audit Google OAuth sign-in and session fallback logic
+- [x] Run test suite and production build verification
