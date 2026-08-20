@@ -91,10 +91,10 @@
 - [x] Verify the feedback box placement, turquoise styling, multiline wrapping, and mobile responsive behavior in the live preview.
 - [x] Add or update automated coverage for the homepage feedback flow if the current tests do not cover the reported regression.
 - [x] Run final tests and production build after repairing the reported regression.
-- [ ] User-reported regression: homepage does not visibly show the public post box despite prior implementation claim; do not mark resolved until browser verification succeeds.
+- [x] User-reported regression: homepage does not visibly show the public post box despite prior implementation claim; do not mark resolved until browser verification succeeds.
 - [ ] Perform a real browser end-to-end check: submit a homepage public post as a guest on mobile and confirm the exact post appears in Admin Panel Public Posts with pending/unread state.
 - [x] Add automated coverage asserting the admin overview/public post unread count and pending status after a public post submission.
-- [ ] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
+- [x] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
 
 
 ## Repository Structure Restoration & GitHub Alignment
@@ -105,14 +105,14 @@
 - [ ] Provide a transparent file map and inventory to the user so they can locate every file immediately.
 
 ## Canonical Layout Restoration (per user attached inventory)
-- [ ] Align working directory tree 100% with `repo_tracked_files.txt` and `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`.
+- [x] Align working directory tree 100% with `repo_tracked_files.txt` and `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`.
 - [x] Ensure all original frontend pages (`HomePage.tsx`, `SignInPage.tsx`, `AdminDashboard.tsx`, etc.) and backend files match the canonical layout.
 - [x] Verify database schema, D1 tables, user history, and authentication remain fully preserved.
 - [x] Run full test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
 
 ## Strict Original Layout Restoration (per user attached inventory)
 - [x] Parse user attached inventory files (`repo_tracked_tree.txt`, `repo_tracked_files.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to extract the exact directory and file paths.
-- [ ] Transition the codebase from the managed template structure (`client/`, `server/`, `shared/`) to the user's requested original structure (`src/frontend/`, `src/backend/`, etc.).
+- [x] Transition the codebase from the managed template structure (`client/`, `server/`, `shared/`) to the user's requested original structure (`src/frontend/`, `src/backend/`, etc.).
 - [x] Preserve all D1 database configurations, R2 storage connections, Google OAuth logic, and live user data without loss.
 - [x] Verify build, configuration files, and package dependencies against the original layout.
 - [ ] Provide a precise file inventory report to the user confirming the exact restored paths.
@@ -123,3 +123,9 @@
 - [x] Correct folder placement and file paths to match the original inventory without altering any code logic, database schema, or authentication flows.
 - [x] Run test suite and production build verification to ensure absolute runtime stability.
 - [ ] Provide a concise inventory report confirming original path alignment.
+
+## Pre-Cleanup Layout Reversion (per user request)
+- [ ] Locate the checkpoint immediately prior to the PDF layout guide cleanup and structural adjustments.
+- [ ] Revert the repository layout back to that stable pre-cleanup state without losing database records, authentication tokens, or features.
+- [ ] Verify test suite passing and production build success after reversion.
+- [ ] Confirm with the user that the file structure matches their desired familiar layout.
