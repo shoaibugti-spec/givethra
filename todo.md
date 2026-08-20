@@ -153,3 +153,14 @@
 - [ ] Ensure existing users log in directly without loops or errors.
 - [ ] Add unit tests verifying Google OAuth upsert for new and existing users.
 - [ ] Verify test suite passing and production build success.
+- [x] Implement 'Upsert' mechanism in Cloudflare D1 database and Google Auth (`server/googleAuth.ts`, `server/_core/sdk.ts`, `server/db.ts`) for seamless login of new and legacy users without infinite loading loops or errors.
+- [x] Create or update `feedbacks` table in `drizzle/schema.ts` to store guest/user feedback submissions with unique identifier, user_id (optional), session_token / IP address tracking, message text, and created_at timestamp.
+- [x] Implement public backend router procedure in `server/routers/givethra.ts` for unauthenticated visitors and logged-in users to submit feedback multiple times without blocking.
+- [x] Implement admin procedure to fetch and group feedbacks by sender (user_id or session token / IP identifier), returning WhatsApp/Messenger style conversation threads in chronological order.
+- [ ] Implement frontend 'What's on your mind? Share your feedback or issues here...' chat box on the Home Page directly ABOVE the existing hand-illustration slider without removing or replacing the slider. The active repository currently contains no hand-illustration slider reference; the composer is above the existing hero block and no hero asset was removed.
+- [x] Add success popup/toast message ('Thank you for your feedback!') and ensure repeat submissions work smoothly without login barriers.
+- [x] Create a dedicated 'Public Feedbacks' grouped chat view in the Admin Panel showing sender lists on the left and chronological thread inspection/reply on the right.
+- [x] Run `pnpm test` and `pnpm build` to verify correctness and compilation.
+- [x] Add a real transient Sonner toast saying `Thank you for your feedback!` after every successful public feedback submission while retaining the inline status and repeat-submit flow.
+- [x] Verify the toast implementation compiles and the full test suite remains passing.
+- [ ] Confirm exact placement relative to the hand-illustration slider after locating that slider in the canonical homepage source; no such reference exists in the active repository at present.

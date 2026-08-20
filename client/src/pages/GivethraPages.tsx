@@ -6,6 +6,7 @@ import { GoogleSignIn } from "@/components/GoogleSignIn";
 import { AlertCircle, ArrowRight, Bell, CheckCircle2, ChevronLeft, FileText, HeartHandshake, Image as ImageIcon, Loader2, LockKeyhole, MessageCircle, Send, ShieldCheck, UploadCloud, UserRound, Video } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
+import { toast } from "sonner";
 
 const categories = ["Medical", "Education", "Emergency", "Livelihood", "Housing", "Other"] as const;
 type Category = (typeof categories)[number];
@@ -33,106 +34,62 @@ function FilePicker({ label, accept, file, onChange, helper }: { label: string; 
 
 function WhatsOnYourMindBox() {
   const { user } = useAuth();
-  const upload = trpc.givethra.publicPosts.uploadImage.useMutation();
   const [content, setContent] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>();
   const [notice, setNotice] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  useEffect(() => {
-    if (!imageFile) {
-      setImagePreviewUrl(undefined);
-      return;
-    }
-    const previewUrl = URL.createObjectURL(imageFile);
-    setImagePreviewUrl(previewUrl);
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [imageFile]);
+  const submitMutation = trpc.givethra.feedbacks.submit.useMutation();
 
-  const submitMutation = trpc.givethra.publicPosts.submit.useMutation({
-    onSuccess: () => {
-      setSubmitted(true);
-      setContent("");
-      setImageFile(null);
-      setNotice("Your feedback has been posted successfully!");
-      setTimeout(() => setSubmitted(false), 5000);
-    },
-    onError: err => {
-      setNotice(err.message);
-    },
-  });
-
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!content.trim()) return;
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    const message = content.trim();
+    if (!message || submitMutation.isPending) return;
     setNotice("");
+    setSubmitted(false);
     try {
-      let imageUrl: string | undefined;
-      if (imageFile) {
-        const uploaded = await upload.mutateAsync(await fileToUploadInput(imageFile, "public"));
-        imageUrl = uploaded.url;
-      }
-      await submitMutation.mutateAsync({
-        authorName: user?.name || "Guest Visitor",
-        authorEmail: user?.email || undefined,
-        content: content.trim(),
-        imageUrl,
-      });
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Failed to post");
+      await submitMutation.mutateAsync({ content: message });
+      setContent("");
+      setSubmitted(true);
+      toast.success("Thank you for your feedback!");
+      setNotice("Thank you for your feedback!");
+      window.setTimeout(() => setSubmitted(false), 4500);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "We could not send your feedback. Please try again.");
     }
   };
 
-  const isSending = submitMutation.isPending || upload.isPending;
-
   return (
-    <section className="container py-12" aria-labelledby="public-feedback-title">
+    <section className="container py-8 sm:py-10" aria-labelledby="public-feedback-title">
       <div className="mx-auto max-w-3xl rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/10 sm:p-7">
         <div className="flex items-start gap-3">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-emerald-900 text-base font-bold text-amber-100" aria-hidden="true">
             {user?.name ? user.name.charAt(0).toUpperCase() : "G"}
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-700">Community feedback</p>
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-teal-700">Public help & feedback</p>
             <h2 id="public-feedback-title" className="mt-1 font-display text-2xl font-semibold text-emerald-950">What's on your mind?</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-600">Share a question, suggestion, or problem with the Givethra team. You can post as a guest.</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">Share your feedback or issues here. You can send as many messages as you need, with or without signing in.</p>
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-3 transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-100">
+        <form onSubmit={onSubmit} className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-3 transition focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
           <textarea
-            rows={3}
-            maxLength={2000}
+            rows={4}
+            maxLength={4000}
             value={content}
-            onChange={e => setContent(e.target.value)}
-            onInput={e => {
-              e.currentTarget.style.height = "auto";
-              e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 176)}px`;
-            }}
-            placeholder="Write your message here…"
-            aria-label="What's on your mind?"
-            className="min-h-24 max-h-44 w-full resize-none overflow-y-auto bg-transparent px-2 py-1 text-base leading-7 text-slate-800 placeholder:text-slate-400 outline-none"
+            onChange={event => setContent(event.target.value)}
+            placeholder="What's on your mind? Share your feedback or issues here..."
+            aria-label="What's on your mind? Share your feedback or issues here"
+            className="min-h-28 max-h-56 w-full resize-y overflow-y-auto bg-transparent px-2 py-1 text-base leading-7 text-slate-800 outline-none placeholder:text-slate-400"
             required
           />
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-600 hover:text-emerald-800" title="Attach an image">
-                <ImageIcon className="h-4 w-4" />
-                <span>Attach image</span>
-                <input type="file" accept="image/*" className="hidden" onChange={e => setImageFile(e.target.files?.[0] ?? null)} />
-              </label>
-              {imageFile ? <span className="max-w-40 truncate text-xs font-medium text-emerald-800" title={imageFile.name}>{imageFile.name}</span> : null}
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-400">{content.length}/2000</span>
-              <button type="submit" disabled={isSending || !content.trim()} className="inline-flex items-center gap-2 rounded-full bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-50" title="Send post">
-                {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                <span>{isSending ? "Sending…" : "Send feedback"}</span>
-              </button>
-            </div>
+            <span className="text-xs text-slate-400">{content.length}/4000</span>
+            <button type="submit" disabled={submitMutation.isPending || !content.trim()} className="inline-flex items-center gap-2 rounded-full bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-50" title="Send feedback">
+              {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <span>{submitMutation.isPending ? "Sending…" : "Send"}</span>
+            </button>
           </div>
-          {imagePreviewUrl ? <img src={imagePreviewUrl} alt="Selected attachment preview" className="mt-3 h-24 w-24 rounded-xl border border-emerald-100 object-cover" /> : null}
         </form>
         {notice ? <p role="status" className={`mt-3 text-center text-sm ${submitted ? "font-semibold text-emerald-700" : "text-rose-700"}`}>{notice}</p> : null}
       </div>
@@ -143,9 +100,7 @@ function WhatsOnYourMindBox() {
 export function LandingPage() {
   const { isAuthenticated } = useAuth();
   const approved = trpc.givethra.public.approvedCases.useQuery();
-  return <div className="min-h-screen overflow-hidden bg-[#f8f8f5] text-slate-900"><header className="container flex h-20 items-center justify-between"><Link href="/" className="flex items-center gap-2.5 font-display text-xl font-semibold tracking-tight text-emerald-950"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-900 text-sm font-bold text-amber-100">G</span>Givethra</Link><div className="flex items-center gap-4"><Link href="/cases" className="hidden text-sm font-medium text-slate-600 hover:text-emerald-900 sm:block">Browse approved cases</Link>{isAuthenticated ? <Link href="/dashboard" className="rounded-full bg-emerald-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800">Open workspace</Link> : <Link href="#sign-in" className="rounded-full border border-emerald-900 px-4 py-2 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-900 hover:text-white">Sign in</Link>}</div></header><main><section className="container grid items-center gap-12 pb-12 pt-12 lg:grid-cols-[1.05fr_.95fr] lg:pb-16 lg:pt-20"><div><p className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold uppercase tracking-[.14em] text-emerald-800"><ShieldCheck className="h-3.5 w-3.5" />Verified help. Real impact.</p><h1 className="max-w-3xl font-display text-5xl font-semibold leading-[.98] tracking-[-.045em] text-emerald-950 sm:text-6xl">A more careful way to ask for — and offer — help.</h1><p className="mt-7 max-w-xl text-lg leading-8 text-slate-600">Givethra combines private identity verification with a respectful, transparent case-review process. Each approved story is presented with clarity, not spectacle.</p><div className="mt-8 flex flex-wrap gap-3"><Link href="/cases" className="inline-flex items-center gap-2 rounded-full bg-emerald-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/15 transition hover:-translate-y-0.5 hover:bg-emerald-800 active:scale-[.97]">Explore approved cases <ArrowRight className="h-4 w-4" /></Link><Link href="#how-it-works" className="rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-800 hover:text-emerald-900">How verification works</Link></div></div><div className="relative"><div className="absolute -inset-7 rounded-full bg-amber-100/80 blur-3xl" /><div className="relative rounded-[2.4rem] bg-emerald-950 p-7 text-white shadow-2xl shadow-emerald-950/20 sm:p-10"><p className="text-sm font-medium text-amber-100">The Givethra standard</p><div className="mt-9 grid gap-7"><div className="border-l border-emerald-700 pl-5"><p className="font-display text-2xl font-semibold">Private by design</p><p className="mt-2 text-sm leading-6 text-emerald-100/75">Sensitive identity files are visible only to the account holder and authorised owner review.</p></div><div className="border-l border-emerald-700 pl-5"><p className="font-display text-2xl font-semibold">Reviewed with care</p><p className="mt-2 text-sm leading-6 text-emerald-100/75">KYC and case review status remain clear: pending, approved or rejected.</p></div><div className="border-l border-emerald-700 pl-5"><p className="font-display text-2xl font-semibold">Support stays close</p><p className="mt-2 text-sm leading-6 text-emerald-100/75">Private in-app conversation creates a direct line to the support team.</p></div></div></div></div></section><section id="how-it-works" className="border-y border-stone-200 bg-white"><div className="container grid gap-8 py-16 md:grid-cols-3"><div><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-sm font-bold text-emerald-950">01</span><h2 className="mt-5 font-display text-2xl font-semibold text-emerald-950">Sign in securely</h2><p className="mt-3 text-sm leading-6 text-slate-600">Continue with your Google account to create your private Givethra workspace.</p></div><div><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-sm font-bold text-emerald-950">02</span><h2 className="mt-5 font-display text-2xl font-semibold text-emerald-950">Verify your identity</h2><p className="mt-3 text-sm leading-6 text-slate-600">Submit your identity evidence in a protected verification flow and follow the review outcome.</p></div><div><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-sm font-bold text-emerald-950">03</span><h2 className="mt-5 font-display text-2xl font-semibold text-emerald-950">Submit a meaningful case</h2><p className="mt-3 text-sm leading-6 text-slate-600">Share the context, supporting files and optional liveness media needed for a careful review.</p></div></div></section><section className="container py-20"><div className="flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-700">Stories with approval</p><h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-emerald-950">Approved cases</h2></div><Link href="/cases" className="text-sm font-semibold text-emerald-800 hover:underline">View all cases</Link></div><div className="mt-9 grid gap-5 md:grid-cols-3">{approved.isLoading ? <p className="text-sm text-slate-500">Loading approved cases…</p> : approved.data?.slice(0, 3).map(item => <Link key={item.id} href={`/cases/${item.id}`} className="group rounded-3xl border border-stone-200 bg-white p-6 transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-950/5"><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">{item.category}</span><h3 className="mt-5 font-display text-2xl font-semibold text-emerald-950 group-hover:text-emerald-700">{item.title}</h3><p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{item.description}</p><span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">Read case <ArrowRight className="h-4 w-4" /></span></Link>) ?? <p className="rounded-3xl border border-dashed border-stone-300 bg-white p-8 text-sm text-slate-600 md:col-span-3">Approved cases will appear here once they complete the platform review.</p>}</div></section>
-
-<WhatsOnYourMindBox />
+  return <div className="min-h-screen overflow-hidden bg-[#f8f8f5] text-slate-900"><header className="container flex h-20 items-center justify-between"><Link href="/" className="flex items-center gap-2.5 font-display text-xl font-semibold tracking-tight text-emerald-950"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-900 text-sm font-bold text-amber-100">G</span>Givethra</Link><div className="flex items-center gap-4"><Link href="/cases" className="hidden text-sm font-medium text-slate-600 hover:text-emerald-900 sm:block">Browse approved cases</Link>{isAuthenticated ? <Link href="/dashboard" className="rounded-full bg-emerald-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800">Open workspace</Link> : <Link href="#sign-in" className="rounded-full border border-emerald-900 px-4 py-2 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-900 hover:text-white">Sign in</Link>}</div></header><main><WhatsOnYourMindBox /><section className="container grid items-center gap-12 pb-12 pt-12 lg:grid-cols-[1.05fr_.95fr] lg:pb-16 lg:pt-20"><div><p className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold uppercase tracking-[.14em] text-emerald-800"><ShieldCheck className="h-3.5 w-3.5" />Verified help. Real impact.</p><h1 className="max-w-3xl font-display text-5xl font-semibold leading-[.98] tracking-[-.045em] text-emerald-950 sm:text-6xl">A more careful way to ask for — and offer — help.</h1><p className="mt-7 max-w-xl text-lg leading-8 text-slate-600">Givethra combines private identity verification with a respectful, transparent case-review process. Each approved story is presented with clarity, not spectacle.</p><div className="mt-8 flex flex-wrap gap-3"><Link href="/cases" className="inline-flex items-center gap-2 rounded-full bg-emerald-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/15 transition hover:-translate-y-0.5 hover:bg-emerald-800 active:scale-[.97]">Explore approved cases <ArrowRight className="h-4 w-4" /></Link><Link href="#how-it-works" className="rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-800 hover:text-emerald-900">How verification works</Link></div></div><div className="relative"><div className="absolute -inset-7 rounded-full bg-amber-100/80 blur-3xl" /><div className="relative rounded-[2.4rem] bg-emerald-950 p-7 text-white shadow-2xl shadow-emerald-950/20 sm:p-10"><p className="text-sm font-medium text-amber-100">The Givethra standard</p><div className="mt-9 grid gap-7"><div className="border-l border-emerald-700 pl-5"><p className="font-display text-2xl font-semibold">Private by design</p><p className="mt-2 text-sm leading-6 text-emerald-100/75">Sensitive identity files are visible only to the account holder and authorised owner review.</p></div><div className="border-l border-emerald-700 pl-5"><p className="font-display text-2xl font-semibold">Reviewed with care</p><p className="mt-2 text-sm leading-6 text-emerald-100/75">KYC and case review status remain clear: pending, approved or rejected.</p></div><div className="border-l border-emerald-700 pl-5"><p className="font-display text-2xl font-semibold">Support stays close</p><p className="mt-2 text-sm leading-6 text-emerald-100/75">Private in-app conversation creates a direct line to the support team.</p></div></div></div></div></section><section id="how-it-works" className="border-y border-stone-200 bg-white"><div className="container grid gap-8 py-16 md:grid-cols-3"><div><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-sm font-bold text-emerald-950">01</span><h2 className="mt-5 font-display text-2xl font-semibold text-emerald-950">Sign in securely</h2><p className="mt-3 text-sm leading-6 text-slate-600">Continue with your Google account to create your private Givethra workspace.</p></div><div><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-sm font-bold text-emerald-950">02</span><h2 className="mt-5 font-display text-2xl font-semibold text-emerald-950">Verify your identity</h2><p className="mt-3 text-sm leading-6 text-slate-600">Submit your identity evidence in a protected verification flow and follow the review outcome.</p></div><div><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-sm font-bold text-emerald-950">03</span><h2 className="mt-5 font-display text-2xl font-semibold text-emerald-950">Submit a meaningful case</h2><p className="mt-3 text-sm leading-6 text-slate-600">Share the context, supporting files and optional liveness media needed for a careful review.</p></div></div></section><section className="container py-20"><div className="flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-700">Stories with approval</p><h2 className="mt-3 font-display text-4xl font-semibold tracking-tight text-emerald-950">Approved cases</h2></div><Link href="/cases" className="text-sm font-semibold text-emerald-800 hover:underline">View all cases</Link></div><div className="mt-9 grid gap-5 md:grid-cols-3">{approved.isLoading ? <p className="text-sm text-slate-500">Loading approved cases…</p> : approved.data?.slice(0, 3).map(item => <Link key={item.id} href={`/cases/${item.id}`} className="group rounded-3xl border border-stone-200 bg-white p-6 transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-950/5"><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">{item.category}</span><h3 className="mt-5 font-display text-2xl font-semibold text-emerald-950 group-hover:text-emerald-700">{item.title}</h3><p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{item.description}</p><span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">Read case <ArrowRight className="h-4 w-4" /></span></Link>) ?? <p className="rounded-3xl border border-dashed border-stone-300 bg-white p-8 text-sm text-slate-600 md:col-span-3">Approved cases will appear here once they complete the platform review.</p>}</div></section>
 
 <section id="sign-in" className="bg-emerald-950 py-20"><div className="container grid items-center gap-8 lg:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-amber-100">A private workspace awaits</p><h2 className="mt-4 max-w-xl font-display text-4xl font-semibold tracking-tight text-white">Manage every part of your request with dignity and clarity.</h2><p className="mt-4 max-w-xl text-sm leading-6 text-emerald-100/75">Google sign-in starts a secure, account-specific session. It does not make your KYC files or case evidence public.</p></div><div className="rounded-[2rem] bg-white p-8 shadow-2xl shadow-black/20"><h3 className="font-display text-2xl font-semibold text-emerald-950">Continue to Givethra</h3><p className="mt-2 text-sm leading-6 text-slate-600">Use the Google account you want associated with your profile.</p><div className="mt-6"><GoogleSignIn /></div></div></div></section></main><footer className="container flex flex-col gap-3 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span>Givethra — Verified Help. Real Impact.</span><span>Identity data is handled in private account workflows.</span></footer></div>;
 }
@@ -225,14 +180,18 @@ export function AdminPage() {
   const users = trpc.givethra.admin.users.useQuery(undefined, { enabled });
   const support = trpc.givethra.admin.support.useQuery(undefined, { enabled, refetchInterval: 5000 });
   const publicPosts = trpc.givethra.admin.publicPosts.useQuery(undefined, { enabled, refetchInterval: 5000 });
+  const feedbacks = trpc.givethra.admin.feedbacks.useQuery(undefined, { enabled, refetchInterval: 5000 });
 
   const reviewKyc = trpc.givethra.admin.reviewKyc.useMutation({ onSuccess: () => void kyc.refetch() });
   const reviewCase = trpc.givethra.admin.reviewCase.useMutation({ onSuccess: () => void cases.refetch() });
   const reply = trpc.givethra.admin.replySupport.useMutation({ onSuccess: () => void support.refetch() });
   const updatePost = trpc.givethra.admin.updatePublicPost.useMutation({ onSuccess: () => void publicPosts.refetch() });
+  const updateFeedback = trpc.givethra.admin.updateFeedback.useMutation({ onSuccess: () => void feedbacks.refetch() });
 
   const [replyBody, setReplyBody] = useState<Record<number, string>>({});
   const [postReplyBody, setPostReplyBody] = useState<Record<number, string>>({});
+  const [selectedFeedbackKey, setSelectedFeedbackKey] = useState<string>();
+  const [feedbackReply, setFeedbackReply] = useState("");
 
   useEffect(() => {
     if (!enabled) return;
@@ -242,9 +201,15 @@ export function AdminPage() {
       void cases.refetch();
       void support.refetch();
       void publicPosts.refetch();
+      void feedbacks.refetch();
     }, 5000);
     return () => clearInterval(interval);
   }, [enabled]);
+
+  useEffect(() => {
+    if (!selectedFeedbackKey && feedbacks.data?.length) setSelectedFeedbackKey(feedbacks.data[0].key);
+    if (selectedFeedbackKey && feedbacks.data?.length && !feedbacks.data.some(thread => thread.key === selectedFeedbackKey)) setSelectedFeedbackKey(feedbacks.data[0].key);
+  }, [feedbacks.data, selectedFeedbackKey]);
 
   if (!enabled)
     return (
@@ -265,16 +230,20 @@ export function AdminPage() {
     void cases.refetch();
     void support.refetch();
     void publicPosts.refetch();
+    void feedbacks.refetch();
   };
 
   const unreadSupportCount = support.data?.filter(item => item.senderRole === "user").length ?? 0;
   const unreadPostsCount = publicPosts.data?.filter(item => item.status === "pending").length ?? 0;
-  const overviewData = overview.data as ({ users: number; pendingKyc: number; pendingCases: number; supportMessages: number; publicPosts: number } | undefined);
+  const unreadFeedbackCount = feedbacks.data?.reduce((total, thread) => total + thread.unreadCount, 0) ?? 0;
+  const selectedFeedback = feedbacks.data?.find(thread => thread.key === selectedFeedbackKey);
+  const overviewData = overview.data as ({ users: number; pendingKyc: number; pendingCases: number; supportMessages: number; publicPosts: number; publicFeedbacks: number } | undefined);
   const stats: Array<[string, string | number | undefined]> = [
     ["Users", overviewData?.users],
     ["Pending KYC", overviewData?.pendingKyc],
     ["Pending cases", overviewData?.pendingCases],
     ["Public posts", unreadPostsCount > 0 ? `${overviewData?.publicPosts ?? 0} (${unreadPostsCount} unread)` : overviewData?.publicPosts],
+    ["Feedback chats", unreadFeedbackCount > 0 ? `${overviewData?.publicFeedbacks ?? 0} (${unreadFeedbackCount} unread)` : overviewData?.publicFeedbacks],
     ["Support msgs", unreadSupportCount > 0 ? `${overviewData?.supportMessages ?? 0} (${unreadSupportCount} unread)` : overviewData?.supportMessages],
   ];
 
@@ -285,7 +254,7 @@ export function AdminPage() {
         title="Admin command centre"
         copy="Review identity submissions, case submissions, public feedback, accounts and support conversations from a single owner-only workspace."
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {stats.map(([label, value]) => (
           <div key={String(label)} className="rounded-3xl bg-emerald-950 p-5 text-white">
             <p className="text-sm text-emerald-100/75">{label}</p>
@@ -374,7 +343,71 @@ export function AdminPage() {
             <p className="text-sm text-slate-600">No case submissions are available for review.</p>
           )}
         </div>
-      </section><section className="mt-8 rounded-3xl border border-stone-200 bg-white p-6">
+      </section>
+
+      <section className="mt-8 rounded-3xl border border-teal-100 bg-white p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="font-display text-2xl font-semibold text-emerald-950">
+            Public Feedbacks {unreadFeedbackCount > 0 ? <span className="ml-2 inline-flex items-center rounded-full bg-rose-500 px-2.5 py-0.5 text-xs text-white">{unreadFeedbackCount} unread</span> : null}
+          </h2>
+          <p className="text-sm text-slate-500">Grouped by account or anonymous visitor session</p>
+        </div>
+        <div className="mt-5 grid min-h-[520px] overflow-hidden rounded-2xl border border-stone-200 lg:grid-cols-[minmax(220px,.72fr)_minmax(0,1.55fr)]">
+          <div className="border-b border-stone-200 bg-stone-50 lg:border-b-0 lg:border-r">
+            <div className="border-b border-stone-200 px-4 py-3 text-xs font-bold uppercase tracking-[.15em] text-slate-500">Senders</div>
+            <div className="max-h-[470px] overflow-y-auto">
+              {feedbacks.data?.length ? feedbacks.data.map(thread => (
+                <button key={thread.key} type="button" onClick={() => setSelectedFeedbackKey(thread.key)} className={`w-full border-b border-stone-200 px-4 py-4 text-left transition ${selectedFeedbackKey === thread.key ? "bg-teal-50" : "bg-transparent hover:bg-white"}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{thread.senderName}</p>
+                      <p className="mt-1 truncate text-xs text-slate-500">{thread.senderEmail || (thread.ipAddress ? `Visitor · ${thread.ipAddress}` : "Anonymous visitor")}</p>
+                    </div>
+                    {thread.unreadCount ? <span className="grid h-6 min-w-6 shrink-0 place-items-center rounded-full bg-teal-700 px-1.5 text-[11px] font-bold text-white">{thread.unreadCount}</span> : null}
+                  </div>
+                  <p className="mt-2 line-clamp-1 text-xs text-slate-500">{thread.messages[thread.messages.length - 1]?.content}</p>
+                  <p className="mt-2 text-[10px] uppercase tracking-wide text-slate-400">{thread.messages.length} message{thread.messages.length === 1 ? "" : "s"} · {new Date(thread.latestAt).toLocaleString()}</p>
+                </button>
+              )) : <p className="p-5 text-sm text-slate-600">No public feedback has been submitted yet.</p>}
+            </div>
+          </div>
+          <div className="flex min-h-[520px] flex-col bg-white">
+            {selectedFeedback ? (
+              <>
+                <div className="border-b border-stone-200 px-5 py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-display text-xl font-semibold text-emerald-950">{selectedFeedback.senderName}</p>
+                      <p className="mt-1 text-xs text-slate-500">{selectedFeedback.senderEmail || "Guest visitor"}{selectedFeedback.ipAddress ? ` · IP ${selectedFeedback.ipAddress}` : ""}</p>
+                    </div>
+                    <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">{selectedFeedback.messages.length} messages</span>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-3 overflow-y-auto bg-[#f7fbfa] p-5">
+                  {selectedFeedback.messages.map(message => (
+                    <div key={message.id} className="flex flex-col items-start">
+                      <div className={`max-w-[88%] rounded-2xl rounded-tl-md px-4 py-3 text-sm leading-6 shadow-sm ${message.status === "unread" ? "border border-teal-200 bg-teal-50 text-teal-950" : "bg-white text-slate-800"}`}>
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                        {message.adminReply ? <div className="mt-3 border-t border-teal-200 pt-2 text-xs leading-5 text-emerald-800"><span className="font-bold">Admin reply:</span> {message.adminReply}</div> : null}
+                        <p className="mt-2 text-[10px] text-slate-400">{new Date(message.createdAt).toLocaleString()}</p>
+                      </div>
+                      {message.status === "unread" ? <button type="button" onClick={() => void updateFeedback.mutateAsync({ id: message.id, status: "read" })} className="mt-1 text-[11px] font-semibold text-teal-700 hover:underline">Mark read</button> : null}
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={event => { event.preventDefault(); const body = feedbackReply.trim(); const last = selectedFeedback.messages[selectedFeedback.messages.length - 1]; if (!body || !last) return; void updateFeedback.mutateAsync({ id: last.id, status: "replied", adminReply: body }).then(() => { setFeedbackReply(""); refresh(); }); }} className="border-t border-stone-200 bg-white p-4">
+                  <div className="flex gap-3">
+                    <textarea value={feedbackReply} onChange={event => setFeedbackReply(event.target.value)} rows={2} className="min-h-12 flex-1 resize-y rounded-2xl border border-stone-300 p-3 text-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-50" placeholder="Reply with context or next steps..." />
+                    <button type="submit" disabled={!feedbackReply.trim() || updateFeedback.isPending} className="grid h-12 w-12 shrink-0 place-items-center self-end rounded-2xl bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Reply to feedback"><Send className="h-5 w-5" /></button>
+                  </div>
+                </form>
+              </>
+            ) : <div className="grid flex-1 place-items-center p-8 text-center text-sm text-slate-500">Select a sender to open their feedback conversation.</div>}
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="font-display text-2xl font-semibold text-emerald-950">
             Public Posts & Visitor Feedback {unreadPostsCount > 0 ? <span className="ml-2 inline-flex items-center rounded-full bg-rose-500 px-2.5 py-0.5 text-xs text-white">{unreadPostsCount} unread</span> : null}
