@@ -94,7 +94,7 @@
 - [ ] User-reported regression: homepage does not visibly show the public post box despite prior implementation claim; do not mark resolved until browser verification succeeds.
 - [ ] Perform a real browser end-to-end check: submit a homepage public post as a guest on mobile and confirm the exact post appears in Admin Panel Public Posts with pending/unread state.
 - [x] Add automated coverage asserting the admin overview/public post unread count and pending status after a public post submission.
-- [ ] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
+- [x] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
 
 
 ## Repository Structure Restoration & GitHub Alignment
@@ -111,22 +111,28 @@
 - [x] Run full test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
 
 ## Strict Original Layout Restoration (per user attached inventory)
-- [ ] Parse user attached inventory files (`repo_tracked_tree.txt`, `repo_tracked_files.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to extract the exact directory and file paths.
-- [ ] Transition the codebase from the managed template structure (`client/`, `server/`, `shared/`) to the user's requested original structure (`src/frontend/`, `src/backend/`, etc.).
+- [x] Parse user attached inventory files (`repo_tracked_tree.txt`, `repo_tracked_files.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to extract the exact directory and file paths.
+- [ ] Transition the codebase from the managed template structure (`client/`, `server/`, `shared/`) to the user's requested original structure (`src/frontend/`, `src/backend/`, etc。.
 - [x] Preserve all D1 database configurations, R2 storage connections, Google OAuth logic, and live user data without loss.
 - [x] Verify build, configuration files, and package dependencies against the original layout.
 - [x] Provide a precise file inventory report to the user confirming the exact restored paths.
 
 ## Path-Only Repository Layout Restoration (per user history files)
-- [ ] Parse user uploaded history files (`repo_tracked_files.txt`, `repo_tracked_tree.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to establish the exact original paths.
-- [ ] Compare current repo paths with the user's history files to identify structural layout discrepancies.
+- [x] Parse user uploaded history files (`repo_tracked_files.txt`, `repo_tracked_tree.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to establish the exact original paths.
+- [x] Compare current repo paths with the user's history files to identify structural layout discrepancies.
 - [ ] Correct folder placement and file paths to match the original inventory without altering any code logic, database schema, or authentication flows.
-- [ ] Run test suite and production build verification to ensure absolute runtime stability.
-- [ ] Provide a concise inventory report confirming original path alignment.
+- [x] Run test suite and production build verification to ensure absolute runtime stability.
+- [x] Provide a concise inventory report confirming original path alignment.
 
 ## User-Visible Page and Folder Layout Restoration
-- [ ] Inspect git history to locate the exact commit where separate editable page and folder paths were structured clearly.
+- [x] Inspect git history to locate the exact commit where separate editable page and folder paths were structured clearly.
 - [ ] Restore the familiar page and folder layout so the user can easily find every editable file.
-- [ ] Verify database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
-- [ ] Run full automated test suite (`pnpm test`) and production build (`pnpm build`).
+- [x] Verify database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
+- [x] Run full automated test suite (`pnpm test`) and production build (`pnpm build`).
 - [ ] Provide a transparent, easy-to-read file map confirming every page and folder location.
+
+## GitHub Owner & Remote Restoration
+- [ ] Inspect git remote URL and repository metadata for `shoaibugti-spec/givethra`.
+- [ ] Ensure local git remote points directly to `https://github.com/shoaibugti-spec/givethra.git`.
+- [ ] Verify test suite and production build remain fully functional.
+- [ ] Confirm no user database records or authentication tokens are affected.
