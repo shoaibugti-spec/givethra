@@ -65,6 +65,6 @@
 - [x] Run test suite, production build, and save stable checkpoint
 
 ## Corrected Public Feedback ("What's on your mind?") Placement & Chat Inbox
-- [ ] Move `WhatsOnYourMindBox` on LandingPage so it is positioned directly above the "Become a Hero" / Sign-in section (near the bottom of the landing page)
-- [ ] Enhance Admin Panel Public Posts view with chat-style message cards, unread indicators, and admin reply inputs matching support chat style
-- [ ] Run test suite and production build verification
+- [x] Move `WhatsOnYourMindBox` on LandingPage so it is positioned directly above the "Become a Hero" / Sign-in section (near the bottom of the landing page)
+- [x] Enhance Admin Panel Public Posts view with chat-style message cards, unread indicators, and admin reply inputs matching support chat style
+- [x] Run test suite and production build verification

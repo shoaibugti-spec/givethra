@@ -66,3 +66,33 @@ describe("Givethra workflow permissions and validation", () => {
     await expect(caller.givethra.cases.submit({ title: "A respectful medical support request", category: "Medical", description: "This description is intentionally long enough to pass the minimum validation requirements for a reviewable case.", documents: [imageUpload], selfie: { ...imageUpload, purpose: "avatar" } })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
+
+
+  it("allows unauthenticated public visitors to submit feedback posts and allows admins to review and update them", async () => {
+    const publicCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as any,
+      res: {} as any,
+    });
+    const adminCaller = appRouter.createCaller(createContext("admin", ENV.givethraOwnerEmail));
+
+    const submitRes = await publicCaller.givethra.publicPosts.submit({
+      authorName: "Visitor Ali",
+      authorEmail: "ali@example.com",
+      content: "I cannot find the sign-in button on mobile browsers.",
+    });
+    expect(submitRes).toEqual({ success: true });
+
+    const posts = await adminCaller.givethra.admin.publicPosts();
+    expect(posts.length).toBeGreaterThan(0);
+    const latest = posts[0];
+    expect(latest.authorName).toBe("Visitor Ali");
+    expect(latest.content).toContain("sign-in button");
+
+    const updateRes = await adminCaller.givethra.admin.updatePublicPost({
+      id: latest.id,
+      status: "resolved",
+      adminReply: "Thank you Ali, we have added a direct login link.",
+    });
+    expect(updateRes).toEqual({ success: true });
+  });
