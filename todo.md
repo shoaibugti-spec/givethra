@@ -103,3 +103,9 @@
 - [ ] Verify that database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
 - [ ] Run full automated test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
 - [ ] Provide a transparent file map and inventory to the user so they can locate every file immediately.
+
+## Canonical Layout Restoration (per user attached inventory)
+- [ ] Align working directory tree 100% with `repo_tracked_files.txt` and `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`.
+- [ ] Ensure all original frontend pages (`HomePage.tsx`, `SignInPage.tsx`, `AdminDashboard.tsx`, etc.) and backend files match the canonical layout.
+- [ ] Verify database schema, D1 tables, user history, and authentication remain fully preserved.
+- [ ] Run full test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
