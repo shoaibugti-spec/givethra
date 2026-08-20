@@ -68,6 +68,17 @@ describe("Givethra workflow permissions and validation", () => {
 });
 
 
+  it("rejects non-image or non-public-purpose attachments for guest feedback", async () => {
+    const publicCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as any,
+      res: {} as any,
+    });
+
+    await expect(publicCaller.givethra.publicPosts.uploadImage(imageUpload)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(publicCaller.givethra.publicPosts.uploadImage({ ...imageUpload, purpose: "public", mimeType: "application/pdf" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
   it("allows unauthenticated public visitors to submit feedback posts and allows admins to review and update them", async () => {
     const publicCaller = appRouter.createCaller({
       user: null,
@@ -83,11 +94,15 @@ describe("Givethra workflow permissions and validation", () => {
     });
     expect(submitRes).toEqual({ success: true });
 
+    const overview = await adminCaller.givethra.admin.overview();
+    expect(overview.publicPosts).toBeGreaterThan(0);
+
     const posts = await adminCaller.givethra.admin.publicPosts();
     expect(posts.length).toBeGreaterThan(0);
     const latest = posts[0];
     expect(latest.authorName).toBe("Visitor Ali");
     expect(latest.content).toContain("sign-in button");
+    expect(latest.status).toBe("pending");
 
     const updateRes = await adminCaller.givethra.admin.updatePublicPost({
       id: latest.id,

@@ -25,7 +25,7 @@ const uploadInput = z.object({
   name: z.string().min(1).max(255),
   mimeType: z.string().min(1).max(120),
   dataUrl: z.string().min(24).max(45_000_000),
-  purpose: z.enum(["avatar", "cover", "kyc", "case"]),
+  purpose: z.enum(["avatar", "cover", "kyc", "case", "public"]),
 });
 
 type StoredFile = { key: string; url: string; name: string; mimeType: string };
@@ -254,6 +254,12 @@ export const givethraRouter = router({
   }),
 
   publicPosts: router({
+    uploadImage: publicProcedure.input(uploadInput).mutation(async ({ ctx, input }) => {
+      if (input.purpose !== "public" || !input.mimeType.startsWith("image/")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Public feedback attachments must be images." });
+      }
+      return storeFile(ctx.user?.id ?? 0, input);
+    }),
     submit: publicProcedure
       .input(
         z.object({

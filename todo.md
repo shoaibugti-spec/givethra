@@ -84,3 +84,22 @@
 - [x] Verify local changes for `publicPosts` schema, router, tests, and `GivethraPages.tsx` component placement
 - [x] Commit and push changes to `main` branch on GitHub repository `shoaibugti-spec/givethra`
 - [x] Verify remote commit hash and test suite pass
+
+## User-Reported Public Feedback Regression
+- [x] Re-audit and visibly restore the public “What’s on your mind?” feedback box on the homepage so guests can type and send a post from mobile.
+- [ ] Verify that a submitted public post persists and appears in the Admin Panel Public Posts section with the correct unread state.
+- [x] Verify the feedback box placement, turquoise styling, multiline wrapping, and mobile responsive behavior in the live preview.
+- [x] Add or update automated coverage for the homepage feedback flow if the current tests do not cover the reported regression.
+- [x] Run final tests and production build after repairing the reported regression.
+- [ ] User-reported regression: homepage does not visibly show the public post box despite prior implementation claim; do not mark resolved until browser verification succeeds.
+- [ ] Perform a real browser end-to-end check: submit a homepage public post as a guest on mobile and confirm the exact post appears in Admin Panel Public Posts with pending/unread state.
+- [ ] Add automated coverage asserting the admin overview/public post unread count and pending status after a public post submission.
+- [ ] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
+
+
+## Repository Structure Restoration & GitHub Alignment
+- [ ] Audit git status, remote commits, and previous checkouts for structural drift relative to user's familiar layout.
+- [ ] Reorganize code files into clear, modular components and route files so frontend pages (`client/src/pages/`) remain clean and easy to navigate.
+- [ ] Verify that database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
+- [ ] Run full automated test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
+- [ ] Provide a transparent file map and inventory to the user so they can locate every file immediately.

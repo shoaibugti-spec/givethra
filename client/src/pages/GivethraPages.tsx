@@ -33,11 +33,22 @@ function FilePicker({ label, accept, file, onChange, helper }: { label: string; 
 
 function WhatsOnYourMindBox() {
   const { user } = useAuth();
-  const upload = trpc.givethra.files.upload.useMutation();
+  const upload = trpc.givethra.publicPosts.uploadImage.useMutation();
   const [content, setContent] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>();
   const [notice, setNotice] = useState("");
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl(undefined);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [imageFile]);
 
   const submitMutation = trpc.givethra.publicPosts.submit.useMutation({
     onSuccess: () => {
@@ -73,43 +84,59 @@ function WhatsOnYourMindBox() {
     }
   };
 
+  const isSending = submitMutation.isPending || upload.isPending;
+
   return (
-    <div className="container my-8">
-      <div className="mx-auto max-w-3xl">
-        <form onSubmit={onSubmit} className="flex items-center gap-3 rounded-full border border-stone-300 bg-white px-4 py-2.5 shadow-md shadow-emerald-950/5 transition hover:border-emerald-700">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-white font-bold">
+    <section className="container py-12" aria-labelledby="public-feedback-title">
+      <div className="mx-auto max-w-3xl rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/10 sm:p-7">
+        <div className="flex items-start gap-3">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-emerald-900 text-base font-bold text-amber-100" aria-hidden="true">
             {user?.name ? user.name.charAt(0).toUpperCase() : "G"}
           </div>
-          <div className="relative flex-1">
-            <textarea
-              rows={1}
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="What's on your mind?"
-              className="max-h-32 w-full resize-none bg-transparent pt-1 text-sm text-slate-800 placeholder:text-slate-400 outline-none"
-              style={{ minHeight: "28px" }}
-              required
-            />
-            {imageFile && <span className="absolute -bottom-5 left-0 text-[11px] font-medium text-emerald-800">Attached: {imageFile.name}</span>}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-700">Community feedback</p>
+            <h2 id="public-feedback-title" className="mt-1 font-display text-2xl font-semibold text-emerald-950">What's on your mind?</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">Share a question, suggestion, or problem with the Givethra team. You can post as a guest.</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <label className="cursor-pointer rounded-full p-2 text-slate-500 transition hover:bg-stone-100 hover:text-emerald-800" title="Attach image">
-              <ImageIcon className="h-5 w-5" />
-              <input type="file" accept="image/*" className="hidden" onChange={e => setImageFile(e.target.files?.[0] ?? null)} />
-            </label>
-            <button
-              type="submit"
-              disabled={submitMutation.isPending || upload.isPending || !content.trim()}
-              className="grid h-10 w-10 place-items-center rounded-full bg-emerald-900 text-white transition hover:bg-emerald-800 disabled:opacity-50"
-              title="Send post"
-            >
-              {submitMutation.isPending || upload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-3 transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-100">
+          <textarea
+            rows={3}
+            maxLength={2000}
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            onInput={e => {
+              e.currentTarget.style.height = "auto";
+              e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 176)}px`;
+            }}
+            placeholder="Write your message here…"
+            aria-label="What's on your mind?"
+            className="min-h-24 max-h-44 w-full resize-none overflow-y-auto bg-transparent px-2 py-1 text-base leading-7 text-slate-800 placeholder:text-slate-400 outline-none"
+            required
+          />
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-600 hover:text-emerald-800" title="Attach an image">
+                <ImageIcon className="h-4 w-4" />
+                <span>Attach image</span>
+                <input type="file" accept="image/*" className="hidden" onChange={e => setImageFile(e.target.files?.[0] ?? null)} />
+              </label>
+              {imageFile ? <span className="max-w-40 truncate text-xs font-medium text-emerald-800" title={imageFile.name}>{imageFile.name}</span> : null}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-400">{content.length}/2000</span>
+              <button type="submit" disabled={isSending || !content.trim()} className="inline-flex items-center gap-2 rounded-full bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-50" title="Send post">
+                {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                <span>{isSending ? "Sending…" : "Send feedback"}</span>
+              </button>
+            </div>
           </div>
+          {imagePreviewUrl ? <img src={imagePreviewUrl} alt="Selected attachment preview" className="mt-3 h-24 w-24 rounded-xl border border-emerald-100 object-cover" /> : null}
         </form>
-        {notice && <p className={`mt-2 text-center text-xs ${submitted ? "text-emerald-700 font-semibold" : "text-rose-700"}`}>{notice}</p>}
+        {notice ? <p role="status" className={`mt-3 text-center text-sm ${submitted ? "font-semibold text-emerald-700" : "text-rose-700"}`}>{notice}</p> : null}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -242,6 +269,14 @@ export function AdminPage() {
 
   const unreadSupportCount = support.data?.filter(item => item.senderRole === "user").length ?? 0;
   const unreadPostsCount = publicPosts.data?.filter(item => item.status === "pending").length ?? 0;
+  const overviewData = overview.data as ({ users: number; pendingKyc: number; pendingCases: number; supportMessages: number; publicPosts: number } | undefined);
+  const stats: Array<[string, string | number | undefined]> = [
+    ["Users", overviewData?.users],
+    ["Pending KYC", overviewData?.pendingKyc],
+    ["Pending cases", overviewData?.pendingCases],
+    ["Public posts", unreadPostsCount > 0 ? `${overviewData?.publicPosts ?? 0} (${unreadPostsCount} unread)` : overviewData?.publicPosts],
+    ["Support msgs", unreadSupportCount > 0 ? `${overviewData?.supportMessages ?? 0} (${unreadSupportCount} unread)` : overviewData?.supportMessages],
+  ];
 
   return (
     <AuthRequired>
@@ -251,13 +286,7 @@ export function AdminPage() {
         copy="Review identity submissions, case submissions, public feedback, accounts and support conversations from a single owner-only workspace."
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          ["Users", overview.data?.users],
-          ["Pending KYC", overview.data?.pendingKyc],
-          ["Pending cases", overview.data?.pendingCases],
-          ["Public posts", unreadPostsCount > 0 ? `${(overview.data as any)?.publicPosts ?? 0} (${unreadPostsCount} unread)` : ((overview.data as any)?.publicPosts ?? "—")],
-          ["Support msgs", unreadSupportCount > 0 ? `${overview.data?.supportMessages ?? 0} (${unreadSupportCount} unread)` : (overview.data?.supportMessages ?? "—")],
-        ].map(([label, value]: [string, any]) => (
+        {stats.map(([label, value]) => (
           <div key={String(label)} className="rounded-3xl bg-emerald-950 p-5 text-white">
             <p className="text-sm text-emerald-100/75">{label}</p>
             <p className="mt-5 font-display text-4xl font-semibold">{value ?? "—"}</p>

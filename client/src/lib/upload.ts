@@ -1,4 +1,4 @@
-export type UploadPurpose = "avatar" | "cover" | "kyc" | "case";
+export type UploadPurpose = "avatar" | "cover" | "kyc" | "case" | "public";
 
 export type UploadInput = {
   name: string;
