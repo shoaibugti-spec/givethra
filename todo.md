@@ -146,3 +146,10 @@
 - [x] Inspect local Git user.name and user.email settings.
 - [x] Check recent commit authors in git log.
 - [x] Provide safe instructions or automated script for future commit attribution (documented in `git-attribution-guide.md`).
+
+## Google Login Upsert & Infinite Loop Fix
+- [ ] Audit server auth callback and D1 database query helpers for email lookup.
+- [ ] Implement email-based upsert mechanism: check if email exists; if not, generate UUID, insert fresh user profile, and log in.
+- [ ] Ensure existing users log in directly without loops or errors.
+- [ ] Add unit tests verifying Google OAuth upsert for new and existing users.
+- [ ] Verify test suite passing and production build success.
