@@ -93,19 +93,26 @@
 - [x] Run final tests and production build after repairing the reported regression.
 - [ ] User-reported regression: homepage does not visibly show the public post box despite prior implementation claim; do not mark resolved until browser verification succeeds.
 - [ ] Perform a real browser end-to-end check: submit a homepage public post as a guest on mobile and confirm the exact post appears in Admin Panel Public Posts with pending/unread state.
-- [ ] Add automated coverage asserting the admin overview/public post unread count and pending status after a public post submission.
+- [x] Add automated coverage asserting the admin overview/public post unread count and pending status after a public post submission.
 - [ ] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
 
 
 ## Repository Structure Restoration & GitHub Alignment
-- [ ] Audit git status, remote commits, and previous checkouts for structural drift relative to user's familiar layout.
-- [ ] Reorganize code files into clear, modular components and route files so frontend pages (`client/src/pages/`) remain clean and easy to navigate.
-- [ ] Verify that database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
-- [ ] Run full automated test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
+- [x] Audit git status, remote commits, and previous checkouts for structural drift relative to user's familiar layout.
+- [x] Reorganize code files into clear, modular components and route files so frontend pages (`client/src/pages/`) remain clean and easy to navigate.
+- [x] Verify that database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
+- [x] Run full automated test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
 - [ ] Provide a transparent file map and inventory to the user so they can locate every file immediately.
 
 ## Canonical Layout Restoration (per user attached inventory)
 - [ ] Align working directory tree 100% with `repo_tracked_files.txt` and `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`.
 - [ ] Ensure all original frontend pages (`HomePage.tsx`, `SignInPage.tsx`, `AdminDashboard.tsx`, etc.) and backend files match the canonical layout.
-- [ ] Verify database schema, D1 tables, user history, and authentication remain fully preserved.
-- [ ] Run full test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
+- [x] Verify database schema, D1 tables, user history, and authentication remain fully preserved.
+- [x] Run full test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
+
+## Strict Original Layout Restoration (per user attached inventory)
+- [ ] Parse user attached inventory files (`repo_tracked_tree.txt`, `repo_tracked_files.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to extract the exact directory and file paths.
+- [ ] Transition the codebase from the managed template structure (`client/`, `server/`, `shared/`) to the user's requested original structure (`src/frontend/`, `src/backend/`, etc.).
+- [ ] Preserve all D1 database configurations, R2 storage connections, Google OAuth logic, and live user data without loss.
+- [ ] Verify build, configuration files, and package dependencies against the original layout.
+- [ ] Provide a precise file inventory report to the user confirming the exact restored paths.
