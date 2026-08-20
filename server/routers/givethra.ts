@@ -99,32 +99,6 @@ export const givethraRouter = router({
         .limit(1);
       return rows[0] ?? null;
     }),
-    publicPosts: router({
-      submit: publicProcedure
-        .input(
-          z.object({
-            authorName: z.string().trim().min(2).max(120),
-            authorEmail: z.string().trim().email().max(160).optional().or(z.literal("")),
-            content: z.string().trim().min(3).max(2000),
-          })
-        )
-        .mutation(async ({ ctx, input }) => {
-          const db = await requireDb();
-          const userId = ctx.user?.id ?? null;
-          await db.insert(publicPosts).values({
-            userId,
-            authorName: input.authorName,
-            authorEmail: input.authorEmail || null,
-            content: input.content,
-            status: "pending",
-          });
-          ownerAlert(
-            "New Public Post / Note",
-            `${input.authorName}${input.authorEmail ? ` (${input.authorEmail})` : ""} shared a note: “${input.content.slice(0, 100)}…”`
-          );
-          return { success: true };
-        }),
-    }),
   }),
 
   files: router({
