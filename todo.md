@@ -113,6 +113,13 @@
 ## Strict Original Layout Restoration (per user attached inventory)
 - [ ] Parse user attached inventory files (`repo_tracked_tree.txt`, `repo_tracked_files.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to extract the exact directory and file paths.
 - [ ] Transition the codebase from the managed template structure (`client/`, `server/`, `shared/`) to the user's requested original structure (`src/frontend/`, `src/backend/`, etc.).
-- [ ] Preserve all D1 database configurations, R2 storage connections, Google OAuth logic, and live user data without loss.
-- [ ] Verify build, configuration files, and package dependencies against the original layout.
+- [x] Preserve all D1 database configurations, R2 storage connections, Google OAuth logic, and live user data without loss.
+- [x] Verify build, configuration files, and package dependencies against the original layout.
 - [ ] Provide a precise file inventory report to the user confirming the exact restored paths.
+
+## Path-Only Repository Layout Restoration (per user history files)
+- [ ] Parse user uploaded history files (`repo_tracked_files.txt`, `repo_tracked_tree.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to establish the exact original paths.
+- [ ] Compare current repo paths with the user's history files to identify structural layout discrepancies.
+- [ ] Correct folder placement and file paths to match the original inventory without altering any code logic, database schema, or authentication flows.
+- [ ] Run test suite and production build verification to ensure absolute runtime stability.
+- [ ] Provide a concise inventory report confirming original path alignment.
