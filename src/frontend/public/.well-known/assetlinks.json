@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "org.givethra.www.twa",
+    "sha256_cert_fingerprints": ["40:36:95:C6:2C:68:0B:0C:F9:96:85:3F:75:B4:C6:90:D3:73:69:B4:8A:8B:37:1A:2C:73:C4:C9:B3:0C:AF:D5"]
+  }
+}]
