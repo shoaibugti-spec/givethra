@@ -141,3 +141,8 @@
 - [x] Inspect remote GitHub tree for `shoaibugti-spec/givethra` via GitHub CLI.
 - [x] Compare remote files against local workspace files path-by-path.
 - [x] Generate an exact discrepancy report without modified application files or database records.
+
+## Git Author & Attribution Configuration
+- [x] Inspect local Git user.name and user.email settings.
+- [x] Check recent commit authors in git log.
+- [x] Provide safe instructions or automated script for future commit attribution (documented in `git-attribution-guide.md`).
