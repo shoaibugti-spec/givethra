@@ -63,3 +63,8 @@
 - [x] Add compact, beautifully styled "What's on your mind?" submission card on Home.tsx between slider and Become a Hero section
 - [x] Add Public Posts tab and unread badge count in AdminPanel (`client/src/pages/GivethraPages.tsx`)
 - [x] Run test suite, production build, and save stable checkpoint
+
+## Corrected Public Feedback ("What's on your mind?") Placement & Chat Inbox
+- [ ] Move `WhatsOnYourMindBox` on LandingPage so it is positioned directly above the "Become a Hero" / Sign-in section (near the bottom of the landing page)
+- [ ] Enhance Admin Panel Public Posts view with chat-style message cards, unread indicators, and admin reply inputs matching support chat style
+- [ ] Run test suite and production build verification
