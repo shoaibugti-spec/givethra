@@ -123,3 +123,10 @@
 - [ ] Correct folder placement and file paths to match the original inventory without altering any code logic, database schema, or authentication flows.
 - [ ] Run test suite and production build verification to ensure absolute runtime stability.
 - [ ] Provide a concise inventory report confirming original path alignment.
+
+## User-Visible Page and Folder Layout Restoration
+- [ ] Inspect git history to locate the exact commit where separate editable page and folder paths were structured clearly.
+- [ ] Restore the familiar page and folder layout so the user can easily find every editable file.
+- [ ] Verify database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
+- [ ] Run full automated test suite (`pnpm test`) and production build (`pnpm build`).
+- [ ] Provide a transparent, easy-to-read file map confirming every page and folder location.
