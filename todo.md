@@ -68,3 +68,13 @@
 - [x] Move `WhatsOnYourMindBox` on LandingPage so it is positioned directly above the "Become a Hero" / Sign-in section (near the bottom of the landing page)
 - [x] Enhance Admin Panel Public Posts view with chat-style message cards, unread indicators, and admin reply inputs matching support chat style
 - [x] Run test suite and production build verification
+
+## Reference-Matched Public Post Composer ("What's on your mind?")
+- [x] Update `publicPosts` schema in `drizzle/schema.ts` to support author image/attachment and guest identity
+- [x] Update `server/routers/givethra.ts` publicPosts submit and admin procedures
+- [x] Build the exact reference-matched `WhatsOnYourMindBox` component with avatar, multi-line auto-growing/wrapping textarea, image upload/preview, and send icon
+- [x] Position `WhatsOnYourMindBox` directly above the Become a Hero / Sign-in section on the homepage
+- [x] Build the complete Admin Panel Public Posts inbox with visitor/user identity, full content expansion, image preview, unread status, and admin reply support
+- [x] Run test suite, compile production build, verify with preview screenshot, and save stable checkpoint
+
+- [x] All tasks completed successfully.

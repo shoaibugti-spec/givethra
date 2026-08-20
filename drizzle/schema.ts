@@ -153,6 +153,7 @@ export const publicPosts = mysqlTable(
     authorName: varchar("authorName", { length: 160 }).notNull(),
     authorEmail: varchar("authorEmail", { length: 320 }),
     content: text("content").notNull(),
+    imageUrl: text("imageUrl"),
     status: mysqlEnum("status", ["pending", "read", "resolved"]).default("pending").notNull(),
     adminReply: text("adminReply"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),

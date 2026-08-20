@@ -257,9 +257,10 @@ export const givethraRouter = router({
     submit: publicProcedure
       .input(
         z.object({
-          authorName: z.string().trim().min(2).max(160),
+          authorName: z.string().trim().min(1).max(160),
           authorEmail: z.string().trim().email().optional().or(z.literal("")),
-          content: z.string().trim().min(3).max(2000),
+          content: z.string().trim().min(1).max(2000),
+          imageUrl: z.string().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -267,9 +268,10 @@ export const givethraRouter = router({
         const userId = ctx.user?.id ?? null;
         await db.insert(publicPosts).values({
           userId,
-          authorName: input.authorName,
-          authorEmail: input.authorEmail ? input.authorEmail : null,
+          authorName: input.authorName || (ctx.user?.name ?? "Guest Visitor"),
+          authorEmail: input.authorEmail ? input.authorEmail : (ctx.user?.email ?? null),
           content: input.content,
+          imageUrl: input.imageUrl ?? null,
           status: "pending",
         });
         ownerAlert("New Public Post ('What's on your mind')", `${input.authorName} posted: "${input.content.slice(0, 100)}..."`);

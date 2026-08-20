@@ -1,0 +1,1 @@
+ALTER TABLE `public_posts` ADD `imageUrl` text;
