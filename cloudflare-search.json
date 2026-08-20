@@ -1,1 +1,0 @@
-{"code":"async () => { const out = []; for (const [path, methods] of Object.entries(spec.paths)) { const text = (path + ' ' + JSON.stringify(methods)).toLowerCase(); if (path.includes('/workers/') && (text.includes('asset') || text.includes('deployment') || text.includes('version') || text.includes('script'))) out.push({path, methods:Object.keys(methods)}); } return out; }"}
