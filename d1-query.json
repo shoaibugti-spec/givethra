@@ -1,0 +1,1 @@
+{"code":"async () => cloudflare.request({method: \"POST\", path: `/accounts/${accountId}/d1/database/5ad1094c-3288-4519-aeec-0446d82126f6/raw`, body: {sql: \"SELECT id, category, title, photo_urls, selfie_url, video_url, category_details FROM case_submissions ORDER BY submitted_at DESC LIMIT 2;\"}})"}

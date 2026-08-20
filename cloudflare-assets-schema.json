@@ -1,0 +1,1 @@
+{"code":"async () => { const paths = ['/accounts/{account_id}/workers/assets/upload','/accounts/{account_id}/workers/scripts/{script_name}/deployments','/accounts/{account_id}/workers/scripts/{script_name}/versions','/accounts/{account_id}/workers/scripts/{script_name}']; const out = {}; for (const p of paths) out[p] = spec.paths[p]; return out; }"}
