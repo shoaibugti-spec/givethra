@@ -143,3 +143,22 @@ export const pushSubscriptions = mysqlTable(
   },
   table => [index("push_subscriptions_user_index").on(table.userId)],
 );
+
+
+export const publicPosts = mysqlTable(
+  "public_posts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId"), // optional if visitor is not logged in
+    authorName: varchar("authorName", { length: 160 }).notNull(),
+    authorEmail: varchar("authorEmail", { length: 320 }),
+    content: text("content").notNull(),
+    status: mysqlEnum("status", ["pending", "read", "resolved"]).default("pending").notNull(),
+    adminReply: text("adminReply"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("public_posts_status_index").on(table.status), index("public_posts_created_index").on(table.createdAt)]
+);
+
+export type PublicPost = typeof publicPosts.$inferSelect;
+export type InsertPublicPost = typeof publicPosts.$inferInsert;

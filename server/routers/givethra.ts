@@ -8,6 +8,7 @@ import {
   notifications,
   profiles,
   pushSubscriptions,
+  publicPosts,
   supportMessages,
   users,
 } from "../../drizzle/schema";
@@ -97,6 +98,32 @@ export const givethraRouter = router({
         .where(and(eq(cases.id, input.id), eq(cases.status, "approved")))
         .limit(1);
       return rows[0] ?? null;
+    }),
+    publicPosts: router({
+      submit: publicProcedure
+        .input(
+          z.object({
+            authorName: z.string().trim().min(2).max(120),
+            authorEmail: z.string().trim().email().max(160).optional().or(z.literal("")),
+            content: z.string().trim().min(3).max(2000),
+          })
+        )
+        .mutation(async ({ ctx, input }) => {
+          const db = await requireDb();
+          const userId = ctx.user?.id ?? null;
+          await db.insert(publicPosts).values({
+            userId,
+            authorName: input.authorName,
+            authorEmail: input.authorEmail || null,
+            content: input.content,
+            status: "pending",
+          });
+          ownerAlert(
+            "New Public Post / Note",
+            `${input.authorName}${input.authorEmail ? ` (${input.authorEmail})` : ""} shared a note: “${input.content.slice(0, 100)}…”`
+          );
+          return { success: true };
+        }),
     }),
   }),
 
@@ -252,6 +279,30 @@ export const givethraRouter = router({
     }),
   }),
 
+  publicPosts: router({
+    submit: publicProcedure
+      .input(
+        z.object({
+          authorName: z.string().trim().min(2).max(160),
+          authorEmail: z.string().trim().email().optional().or(z.literal("")),
+          content: z.string().trim().min(3).max(2000),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const db = await requireDb();
+        const userId = ctx.user?.id ?? null;
+        await db.insert(publicPosts).values({
+          userId,
+          authorName: input.authorName,
+          authorEmail: input.authorEmail ? input.authorEmail : null,
+          content: input.content,
+          status: "pending",
+        });
+        ownerAlert("New Public Post ('What's on your mind')", `${input.authorName} posted: "${input.content.slice(0, 100)}..."`);
+        return { success: true };
+      }),
+  }),
+
   support: router({
     mine: protectedProcedure.query(async ({ ctx }) => {
       const db = await requireDb();
@@ -268,14 +319,44 @@ export const givethraRouter = router({
   admin: router({
     overview: adminProcedure.query(async () => {
       const db = await requireDb();
-      const [userCount, kycCount, caseCount, messageCount] = await Promise.all([
+      const [userCount, kycCount, caseCount, messageCount, publicPostCount] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(users),
         db.select({ count: sql<number>`count(*)` }).from(kycSubmissions).where(eq(kycSubmissions.status, "pending")),
         db.select({ count: sql<number>`count(*)` }).from(cases).where(eq(cases.status, "pending")),
         db.select({ count: sql<number>`count(*)` }).from(supportMessages).where(eq(supportMessages.senderRole, "user")),
+        db.select({ count: sql<number>`count(*)` }).from(publicPosts).where(eq(publicPosts.status, "pending")),
       ]);
-      return { users: Number(userCount[0]?.count ?? 0), pendingKyc: Number(kycCount[0]?.count ?? 0), pendingCases: Number(caseCount[0]?.count ?? 0), supportMessages: Number(messageCount[0]?.count ?? 0) };
+      return {
+        users: Number(userCount[0]?.count ?? 0),
+        pendingKyc: Number(kycCount[0]?.count ?? 0),
+        pendingCases: Number(caseCount[0]?.count ?? 0),
+        supportMessages: Number(messageCount[0]?.count ?? 0),
+        publicPosts: Number(publicPostCount[0]?.count ?? 0),
+      };
     }),
+    publicPosts: adminProcedure.query(async () => {
+      const db = await requireDb();
+      return db.select().from(publicPosts).orderBy(desc(publicPosts.createdAt));
+    }),
+    updatePublicPost: adminProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          status: z.enum(["pending", "read", "resolved"]),
+          adminReply: z.string().trim().max(2000).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const db = await requireDb();
+        await db
+          .update(publicPosts)
+          .set({
+            status: input.status,
+            adminReply: input.adminReply !== undefined ? input.adminReply : undefined,
+          })
+          .where(eq(publicPosts.id, input.id));
+        return { success: true };
+      }),
     kyc: adminProcedure.input(z.object({ state: status.optional() }).optional()).query(async ({ input }) => {
       const db = await requireDb();
       return db.select().from(kycSubmissions).where(input?.state ? eq(kycSubmissions.status, input.state) : undefined).orderBy(desc(kycSubmissions.submittedAt));

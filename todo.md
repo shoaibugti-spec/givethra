@@ -56,3 +56,10 @@
 - [x] Implement robust timeout, error catching, and retry logic on frontend fetch calls to prevent "Failed to fetch" freezes
 - [x] Ensure Google button and manual account chooser trigger are foolproof across all mobile and desktop browsers
 - [x] Run test suite and production build verification
+
+## Public Posts ("What's on your mind?") Feature
+- [ ] Add `publicPosts` table in `drizzle/schema.ts` and generate/apply D1 migration
+- [ ] Add public submit procedure and admin list/status mutation in tRPC router (`server/routers/givethra.ts`)
+- [ ] Add compact, beautifully styled "What's on your mind?" submission card on Home.tsx between slider and Become a Hero section
+- [ ] Add Public Posts tab and unread badge count in AdminPanel (`client/src/pages/GivethraPages.tsx`)
+- [ ] Run test suite, production build, and save stable checkpoint
