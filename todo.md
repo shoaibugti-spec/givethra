@@ -120,7 +120,7 @@
 ## Path-Only Repository Layout Restoration (per user history files)
 - [ ] Parse user uploaded history files (`repo_tracked_files.txt`, `repo_tracked_tree.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to establish the exact original paths.
 - [ ] Compare current repo paths with the user's history files to identify structural layout discrepancies.
-- [ ] Correct folder placement and file paths to match the original inventory without altering any code logic, database schema, or authentication flows.
+- [ ] Correct false folder placement or missing paths to match the original inventory.
 - [x] Run test suite and production build verification to ensure absolute runtime stability.
 - [ ] Provide a concise inventory report confirming original path alignment.
 
@@ -135,3 +135,10 @@
 - [x] Audit wrangler.toml, Cloudflare bindings, D1 database schema (`givethra-auth`), and R2 object storage (`givethra-user-uploads`)
 - [x] Check Drizzle schema alignment with local D1 tables and query helpers in `server/db.ts`
 - [x] Generate comprehensive Three-Way Consistency Audit Report (`/home/ubuntu/givethra-consistency-audit.md`)
+
+## GitHub Actions CI/CD Pipeline Setup
+- [x] Audit current repository build scripts, worker setup, and existing workflows
+- [x] Design safe GitHub Actions workflow for automated validation and deployment
+- [x] Create `.github/workflows/deploy.yml` with test, build, and Cloudflare deploy steps
+- [x] Verify local test suite (`pnpm test`) and production build (`pnpm build`)
+- [x] Commit and push CI/CD workflow to remote repository (`shoaibugti-spec/givethra`)
