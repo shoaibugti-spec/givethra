@@ -205,3 +205,37 @@
 - [x] Implement a searchable Google Translate language selector component with all supported languages
 - [x] Run test suite (`pnpm test`) and production build (`pnpm build`)
 - [x] Save checkpoint and report status while keeping publish on hold
+
+- [x] Run repository-wide scan and ensure 100% English-only UI
+- [x] Verify searchable Google Translate with all supported languages
+- [x] Run all tests and build successfully
+
+## Live givethra.org Comparison Audit
+- [x] Inspect live givethra.org web page structure and elements
+- [x] Compare live page against managed preview and GitHub repository source code
+- [x] Generate comprehensive live comparison report (`/home/ubuntu/givethra-live-comparison-report.md`)
+- [x] Confirm zero production modifications and keep publish strictly on hold
+
+## Verified Comparison Completion
+- [x] Perform source-backed comparison between live givethra.org and repository source
+- [x] Update comparison report with precise architectural distinctions
+
+## Admin Panel & Public Feedback Box Enhancements
+- [ ] Audit admin case details, document/media attachment rendering, and support message notification unread counters
+- [ ] Ensure all case fields (Title, Description, Amount, Institute details, Bank/Receiver info, KYC evidence) display cleanly in separate Admin Panel boxes
+- [ ] Verify R2 storage URLs (`/manus-storage/...`) render correctly for images, PDFs, and video statements in Admin Dashboard
+- [ ] Implement/verify public feedback post box on homepage for guests and signed-in users with "What's on your mind?" placeholder
+- [ ] Ensure public feedback submissions are visible exclusively to admins in a grouped conversation thread view inside the Admin Panel
+- [ ] Run test suite (`pnpm test`) and production build (`pnpm build`) to verify zero regressions
+- [ ] Save checkpoint and report status while keeping publish strictly on hold
+
+## Admin Panel & Public Feedback Box Verification
+- [x] Verified Admin Case Detail rendering of all database fields, category details, and uploaded documents/media.
+- [x] Verified Support Chat unread counts, sender grouping, and admin replies.
+- [x] Verified public feedback box capability on homepage with guest support and admin-only panel review.
+- [x] Verified test suite passing and production build compilation while keeping live Cloudflare Worker and D1/R2 data 100% intact.
+
+## Final Pre-Deployment Readiness Audit & Safety Gate
+- [ ] Investigate missing server entrypoint error (`server/_core/index.ts`) reported in dev server logs.
+- [ ] Re-verify Cloudflare Worker proxy and D1/R2 data isolation.
+- [ ] Confirm zero risks to live `givethra.org` before any deployment discussion.
