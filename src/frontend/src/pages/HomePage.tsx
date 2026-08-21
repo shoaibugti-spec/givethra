@@ -49,6 +49,7 @@ import {
   getUnlockCount,
   getUnreadNotificationsCount,
 } from "@/lib/api";
+import { toast } from "sonner"; // ✅ شامل کیا گیا
 
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
@@ -214,10 +215,7 @@ export default function HomePage() {
       loadGuideStatus();
       loadUnlockCount();
 
-      // Poll for notifications every 20 seconds
       const interval = setInterval(loadNotifCount, 20000);
-
-      // Refresh cases periodically
       const caseInterval = setInterval(loadCases, 60000);
 
       return () => {
@@ -287,14 +285,10 @@ export default function HomePage() {
     image: "/assets/generated/hero-givethra.dim_1200x500.jpg",
   };
 
-  // Build guide slides based on auth status
   const guideSlides: any[] = [];
-
-  // Always include the hand slide first
   guideSlides.push(HAND_SLIDE);
 
   if (!isAuthenticated) {
-    // For non-authenticated users: show two action slides
     guideSlides.push({
       key: "free_helps",
       type: "action",
@@ -318,7 +312,6 @@ export default function HomePage() {
       bg: "bg-primary/10",
     });
   } else {
-    // For authenticated users, keep the existing guide slides
     if (kycStatus !== "approved") {
       guideSlides.push({ key: "announce", type: "announce", to: "/kyc" });
       guideSlides.push({
@@ -370,7 +363,6 @@ export default function HomePage() {
     }
   }
 
-  // Auto-slide timer
   useEffect(() => {
     if (guideSlides.length <= 1) return;
     const t = setInterval(() => {
@@ -456,7 +448,6 @@ export default function HomePage() {
 
   const currentSlide = guideSlides[slideIndex] ?? HAND_SLIDE;
 
-  // Render slide content based on type
   function renderSlideContent() {
     if (currentSlide.type === "image") {
       return (
@@ -513,7 +504,6 @@ export default function HomePage() {
         </button>
       );
     }
-    // Default guide slide (for authenticated)
     return (
       <button
         type="button"
@@ -560,6 +550,7 @@ export default function HomePage() {
           <div className="absolute bottom-0 -left-16 h-48 w-48 rounded-full bg-primary/8 blur-2xl" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 pt-8 pb-6 md:py-12 flex flex-col md:flex-row items-center gap-6 md:gap-12">
+          {/* LEFT SIDE: TEXT & BUTTONS */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -620,56 +611,82 @@ export default function HomePage() {
             )}
           </motion.div>
 
+          {/* RIGHT SIDE: PUBLIC POST BOX + SLIDER */}
           <motion.div
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.65, delay: 0.15 }}
             className="flex-1 w-full space-y-4"
           >
-            {/* Public Post Above Slider */}
+            {/* ✅ PUBLIC POST BOX (درست شدہ) */}
             <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm text-left">
               <div className="flex items-center gap-2 mb-2">
                 <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-sm font-semibold text-foreground">What's on your mind? (Public Post)</h3>
+                <h3 className="text-sm font-semibold text-foreground">
+                  💭 What's on your mind?
+                </h3>
               </div>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                const formEl = e.currentTarget;
-                const inputEl = formEl.elements.namedItem("postText") as HTMLInputElement;
-                const txt = inputEl?.value?.trim();
-                if (!txt) return;
-                try {
-                  const res = await fetch("/api/public-feedback", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: txt, guest_name: user?.name || "Guest Visitor" })
-                  });
-                  if (res.ok) {
-                    toast.success("Thank you! Your post has been posted for the Givethra.");
-                    formEl.reset();
-                  } else {
-                    toast.error("Failed to post. Please try again.");
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formEl = e.currentTarget;
+                  const inputEl = formEl.elements.namedItem("postText") as HTMLInputElement;
+                  const txt = inputEl?.value?.trim();
+                  if (!txt) {
+                    toast.error("Please write something.");
+                    return;
                   }
-                } catch {
-                  toast.success("Thank you! Your post has been recorded.");
-                  formEl.reset();
-                }
-              }} className="space-y-2">
+                  try {
+                    const payload: any = {
+                      message: txt,
+                      display_name: isAuthenticated
+                        ? user?.full_name || user?.name || user?.email?.split("@")[0] || "User"
+                        : "Guest",
+                      is_guest: !isAuthenticated,
+                      user_id: isAuthenticated ? user?.id : null,
+                    };
+                    const res = await fetch("/api/community-posts", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    });
+                    if (res.ok) {
+                      toast.success("Thank you! Your post has been shared.");
+                      formEl.reset();
+                      // Reset textarea height if needed
+                      const ta = formEl.querySelector("textarea");
+                      if (ta) ta.style.height = "auto";
+                    } else {
+                      const err = await res.json();
+                      toast.error(err?.error || "Failed to post. Please try again.");
+                    }
+                  } catch {
+                    toast.error("Network error. Please try again.");
+                  }
+                }}
+                className="space-y-2"
+              >
                 <input
-                  name="PostText"
+                  name="postText"
                   placeholder="Write your thoughts..."
                   className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                   required
                 />
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground">Visible only in Givethra</span>
-                  <button type="submit" className="px-3 py-1.5 font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition">
+                  <span className="text-muted-foreground">
+                    {isAuthenticated ? `Logged in as ${user?.full_name || user?.email}` : "Posting as Guest"}
+                  </span>
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition"
+                  >
                     Post
                   </button>
                 </div>
               </form>
             </div>
 
+            {/* SLIDER */}
             <div className="relative w-full rounded-2xl overflow-hidden shadow-xl">
               {renderSlideContent()}
 
@@ -753,8 +770,7 @@ export default function HomePage() {
                 setFilterCountry(detectedCountry);
                 if (detectedCity) setFilterCity(detectedCity);
                 setTimeout(
-                  () =>
-                    resultsRef.current?.scrollIntoView({ behavior: "smooth" }),
+                  () => resultsRef.current?.scrollIntoView({ behavior: "smooth" }),
                   100
                 );
               }}
@@ -947,10 +963,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section
-        ref={resultsRef}
-        className="py-8 px-4 bg-background scroll-mt-32"
-      >
+      <section ref={resultsRef} className="py-8 px-4 bg-background scroll-mt-32">
         <div className="max-w-7xl mx-auto space-y-5">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-bold">
@@ -970,9 +983,7 @@ export default function HomePage() {
           </div>
 
           {loading ? (
-            <div className="text-center py-16 text-muted-foreground">
-              Loading...
-            </div>
+            <div className="text-center py-16 text-muted-foreground">Loading...</div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 rounded-xl border border-dashed border-border bg-muted/20">
               <p className="text-foreground font-semibold">No cases found.</p>
@@ -980,12 +991,7 @@ export default function HomePage() {
                 Try changing your filters or location.
               </p>
               {activeFilterCount > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={resetFilters}
-                >
+                <Button variant="outline" size="sm" className="mt-4" onClick={resetFilters}>
                   Clear Filters
                 </Button>
               )}
@@ -1000,8 +1006,7 @@ export default function HomePage() {
                 const percent =
                   needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
                 const remaining = Math.max(needed - collected, 0);
-                const appeal =
-                  CATEGORY_APPEAL[c.category] ?? "Be someone's hope today 🤲";
+                const appeal = CATEGORY_APPEAL[c.category] ?? "Be someone's hope today 🤲";
                 const isDone = needed > 0 && collected >= needed;
                 return (
                   <motion.div
@@ -1344,37 +1349,22 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
-            <Link
-              to="/about"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/about" className="hover:text-primary transition-colors">
               About
             </Link>
             <Link to="/faq" className="hover:text-primary transition-colors">
               FAQ
             </Link>
-            <Link
-              to="/privacy"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/privacy" className="hover:text-primary transition-colors">
               Privacy Policy
             </Link>
-            <Link
-              to="/terms"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/terms" className="hover:text-primary transition-colors">
               Terms
             </Link>
-            <Link
-              to="/community-guidelines"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/community-guidelines" className="hover:text-primary transition-colors">
               Community Guidelines
             </Link>
-            <Link
-              to="/contact"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/contact" className="hover:text-primary transition-colors">
               Contact Us
             </Link>
           </div>
