@@ -2084,73 +2084,74 @@ export default function SubmitRequestPage() {
   }
 
   function renderPaymentReceiverDetails() {
-    if (!needsPaymentReceiver) return null;
+  if (!needsPaymentReceiver) return null;
 
-    return (
-      <div className="pt-2 space-y-3 border-t border-border">
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
-          <p className="text-xs font-semibold text-primary mb-2">📌 {getReceiverLabel()} Payment Details</p>
-          <p className="text-[11px] text-muted-foreground mb-2">
-            💡 Provide the official institute, school, hospital, or supplier details where funds should be sent so Givethra can verify.
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <Label>{getReceiverLabel()} Name *</Label>
-              <Input
-                value={receiverName}
-                onChange={(e) => setReceiverName(e.target.value)}
-                placeholder={`Enter ${getReceiverLabel()} full name`}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{getReceiverLabel()} Contact Number *</Label>
-              <Input
-                value={receiverContact}
-                onChange={(e) => setReceiverContact(e.target.value)}
-                placeholder="Phone number for verification"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Shop / Business Name {["Food & Groceries", "Medicines", "Home Repair"].includes(category) ? "*" : ""}</Label>
-              <Input
-                value={receiverShopName}
-                onChange={(e) => setReceiverShopName(e.target.value)}
-                placeholder="Shop or business name"
-              />
-              {["Food & Groceries", "Medicines", "Home Repair"].includes(category) && (
-                <p className="text-[11px] text-muted-foreground">💡 Required for shop purchases</p>
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label>{getReceiverLabel()} Bank Name *</Label>
-              <Input
-                value={receiverBank}
-                onChange={(e) => setReceiverBank(e.target.value)}
-                placeholder="Bank name"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{getReceiverLabel()} Account Number *</Label>
-              <Input
-                value={receiverAccount}
-                onChange={(e) => setReceiverAccount(e.target.value)}
-                placeholder="Account number"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{getReceiverLabel()} Address / Shop Address *</Label>
-              <Textarea
-                value={receiverAddress}
-                onChange={(e) => setReceiverAddress(e.target.value)}
-                placeholder="Complete address of the receiver/shop"
-                rows={2}
-              />
-              <p className="text-[11px] text-muted-foreground">💡 Complete address for verification purposes</p>
-            </div>
+  return (
+    <div className="pt-2 space-y-3 border-t border-border">
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+        <p className="text-xs font-semibold text-primary mb-2">📌 {getReceiverLabel()} Payment Details</p>
+        <p className="text-[11px] text-muted-foreground mb-2">
+          💡 Provide the official institute, school, hospital, or supplier details where funds should be sent so Givethra can verify.
+        </p>
+        <div className="space-y-2">
+          <div className="space-y-1">
+            <Label>{getReceiverLabel()} Name *</Label>
+            <Input
+              value={receiverName}
+              onChange={(e) => setReceiverName(e.target.value)}
+              placeholder={`Enter ${getReceiverLabel()} full name`}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>{getReceiverLabel()} Contact Number *</Label>
+            <Input
+              value={receiverContact}
+              onChange={(e) => setReceiverContact(e.target.value)}
+              placeholder="Phone number for verification"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Shop / Business Name {["Food & Groceries", "Medicines", "Home Repair"].includes(category) ? "*" : ""}</Label>
+            <Input
+              value={receiverShopName}
+              onChange={(e) => setReceiverShopName(e.target.value)}
+              placeholder="Shop or business name"
+            />
+            {["Food & Groceries", "Medicines", "Home Repair"].includes(category) && (
+              <p className="text-[11px] text-muted-foreground">💡 Required for shop purchases</p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <Label>{getReceiverLabel()} Bank Name *</Label>
+            <Input
+              value={receiverBank}
+              onChange={(e) => setReceiverBank(e.target.value)}
+              placeholder="Bank name"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>{getReceiverLabel()} Account Number *</Label>
+            <Input
+              value={receiverAccount}
+              onChange={(e) => setReceiverAccount(e.target.value)}
+              placeholder="Account number"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>{getReceiverLabel()} Address / Shop Address *</Label>
+            <Textarea
+              value={receiverAddress}
+              onChange={(e) => setReceiverAddress(e.target.value)}
+              placeholder="Complete address of the receiver/shop"
+              rows={2}
+            />
+            <p className="text-[11px] text-muted-foreground">💡 Complete address for verification purposes</p>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   function renderPaymentReceiver() {
     if (!shouldShowPaymentReceiver()) return null;
