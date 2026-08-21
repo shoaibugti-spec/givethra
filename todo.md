@@ -450,9 +450,16 @@
 - [x] Identify whether the live site is using an older branch, stale build, or different homepage file; the live deployment is stale because validation/install failed before the current source could deploy.
 - [x] Ensure the Public Post section remains visible above the slider and its send endpoint is included in the canonical deploy source.
 - [x] Verify the exact deployment action needed without publishing or showing preview/settings cards: sync the verified source to main and rerun the existing deploy workflow.
-- [x] Run the relevant regression/build checks after the source correction; checkpointing remains pending until the final diff is reviewed.
+- [x] Run the relevant regression/build checks after the source correction; checkpoint afc02da1 is saved without publishing.
 
 ## Confirmed GitHub CI Blocker
 - [x] Fix the canonical GitHub Actions frontend install so pnpm v10 does not abort on ignored dependency build scripts.
 - [x] Preserve the existing Cloudflare deploy workflow and application behavior while allowing only required build dependencies.
 - [x] Re-run the exact canonical workflow-equivalent install/build checks locally after the workflow fix.
+
+## Confirmed Homepage Public Post Missing on Mobile
+- [x] Restore the complete Public Post composer on the canonical homepage after the hero/banner and before the homepage content cards or slider.
+- [x] Ensure the composer is rendered for mobile visitors as well as desktop visitors and is not hidden by an auth or viewport condition in the canonical source.
+- [x] Preserve the simple Public Post heading, textarea, Post Message button, and guest submission behavior.
+- [x] Add a mobile regression assertion for the visible composer and run the canonical tests/build.
+- [ ] Save a checkpoint without publishing, deploying, or showing preview/settings cards.
