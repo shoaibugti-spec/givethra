@@ -361,7 +361,15 @@
 - [x] Run `pnpm build` in `src/frontend` to verify 100% clean compilation.
 
 ## Givethra GitHub & Cloudflare Architecture Documentation (givethra.org)
-- [ ] Inventory complete file tree of the Givethra repository (`src/frontend/`, worker.js, wranger.toml / config, GitHub workflows).
-- [ ] Document Cloudflare Worker routing, D1 SQLite database tables and queries, R2 storage bucket bindings, and Google OAuth upsert for 7,000 legacy users.
-- [ ] Document GitHub Actions CI/CD deployment pipeline and live domain routing for givethra.org.
-- [ ] Produce a comprehensive, professional technical report in Urdu.
+- [x] Inventory complete file tree of the Givethra repository (`src/frontend/`, worker.js, wranger.toml / config, GitHub workflows).
+- [x] Document Cloudflare Worker routing, D1 SQLite database tables and queries, R2 storage bucket bindings, and Google OAuth upsert for 7,000 legacy users.
+- [x] Document GitHub Actions CI/CD deployment pipeline and live domain routing for givethra.org.
+- [x] Produce a professional technical report in Urdu (`GIVETHRA_ARCHITECTURE_REPORT.md`).
+
+## GitHub Reconciliation & Verified Feature Implementation (givethra.org)
+- [x] Inspect GitHub remote (`gh repo view`, `git status`, `git log`) to verify what is actually pushed versus local state.
+- [x] Ensure Admin case attachment file list displays original, human-readable file names and direct working links.
+- [x] Implement and verify the homepage "What's on your mind?" public/signed-in post box above the slider.
+- [x] Implement and verify the dedicated **Posts** folder in the Admin Dashboard showing user ID or "Public".
+- [x] Ensure the homepage slider is 100% pure English across all accounts including Admin.
+- [x] Commit all changes to the active GitHub branch and verify GitHub Actions Cloudflare build passes.
