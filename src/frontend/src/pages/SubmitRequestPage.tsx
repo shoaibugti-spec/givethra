@@ -2087,7 +2087,7 @@ export default function SubmitRequestPage() {
           <p className="text-xs font-semibold text-primary mb-2">📌 {getReceiverLabel()} Payment Details</p>
           <p className="text-[11px] text-muted-foreground mb-2">
             💡 Provide the official institute, school, hospital, or supplier details where funds should be sent so Givethra can verify.
-          </p>}
+          </p>
           <div className="space-y-2">
             <div className="space-y-1">
               <Label>{getReceiverLabel()} Name *</Label>

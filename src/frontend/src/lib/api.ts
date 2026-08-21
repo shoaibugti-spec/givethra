@@ -724,3 +724,15 @@ export async function getCaseCount(userId: string): Promise<number> {
     return 0;
   }
 }
+
+
+export async function getChatMessages(userId: string) {
+  const res = await fetch(`${WORKER_URL}/api/support/messages?user_id=${userId}`, {
+    headers: headers(),
+  });
+  return res.json();
+}
+
+export async function sendChatMessage(data: any) {
+  return sendSupportMessage(data);
+}
