@@ -626,18 +626,18 @@ export default function HomePage() {
             transition={{ duration: 0.65, delay: 0.15 }}
             className="flex-1 w-full space-y-4"
           >
-            {/* Public Help & Feedback Box Above Slider */}
+            {/* Public message box above slider */}
             <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm text-left">
               <div className="flex items-center gap-2 mb-2">
                 <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-sm font-semibold text-foreground">What would you like to share with Givethra?</h3>
+                <h3 className="text-sm font-semibold text-foreground">What’s on your mind? (Any problem with Givethra?)</h3>
               </div>
-              <p className="mb-3 text-xs leading-5 text-muted-foreground">Share a message, suggestion, question, or anything you would like us to know.</p>
+              <p className="mb-3 text-xs leading-5 text-muted-foreground">If you are facing a problem anywhere on Givethra, write it here.</p>
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const formEl = e.currentTarget;
-                const inputEl = formEl.elements.namedItem("feedbackText") as HTMLInputElement;
-                const txt = inputEl?.value?.trim();
+                const field = formEl.elements.namedItem("feedbackText") as HTMLInputElement | HTMLTextAreaElement;
+                const txt = field?.value?.trim();
                 if (!txt) return;
                 try {
                   const token = localStorage.getItem("auth_token");
@@ -649,20 +649,21 @@ export default function HomePage() {
                     },
                     body: JSON.stringify({ message: txt, guest_name: user?.fullName || "Public Visitor" })
                   });
-                  if (res.ok) {
-                    toast.success("Thank you! Your message has been sent successfully.");
-                    formEl.reset();
-                  } else {
-                    toast.error("Failed to send message. Please try again.");
+                  const result = await res.json().catch(() => null);
+                  if (!res.ok) {
+                    throw new Error(result?.error || "Failed to send message.");
                   }
-                } catch {
-                  toast.error("We could not send your message. Please check your connection and try again.");
+                  toast.success("Your message has been sent.");
+                  formEl.reset();
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "We could not send your message. Please try again.");
                 }
               }} className="space-y-2">
-                <input
+                <textarea
                   name="feedbackText"
-                  placeholder="Write a message..."
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  rows={3}
+                  placeholder="Write your message..."
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
                   required
                 />
                 <div className="flex justify-end items-center text-xs">

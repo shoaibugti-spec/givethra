@@ -410,7 +410,7 @@
 - [x] Ensure Admin Posts lists all public messages with a simple Public or user identity label.
 - [x] Add regression coverage for an unauthenticated guest submission and Admin Posts filtering.
 - [x] Run guest-flow tests and the canonical Cloudflare production build.
-- [ ] Save a checkpoint without publishing, deploying, or showing a preview/settings card.
+- [x] Save a checkpoint without publishing, deploying, or showing a preview/settings card.
 
 ## Confirmed Live Guest Submission Failure
 - [x] Align the deployed-compatible Worker source so `/api/public-feedback` exists for anonymous POST requests.
@@ -420,4 +420,13 @@
 - [x] Verify Posts loads messages from the same D1 feedback inbox with Public or user identity labels.
 - [x] Add an automated anonymous POST regression test that exercises the Worker handler without a Google token.
 - [x] Run the canonical frontend tests, repository tests, Worker syntax check, and Cloudflare production build.
-- [ ] Save a source checkpoint without deploying or publishing.
+- [x] Save a source checkpoint without deploying or publishing.
+
+## User-Reported Post Message Failure — Follow-up
+- [x] Reproduce and trace why the public Post Message action is not sending for guest visitors; the live Worker lacked the deployed public route.
+- [x] Make the canonical guest submission request and Worker persistence path agree exactly.
+- [x] Finalize the public post-box words as simple visitor messaging language with no Admin, Support, Help, or visibility instructions.
+- [x] Verify the standalone Admin Posts tab receives the newly submitted guest row from the shared D1 feedback inbox; live verification remains deployment-dependent because the deployed Worker is stale.
+- [x] Add or update regression coverage for the actual failing send path.
+- [x] Run the canonical frontend tests, repository tests, Worker syntax check, and Cloudflare production build.
+- [ ] Save a repaired source checkpoint without publishing, deploying, or showing preview/settings cards.
