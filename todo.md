@@ -291,3 +291,6 @@
 - [x] Confirmed screenshot and acknowledged that Manus managed preview cards must never be presented as givethra.org.
 
 - [x] Fixed the JSX closing brace error in SubmitRequestPage.tsx, verified local build and tests, and pushed the clean commit to GitHub.
+
+## Permanent Ban on Manus Checkpoint Cards
+- [x] Permanently stopped sending Manus managed preview cards (`manus-webdev://...`) to the user, confirming https://givethra.org as the sole canonical live domain.
