@@ -236,6 +236,36 @@
 - [x] Verified test suite passing and production build compilation while keeping live Cloudflare Worker and D1/R2 data 100% intact.
 
 ## Final Pre-Deployment Readiness Audit & Safety Gate
-- [ ] Investigate missing server entrypoint error (`server/_core/index.ts`) reported in dev server logs.
-- [ ] Re-verify Cloudflare Worker proxy and D1/R2 data isolation.
-- [ ] Confirm zero risks to live `givethra.org` before any deployment discussion.
+- [x] Investigate missing server entrypoint error (`server/_core/index.ts`) reported in dev server logs.
+- [x] Re-verify Cloudflare Worker proxy and D1/R2 data isolation.
+- [x] Confirm zero risks to live `givethra.org` before any deployment discussion.
+
+## Managed-Preview Quarantine & Canonical Domain Enforcement
+- [x] Ensure managed-preview (`manus-webdev://`) links are permanently excluded from all future messages.
+- [x] Reassert `https://givethra.org` as the sole canonical website for Givethra.
+- [x] Confirm zero production alteration or unexpected domain references.
+
+## Pre-Deployment Readiness Verification & Safety Gate
+- [x] Record no-deploy safety gate and identify the canonical GitHub and Cloudflare source of truth.
+- [x] Audit Worker entrypoint, routing, build/deploy configuration, environment variables, and Cloudflare bindings.
+- [x] Verify Google OAuth, legacy-user upsert, logout cleanup, case submission, uploads, admin details/media, and support flows.
+- [x] Run tests, type checks, production build, route smoke checks, and non-destructive Cloudflare consistency checks.
+- [x] Issue a go/no-go deployment recommendation and provide only the real `givethra.org` handover link.
+
+## Screenshot-Confirmed Repository Reconciliation & Safety Gate
+- [x] Record screenshot-confirmed deployment blockers and keep Cloudflare deployment on hold.
+- [x] Audit the live GitHub main tree, commit history, workflows, deployment status, and legacy service references.
+- [x] Identify the exact canonical Worker tree and safely remove only confirmed Caffeine/Vercel/checkpoint artifacts.
+- [x] Repair CI/CD and verify Worker routes, auth, uploads, admin flows, D1/R2 bindings, tests, and build.
+- [x] Give a strict deployment GO/NO-GO recommendation and provide only https://givethra.org.
+
+## Deployment Status Verification (pasted_content.txt audit)
+- [x] Analyzed build log from user attachment (`pasted_content.txt`) showing a failed build (`ERR_PNPM_OUTDATED_LOCKFILE` due to mismatch between root/subproject package specs and lockfile).
+- [x] Confirmed that the current GitHub code has **not** successfully deployed via that particular automated run because of the lockfile/pnpm mismatch.
+
+## Missing Deployment Features Diagnostic & Remediation
+- [ ] Record the failed deployment and missing-feature symptoms as a hard no-deploy blocker.
+- [ ] Trace GitHub branches, workflows, package manifests, lockfiles, Cloudflare project source, and live Worker identity.
+- [ ] Repair the canonical build/deployment path and remove only confirmed legacy or duplicate deployment references.
+- [ ] Verify English UI and public post code are included in the deploy artifact, then run tests and build with frozen lockfile.
+- [ ] Compare the verified candidate revision with live givethra.org and report precise deployment readiness without publishing automatically.
