@@ -406,7 +406,11 @@ export async function sendSupportMessage(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  const jsonRes = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(jsonRes.error || `Failed to send message (${res.status})`);
+  }
+  return jsonRes;
 }
 
 export async function markSupportMessagesAsRead(userId: string) {

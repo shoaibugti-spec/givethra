@@ -151,6 +151,21 @@ const DOC_LABELS: Record<string, string> = {
   treatment_patient_number: "Patient/Bill Number",
   disability_bank_title: "Bank Title",
   disability_bank_number: "Bank Number",
+  selfie_url: "Case Selfie",
+  video_url: "Case Appeal Video",
+  paid_receipt_url: "Paid Receipt / Transaction Proof",
+  medical_report_url: "Medical Report / Bill",
+  electricity_bill_url: "Electricity Bill",
+  cnic_front_url: "CNIC Front",
+  cnic_back_url: "CNIC Back",
+  income_certificate_url: "Income Certificate",
+  death_certificate_url: "Death Certificate",
+  fee_challan_url: "Fee Challan / Admission Letter",
+  rental_agreement_url: "Rental Agreement",
+  landlord_cnic_url: "Landlord CNIC",
+  shop_agreement_url: "Shop Agreement",
+  business_proof_url: "Business Proof",
+  disability_certificate_url: "Disability Certificate",
 };
 
 function getDocLabel(key: string): string {

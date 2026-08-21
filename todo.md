@@ -332,3 +332,12 @@
 - [ ] Refine `AdminDashboard.tsx` attachment collection and rendering logic so every uploaded file (selfie, video, paid receipt, photo arrays, category details, and category documents) displays its original filename and a valid, clickable download/view link without fallback hash labels.
 - [ ] Verify that all user-uploaded files are captured without omission.
 - [ ] Run automated tests and production build verification.
+
+## GitHub & Cloudflare Live Deployment Audit (givethra.org)
+- [ ] Audit `.github/workflows/` and Cloudflare worker configuration to ensure GitHub pushes automatically build and deploy to givethra.org without relying on Manus preview cards.
+- [ ] Verify clean git status and remote synchronization with `shoaibugti-spec/givethra`.
+
+## Precision Bug Fixes & Feedback Box
+- [ ] Fix support chat user message sending (prevent 'Failed to send' or invalid payload errors) and ensure robust timestamp/sender display.
+- [ ] Ensure Admin Case Panel displays meaningful original filenames (e.g. 'Electricity Bill', 'Medical Report', 'Case Selfie', 'ID Card Front') for every uploaded attachment instead of raw hash names.
+- [ ] Implement the public guest/user feedback box on the homepage (above slider) and verify admin-only inbox visibility.
