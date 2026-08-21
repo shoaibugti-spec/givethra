@@ -79,6 +79,14 @@
 
 - [x] All tasks completed successfully.
 
+## Priority Admin & Support Repairs (Current Sprint)
+- [x] Ensure 100% pure English localization across all Admin panels and views (removing any remaining admin-side Urdu).
+- [x] Fix support conversation message rendering so full message bodies and sender info are clearly visible to both admins and users.
+- [x] Fix unread support counts so unread message indicators properly update and reset to 0 once read by admin or user.
+- [x] Eliminate duplicated case fields in the Admin Panel view.
+- [x] Ensure every uploaded file and attachment in case details displays its original filename instead of raw/generated hash names.
+- [x] Defer public post-box work until these priority admin/support issues are fully verified.
+
 ## GitHub Synchronization for Public Posts Feature
 - [x] Audit local git status and remote `shoaibugti-spec/givethra` status
 - [x] Verify local changes for `publicPosts` schema, router, tests, and `GivethraPages.tsx` component placement

@@ -496,7 +496,7 @@ export default function AdminPage() {
   }
 
   async function cleanupAllRejectedFiles() {
-    if (!confirm("Yeh sab REJECTED KYC aur Cases ki files delete kar dega. Pakka?")) return;
+    if (!confirm("This will permanently delete all files associated with rejected KYC and cases. Are you sure?")) return;
     setLoading(true);
     try {
       const rejectedKyc = kycList.filter((k) => k.status === "rejected");
@@ -1377,6 +1377,16 @@ function OfferRow({ category, offer, onReload }: any) {
 // ============================================================
 function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   const [activeUser, setActiveUser] = useState<string | null>(null);
+
+  const openChat = async (uid: string) => {
+    setActiveUser(uid);
+    try {
+      await markSupportMessagesAsRead(uid);
+      if (onNewMessage) onNewMessage();
+    } catch (e) {
+      console.error("Failed to mark support messages as read:", e);
+    }
+  };
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -1481,7 +1491,7 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
     return (
       <div className="rounded-2xl border bg-card flex flex-col" style={{ height: "70vh" }}>
         <div className="flex items-center gap-2 p-3 border-b border-border bg-muted/20">
-          <button onClick={() => setActiveUser(null)} className="text-muted-foreground hover:text-foreground">
+          <button onClick={() => { setActiveUser(null); if (onNewMessage) onNewMessage(); }} className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="min-w-0 flex-1">
@@ -1834,8 +1844,34 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     if (typeof value !== "string") return;
     const url = value.trim();
     if (!url.startsWith("http")) return;
+    
+    // Extract original filename if present in url pathname or query
+        let label = getDocLabel(key);
+    try {
+      const parsedUrl = new URL(url);
+      // Check query parameter like filename or name if present
+      const qName = parsedUrl.searchParams.get("filename") || parsedUrl.searchParams.get("name");
+      let extracted = qName || "";
+      if (!extracted) {
+        const segments = parsedUrl.pathname.split("/");
+        const lastSeg = segments[segments.length - 1];
+        if (lastSeg) extracted = decodeURIComponent(lastSeg);
+      }
+      if (extracted) {
+        // Strip leading timestamp / uuid prefix numbers if any
+        const cleanName = extracted.replace(/^[0-9]{10,}[-_]?/, "").replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]?/i, "");
+        if (cleanName && !cleanName.match(/^[0-9a-f]{8,}$/i)) {
+          label = cleanName;
+        } else if (extracted && !extracted.match(/^[0-9a-f]{8,}$/i)) {
+          label = extracted;
+        }
+      }
+    } catch (e) {
+      // fallback to getDocLabel(key)
+    }
+
     if (!fileEntries.some((f) => f.url === url)) {
-      fileEntries.push({ key, label: getDocLabel(key), url });
+      fileEntries.push({ key, label, url });
     }
   };
 

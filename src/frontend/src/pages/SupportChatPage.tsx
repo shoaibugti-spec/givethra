@@ -55,10 +55,11 @@ export default function SupportChatPage() {
   async function loadMessages() {
     if (!user?.id) return;
     try {
-      const data = await getChatMessages(user.id);
-      setMessages(data || []);
+      const data = await getSupportMessages(user.id);
+      setMessages(Array.isArray(data) ? data : []);
+      await markSupportMessagesAsRead(user.id);
     } catch (e) {
-      // ignore
+      console.error("Failed to load messages:", e);
     }
   }
 
@@ -69,18 +70,19 @@ export default function SupportChatPage() {
     setText("");
     setSending(true);
     try {
-      const res = await sendChatMessage({
-        userId: user.id,
+      const res = await sendSupportMessage({
+        user_id: user.id,
         sender: "user",
         message: msgText,
       });
-      if (res?.success) {
+      if (res && (res.id || res.success !== false || res.message)) {
         await loadMessages();
       } else {
-        toast.error("Failed to send message.");
+        toast.error(res?.error || "Failed to send message.");
       }
     } catch (e) {
       toast.error("Failed to send. Please try again.");
+      console.error(e);
     } finally {
       setSending(false);
     }
@@ -185,21 +187,22 @@ export default function SupportChatPage() {
                       }`}
                     >
                       <p className="whitespace-pre-wrap leading-relaxed">{m.message}</p>
-                      {m.attachmentUrl && (
+                      {(m.attachment_url || m.attachmentUrl) && (
                         <a
-                          href={m.attachmentUrl}
+                          href={m.attachment_url || m.attachmentUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="mt-2 inline-flex items-center gap-1.5 text-xs underline font-medium opacity-90 hover:opacity-100"
                         >
-                          <FileText className="h-3 w-3" /> View attachment
+                          <FileText className="h-3 w-3" /> {m.filename || "View attachment"}
                         </a>
                       )}
                     </div>
                     <span className="text-[10px] text-muted-foreground mt-1 px-1">
                       {(() => {
-                        const t = Number(m.createdAt || m.created_at || Date.now());
-                        const d = isNaN(t) ? new Date() : new Date(t);
+                        const raw = m.created_at || m.createdAt;
+                        if (!raw) return "";
+                        const d = new Date(typeof raw === "number" ? raw : String(raw));
                         return isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
                       })()}
                     </span>
