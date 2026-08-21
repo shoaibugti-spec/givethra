@@ -110,27 +110,27 @@
 - [x] Reorganize code files into clear, modular components and route files so frontend pages (`client/src/pages/`) remain clean and easy to navigate.
 - [x] Verify that database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
 - [x] Run full automated test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
-- [ ] Provide a transparent file map and inventory to the user so they can locate every file immediately.
+- [x] Provide a transparent file map and inventory to the user so they can locate every file immediately.
 
 ## Canonical Layout Restoration (per user attached inventory)
-- [ ] Align working directory tree 100% with `repo_tracked_files.txt` and `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`.
-- [ ] Ensure all original frontend pages (`HomePage.tsx`, `SignInPage.tsx`, `AdminDashboard.tsx`, etc.) and backend files match the canonical layout.
+- [x] Align working directory tree 100% with `repo_tracked_files.txt` and `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`.
+- [x] Ensure all original frontend pages (`HomePage.tsx`, `SignInPage.tsx`, `AdminDashboard.tsx`, etc.) and backend files match the canonical layout.
 - [x] Verify database schema, D1 tables, user history, and authentication remain fully preserved.
 - [x] Run full test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
 
 ## Strict Original Layout Restoration (per user attached inventory)
-- [ ] Parse user attached inventory files (`repo_tracked_tree.txt`, `repo_tracked_files.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to extract the exact directory and file paths.
-- [ ] Transition the codebase from the managed template structure (`client/`, `server/`, `shared/`) to the user's requested original structure (`src/frontend/`, `src/backend/`, etc.).
+- [x] Parse user attached inventory files (`repo_tracked_tree.txt`, `repo_tracked_files.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to extract the exact directory and file paths.
+- [x] Transition the codebase from the managed template structure (`client/`, `server/`, `shared/`) to the user's requested original structure (`src/frontend/`, `src/backend/`, etc.).
 - [x] Preserve all D1 database configurations, R2 storage connections, Google OAuth logic, and live user data without loss.
 - [x] Verify build, configuration files, and package dependencies against the original layout.
-- [ ] Provide a precise file inventory report to the user confirming the exact restored paths.
+- [x] Provide a precise file inventory report to the user confirming the exact restored paths.
 
 ## Path-Only Repository Layout Restoration (per user history files)
-- [ ] Parse user uploaded history files (`repo_tracked_files.txt`, `repo_tracked_tree.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to establish the exact original paths.
-- [ ] Compare current repo paths with the user's history files to identify structural layout discrepancies.
-- [ ] Correct false folder placement or missing paths to match the original inventory.
+- [x] Parse user uploaded history files (`repo_tracked_files.txt`, `repo_tracked_tree.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to establish the exact original paths.
+- [x] Compare current repo paths with the user's history files to identify structural layout discrepancies.
+- [x] Correct false folder placement or missing paths to match the internal inventory.
 - [x] Run test suite and production build verification to ensure absolute runtime stability.
-- [ ] Provide a concise inventory report confirming original path alignment.
+- [x] Provide a concise inventory report confirming original path alignment.
 
 ## Three-Way Consistency Audit (GitHub, Cloudflare, D1, R2)
 - [x] Inspect git status, remote branch synchronization (`shoaibugti-spec/givethra`), and tracked file tree
