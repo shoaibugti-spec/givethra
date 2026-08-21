@@ -627,12 +627,12 @@ export default function HomePage() {
             className="flex-1 w-full space-y-4"
           >
             {/* Public message box above slider */}
-            <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm text-left">
+            <div id="public-post" className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm text-left">
               <div className="flex items-center gap-2 mb-2">
                 <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-sm font-semibold text-foreground">What’s on your mind? (Any problem with Givethra?)</h3>
+                <h3 className="text-sm font-semibold text-foreground">Public Post</h3>
               </div>
-              <p className="mb-3 text-xs leading-5 text-muted-foreground">If you are facing a problem anywhere on Givethra, write it here.</p>
+              <p className="mb-3 text-xs leading-5 text-muted-foreground">Share any message about Givethra here.</p>
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const formEl = e.currentTarget;

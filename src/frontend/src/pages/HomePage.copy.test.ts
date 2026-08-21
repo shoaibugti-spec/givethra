@@ -5,9 +5,10 @@ const homePageSource = readFileSync(new URL("./HomePage.tsx", import.meta.url), 
 
 describe("homepage public feedback composer copy", () => {
   it("explains that users can report any Givethra problem", () => {
-    expect(homePageSource).toContain("What’s on your mind? (Any problem with Givethra?)");
+    expect(homePageSource).toContain('id="public-post"');
+    expect(homePageSource).toContain("Public Post");
     expect(homePageSource).toContain('placeholder="Write your message..."');
-    expect(homePageSource).toContain("If you are facing a problem anywhere on Givethra, write it here.");
+    expect(homePageSource).toContain("Share any message about Givethra here.");
     expect(homePageSource).toContain("<textarea");
   });
 

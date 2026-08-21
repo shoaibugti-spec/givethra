@@ -435,4 +435,12 @@
 - [x] Show a clear English success message after Post Message is saved successfully.
 - [x] Keep the failure path showing a clear error message and avoid false success.
 - [x] Add regression coverage for the success state and run the canonical tests/build.
+- [x] Save a checkpoint without publishing, deploying, or showing preview/settings cards.
+
+## Homepage Public Post Visibility Follow-up
+- [x] Restore the public posts/message section so it is visible on the canonical homepage above the slider.
+- [x] Use the intended simple Public Post wording without Admin, Support, Help, or visibility instructions.
+- [x] Ensure the homepage label change does not hide or remove the composer or its send action.
+- [x] Add regression coverage for visible Public Post heading, textarea, and endpoint.
+- [x] Run the canonical frontend tests and Cloudflare production build.
 - [ ] Save a checkpoint without publishing, deploying, or showing preview/settings cards.
