@@ -211,7 +211,7 @@ function FeedbackPost({
           }`}
         >
           <Heart className="h-4 w-4" fill={iLiked ? "currentColor" : "none"} />
-          مہربان دل {likes.length > 0 && <span>({likes.length})</span>}
+          Kindness {likes.length > 0 && <span>({likes.length})</span>}
         </button>
         <button
           onClick={() => setShowComments(!showComments)}

@@ -200,8 +200,8 @@
 - [x] Send final update using message tool
 
 ## English-Only Conversion & Searchable Google Translate
-- [ ] Scan and inspect all pages for Urdu script or Roman Urdu text
-- [ ] Replace any non-English UI copy, toasts, or component labels with professional English
-- [ ] Implement a searchable Google Translate language selector component with all supported languages
-- [ ] Run test suite (`pnpm test`) and production build (`pnpm build`)
-- [ ] Save checkpoint and report status while keeping publish on hold
+- [x] Scan and inspect all pages for Urdu script or Roman Urdu text
+- [x] Replace any non-English UI copy, toasts, or component labels with professional English
+- [x] Implement a searchable Google Translate language selector component with all supported languages
+- [x] Run test suite (`pnpm test`) and production build (`pnpm build`)
+- [x] Save checkpoint and report status while keeping publish on hold

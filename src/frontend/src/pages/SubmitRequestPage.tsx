@@ -2086,8 +2086,8 @@ export default function SubmitRequestPage() {
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
           <p className="text-xs font-semibold text-primary mb-2">📌 {getReceiverLabel()} Payment Details</p>
           <p className="text-[11px] text-muted-foreground mb-2">
-            💡 یہ وہ شخص/دکان ہے جسے آپ رقم دینا چاہتے ہیں۔ اس کی مکمل تفصیلات فراہم کریں تاکہ Givethra تصدیق کر سکے۔
-          </p>
+            💡 Provide the official institute, school, hospital, or supplier details where funds should be sent so Givethra can verify.
+          </p>}
           <div className="space-y-2">
             <div className="space-y-1">
               <Label>{getReceiverLabel()} Name *</Label>
@@ -3840,15 +3840,15 @@ export default function SubmitRequestPage() {
             <div className="space-y-2">
               <Label className="font-semibold">🎥 Video Statement (60 Seconds)</Label>
               <p className="text-xs text-muted-foreground">
-                <strong>اپنی ویڈیو میں پوری تفصیل سے بتائیں:</strong>
+                <strong>Explain the following details clearly in your video statement:</strong>
               </p>
               <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1 ml-2">
-                <li>آپ کو کس مسئلے کا سامنا ہے اور آپ کو مدد کی کیوں ضرورت ہے؟</li>
-                <li>آپ کی مالی حالت کیا ہے اور یہ مسئلہ آپ کی زندگی کو کیسے متاثر کر رہا ہے؟</li>
-                <li>آپ کو کن مشکلات کا سامنا ہے اور آپ اس مدد سے کیا حل کرنا چاہتے ہیں؟</li>
+                <li>What challenge are you facing and why do you need help?</li>
+                <li>What is your financial situation and how does this impact your daily life?</li>
+                <li>What do you hope to achieve with this support?</li>
               </ul>
               <p className="text-xs text-amber-600 mt-1">
-                ⚠️ <strong>ویڈیو 60 سیکنڈ (1 منٹ) تک ہونی چاہیے تاکہ فائل سائز 50 MB سے کم رہے۔</strong>
+                ⚠️ <strong>The video must be up to 60 seconds (1 minute) to keep file size under 50 MB.</strong>
               </p>
 
               {!videoPreview ? (
