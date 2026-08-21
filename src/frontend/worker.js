@@ -934,6 +934,36 @@ async function handleStoredUpload(request, env, url, origin) {
   return new Response(request.method === "HEAD" ? null : object.body, { status: 200, headers });
 }
 
+async function handlePublicFeedback(request, env, user, origin) {
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
+  const body = await readJson(request);
+  const message = String(body?.message || "").trim();
+  if (!message) return json({ error: "message is required" }, 400, origin);
+  if (message.length > 5000) return json({ error: "message is too long" }, 413, origin);
+
+  const isAuthenticated = Boolean(user?.user_id);
+  const userId = isAuthenticated ? String(user.user_id) : "public";
+  const firstName = isAuthenticated
+    ? String(user.full_name || user.email || body?.guest_name || "User").trim()
+    : String(body?.guest_name || "Public Visitor").trim();
+  const feedbackId = id();
+  const createdAt = now();
+
+  await env.DB.prepare(
+    "INSERT INTO feedbacks (id, case_id, user_id, first_name, text_message, video_url, status, created_at) VALUES (?, NULL, ?, ?, ?, NULL, 'pending_review', ?)",
+  ).bind(feedbackId, userId, firstName || (isAuthenticated ? "User" : "Public Visitor"), message, createdAt).run();
+
+  return json({
+    id: feedbackId,
+    case_id: null,
+    user_id: userId,
+    first_name: firstName || (isAuthenticated ? "User" : "Public Visitor"),
+    text_message: message,
+    status: "pending_review",
+    created_at: createdAt,
+  }, 201, origin);
+}
+
 async function routeApi(request, env, user, url, origin) {
   const parts = pathParts(url);
   if (parts[1] === "upload") return handleUpload(request, env, user, origin);
@@ -986,6 +1016,13 @@ export default {
       }
 
       if (url.pathname === "/uploads") return handleStoredUpload(request, env, url, origin);
+
+      if (url.pathname === "/api/public-feedback") {
+        if (!env.DB) return json({ error: "D1 binding DB is not configured" }, 503, origin);
+        const optionalUser = await authenticate(request, env, clientId, false);
+        const publicUser = optionalUser || { user_id: "", email: "", full_name: "", avatar_url: "" };
+        return handlePublicFeedback(request, env, publicUser, origin);
+      }
 
       const publicRead = request.method === "GET" && (
         url.pathname === "/api/cases/approved" ||

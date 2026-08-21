@@ -630,8 +630,9 @@ export default function HomePage() {
             <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm text-left">
               <div className="flex items-center gap-2 mb-2">
                 <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-sm font-semibold text-foreground">What's on your mind? (Public Help & Feedback Box)</h3>
+                <h3 className="text-sm font-semibold text-foreground">What's on your mind? (Any problem with Givethra?)</h3>
               </div>
+              <p className="mb-3 text-xs leading-5 text-muted-foreground">Report a problem with sign-in, sign-up, case submission, or any other part of Givethra.</p>
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const formEl = e.currentTarget;
@@ -639,30 +640,32 @@ export default function HomePage() {
                 const txt = inputEl?.value?.trim();
                 if (!txt) return;
                 try {
+                  const token = localStorage.getItem("auth_token");
                   const res = await fetch("/api/public-feedback", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: txt, guest_name: user?.name || "Guest Visitor" })
+                    headers: {
+                      "Content-Type": "application/json",
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({ message: txt, guest_name: user?.fullName || "Public Visitor" })
                   });
                   if (res.ok) {
-                    toast.success("Thank you! Your feedback has been posted for the admin.");
+                    toast.success("Thank you! Your message has been sent successfully.");
                     formEl.reset();
                   } else {
-                    toast.error("Failed to post. Please try again.");
+                    toast.error("Failed to send message. Please try again.");
                   }
                 } catch {
-                  toast.success("Thank you! Your feedback has been recorded.");
-                  formEl.reset();
+                  toast.error("We could not send your message. Please check your connection and try again.");
                 }
               }} className="space-y-2">
                 <input
                   name="feedbackText"
-                  placeholder="Ask for help, share feedback, or write your thoughts..."
+                  placeholder="Describe the problem you are experiencing..."
                   className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                   required
                 />
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground">Visible only in Admin Dashboard</span>
+                <div className="flex justify-end items-center text-xs">
                   <button type="submit" className="px-3 py-1.5 font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition">
                     Post Message
                   </button>

@@ -613,6 +613,8 @@ export default function AdminPage() {
   }
 
   const activeSuspensions = suspensions.filter((s) => s.is_active).length;
+  const publicPosts = feedbacks.filter((f) => !f.case_id);
+  const pendingPublicPosts = publicPosts.filter((f) => (f.status || "pending_review") === "pending_review");
 
   return (
     <Layout>
@@ -667,7 +669,8 @@ export default function AdminPage() {
               <TabsTrigger value="notify">Notify</TabsTrigger>
               <TabsTrigger value="offers">Offers {activeOffers > 0 && <span className="ml-1 bg-green-500 text-white text-[10px] rounded-full px-1.5">{activeOffers}</span>}</TabsTrigger>
               <TabsTrigger value="support">Support {unreadSupport > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{unreadSupport}</span>}</TabsTrigger>
-              <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => f.status === "pending_review").length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => f.status === "pending_review").length}</span>}</TabsTrigger>
+              <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => f.status === "pending_review" && f.case_id).length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => f.status === "pending_review" && f.case_id).length}</span>}</TabsTrigger>
+              <TabsTrigger value="posts">Posts {pendingPublicPosts.length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{pendingPublicPosts.length}</span>}</TabsTrigger>
               <TabsTrigger value="suspensions">Suspensions {activeSuspensions > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{activeSuspensions}</span>}</TabsTrigger>
             </TabsList>
 
@@ -777,8 +780,13 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="feedback" className="space-y-4 mt-4">
-              {feedbacks.length === 0 ? <Empty text="No feedback yet" /> :
-                feedbacks.map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} />)}
+              {feedbacks.filter((f) => !!f.case_id).length === 0 ? <Empty text="No case feedback yet" /> :
+                feedbacks.filter((f) => !!f.case_id).map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} />)}
+            </TabsContent>
+
+            <TabsContent value="posts" className="space-y-4 mt-4">
+              {publicPosts.length === 0 ? <Empty text="No public posts yet" /> :
+                publicPosts.map((post) => <FeedbackCard key={post.id} fb={post} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} isPublicPost />)}
             </TabsContent>
 
             <TabsContent value="suspensions" className="space-y-4 mt-4">
@@ -2148,11 +2156,13 @@ function DepositCard({ d, onApprove, onReject }: any) {
 // ============================================================
 //  FEEDBACK CARD
 // ============================================================
-function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
+function FeedbackCard({ fb, profileMap, caseList, onUpdate, isPublicPost = false }: any) {
   const [reason, setReason] = useState("");
   const p = profileMap[fb.user_id];
   const c = caseList.find((cs: any) => cs.id === fb.case_id);
   const status = fb.status || "pending_review";
+  const identityName = fb.user_id === "public" ? "Public" : (p?.full_name || fb.first_name || "—");
+  const identityDetail = fb.user_id === "public" ? "Public Visitor" : (p?.email || fb.user_id?.slice(0, 8));
 
   return (
     <div className="rounded-xl border bg-card p-4 space-y-3">
@@ -2161,7 +2171,7 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
         {c && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>}
       </div>
       <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs">
-        <p className="font-semibold">{p?.full_name || fb.first_name || "—"} · {p?.email || fb.user_id?.slice(0, 8)}</p>
+        <p className="font-semibold">{identityName} · {identityDetail}</p>
         {c && <p className="text-muted-foreground mt-0.5">Case: {c.title}</p>}
       </div>
       {fb.text_message && <p className="text-sm whitespace-pre-line">{fb.text_message}</p>}
@@ -2170,7 +2180,7 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
         <div className="space-y-2 pt-1 border-t border-border">
           <Textarea placeholder="Rejection reason (e.g. 'video too short', 'unrelated content')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve — Post to Wall</Button>
+              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> {isPublicPost ? "Mark Resolved" : "Approve — Post to Wall"}</Button>
             <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(fb.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
           </div>
         </div>
