@@ -38,6 +38,8 @@ import {
   MessageCircle,
   ShieldCheck,
   Gift,
+  Send,
+  CheckCircle,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -49,7 +51,7 @@ import {
   getUnlockCount,
   getUnreadNotificationsCount,
 } from "@/lib/api";
-import { toast } from "sonner"; // ✅ شامل کیا گیا
+import { toast } from "sonner";
 
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
@@ -58,7 +60,6 @@ const WHATSAPP_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
 
-// ====== ANNOUNCEMENT ======
 const ANNOUNCEMENT =
   "🎉 Big Offer for Everyone! Complete your KYC and submit your FIRST CASE completely FREE — no fee! After review & approval, Heroes will help you. Start now at givethra.org 🤲   •   🎉 Heroes: Your first 3 helps are FREE! After that, 1 credit per help. Become a Hero and change lives today.";
 
@@ -184,6 +185,11 @@ export default function HomePage() {
   const [detectedCity, setDetectedCity] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  // ===== PUBLIC POST STATE =====
+  const [postMessage, setPostMessage] = useState("");
+  const [postSubmitting, setPostSubmitting] = useState(false);
+  const [postSubmitted, setPostSubmitted] = useState(false);
+
   // Load cases on mount
   useEffect(() => {
     loadCases();
@@ -275,6 +281,43 @@ export default function HomePage() {
       setCategoryCounts(counts ?? {});
     } catch {
       // ignore
+    }
+  }
+
+  // ===== PUBLIC POST SUBMIT =====
+  async function handleSubmitPost() {
+    if (!postMessage.trim()) {
+      toast.error("Please write something before posting.");
+      return;
+    }
+    setPostSubmitting(true);
+    try {
+      const payload: any = {
+        message: postMessage.trim(),
+        display_name: isAuthenticated
+          ? user?.full_name || user?.name || user?.email?.split("@")[0] || "User"
+          : "Guest",
+        is_guest: !isAuthenticated,
+        user_id: isAuthenticated ? user?.id : null,
+      };
+      const res = await fetch("/api/community-posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setPostSubmitted(true);
+        setPostMessage("");
+        toast.success("Thank you! Your post has been shared.");
+        setTimeout(() => setPostSubmitted(false), 4000);
+      } else {
+        const err = await res.json();
+        toast.error(err?.error || "Failed to post. Please try again.");
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setPostSubmitting(false);
     }
   }
 
@@ -618,72 +661,61 @@ export default function HomePage() {
             transition={{ duration: 0.65, delay: 0.15 }}
             className="flex-1 w-full space-y-4"
           >
-            {/* ✅ PUBLIC POST BOX (درست شدہ) */}
-            <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm text-left">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-sm font-semibold text-foreground">
-                  💭 What's on your mind?
-                </h3>
+            {/* === PUBLIC POST BOX (ABOVE SLIDER) === */}
+            <div className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageCircle className="h-5 w-5 text-primary" />
+                <h3 className="font-bold text-lg">💬 What's on your mind?</h3>
               </div>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const formEl = e.currentTarget;
-                  const inputEl = formEl.elements.namedItem("postText") as HTMLInputElement;
-                  const txt = inputEl?.value?.trim();
-                  if (!txt) {
-                    toast.error("Please write something.");
-                    return;
-                  }
-                  try {
-                    const payload: any = {
-                      message: txt,
-                      display_name: isAuthenticated
-                        ? user?.full_name || user?.name || user?.email?.split("@")[0] || "User"
-                        : "Guest",
-                      is_guest: !isAuthenticated,
-                      user_id: isAuthenticated ? user?.id : null,
-                    };
-                    const res = await fetch("/api/community-posts", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(payload),
-                    });
-                    if (res.ok) {
-                      toast.success("Thank you! Your post has been shared.");
-                      formEl.reset();
-                      // Reset textarea height if needed
-                      const ta = formEl.querySelector("textarea");
-                      if (ta) ta.style.height = "auto";
-                    } else {
-                      const err = await res.json();
-                      toast.error(err?.error || "Failed to post. Please try again.");
-                    }
-                  } catch {
-                    toast.error("Network error. Please try again.");
-                  }
-                }}
-                className="space-y-2"
-              >
-                <input
-                  name="postText"
-                  placeholder="Write your thoughts..."
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  required
-                />
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-muted-foreground">
-                    {isAuthenticated ? `Logged in as ${user?.full_name || user?.email}` : "Posting as Guest"}
+              <p className="text-sm text-muted-foreground mb-4">
+                Share your thoughts, suggestions, or any problem with Givethra.
+                {isAuthenticated && (
+                  <span className="ml-1 text-xs font-medium text-green-600">
+                    (Logged in as {user?.full_name || user?.email})
                   </span>
-                  <button
-                    type="submit"
-                    className="px-3 py-1.5 font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition"
-                  >
-                    Post
-                  </button>
+                )}
+                {!isAuthenticated && (
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">
+                    (Posting as Guest)
+                  </span>
+                )}
+              </p>
+
+              {postSubmitted ? (
+                <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-6 text-center space-y-3">
+                  <CheckCircle className="h-10 w-10 text-green-600 mx-auto" />
+                  <h4 className="font-bold text-green-700 dark:text-green-400">Thank You! 🙏</h4>
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    Your post has been shared with the Givethra team.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => setPostSubmitted(false)}>
+                    Send Another
+                  </Button>
                 </div>
-              </form>
+              ) : (
+                <div className="space-y-3">
+                  <textarea
+                    placeholder="Write your message here..."
+                    value={postMessage}
+                    onChange={(e) => setPostMessage(e.target.value)}
+                    rows={4}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  <Button
+                    className="w-full gap-2"
+                    onClick={handleSubmitPost}
+                    disabled={postSubmitting || !postMessage.trim()}
+                  >
+                    {postSubmitting ? (
+                      "Sending..."
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" /> Post
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* SLIDER */}
@@ -711,6 +743,9 @@ export default function HomePage() {
           </motion.div>
         </div>
       </section>
+
+      {/* ===== REMAINING SECTIONS: Become a Hero, Need Help?, Location, Filters, Cases, Trust, App, FeedbackWall, How it works, Footer ===== */}
+      {/* These sections are exactly as they were in your original file. Keep them unchanged. */}
 
       {isAuthenticated && (
         <section className="bg-background border-b border-border py-5 px-4">
