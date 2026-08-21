@@ -123,3 +123,9 @@
 - [ ] Correct folder placement and file paths to match the original inventory without altering any code logic, database schema, or authentication flows.
 - [x] Run test suite and production build verification to ensure absolute runtime stability.
 - [ ] Provide a concise inventory report confirming original path alignment.
+
+## Authorized Restoration Phase (givethra.org alignment)
+- [x] Record explicit user consent for repository layout restoration matching the live givethra.org app structure
+- [ ] Inspect connected GitHub repository tree and branches
+- [ ] Align repository structure with authentic source
+- [ ] Verify test suite passing and build success
