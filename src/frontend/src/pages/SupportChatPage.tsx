@@ -1,9 +1,27 @@
 import Layout from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { getChatMessages, sendChatMessage, getUnreadChatMessagesCount } from "@/lib/api";
+import {
+  getChatMessages,
+  sendChatMessage,
+  getUnreadChatMessagesCount,
+  markSupportMessagesAsRead,
+  uploadFileToStorage,
+} from "@/lib/api";
 import { useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
-import { Send, MessageCircle, ArrowLeft, BookOpen, ExternalLink, ShieldCheck, FileText, Sparkles } from "lucide-react";
+import {
+  Send,
+  MessageCircle,
+  ArrowLeft,
+  BookOpen,
+  ExternalLink,
+  ShieldCheck,
+  FileText,
+  Sparkles,
+  Paperclip,
+  X,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 const FAQ_ARTICLES = [
@@ -37,6 +55,13 @@ export default function SupportChatPage() {
   const [sending, setSending] = useState(false);
   const [openArticle, setOpenArticle] = useState<any>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Attachment state
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -52,10 +77,18 @@ export default function SupportChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  }, [text]);
+
   async function loadMessages() {
     if (!user?.id) return;
     try {
-      const data = await getSupportMessages(user.id);
+      const data = await getChatMessages(user.id);
       setMessages(Array.isArray(data) ? data : []);
       await markSupportMessagesAsRead(user.id);
     } catch (e) {
@@ -63,28 +96,83 @@ export default function SupportChatPage() {
     }
   }
 
+  // File selection handler
+  function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    // Max 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File too large! Maximum 10MB allowed.");
+      return;
+    }
+    setAttachmentFile(file);
+    setAttachmentPreview(URL.createObjectURL(file));
+    toast.success(`📎 ${file.name} selected`);
+    // Reset input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeAttachment() {
+    setAttachmentFile(null);
+    setAttachmentPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim() || !user?.id) return;
-    const msgText = text.trim();
-    setText("");
+    if ((!text.trim() && !attachmentFile) || !user?.id) return;
+
     setSending(true);
+    let attachmentUrl = "";
+    let filename = "";
+
+    // Upload attachment if present
+    if (attachmentFile) {
+      setUploadingAttachment(true);
+      try {
+        // Sanitize filename for path
+        const safeName = attachmentFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `support_attachments/${user.id}/${Date.now()}_${safeName}`;
+        attachmentUrl = await uploadFileToStorage(attachmentFile, path);
+        filename = attachmentFile.name;
+        setUploadingAttachment(false);
+      } catch (err) {
+        toast.error("Failed to upload attachment. Please try again.");
+        setSending(false);
+        setUploadingAttachment(false);
+        return;
+      }
+    }
+
     try {
-      const res = await sendSupportMessage({
+      const payload: any = {
         user_id: user.id,
         sender: "user",
-        message: msgText,
-      });
-      if (res && (res.id || res.success !== false || res.message)) {
-        await loadMessages();
-      } else {
-        toast.error(res?.error || "Failed to send message.");
+        message: text.trim() || null, // message can be null if only attachment
+      };
+      if (attachmentUrl) {
+        payload.attachment_url = attachmentUrl;
+        // Optionally send filename for display
+        payload.filename = filename;
       }
-    } catch (e) {
-      toast.error("Failed to send. Please try again.");
-      console.error(e);
+
+      const res = await sendChatMessage(payload);
+
+      // Check if response indicates success
+      if (res && (res.id || res.success !== false)) {
+        setText("");
+        removeAttachment(); // Clear attachment after send
+        await loadMessages();
+        toast.success("Message sent!");
+      } else {
+        toast.error(res?.error || "Failed to send message. Please try again.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send. Please try again.");
+      console.error(err);
     } finally {
       setSending(false);
+      setUploadingAttachment(false);
     }
   }
 
@@ -186,7 +274,9 @@ export default function SupportChatPage() {
                           : "bg-muted text-foreground rounded-bl-none"
                       }`}
                     >
-                      <p className="whitespace-pre-wrap leading-relaxed">{m.message}</p>
+                      {m.message && (
+                        <p className="whitespace-pre-wrap leading-relaxed">{m.message}</p>
+                      )}
                       {(m.attachment_url || m.attachmentUrl) && (
                         <a
                           href={m.attachment_url || m.attachmentUrl}
@@ -194,7 +284,8 @@ export default function SupportChatPage() {
                           rel="noreferrer"
                           className="mt-2 inline-flex items-center gap-1.5 text-xs underline font-medium opacity-90 hover:opacity-100"
                         >
-                          <FileText className="h-3 w-3" /> {m.filename || "View attachment"}
+                          <FileText className="h-3 w-3" />{" "}
+                          {m.filename || m.filename || "View attachment"}
                         </a>
                       )}
                     </div>
@@ -213,22 +304,92 @@ export default function SupportChatPage() {
             <div ref={bottomRef} />
           </div>
 
-          <form onSubmit={handleSend} className="p-3 border-t bg-background flex items-center gap-2">
-            <input
-              type="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 bg-muted/50 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <button
-              type="submit"
-              disabled={sending || !text.trim()}
-              className="h-10 px-5 rounded-xl bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-1.5 hover:opacity-90 disabled:opacity-50 transition-opacity"
-            >
-              <Send className="h-4 w-4" />
-              <span>Send</span>
-            </button>
+          {/* Input Area with Attachment */}
+          <form onSubmit={handleSend} className="p-3 border-t bg-background">
+            {/* Attachment preview */}
+            {attachmentPreview && (
+              <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-lg border border-border">
+                {attachmentFile?.type.startsWith("image/") ? (
+                  <img
+                    src={attachmentPreview}
+                    alt="Attachment preview"
+                    className="h-10 w-10 rounded object-cover"
+                  />
+                ) : (
+                  <FileText className="h-8 w-8 text-muted-foreground" />
+                )}
+                <span className="text-xs flex-1 truncate">{attachmentFile?.name}</span>
+                <button
+                  type="button"
+                  onClick={removeAttachment}
+                  className="text-red-500 hover:text-red-700"
+                  disabled={sending}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-end gap-2">
+              <div className="flex-1 relative">
+                <textarea
+                  ref={textareaRef}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Type your message... (Shift+Enter for new line)"
+                  className="w-full min-h-[44px] max-h-[200px] resize-none overflow-y-auto rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  rows={1}
+                  disabled={sending}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend(e);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Attachment button */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                className="hidden"
+                accept="image/*,.pdf,.doc,.docx,.txt,.csv,.xlsx,.pptx,.zip"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={sending || uploadingAttachment}
+                className="h-11 w-11 shrink-0 rounded-xl border border-border bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-muted transition-colors disabled:opacity-50"
+                title="Attach a file (max 10MB)"
+              >
+                {uploadingAttachment ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Paperclip className="h-4 w-4" />
+                )}
+              </button>
+
+              <button
+                type="submit"
+                disabled={sending || (!text.trim() && !attachmentFile)}
+                className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-1.5 hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
+              >
+                {sending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                <span>{sending ? "Sending" : "Send"}</span>
+              </button>
+            </div>
+            <div className="flex justify-between text-[10px] text-muted-foreground mt-1.5 px-1">
+              <span>Supported: Images, PDF, DOC, DOCX, TXT, CSV, XLSX, PPTX, ZIP (max 10MB)</span>
+              {attachmentFile && !uploadingAttachment && (
+                <span className="text-green-600">📎 {attachmentFile.name}</span>
+              )}
+            </div>
           </form>
         </div>
       </div>
