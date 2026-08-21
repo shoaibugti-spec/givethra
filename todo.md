@@ -429,4 +429,10 @@
 - [x] Verify the standalone Admin Posts tab receives the newly submitted guest row from the shared D1 feedback inbox; live verification remains deployment-dependent because the deployed Worker is stale.
 - [x] Add or update regression coverage for the actual failing send path.
 - [x] Run the canonical frontend tests, repository tests, Worker syntax check, and Cloudflare production build.
-- [ ] Save a repaired source checkpoint without publishing, deploying, or showing preview/settings cards.
+- [x] Save a repaired source checkpoint without publishing, deploying, or showing preview/settings cards.
+
+## Public Post Success Message
+- [x] Show a clear English success message after Post Message is saved successfully.
+- [x] Keep the failure path showing a clear error message and avoid false success.
+- [x] Add regression coverage for the success state and run the canonical tests/build.
+- [ ] Save a checkpoint without publishing, deploying, or showing preview/settings cards.

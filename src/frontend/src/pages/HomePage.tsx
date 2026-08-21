@@ -653,7 +653,7 @@ export default function HomePage() {
                   if (!res.ok) {
                     throw new Error(result?.error || "Failed to send message.");
                   }
-                  toast.success("Your message has been sent.");
+                  toast.success("Success! Your message has been sent to Givethra.");
                   formEl.reset();
                 } catch (error) {
                   toast.error(error instanceof Error ? error.message : "We could not send your message. Please try again.");

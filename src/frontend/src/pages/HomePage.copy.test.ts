@@ -21,4 +21,10 @@ describe("homepage public feedback composer copy", () => {
     expect(homePageSource).toContain("Post Message");
     expect(homePageSource).toContain('fetch("/api/public-feedback"');
   });
+
+  it("shows a clear success confirmation only after the server accepts the message", () => {
+    expect(homePageSource).toContain('toast.success("Success! Your message has been sent to Givethra.");');
+    expect(homePageSource).toContain("if (!res.ok)");
+    expect(homePageSource).toContain("toast.error");
+  });
 });
