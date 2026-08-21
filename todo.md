@@ -164,3 +164,19 @@
 ## Final Corrective Verification Tasks (Required)
 - [x] Write and save path-by-path comparison document between `client/`/`server/` and `src/frontend/` with architectural rationale (`/home/ubuntu/givethra-structure-comparison.md`)
 - [x] Deliver clear message to user presenting corrective audit results and confirming publish remains on hold
+
+## Legacy Cleanup & Google Auth Hardening
+- [x] Audit repository for any obsolete Vercel, Supabase, or Caffeine references or config files
+- [x] Ensure frontend auth bootstrap cleans up legacy localStorage/cookies to prevent infinite loading
+- [x] Verify Google Login upsert and session persistence in Cloudflare D1
+- [x] Run test suite (`pnpm test`) and production build (`pnpm build`)
+
+## Remaining Cleanup & Verification Tasks (Required)
+- [x] Remove obsolete legacy files like `src/frontend/vercel.json` and prune unused Vercel/Caffeine references
+- [x] Inspect and confirm active frontend auth bootstrap cleanup logic for legacy cookies and localStorage keys
+- [x] Save checkpoint and present final verified status while keeping publish on hold
+
+## Final Verification Tasks (Required)
+- [ ] Prune remaining obsolete Vercel/Caffeine text references across components
+- [ ] Save fresh checkpoint confirming clean state
+- [ ] Deliver final progress message to user confirming all legacy cleanup is complete and publish remains on hold
