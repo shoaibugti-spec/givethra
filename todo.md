@@ -322,3 +322,8 @@
 - [x] Verify frontend test suite and production build pass successfully.
 
 - [x] Permanently banned sending Manus managed preview/checkpoint cards (`manus-webdev://...`) to the user. Givethra's only canonical website is https://givethra.org.
+
+## Admin Case Attachment Filename & Completeness Sprint
+- [ ] Update `AdminDashboard.tsx` attachment file label extraction so that stored R2 / Worker storage keys and URLs correctly recover original uploaded filenames instead of raw hashes or generic fallback labels ('f2').
+- [ ] Ensure 100% lossless inclusion of all case documents, selfies, videos, receipts, and category-specific files in the Admin Case view.
+- [ ] Run automated tests and verify clean Cloudflare production build.

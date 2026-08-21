@@ -1850,13 +1850,19 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         if (lastSeg) extracted = decodeURIComponent(lastSeg);
       }
       if (extracted) {
-        // Strip leading timestamp / uuid prefix numbers if any
-        const cleanName = extracted.replace(/^[0-9]{10,}[-_]?/, "").replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]?/i, "");
+        // Remove uuid/timestamp prefix e.g. "1724000000000-electricity_bill.pdf" -> "electricity_bill.pdf"
+        let cleanName = extracted
+          .replace(/^[0-9]{10,}[-_]/, "")
+          .replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]/i, "")
+          .replace(/^[0-9]+[-_]/, "");
         if (cleanName && !cleanName.match(/^[0-9a-f]{8,}$/i)) {
-          label = cleanName;
+          label = cleanName.replace(/[_]/g, " ");
         } else if (extracted && !extracted.match(/^[0-9a-f]{8,}$/i)) {
-          label = extracted;
+          label = extracted.replace(/[_]/g, " ");
         }
+      }
+      if (!label || label === key || label.match(/^[0-9a-f]{8,}$/i)) {
+        label = getDocLabel(key);
       }
     } catch (e) {
       // fallback to getDocLabel(key)
