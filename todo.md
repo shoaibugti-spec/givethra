@@ -144,13 +144,23 @@
 - [x] Commit and push CI/CD workflow to remote repository (`shoaibugti-spec/givethra`)
 
 ## Preview Diagnosis & GitHub Duplicate File Audit
-- [ ] Inspect dev-server logs (`.manus-logs/devserver.log`) and client console logs for path errors or module missing issues
-- [ ] Audit GitHub repository file tree for any duplicate, template boilerplates, or orphaned files
-- [ ] Verify that preview rendering and images load correctly without breaking the live Cloudflare site
-- [ ] Present audit findings to user and confirm publish readiness only when user is fully satisfied
+- [x] Inspect dev-server logs (`.manus-logs/devserver.log`) and client console logs for path errors or module missing issues
+- [x] Audit GitHub repository file tree for any duplicate, template boilerplates, or orphaned files
+- [x] Verify that preview rendering and images load correctly without grading the live Cloudflare site
+- [x] Present audit findings to user and confirm publish readiness only when user is fully satisfied
 
 ## Pre-Publication Audit & Hold
 - [x] Inspect dev-server logs and verify preview rendering via screenshot
 - [x] Audit GitHub repository for duplicate or orphaned files and clean working tree
 - [x] Generate pre-publication audit report (`/home/ubuntu/givethra-prepublication-audit.md`)
 - [x] Keep production publish on hold per user instructions until manual visual confirmation
+
+## Corrective Audit Tasks (Required)
+- [x] Inspect client browser console logs and network requests alongside dev-server logs
+- [x] Perform a path-by-path file audit between managed directories (`client/`, `server/`) and canonical source directories (`src/frontend/`) to document dual-structure rationale
+- [x] Capture and verify preview rendering showing homepage elements and assets loading correctly
+- [x] Present findings to user and keep publish on hold until explicit user approval
+
+## Final Corrective Verification Tasks (Required)
+- [x] Write and save path-by-path comparison document between `client/`/`server/` and `src/frontend/` with architectural rationale (`/home/ubuntu/givethra-structure-comparison.md`)
+- [x] Deliver clear message to user presenting corrective audit results and confirming publish remains on hold
