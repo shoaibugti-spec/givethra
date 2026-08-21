@@ -1114,11 +1114,17 @@ export default {
         return routeApi(request, env, publicUser, url, origin);
       }
 
-      if (url.pathname.startsWith("/api/")) {
-        const user = await authenticate(request, env, clientId, false);
-        if (!user) return json({ error: "Authentication required" }, 401, origin);
-        return routeApi(request, env, user, url, origin);
-      }
+      // ===== PUBLIC ROUTES (No authentication required) =====
+if (url.pathname === "/api/community-posts" && request.method === "POST") {
+  return routeApi(request, env, null, url, origin);
+}
+
+// ===== ALL OTHER API ROUTES (Require authentication) =====
+if (url.pathname.startsWith("/api/")) {
+  const user = await authenticate(request, env, clientId, false);
+  if (!user) return json({ error: "Authentication required" }, 401, origin);
+  return routeApi(request, env, user, url, origin);
+}
 
       if (env.ASSETS) return env.ASSETS.fetch(request);
       return new Response("Not Found", { status: 404, headers: corsHeaders(origin) });
