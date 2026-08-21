@@ -59,7 +59,7 @@ const CONTACT_EMAIL = "info@givethra.org";
 
 // ====== ANNOUNCEMENT ======
 const ANNOUNCEMENT =
-  "🎉 Big Offer for Everyone! Complete your KYC and submit your FIRST CASE completely FREE — no fee! After review & approval, Heroes will help you. Start now at givethra.org 🤲   •   🎉 Heroes: Your first 3 helps are FREE! After that, 1 credit per help. Become a Hero and change lives today.   •   خوشخبری! اپنا KYC مکمل کریں اور اپنا پہلا کیس بالکل مفت جمع کریں — کوئی فیس نہیں! تصدیق کے بعد ہیروز آپ کی مدد کریں گے۔   •   ہیروز: پہلے 3 مدد مفت ہیں! اس کے بعد 1 کریڈٹ فی مدد۔ آج ہی ہیرو بنیں اور زندگیاں بدلیں۔";
+  "🎉 Big Offer for Everyone! Complete your KYC and submit your FIRST CASE completely FREE — no fee! After review & approval, Heroes will help you. Start now at givethra.org 🤲   •   🎉 Heroes: Your first 3 helps are FREE! After that, 1 credit per help. Become a Hero and change lives today.";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
