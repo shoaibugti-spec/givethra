@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, ShieldCheck, UserCheck, LogIn, AlertCircle } from "lucide-react";
+import { clearLegacySupabaseBrowserData, recoverFromLegacyAuthError } from "@/_core/legacyAuthCleanup";
 
 type GoogleIdentityApi = {
   accounts: {
@@ -39,6 +40,7 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
 
   const handleCredentialWithRetry = async (credential: string, retries = 2) => {
     if (!credential) return;
+    clearLegacySupabaseBrowserData();
     setError("");
     setLoading(true);
 
@@ -65,6 +67,7 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
         return;
       } catch (cause) {
         window.clearTimeout(timeoutId);
+        if (recoverFromLegacyAuthError(cause)) return;
         const msg = cause instanceof Error ? cause.message : "Sign-in network error.";
         const isNetworkOrTimeout = msg.includes("aborted") || msg.includes("Failed to fetch") || msg.includes("NetworkError");
 
@@ -113,6 +116,7 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
   }, [clientId, compact, ready]);
 
   const triggerDirectOAuth = () => {
+    clearLegacySupabaseBrowserData();
     setError("");
     const redirectUri = window.location.origin;
     if (!clientId) {
@@ -129,6 +133,7 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
       const params = new URLSearchParams(hash.substring(1));
       const accessToken = params.get("access_token");
       if (accessToken) {
+        clearLegacySupabaseBrowserData();
         setLoading(true);
         window.history.replaceState(null, "", window.location.pathname);
         handleCredentialWithRetry(accessToken);
@@ -142,7 +147,12 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="grid justify-items-center gap-3 w-full">
-      <div className="relative min-h-12 flex justify-center w-full" ref={buttonRef} aria-label="Continue with Google" />
+      <div
+        className="relative min-h-12 flex justify-center w-full"
+        ref={buttonRef}
+        onClick={clearLegacySupabaseBrowserData}
+        aria-label="Continue with Google"
+      />
 
       <button
         type="button"

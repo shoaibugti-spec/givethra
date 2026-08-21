@@ -148,11 +148,11 @@
 - [x] Provide safe instructions or automated script for future commit attribution (documented in `git-attribution-guide.md`).
 
 ## Google Login Upsert & Infinite Loop Fix
-- [ ] Audit server auth callback and D1 database query helpers for email lookup.
-- [ ] Implement email-based upsert mechanism: check if email exists; if not, generate UUID, insert fresh user profile, and log in.
-- [ ] Ensure existing users log in directly without loops or errors.
-- [ ] Add unit tests verifying Google OAuth upsert for new and existing users.
-- [ ] Verify test suite passing and production build success.
+- [x] Audit server auth callback and D1 database query helpers for email lookup.
+- [x] Implement email-based upsert mechanism: check if email exists; if not, generate UUID, insert fresh user profile, and log in.
+- [x] Ensure existing users log in directly without loops or errors (focused route test proves the legacy email reuses the existing openId and receives a 200 session response).
+- [x] Add unit tests verifying Google OAuth upsert for new and existing users (explicit route tests cover absent-email creation and existing-email reconciliation).
+- [x] Verify test suite passing and production build success.
 - [x] Implement 'Upsert' mechanism in Cloudflare D1 database and Google Auth (`server/googleAuth.ts`, `server/_core/sdk.ts`, `server/db.ts`) for seamless login of new and legacy users without infinite loading loops or errors.
 - [x] Create or update `feedbacks` table in `drizzle/schema.ts` to store guest/user feedback submissions with unique identifier, user_id (optional), session_token / IP address tracking, message text, and created_at timestamp.
 - [x] Implement public backend router procedure in `server/routers/givethra.ts` for unauthenticated visitors and logged-in users to submit feedback multiple times without blocking.
@@ -164,3 +164,9 @@
 - [x] Add a real transient Sonner toast saying `Thank you for your feedback!` after every successful public feedback submission while retaining the inline status and repeat-submit flow.
 - [x] Verify the toast implementation compiles and the full test suite remains passing.
 - [ ] Confirm exact placement relative to the hand-illustration slider after locating that slider in the canonical homepage source; no such reference exists in the active repository at present.
+## Legacy Supabase & Auth Cleanup
+- [x] Implement silent client-side cleanup of legacy Supabase keys (`sb-`, `supabase`, `supabase.auth.token`, `sb-access-token`) in `localStorage` and `sessionStorage`.
+- [x] Implement programmatic deletion of legacy auth cookies.
+- [x] Add guarded auto-reload recovery for auth session failures (`window.location.reload()`) with a rate limit guard to prevent infinite reload loops.
+- [x] Integrate silent cleanup into app startup (`main.tsx` or `useAuth`) and the Google Sign-In button click handler.
+- [x] Verify test suite and production build.

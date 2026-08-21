@@ -6,13 +6,19 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
+import { clearLegacySupabaseBrowserData, recoverFromLegacyAuthError } from "./_core/legacyAuthCleanup";
 import "./index.css";
+
+// Silently remove stale Supabase browser artifacts before the first Cloudflare
+// session query. Current Cloudflare/Manus session cookies are not touched.
+clearLegacySupabaseBrowserData();
 
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
-  if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
+  if (recoverFromLegacyAuthError(error)) return;
+  if (!(error instanceof TRPCClientError)) return;
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
 

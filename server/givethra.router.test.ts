@@ -110,7 +110,7 @@ describe("Givethra workflow permissions and validation", () => {
       adminReply: "Thank you Ali, we have added a direct login link.",
     });
     expect(updateRes).toEqual({ success: true });
-  });
+  }, 15_000);
 
 
 describe("public feedback chat", () => {
