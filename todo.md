@@ -294,3 +294,15 @@
 
 ## Permanent Ban on Manus Checkpoint Cards
 - [x] Permanently stopped sending Manus managed preview cards (`manus-webdev://...`) to the user, confirming https://givethra.org as the sole canonical live domain.
+
+## Legacy Supabase Automatic Cleanup
+- [x] Implement automatic background cleanup of legacy Supabase localStorage and sessionStorage keys (`sb-`, `supabase`, `supabase.auth.token`, `sb-access-token`) on app load.
+- [x] Implement automatic deletion of legacy Supabase cookies without touching Cloudflare or Manus active session cookies.
+- [x] Add guarded automatic reload on stale session errors with session-storage throttling to prevent infinite loops.
+- [x] Wire the Google Login button click handler to execute this cleanup silently right before redirecting to Google auth.
+- [x] Verify test suite and frontend build.
+
+## Support Chat & Sender UI Correction
+- [x] Fix support chat rendering so sent messages display cleanly as chat bubbles with correct timestamps without showing Wallet or Invalid Date placeholders.
+- [x] Ensure message input and reply controls are only visible where intended and never display confusing field errors on successful sends.
+- [x] Verify frontend test suite and production build pass successfully.

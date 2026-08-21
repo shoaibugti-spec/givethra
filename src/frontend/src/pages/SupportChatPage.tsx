@@ -197,10 +197,11 @@ export default function SupportChatPage() {
                       )}
                     </div>
                     <span className="text-[10px] text-muted-foreground mt-1 px-1">
-                      {new Date(m.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {(() => {
+                        const t = Number(m.createdAt || m.created_at || Date.now());
+                        const d = isNaN(t) ? new Date() : new Date(t);
+                        return isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                      })()}
                     </span>
                   </div>
                 );

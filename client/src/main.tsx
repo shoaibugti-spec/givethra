@@ -18,6 +18,20 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
+  // Guarded reload throttling to prevent infinite refresh loops for stale legacy sessions
+  try {
+    const lastReloadKey = "givethra_last_auth_reload";
+    const lastReload = sessionStorage.getItem(lastReloadKey);
+    const now = Date.now();
+    if (!lastReload || now - Number(lastReload) > 15000) {
+      sessionStorage.setItem(lastReloadKey, String(now));
+      window.location.reload();
+      return;
+    }
+  } catch {
+    // sessionStorage unavailable
+  }
+
   startLogin();
 };
 
