@@ -341,3 +341,9 @@
 - [ ] Fix support chat user message sending (prevent 'Failed to send' or invalid payload errors) and ensure robust timestamp/sender display.
 - [ ] Ensure Admin Case Panel displays meaningful original filenames (e.g. 'Electricity Bill', 'Medical Report', 'Case Selfie', 'ID Card Front') for every uploaded attachment instead of raw hash names.
 - [ ] Implement the public guest/user feedback box on the homepage (above slider) and verify admin-only inbox visibility.
+
+## Admin Urdu Slider & Public Posts Box
+- [ ] Ensure homepage slider is 100% pure English across all authenticated roles including Admin
+- [ ] Create public "What's on your mind?" post/feedback box above the homepage slider for both signed-in and guest visitors
+- [ ] Add Admin Posts panel in Admin Dashboard showing all posts with user ID for signed-in users and "Public" for guests
+- [ ] Add database schema, API router, and frontend tests for post submissions and Admin viewing
