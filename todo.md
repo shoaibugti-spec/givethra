@@ -373,3 +373,25 @@
 - [x] Implement and verify the dedicated **Posts** folder in the Admin Dashboard showing user ID or "Public".
 - [x] Ensure the homepage slider is 100% pure English across all accounts including Admin.
 - [x] Commit all changes to the active GitHub branch and verify GitHub Actions Cloudflare build passes.
+
+## GitHub Synchronization & Remote Verification (Final)
+- [x] Verify local git commits (`main`) pushed successfully to `shoaibugti-spec/givethra`.
+- [x] Ensure exact build success and test passing for the code powering givethra.org.
+
+## User-Requested Features (Admin Upload Names & Homepage Public Post Box)
+- [ ] Ensure Admin Case Panel displays descriptive, human-readable file names and working links for every case upload (e.g., Case Selfie, CNIC Front, Medical Report, Electricity Bill, Case Video) instead of raw hashes like `F2` or `42...`.
+- [ ] Implement the homepage "What's on your mind?" public post submission box directly above the slider.
+- [ ] Implement the dedicated **Posts** tab/folder in the Admin Dashboard showing all submitted posts with User ID for signed-in users and "Public" for guests.
+- [ ] Run automated tests, compile clean Cloudflare production build, and push to GitHub remote `main`.
+
+## Admin Case Upload Filenames & Homepage Post Box (Final Request)
+- [x] Update Admin Case detail view in `src/frontend/src/pages/AdminDashboard.tsx` to display human-readable attachment names (`Electricity Bill`, `Medical Report`, `Case Selfie`, `CNIC Front`, etc.) instead of hashes or generated codes like `F2`.
+- [x] Build and integrate the homepage "What's on your mind?" post/feedback box above the slider in `src/frontend/src/pages/HomePage.tsx`.
+- [x] Build and integrate the dedicated **Posts** folder in the Admin Dashboard showing user ID for signed-in users and "Public" for guests.
+- [x] Run full test suite and production build under `src/frontend` to ensure 100% clean compilation.
+
+## Real End-to-End Post Submission & Admin Posts Inbox
+- [ ] Connect homepage post box submission to backend API (`/api/public-posts`) with success/error toast feedback.
+- [ ] Ensure guest posts save as "Public" and authenticated posts save with user ID / email.
+- [ ] Implement Admin Posts folder in AdminDashboard.tsx to fetch, display, and mark read all incoming posts.
+- [ ] Run full test suite and production build under `src/frontend` to verify successful compilation.
