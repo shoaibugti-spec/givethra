@@ -175,3 +175,47 @@
 - [x] Verify local git remote, repository owner, and branch name (`shoaibugti-spec/givethra`).
 - [x] Inspect git commit history and remote sync state.
 - [x] Roll back temporary test edits and confirm absolute alignment with the verified repository state (`shoaibugti-spec/givethra`).
+
+## Project Freeze & Canonical Layout Restoration Request
+- [x] Freeze all project edits, schema migrations, checkpoints, and deployments.
+- [ ] Await user confirmation of the canonical GitHub repository URL, branch, or commit hash.
+- [ ] Perform read-only comparison against the user's confirmed repository source before any further action.
+
+## Production Site Freeze & Authentic Layout Recovery
+- [x] Freeze all unverified publishing, deployment, and file mutations.
+- [ ] Identify the user's true production domain (`givethra.org`) and its actual deployment source.
+- [ ] Restore legacy user login and authentic layout matching the user's original GitHub structure.
+
+## Canonical Production Source Recovery & Mismatch Verification
+- [x] Freeze all local edits, publishing, and deployments immediately.
+- [x] Audit live production Worker source via read-only Cloudflare API and save findings (`givethra-org-readonly-findings.md`).
+- [x] Save the live production `worker.js` and standalone backend routes as a verified canonical reference backup.
+- [x] Present the exact mismatch between live production (`Worker v3.1`) and GitHub `main` (`givethra-website` template) to the user.
+- [x] Await user instruction before creating a clean restoration branch matching the live site.
+
+## GitHub Deployment Crash & Author Attribution Audit
+- [x] Freeze all GitHub writes, commits, pushes, and preview deployments.
+- [x] Inspect git commit author identity and recent history against user's GitHub account (`shoaibugti-spec/givethra`).
+- [x] Check GitHub Actions / Pages / Cloudflare Pages deployment status via GitHub CLI read-only (`gh workflow list`, `gh run list`).
+- [x] Report exact crash cause and authorship mismatch to the user without making any repository changes.
+
+## Stop & Freeze State
+- [x] Freeze all further edits, pushes, and build attempts on the disconnected workspace.
+- [x] Acknowledge the user's correct observation that previous edits were made in a disconnected environment.
+
+## GitHub Access Disconnection
+- [x] Freeze all code edits, commits, and pushes.
+- [x] Inspect how GitHub CLI or connector is authenticated for `shoaibugti-spec/givethra`.
+- [x] Disconnect or revoke the sandbox GitHub session / auth token / app access without altering any repository files.
+- [x] Confirm access is fully severed and report completion to the user.
+
+## Screenshot Repository Audit
+- [x] Freeze all repository writes, commits, and pushes.
+- [x] Inspect git reflog and commit history read-only to locate pre-agent commits in `shoaibugti-spec/givethra`.
+- [x] Compare pre-agent commits with the user's expected Givethra layout.
+- [x] Await explicit user authorization before performing any git reset or history cleanup.
+
+## Deployment Branch Audit
+- [x] Freeze all production and repository writes.
+- [x] Inspect live Cloudflare Worker / Pages deployment source and branch metadata.
+- [x] Report the verified deployment source and branch to the user without making any changes.
