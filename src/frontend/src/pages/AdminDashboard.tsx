@@ -1,3 +1,7 @@
+// ============================================================
+// FILE: src/frontend/src/pages/AdminPage.tsx
+// ============================================================
+
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -9,6 +13,7 @@ import {
   Shield, CheckCircle, XCircle, ClipboardCheck, FileText, ExternalLink, Heart, Coins, Users,
   ChevronDown, Wallet, Mail, Calendar, Send, ArrowLeft, Gift, AlertTriangle, Building2, Copy,
   Megaphone, HandCoins, Eye, User, Search, Paperclip, Loader2, X, RotateCw, Ban, MessageCircle,
+  MessageSquare,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -41,6 +46,7 @@ import {
   adminUpsertCategoryOffer,
   adminDeleteFiles,
   uploadFileToStorage,
+  adminGetCommunityPosts,
 } from "@/lib/api";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
@@ -64,6 +70,19 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 const DOC_LABELS: Record<string, string> = {
   selfie_url: "Selfie",
   video_url: "Video Appeal",
+  paid_receipt_url: "Paid Receipt",
+  cnic_front_url: "CNIC Front",
+  cnic_back_url: "CNIC Back",
+  passport_url: "Passport",
+  face_video_url: "Face Video",
+  income_certificate_url: "Income Certificate",
+  death_certificate_url: "Death Certificate",
+  fee_challan_url: "Fee Challan",
+  rental_agreement_url: "Rental Agreement",
+  landlord_cnic_url: "Landlord CNIC",
+  shop_agreement_url: "Shop Agreement",
+  business_proof_url: "Business Proof",
+  disability_certificate_url: "Disability Certificate",
   salary_slip: "Salary Slip (6 Months)",
   statement: "Bank Statement (6 Months)",
   nikah_nama: "Nikah Nama",
@@ -89,7 +108,6 @@ const DOC_LABELS: Record<string, string> = {
   hospital_bill: "Hospital Bill",
   medical_report: "Medical Report",
   relation_proof: "Relation Proof",
-  paid_receipt_url: "Paid Receipt",
   photo_url: "Photo",
   admission_proof: "Admission / Selection Proof (Offer Letter)",
   fee_challan: "Fee Challan / Voucher",
@@ -151,21 +169,8 @@ const DOC_LABELS: Record<string, string> = {
   treatment_patient_number: "Patient/Bill Number",
   disability_bank_title: "Bank Title",
   disability_bank_number: "Bank Number",
-  selfie_url: "Case Selfie",
-  video_url: "Case Appeal Video",
-  paid_receipt_url: "Paid Receipt / Transaction Proof",
   medical_report_url: "Medical Report / Bill",
   electricity_bill_url: "Electricity Bill",
-  cnic_front_url: "CNIC Front",
-  cnic_back_url: "CNIC Back",
-  income_certificate_url: "Income Certificate",
-  death_certificate_url: "Death Certificate",
-  fee_challan_url: "Fee Challan / Admission Letter",
-  rental_agreement_url: "Rental Agreement",
-  landlord_cnic_url: "Landlord CNIC",
-  shop_agreement_url: "Shop Agreement",
-  business_proof_url: "Business Proof",
-  disability_certificate_url: "Disability Certificate",
 };
 
 function getDocLabel(key: string): string {
@@ -273,6 +278,7 @@ export default function AdminPage() {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [offers, setOffers] = useState<any[]>([]);
   const [suspensions, setSuspensions] = useState<any[]>([]);
+  const [communityPosts, setCommunityPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadSupport, setUnreadSupport] = useState(0);
 
@@ -287,7 +293,7 @@ export default function AdminPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [kyc, cases, res, deps, profs, wals, unl, sup, fbs, offs, susp] = await Promise.all([
+      const [kyc, cases, res, deps, profs, wals, unl, sup, fbs, offs, susp, posts] = await Promise.all([
         adminGetAllKyc(),
         adminGetAllCases(),
         adminGetAllResolutions(),
@@ -299,6 +305,7 @@ export default function AdminPage() {
         adminGetAllFeedbacks(),
         adminGetAllOffers(),
         adminGetAllSuspensions(),
+        adminGetCommunityPosts(),
       ]);
       setKycList(asRows(kyc));
       setCaseList(asRows(cases));
@@ -311,6 +318,7 @@ export default function AdminPage() {
       setFeedbacks(asRows(fbs));
       setOffers(asRows(offs));
       setSuspensions(asRows(susp));
+      setCommunityPosts(asRows(posts));
       setUnreadSupport(asRows(sup).filter((m: any) => m.sender === "user" && !m.is_read).length);
     } catch (err) {
       console.error("Admin data load error:", err);
@@ -669,6 +677,7 @@ export default function AdminPage() {
               <TabsTrigger value="support">Support {unreadSupport > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{unreadSupport}</span>}</TabsTrigger>
               <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => f.status === "pending_review").length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => f.status === "pending_review").length}</span>}</TabsTrigger>
               <TabsTrigger value="suspensions">Suspensions {activeSuspensions > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{activeSuspensions}</span>}</TabsTrigger>
+              <TabsTrigger value="posts">Posts {communityPosts.length > 0 && <span className="ml-1 bg-primary text-white text-[10px] rounded-full px-1.5">{communityPosts.length}</span>}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4 mt-4">
@@ -684,6 +693,7 @@ export default function AdminPage() {
                   { label: "Hero Helps (Unlocks)", value: totalHeroHelps, icon: Heart },
                   { label: "Total Deposits", value: deposits.length, icon: Coins },
                   { label: "Active Suspensions", value: activeSuspensions, icon: Shield },
+                  { label: "Community Posts", value: communityPosts.length, icon: MessageSquare },
                 ].map(({ label, value, icon: Icon }) => (
                   <div key={label} className="rounded-xl border bg-card p-4 space-y-2">
                     <Icon className="h-5 w-5 text-primary" />
@@ -784,6 +794,49 @@ export default function AdminPage() {
             <TabsContent value="suspensions" className="space-y-4 mt-4">
               <SuspensionsPanel suspensions={suspensions} profiles={profiles} onUnlock={manualUnlockUser} onReload={loadData} />
             </TabsContent>
+
+            <TabsContent value="posts" className="space-y-4 mt-4">
+              <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
+                <MessageSquare className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <p>All community posts submitted from the homepage. Users can post without logging in — those are marked as <strong>Guest/Visitor</strong>. Logged-in users show their name and user ID.</p>
+              </div>
+              {communityPosts.length === 0 ? <Empty text="No community posts yet" /> :
+                communityPosts.map((post) => (
+                  <div key={post.id} className="rounded-xl border bg-card p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-primary" />
+                        <span className="font-semibold text-sm">
+                          {post.display_name || "Guest"}
+                          {post.user_id && (
+                            <span className="ml-2 text-xs font-mono text-muted-foreground">
+                              (ID: {post.user_id.slice(0, 8)}...)
+                            </span>
+                          )}
+                          {post.is_guest && (
+                            <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Visitor</span>
+                          )}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(post.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-sm whitespace-pre-line break-words">{post.message}</p>
+                    {post.user_id && (
+                      <div className="flex gap-2 pt-1 border-t border-border">
+                        <Button size="sm" variant="outline" className="text-xs" onClick={() => copyText(post.user_id)}>
+                          <Copy className="h-3 w-3 mr-1" /> Copy User ID
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-xs" onClick={() => copyText(post.message)}>
+                          <Copy className="h-3 w-3 mr-1" /> Copy Message
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              }
+            </TabsContent>
           </Tabs>
         )}
       </div>
@@ -792,141 +845,58 @@ export default function AdminPage() {
 }
 
 // ============================================================
-//  SUSPENSIONS PANEL
+//  COMPONENTS
 // ============================================================
-function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
-  const activeSuspensions = suspensions.filter((s: any) => s.is_active);
-  const totalSuspensions = suspensions.length;
 
+function Empty({ text }: { text: string }) {
+  return <div className="text-center py-12 text-muted-foreground"><ClipboardCheck className="h-10 w-10 mx-auto opacity-30 mb-2" /><p>{text}</p></div>;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const c: any = { pending: "bg-orange-100 text-orange-700", approved: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", completed: "bg-blue-100 text-blue-700", none: "bg-gray-100 text-gray-600" };
+  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c[status] ?? "bg-gray-100"}`}>{status === "none" ? "NO KYC" : status?.toUpperCase()}</span>;
+}
+
+function Stat({ icon, label, value }: any) {
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
-        <Shield className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-        <div>
-          <p><strong>Total Suspensions:</strong> {totalSuspensions} · <strong>Active:</strong> {activeSuspensions.length}</p>
-          <p className="text-xs mt-1">Each suspension costs 5 credits to unlock. Users can unlock themselves from the submit page.</p>
-        </div>
+    <div className="rounded-lg bg-card border border-border p-2.5">
+      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+        <span className="text-primary">{icon}</span>
+        <span className="text-[10px] uppercase tracking-wide">{label}</span>
       </div>
-
-      {activeSuspensions.length === 0 ? <Empty text="No active suspensions" /> :
-        activeSuspensions.map((s: any) => {
-          const profile = profiles.find((p: any) => p.user_id === s.user_id);
-          return (
-            <div key={s.id} className="rounded-xl border border-red-300 bg-red-50 dark:bg-red-950/20 p-4 space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-red-600" />
-                  <span className="font-semibold">{profile?.full_name || "Unknown User"}</span>
-                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Suspended</span>
-                </div>
-                <span className="text-xs text-muted-foreground">Suspension #{s.suspension_count}</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-                <div><p className="text-xs text-muted-foreground">User ID</p><p className="font-mono text-xs">{s.user_id.slice(0, 12)}...</p></div>
-                <div><p className="text-xs text-muted-foreground">Email</p><p className="text-sm">{profile?.email || "—"}</p></div>
-                <div><p className="text-xs text-muted-foreground">Rejections at Suspension</p><p className="text-sm font-semibold text-red-600">{s.rejection_count_at_suspension}</p></div>
-                <div><p className="text-xs text-muted-foreground">Suspended At</p><p className="text-sm">{new Date(s.suspended_at).toLocaleDateString()}</p></div>
-              </div>
-              <div className="flex gap-2 pt-2 border-t border-red-200">
-                <Button size="sm" variant="outline" className="text-green-600 border-green-300" onClick={() => onUnlock(s.user_id)}>
-                  <CheckCircle className="h-3.5 w-3.5 mr-1" /> Manually Unlock
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(s.user_id); toast.success("User ID copied!"); }}>
-                  <Copy className="h-3.5 w-3.5 mr-1" /> Copy ID
-                </Button>
-              </div>
-            </div>
-          );
-        })
-      }
+      <p className="text-sm font-bold text-foreground capitalize">{value}</p>
     </div>
   );
 }
 
-// ============================================================
-//  SEARCH BOXES
-// ============================================================
-function KycSearchBox({ kycList, onUpdate, cnicCounts }: any) {
-  const [search, setSearch] = useState("");
-  const sortedKyc = [...kycList].sort((a: any, b: any) => {
-    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
-    return (order[a.status] ?? 3) - (order[b.status] ?? 3);
-  });
-  const filtered = search.trim()
-    ? sortedKyc.filter((k: any) =>
-        k.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-        k.cnic_number?.replace(/\D/g, "").includes(search.replace(/\D/g, "")) ||
-        k.user_id?.toLowerCase().includes(search.toLowerCase()))
-    : sortedKyc;
+function DetailRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
+  if (!value) return null;
   return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search KYC by name, CNIC, or user ID..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
+    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-border/50 last:border-0">
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+        <p className={`text-sm font-medium break-all ${mono ? "font-mono" : ""}`}>{value}</p>
       </div>
-      {filtered.length === 0 ? <Empty text="No matching KYC submissions" /> :
-        filtered.map((kyc: any) => {
-          const c = cleanCnic(kyc.cnic_number);
-          const dupCount = c ? (cnicCounts[c] ?? 0) : 0;
-          return <KycCard key={kyc.id} kyc={kyc} onUpdate={onUpdate} dupCount={dupCount} />;
-        })
-      }
+      <button type="button" onClick={() => copyText(value)}
+        className="shrink-0 h-7 w-7 rounded border border-border flex items-center justify-center text-muted-foreground hover:text-primary">
+        <Copy className="h-3 w-3" />
+      </button>
     </div>
   );
 }
 
-function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap }: any) {
-  const [search, setSearch] = useState("");
-  const sortedCases = [...caseList].sort((a, b) => {
-    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2, completed: 3 };
-    return (order[a.status] ?? 4) - (order[b.status] ?? 4);
-  });
-  const filtered = search.trim()
-    ? sortedCases.filter((c: any) =>
-        c.title?.toLowerCase().includes(search.toLowerCase()) ||
-        c.category?.toLowerCase().includes(search.toLowerCase()) ||
-        c.user_id?.toLowerCase().includes(search.toLowerCase()) ||
-        c.cnic_number?.replace(/\D/g, "").includes(search.replace(/\D/g, "")) ||
-        profileMap[c.user_id]?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-        profileMap[c.user_id]?.email?.toLowerCase().includes(search.toLowerCase()))
-    : sortedCases;
+function Img({ url, label }: { url: string; label: string }) {
   return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search cases by title, category, name, CNIC, or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
-      </div>
-      {filtered.length === 0 ? <Empty text="No matching cases" /> :
-        filtered.map((c: any) => <CaseCard key={c.id} c={c} onUpdate={onUpdate} resolutions={resolutions[c.id] ?? []} profileMap={profileMap} />)
-      }
+    <div className="space-y-1">
+      <p className="text-[10px] font-medium text-muted-foreground truncate">{label}</p>
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        <img src={url} alt={label} className="w-full rounded border max-h-24 object-cover" />
+      </a>
     </div>
   );
 }
 
-function DepositSearchBox({ deposits, onApprove, onReject }: any) {
-  const [search, setSearch] = useState("");
-  const sorted = [...deposits].sort((a, b) => {
-    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
-    return (order[a.status] ?? 3) - (order[b.status] ?? 3);
-  });
-  const filtered = search.trim()
-    ? sorted.filter((d: any) =>
-        d.user_id?.toLowerCase().includes(search.toLowerCase()) ||
-        d.transaction_id?.toLowerCase().includes(search.toLowerCase()))
-    : sorted;
-  return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search deposits by user ID or transaction ID..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
-      </div>
-      {filtered.length === 0 ? <Empty text="No matching deposits" /> :
-        filtered.map((d: any) => <DepositCard key={d.id} d={d} onApprove={onApprove} onReject={onReject} />)
-      }
-    </div>
-  );
-}
-
+// ---------- USER SEARCH BOX ----------
 function UserSearchBox({ usersList, onSuspendChange, onManualUnlock }: any) {
   const [search, setSearch] = useState("");
   const filtered = search.trim()
@@ -949,9 +919,6 @@ function UserSearchBox({ usersList, onSuspendChange, onManualUnlock }: any) {
   );
 }
 
-// ============================================================
-//  USER CARD
-// ============================================================
 function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
   const [open, setOpen] = useState(false);
   const [suspending, setSuspending] = useState(false);
@@ -1059,9 +1026,600 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
   );
 }
 
-// ============================================================
-//  PAY & CLOSE CARD
-// ============================================================
+// ---------- KYC SEARCH BOX ----------
+function KycSearchBox({ kycList, onUpdate, cnicCounts }: any) {
+  const [search, setSearch] = useState("");
+  const sortedKyc = [...kycList].sort((a: any, b: any) => {
+    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
+    return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+  });
+  const filtered = search.trim()
+    ? sortedKyc.filter((k: any) =>
+        k.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        k.cnic_number?.replace(/\D/g, "").includes(search.replace(/\D/g, "")) ||
+        k.user_id?.toLowerCase().includes(search.toLowerCase()))
+    : sortedKyc;
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Search KYC by name, CNIC, or user ID..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
+      </div>
+      {filtered.length === 0 ? <Empty text="No matching KYC submissions" /> :
+        filtered.map((kyc: any) => {
+          const c = cleanCnic(kyc.cnic_number);
+          const dupCount = c ? (cnicCounts[c] ?? 0) : 0;
+          return <KycCard key={kyc.id} kyc={kyc} onUpdate={onUpdate} dupCount={dupCount} />;
+        })
+      }
+    </div>
+  );
+}
+
+function KycCard({ kyc, onUpdate, dupCount }: any) {
+  const [reason, setReason] = useState("");
+  const isDuplicate = dupCount > 1;
+  const isPending = kyc.status === "pending";
+  const isApproved = kyc.status === "approved";
+  const isReKyc = kyc.status === "re_kyc";
+  const isDuplicateStatus = kyc.status === "duplicate";
+  const isRejected = kyc.status === "rejected";
+
+  return (
+    <div className={`rounded-xl border bg-card p-4 space-y-3 ${isDuplicate && isPending ? "border-red-300" : ""}`}>
+      {isDuplicate && isPending && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-300 p-2.5 text-xs text-red-700 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <p><strong>⚠️ Duplicate CNIC!</strong> Used in <strong>{dupCount} active KYC submissions</strong>. Review carefully.</p>
+        </div>
+      )}
+      <StatusBadge status={kyc.status} />
+      <div className="text-sm space-y-1">
+        <p className="font-semibold">{kyc.full_name}</p>
+        <p className="text-muted-foreground">Type: {kyc.document_type?.toUpperCase()} {kyc.cnic_number && `· ${kyc.cnic_number}`}</p>
+        <p className="text-muted-foreground">{kyc.address}</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {kyc.cnic_front_url && <Img url={kyc.cnic_front_url} label="CNIC Front" />}
+        {kyc.cnic_back_url && <Img url={kyc.cnic_back_url} label="CNIC Back" />}
+        {kyc.selfie_url && <Img url={kyc.selfie_url} label="Selfie" />}
+        {kyc.passport_url && <a href={kyc.passport_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1"><FileText className="h-3 w-3" /> Passport</a>}
+        {kyc.face_video_url && (
+          <div className="space-y-1">
+            <p className="text-[10px] text-muted-foreground">Face Video</p>
+            <video src={kyc.face_video_url} controls className="w-full rounded border max-h-24" />
+          </div>
+        )}
+      </div>
+
+      {isPending && (
+        <div className="space-y-2">
+          <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(kyc.id, "approved", "", "approve")}>
+              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
+            </Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(kyc.id, "rejected", reason, "reject")}>
+              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isApproved && (
+        <div className="space-y-2">
+          <Textarea placeholder="Reason for Re-KYC or Duplicate" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" className="text-amber-600 border-amber-300" onClick={() => {
+              if (!reason.trim()) { toast.error("Please provide a reason for re-kyc"); return; }
+              onUpdate(kyc.id, "re_kyc", reason, "re_kyc");
+            }}>
+              <RotateCw className="h-3.5 w-3.5 mr-1" /> Re-KYC
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => {
+              if (!confirm("Are you sure you want to mark this as DUPLICATE and BAN the user?")) return;
+              onUpdate(kyc.id, "duplicate", reason || "Duplicate KYC", "duplicate");
+            }}>
+              <Ban className="h-3.5 w-3.5 mr-1" /> Duplicate - Ban
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">⚡ <strong>Re-KYC:</strong> User will be asked to resubmit KYC. <strong>Duplicate - Ban:</strong> Marks as duplicate and bans the user permanently.</p>
+        </div>
+      )}
+
+      {isReKyc && (
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-300 p-3 text-sm text-blue-700">
+          <p><strong>🔄 Re-KYC Requested</strong></p>
+          <p>User has been notified to resubmit KYC. Reason: {kyc.rejection_reason || "CNIC correction needed"}</p>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="outline" className="text-amber-600 border-amber-300" onClick={() => {
+              if (!reason.trim()) { toast.error("Please provide a reason"); return; }
+              onUpdate(kyc.id, "re_kyc", reason, "re_kyc");
+            }}>
+              <RotateCw className="h-3.5 w-3.5 mr-1" /> Re-KYC Again
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => {
+              if (!confirm("Are you sure you want to mark this as DUPLICATE and BAN the user?")) return;
+              onUpdate(kyc.id, "duplicate", reason || "Duplicate KYC", "duplicate");
+            }}>
+              <Ban className="h-3.5 w-3.5 mr-1" /> Duplicate - Ban
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isDuplicateStatus && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-300 p-3 text-sm text-red-700">
+          <p><strong>🚫 Duplicate KYC - User Banned</strong></p>
+          <p>This KYC was marked as duplicate and the user account has been suspended.</p>
+          <p className="text-xs mt-1 text-red-600">User cannot submit any cases.</p>
+        </div>
+      )}
+
+      {isRejected && (
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/20 border border-gray-300 p-3 text-sm text-muted-foreground">
+          <p><strong>❌ KYC Rejected</strong></p>
+          <p>Reason: {kyc.rejection_reason || "No reason provided"}</p>
+          <p className="text-xs mt-1">User can resubmit KYC.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- CASE SEARCH BOX ----------
+function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap }: any) {
+  const [search, setSearch] = useState("");
+  const sortedCases = [...caseList].sort((a, b) => {
+    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2, completed: 3 };
+    return (order[a.status] ?? 4) - (order[b.status] ?? 4);
+  });
+  const filtered = search.trim()
+    ? sortedCases.filter((c: any) =>
+        c.title?.toLowerCase().includes(search.toLowerCase()) ||
+        c.category?.toLowerCase().includes(search.toLowerCase()) ||
+        c.user_id?.toLowerCase().includes(search.toLowerCase()) ||
+        c.cnic_number?.replace(/\D/g, "").includes(search.replace(/\D/g, "")) ||
+        profileMap[c.user_id]?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        profileMap[c.user_id]?.email?.toLowerCase().includes(search.toLowerCase()))
+    : sortedCases;
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Search cases by title, category, name, CNIC, or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
+      </div>
+      {filtered.length === 0 ? <Empty text="No matching cases" /> :
+        filtered.map((c: any) => <CaseCard key={c.id} c={c} onUpdate={onUpdate} resolutions={resolutions[c.id] ?? []} profileMap={profileMap} />)
+      }
+    </div>
+  );
+}
+
+function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
+  const [reason, setReason] = useState("");
+  const cur = c.currency || "USD";
+  const s = sym(cur);
+  const seeker = profileMap[c.user_id];
+  const hasPayment = c.institute_name || c.account_number || c.account_title || c.account_iban;
+  const catDetails = c.category_details && typeof c.category_details === "object" ? c.category_details : null;
+  const catDocs = catDetails?._documents && typeof catDetails._documents === "object" ? catDetails._documents : {};
+
+  const allFields: { label: string; value: any }[] = [];
+  if (catDetails) {
+    const excludeKeys = new Set([
+      "_documents", "edu_documents", "edu_sub_fields", "property_ownership",
+      "rental_agreement_url", "landlord_cnic_url", "job_status", "gender",
+      "marital_status", "is_orphan", "orphan_parent", "seeker_name",
+      "seeker_contact", "receiver_name", "receiver_contact", "receiver_bank",
+      "receiver_account", "disability_mode", "disability_type", "disability_reason",
+      "disability_shop_name", "disability_shop_contact", "disability_hospital",
+      "treatment_amount", "treatment_expiry", "treatment_patient_number",
+      "disability_bank_title", "disability_bank_number", "institute_name",
+      "institute_contact", "institute_address", "is_institute_in_list",
+      "reference_type", "reference_number", "due_date", "edu_sub_type",
+      "edu_admission_level",
+    ]);
+    for (const [key, val] of Object.entries(catDetails)) {
+      if (excludeKeys.has(key)) continue;
+      if (key.startsWith("_")) continue;
+      if (typeof val === "string" && val.trim()) {
+        allFields.push({ label: getDocLabel(key), value: val });
+      } else if (typeof val === "number" || typeof val === "boolean") {
+        allFields.push({ label: getDocLabel(key), value: String(val) });
+      }
+    }
+  }
+
+  const eduSubFields = catDetails?.edu_sub_fields || {};
+  const eduFields: { label: string; value: any }[] = [];
+  for (const [key, val] of Object.entries(eduSubFields)) {
+    if (val) eduFields.push({ label: getDocLabel(key), value: val });
+  }
+
+  const personalDetails = [
+    { label: "Job Status", value: catDetails?.job_status || "" },
+    { label: "Gender", value: catDetails?.gender || "" },
+    { label: "Marital Status", value: catDetails?.marital_status || "" },
+    { label: "Orphan", value: catDetails?.is_orphan || "" },
+    { label: "Orphan Parent", value: catDetails?.orphan_parent || "" },
+    { label: "Seeker Name", value: catDetails?.seeker_name || "" },
+    { label: "Seeker Contact", value: catDetails?.seeker_contact || "" },
+  ].filter((d) => d.value);
+
+  const receiverDetails = [
+    { label: "Receiver Name", value: catDetails?.receiver_name || "" },
+    { label: "Receiver Contact", value: catDetails?.receiver_contact || "" },
+    { label: "Receiver Bank", value: catDetails?.receiver_bank || "" },
+    { label: "Receiver Account", value: catDetails?.receiver_account || "" },
+    { label: "Receiver Address", value: catDetails?.receiver_address || "" },
+    { label: "Shop Name", value: catDetails?.receiver_shop_name || "" },
+  ].filter((d) => d.value);
+
+  const disabilityDetails = [
+    { label: "Disability Mode", value: catDetails?.disability_mode || "" },
+    { label: "Disability Type", value: catDetails?.disability_type || "" },
+    { label: "Disability Reason", value: catDetails?.disability_reason || "" },
+    { label: "Shop Name", value: catDetails?.disability_shop_name || "" },
+    { label: "Shop Contact", value: catDetails?.disability_shop_contact || "" },
+    { label: "Hospital", value: catDetails?.disability_hospital || "" },
+    { label: "Treatment Amount", value: catDetails?.treatment_amount || "" },
+    { label: "Treatment Expiry", value: catDetails?.treatment_expiry || "" },
+    { label: "Patient/Bill Number", value: catDetails?.treatment_patient_number || "" },
+    { label: "Bank Title (Stipend)", value: catDetails?.disability_bank_title || "" },
+    { label: "Bank Number (Stipend)", value: catDetails?.disability_bank_number || "" },
+  ].filter((d) => d.value);
+
+  const propertyDetails = [
+    { label: "Property Ownership", value: catDetails?.property_ownership === "rented" ? "Rented" : catDetails?.property_ownership === "owned" ? "Owned" : "" },
+  ].filter((d) => d.value);
+
+  const fileEntries: { key: string; label: string; url: string }[] = [];
+  const pushFile = (key: string, value: unknown) => {
+    if (typeof value !== "string") return;
+    const url = value.trim();
+    if (!url.startsWith("http")) return;
+
+    let label = getDocLabel(key);
+    try {
+      const urlObj = new URL(url);
+      const filename = urlObj.pathname.split('/').pop() || '';
+      if (filename) {
+        let decoded = decodeURIComponent(filename);
+        let cleaned = decoded
+          .replace(/^[0-9]{10,}[-_]/, '')
+          .replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]/i, '')
+          .replace(/^[0-9]+[-_]/, '');
+        if (cleaned && cleaned.length > 1 && !cleaned.match(/^[0-9a-f]{8,}$/i)) {
+          label = cleaned.replace(/[_]/g, ' ');
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    if (!fileEntries.some((f) => f.url === url)) {
+      fileEntries.push({ key, label, url });
+    }
+  };
+
+  pushFile("selfie_url", c.selfie_url);
+  pushFile("video_url", c.video_url);
+  pushFile("paid_receipt_url", c.paid_receipt_url);
+
+  if (Array.isArray(c.photo_urls)) {
+    c.photo_urls.forEach((val, idx) => pushFile(`photo_${idx + 1}`, val));
+  } else if (c.photo_urls && typeof c.photo_urls === "object") {
+    for (const [k, val] of Object.entries(c.photo_urls)) pushFile(k, val);
+  }
+
+  const walkFilesDeep = (obj: any, prefix = "") => {
+    if (!obj || typeof obj !== "object") return;
+    if (Array.isArray(obj)) {
+      obj.forEach((item, idx) => walkFilesDeep(item, `${prefix}_${idx + 1}`));
+      return;
+    }
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof v === "string") {
+        const trimmed = v.trim();
+        if (trimmed.startsWith("http")) {
+          pushFile(prefix ? `${prefix}_${k}` : k, trimmed);
+        }
+      } else if (v && typeof v === "object") {
+        walkFilesDeep(v, prefix ? `${prefix}_${k}` : k);
+      }
+    }
+  };
+  walkFilesDeep(catDetails);
+
+  const seen = new Set<string>();
+  const uniqueFiles = fileEntries.filter((file) => {
+    if (seen.has(file.url)) return false;
+    seen.add(file.url);
+    return true;
+  });
+
+  const isRejected = c.status === "rejected";
+
+  return (
+    <div className={`rounded-xl border p-4 space-y-3 ${isRejected ? "border-red-300 bg-red-50/50 dark:bg-red-950/10" : "bg-card"}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <StatusBadge status={c.status} />
+        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
+        <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{c.urgency}</span>
+        {c.was_free
+          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">FREE</span>
+          : <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">PAID</span>}
+        {c.closed_by_admin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">FUNDRAISED & PAID</span>}
+      </div>
+
+      {isRejected && c.rejection_reason && (
+        <div className="rounded-lg border-2 border-red-300 bg-red-100 dark:bg-red-950/30 p-4">
+          <div className="flex items-start gap-2">
+            <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-red-700">❌ Case Rejected</p>
+              <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{c.rejection_reason}</p>
+              {c.reviewed_at && <p className="text-xs text-red-500 mt-2">Reviewed on: {new Date(c.reviewed_at).toLocaleString()}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="text-sm space-y-1">
+        <p className="font-semibold">{c.title}</p>
+        <p className="text-muted-foreground">{c.short_description}</p>
+        <p className="text-muted-foreground text-xs">📍 {c.city}, {c.country} {c.amount_needed && `· Needs: ${s} ${c.amount_needed} ${cur}`}</p>
+        {c.deadline && (
+          <p className="text-xs font-bold text-red-600 flex items-center gap-1">
+            ⏰ Bill / Case Due (Expiry) Date: {new Date(c.deadline).toLocaleDateString()}
+          </p>
+        )}
+        {c.amount_needed > 0 && <p className="text-xs text-green-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>}
+
+        {!isRejected && (
+          <div className="mt-2 rounded-lg bg-primary/5 border border-primary/10 p-3">
+            <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">📋 Full Case Description</p>
+            <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+              {c.description || "No description provided"}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs space-y-0.5">
+        <p className="font-semibold text-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Submitted by</p>
+        <p className="text-muted-foreground">{seeker?.full_name || "—"} · {seeker?.email || c.user_id?.slice(0, 8)}</p>
+      </div>
+
+      {personalDetails.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><User className="h-3 w-3" /> Personal Details</p>
+          {personalDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {receiverDetails.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><HandCoins className="h-3 w-3" /> Payment Receiver</p>
+          {receiverDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {disabilityDetails.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><Heart className="h-3 w-3" /> Disability Details</p>
+          {disabilityDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {propertyDetails.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><Building2 className="h-3 w-3" /> Property Details</p>
+          {propertyDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+          {catDetails?.rental_agreement_url && <Img url={catDetails.rental_agreement_url} label="Rental Agreement" />}
+          {catDetails?.landlord_cnic_url && <Img url={catDetails.landlord_cnic_url} label="Landlord's CNIC" />}
+        </div>
+      )}
+
+      {eduFields.length > 0 && (
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 p-3 space-y-1">
+          <p className="text-xs font-semibold text-blue-700 flex items-center gap-1"><BookOpen className="h-3 w-3" /> Education Details</p>
+          {eduFields.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {allFields.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><ClipboardCheck className="h-3 w-3" /> Other Details</p>
+          {allFields.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {uniqueFiles.length > 0 ? (
+        <div className="rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold flex items-center gap-1"><FileText className="h-4 w-4" /> Uploaded Files ({uniqueFiles.length})</p>
+            <div className="flex gap-1">
+              <button onClick={() => copyText(uniqueFiles.map((f) => f.url).join("\n"))} className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                <Copy className="h-3 w-3" /> Copy URLs
+              </button>
+              <button onClick={() => copyText(JSON.stringify(c, null, 2))} className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                <Copy className="h-3 w-3" /> Copy Raw Data
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {uniqueFiles.map(({ key, label, url }) => {
+              const isVideo = url.match(/\.(mp4|webm|mov|avi)$/i) || url.includes("video");
+              const isPdf = url.match(/\.pdf$/i);
+              return (
+                <div key={key + url} className="space-y-1 bg-background/80 p-1.5 rounded border">
+                  <p className="text-[10px] font-medium text-foreground truncate" title={label}>📎 {label}</p>
+                  {isVideo ? (
+                    <video src={url} controls className="w-full rounded border max-h-32 bg-black" />
+                  ) : isPdf ? (
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
+                      📄 View PDF
+                    </a>
+                  ) : (
+                    <a href={url} target="_blank" rel="noopener noreferrer">
+                      <img src={url} alt={label} className="w-full rounded border max-h-28 object-cover hover:opacity-95" />
+                    </a>
+                  )}
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="block text-[9px] text-primary hover:underline text-center">
+                    Open in Full Size ↗
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-muted-foreground">📌 Click any image to enlarge.</p>
+        </div>
+      ) : (
+        <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 p-3 text-xs text-yellow-700">
+          ⚠️ No files uploaded for this case.
+        </div>
+      )}
+
+      {hasPayment && (
+        <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-3 space-y-1">
+          <p className="font-semibold text-sm flex items-center gap-1 text-amber-700"><Building2 className="h-4 w-4" /> Institute Payment Details</p>
+          <DetailRow label="Institute / Provider" value={c.institute_name} />
+          <DetailRow label="Payment Method" value={c.payment_method} />
+          <DetailRow label="Account Title / Reference" value={c.account_title} />
+          <DetailRow label="Account / Bill Number" value={c.account_number} mono />
+          <DetailRow label="IBAN" value={c.account_iban} mono />
+          <DetailRow label="Institute Contact" value={c.institute_contact} mono />
+          <DetailRow label="Institute Address" value={c.institute_address} />
+        </div>
+      )}
+
+      {resolutions.length > 0 && (
+        <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-2">
+          <p className="font-semibold text-sm flex items-center gap-1"><Heart className="h-4 w-4 text-primary" /> All Helps on this case</p>
+          {resolutions.map((r: any) => (
+            <div key={r.id} className="text-xs space-y-0.5 border-b border-border/50 last:border-0 pb-2">
+              <p>
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.status === "completed" ? "bg-green-100 text-green-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>{r.status?.toUpperCase()}</span>
+                {" "}
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.paid_to === "givethra" ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"}`}>{r.paid_to === "givethra" ? "FUNDRAISING" : "DIRECT"}</span>
+              </p>
+              <p><span className="text-muted-foreground">Amount:</span> {s} {r.seeker_confirmed_amount ?? r.amount_paid} {cur} · <span className="text-muted-foreground">TXN:</span> <span className="font-mono">{r.transaction_id}</span></p>
+              {r.receipt_url && <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary"><ExternalLink className="h-3 w-3" /> Receipt</a>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {c.status === "pending" && (
+        <div className="space-y-2">
+          <Textarea placeholder="Rejection reason (e.g. 'video missing', 'bill not clear', 'account seems personal')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex gap-2">
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(c.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Publish</Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(c.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- DEPOSIT SEARCH BOX ----------
+function DepositSearchBox({ deposits, onApprove, onReject }: any) {
+  const [search, setSearch] = useState("");
+  const sorted = [...deposits].sort((a, b) => {
+    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
+    return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+  });
+  const filtered = search.trim()
+    ? sorted.filter((d: any) =>
+        d.user_id?.toLowerCase().includes(search.toLowerCase()) ||
+        d.transaction_id?.toLowerCase().includes(search.toLowerCase()))
+    : sorted;
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Search deposits by user ID or transaction ID..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
+      </div>
+      {filtered.length === 0 ? <Empty text="No matching deposits" /> :
+        filtered.map((d: any) => <DepositCard key={d.id} d={d} onApprove={onApprove} onReject={onReject} />)
+      }
+    </div>
+  );
+}
+
+function DepositCard({ d, onApprove, onReject }: any) {
+  const [reason, setReason] = useState("");
+  const [credits, setCredits] = useState<string>(String(d.credits ?? d.amount ?? ""));
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <StatusBadge status={d.status} />
+        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{d.method}</span>
+      </div>
+      <div className="text-sm space-y-1">
+        <p className="font-semibold flex items-center gap-1"><Coins className="h-4 w-4 text-primary" /> User claims: ${d.amount} → {d.credits ?? d.amount} Credits</p>
+        <p className="text-muted-foreground text-xs font-mono">TXN: {d.transaction_id}</p>
+        <p className="text-muted-foreground text-xs">User: {d.user_id?.slice(0, 8)}...</p>
+      </div>
+      {d.proof_url && <Img url={d.proof_url} label="Payment Proof" />}
+      {d.status === "pending" && (
+        <div className="space-y-2">
+          <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5 space-y-1.5">
+            <label className="text-xs font-medium text-amber-700 dark:text-amber-400">Credits to add (verify against receipt):</label>
+            <input type="number" step="0.01" min="0" value={credits} onChange={(e) => setCredits(e.target.value)}
+              className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm" placeholder="e.g. 0.99 or 10.1" />
+          </div>
+          <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex gap-2">
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onApprove(d, parseFloat(credits) || 0)}>
+              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Add {credits || 0} Credits
+            </Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onReject(d.id, reason)}>
+              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- FEEDBACK CARD ----------
+function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
+  const [reason, setReason] = useState("");
+  const p = profileMap[fb.user_id];
+  const c = caseList.find((cs: any) => cs.id === fb.case_id);
+  const status = fb.status || "pending_review";
+
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status === "approved" ? "bg-green-100 text-green-700" : status === "rejected" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>{status.replace("_", " ").toUpperCase()}</span>
+        {c && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>}
+      </div>
+      <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs">
+        <p className="font-semibold">{p?.full_name || fb.first_name || "—"} · {p?.email || fb.user_id?.slice(0, 8)}</p>
+        {c && <p className="text-muted-foreground mt-0.5">Case: {c.title}</p>}
+      </div>
+      {fb.text_message && <p className="text-sm whitespace-pre-line">{fb.text_message}</p>}
+      {fb.video_url && <video src={fb.video_url} controls className="w-full rounded border max-h-56" />}
+      {status === "pending_review" && (
+        <div className="space-y-2 pt-1 border-t border-border">
+          <Textarea placeholder="Rejection reason (e.g. 'video too short', 'unrelated content')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex gap-2">
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve — Post to Wall</Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(fb.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- PAY CLOSE CARD ----------
 function PayCloseCard({ c, profileMap, onClose }: any) {
   const cur = c.currency || "USD";
   const s = sym(cur);
@@ -1117,9 +1675,7 @@ function PayCloseCard({ c, profileMap, onClose }: any) {
   );
 }
 
-// ============================================================
-//  VERIFY CARD
-// ============================================================
+// ---------- VERIFY CARD ----------
 function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
   const cur = c?.currency || "USD";
   const s = sym(cur);
@@ -1185,9 +1741,7 @@ function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
   );
 }
 
-// ============================================================
-//  NOTIFY PANEL
-// ============================================================
+// ---------- NOTIFY PANEL ----------
 function NotifyPanel({ profiles, kycList, caseList }: any) {
   const [group, setGroup] = useState("all");
   const [title, setTitle] = useState("");
@@ -1304,9 +1858,7 @@ function NotifyPanel({ profiles, kycList, caseList }: any) {
   );
 }
 
-// ============================================================
-//  OFFERS PANEL
-// ============================================================
+// ---------- OFFERS PANEL ----------
 function OffersPanel({ offers, onReload }: any) {
   const offerMap: Record<string, any> = {};
   for (const o of offers) offerMap[o.category] = o;
@@ -1387,13 +1939,9 @@ function OfferRow({ category, offer, onReload }: any) {
   );
 }
 
-// ============================================================
-//  SUPPORT PANEL (FIXED CHAT)
-// ============================================================
+// ---------- SUPPORT PANEL ----------
 function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   const [activeUser, setActiveUser] = useState<string | null>(null);
-
-
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -1608,606 +2156,61 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   );
 }
 
-// ============================================================
-//  GENERIC HELPERS
-// ============================================================
-function Empty({ text }: { text: string }) {
-  return <div className="text-center py-12 text-muted-foreground"><ClipboardCheck className="h-10 w-10 mx-auto opacity-30 mb-2" /><p>{text}</p></div>;
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const c: any = { pending: "bg-orange-100 text-orange-700", approved: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", completed: "bg-blue-100 text-blue-700", none: "bg-gray-100 text-gray-600" };
-  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c[status] ?? "bg-gray-100"}`}>{status === "none" ? "NO KYC" : status?.toUpperCase()}</span>;
-}
-
-function Stat({ icon, label, value }: any) {
-  return (
-    <div className="rounded-lg bg-card border border-border p-2.5">
-      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-        <span className="text-primary">{icon}</span>
-        <span className="text-[10px] uppercase tracking-wide">{label}</span>
-      </div>
-      <p className="text-sm font-bold text-foreground capitalize">{value}</p>
-    </div>
-  );
-}
-
-// ============================================================
-//  KYC CARD
-// ============================================================
-function KycCard({ kyc, onUpdate, dupCount }: any) {
-  const [reason, setReason] = useState("");
-  const isDuplicate = dupCount > 1;
-  const isPending = kyc.status === "pending";
-  const isApproved = kyc.status === "approved";
-  const isReKyc = kyc.status === "re_kyc";
-  const isDuplicateStatus = kyc.status === "duplicate";
-  const isRejected = kyc.status === "rejected";
+// ---------- SUSPENSIONS PANEL ----------
+function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
+  const activeSuspensions = suspensions.filter((s: any) => s.is_active);
+  const totalSuspensions = suspensions.length;
 
   return (
-    <div className={`rounded-xl border bg-card p-4 space-y-3 ${isDuplicate && isPending ? "border-red-300" : ""}`}>
-      {isDuplicate && isPending && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-300 p-2.5 text-xs text-red-700 flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-          <p><strong>⚠️ Duplicate CNIC!</strong> Used in <strong>{dupCount} active KYC submissions</strong>. Review carefully.</p>
+    <div className="space-y-4">
+      <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
+        <Shield className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+        <div>
+          <p><strong>Total Suspensions:</strong> {totalSuspensions} · <strong>Active:</strong> {activeSuspensions.length}</p>
+          <p className="text-xs mt-1">Each suspension costs 5 credits to unlock. Users can unlock themselves from the submit page.</p>
         </div>
-      )}
-      <StatusBadge status={kyc.status} />
-      <div className="text-sm space-y-1">
-        <p className="font-semibold">{kyc.full_name}</p>
-        <p className="text-muted-foreground">Type: {kyc.document_type?.toUpperCase()} {kyc.cnic_number && `· ${kyc.cnic_number}`}</p>
-        <p className="text-muted-foreground">{kyc.address}</p>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {kyc.cnic_front_url && <Img url={kyc.cnic_front_url} label="CNIC Front" />}
-        {kyc.cnic_back_url && <Img url={kyc.cnic_back_url} label="CNIC Back" />}
-        {kyc.selfie_url && <Img url={kyc.selfie_url} label="Selfie" />}
-        {kyc.passport_url && <a href={kyc.passport_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1"><FileText className="h-3 w-3" /> Passport</a>}
-        {kyc.face_video_url && (
-          <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground">Face Video</p>
-            <video src={kyc.face_video_url} controls className="w-full rounded border max-h-24" />
-          </div>
-        )}
       </div>
 
-      {isPending && (
-        <div className="space-y-2">
-          <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(kyc.id, "approved", "", "approve")}>
-              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
-            </Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(kyc.id, "rejected", reason, "reject")}>
-              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {isApproved && (
-        <div className="space-y-2">
-          <Textarea placeholder="Reason for Re-KYC or Duplicate" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" className="text-amber-600 border-amber-300" onClick={() => {
-              if (!reason.trim()) { toast.error("Please provide a reason for re-kyc"); return; }
-              onUpdate(kyc.id, "re_kyc", reason, "re_kyc");
-            }}>
-              <RotateCw className="h-3.5 w-3.5 mr-1" /> Re-KYC
-            </Button>
-            <Button size="sm" variant="destructive" onClick={() => {
-              if (!confirm("Are you sure you want to mark this as DUPLICATE and BAN the user?")) return;
-              onUpdate(kyc.id, "duplicate", reason || "Duplicate KYC", "duplicate");
-            }}>
-              <Ban className="h-3.5 w-3.5 mr-1" /> Duplicate - Ban
-            </Button>
-          </div>
-          <p className="text-[10px] text-muted-foreground">⚡ <strong>Re-KYC:</strong> User will be asked to resubmit KYC. <strong>Duplicate - Ban:</strong> Marks as duplicate and bans the user permanently.</p>
-        </div>
-      )}
-
-      {isReKyc && (
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-300 p-3 text-sm text-blue-700">
-          <p><strong>🔄 Re-KYC Requested</strong></p>
-          <p>User has been notified to resubmit KYC. Reason: {kyc.rejection_reason || "CNIC correction needed"}</p>
-          <div className="mt-2 flex gap-2">
-            <Button size="sm" variant="outline" className="text-amber-600 border-amber-300" onClick={() => {
-              if (!reason.trim()) { toast.error("Please provide a reason"); return; }
-              onUpdate(kyc.id, "re_kyc", reason, "re_kyc");
-            }}>
-              <RotateCw className="h-3.5 w-3.5 mr-1" /> Re-KYC Again
-            </Button>
-            <Button size="sm" variant="destructive" onClick={() => {
-              if (!confirm("Are you sure you want to mark this as DUPLICATE and BAN the user?")) return;
-              onUpdate(kyc.id, "duplicate", reason || "Duplicate KYC", "duplicate");
-            }}>
-              <Ban className="h-3.5 w-3.5 mr-1" /> Duplicate - Ban
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {isDuplicateStatus && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-300 p-3 text-sm text-red-700">
-          <p><strong>🚫 Duplicate KYC - User Banned</strong></p>
-          <p>This KYC was marked as duplicate and the user account has been suspended.</p>
-          <p className="text-xs mt-1 text-red-600">User cannot submit any cases.</p>
-        </div>
-      )}
-
-      {isRejected && (
-        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/20 border border-gray-300 p-3 text-sm text-muted-foreground">
-          <p><strong>❌ KYC Rejected</strong></p>
-          <p>Reason: {kyc.rejection_reason || "No reason provided"}</p>
-          <p className="text-xs mt-1">User can resubmit KYC.</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-//  DETAIL ROW
-// ============================================================
-function DetailRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
-  if (!value) return null;
-  return (
-    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-border/50 last:border-0">
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
-        <p className={`text-sm font-medium break-all ${mono ? "font-mono" : ""}`}>{value}</p>
-      </div>
-      <button type="button" onClick={() => copyText(value)}
-        className="shrink-0 h-7 w-7 rounded border border-border flex items-center justify-center text-muted-foreground hover:text-primary">
-        <Copy className="h-3 w-3" />
-      </button>
-    </div>
-  );
-}
-
-// ============================================================
-//  CASE CARD (FULLY COMPLETE - ALL FIELDS VISIBLE)
-// ============================================================
-function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
-  const [reason, setReason] = useState("");
-  const cur = c.currency || "USD";
-  const s = sym(cur);
-  const seeker = profileMap[c.user_id];
-  const hasPayment = c.institute_name || c.account_number || c.account_title || c.account_iban;
-  const catDetails = c.category_details && typeof c.category_details === "object" ? c.category_details : null;
-  const catDocs = catDetails?._documents && typeof catDetails._documents === "object" ? catDetails._documents : {};
-
-  const allFields: { label: string; value: any }[] = [];
-  if (catDetails) {
-    const excludeKeys = new Set([
-      "_documents", "edu_documents", "edu_sub_fields", "property_ownership",
-      "rental_agreement_url", "landlord_cnic_url", "job_status", "gender",
-      "marital_status", "is_orphan", "orphan_parent", "seeker_name",
-      "seeker_contact", "receiver_name", "receiver_contact", "receiver_bank",
-      "receiver_account", "disability_mode", "disability_type", "disability_reason",
-      "disability_shop_name", "disability_shop_contact", "disability_hospital",
-      "treatment_amount", "treatment_expiry", "treatment_patient_number",
-      "disability_bank_title", "disability_bank_number", "institute_name",
-      "institute_contact", "institute_address", "is_institute_in_list",
-      "reference_type", "reference_number", "due_date", "edu_sub_type",
-      "edu_admission_level",
-    ]);
-    for (const [key, val] of Object.entries(catDetails)) {
-      if (excludeKeys.has(key)) continue;
-      if (key.startsWith("_")) continue;
-      if (typeof val === "string" && val.trim()) {
-        allFields.push({ label: getDocLabel(key), value: val });
-      } else if (typeof val === "number" || typeof val === "boolean") {
-        allFields.push({ label: getDocLabel(key), value: String(val) });
-      }
-    }
-  }
-
-  const eduSubFields = catDetails?.edu_sub_fields || {};
-  const eduFields: { label: string; value: any }[] = [];
-  for (const [key, val] of Object.entries(eduSubFields)) {
-    if (val) eduFields.push({ label: getDocLabel(key), value: val });
-  }
-
-  const personalDetails = [
-    { label: "Job Status", value: catDetails?.job_status || "" },
-    { label: "Gender", value: catDetails?.gender || "" },
-    { label: "Marital Status", value: catDetails?.marital_status || "" },
-    { label: "Orphan", value: catDetails?.is_orphan || "" },
-    { label: "Orphan Parent", value: catDetails?.orphan_parent || "" },
-    { label: "Seeker Name", value: catDetails?.seeker_name || "" },
-    { label: "Seeker Contact", value: catDetails?.seeker_contact || "" },
-  ].filter((d) => d.value);
-
-  const receiverDetails = [
-    { label: "Receiver Name", value: catDetails?.receiver_name || "" },
-    { label: "Receiver Contact", value: catDetails?.receiver_contact || "" },
-    { label: "Receiver Bank", value: catDetails?.receiver_bank || "" },
-    { label: "Receiver Account", value: catDetails?.receiver_account || "" },
-    { label: "Receiver Address", value: catDetails?.receiver_address || "" },
-    { label: "Shop Name", value: catDetails?.receiver_shop_name || "" },
-  ].filter((d) => d.value);
-
-  const disabilityDetails = [
-    { label: "Disability Mode", value: catDetails?.disability_mode || "" },
-    { label: "Disability Type", value: catDetails?.disability_type || "" },
-    { label: "Disability Reason", value: catDetails?.disability_reason || "" },
-    { label: "Shop Name", value: catDetails?.disability_shop_name || "" },
-    { label: "Shop Contact", value: catDetails?.disability_shop_contact || "" },
-    { label: "Hospital", value: catDetails?.disability_hospital || "" },
-    { label: "Treatment Amount", value: catDetails?.treatment_amount || "" },
-    { label: "Treatment Expiry", value: catDetails?.treatment_expiry || "" },
-    { label: "Patient/Bill Number", value: catDetails?.treatment_patient_number || "" },
-    { label: "Bank Title (Stipend)", value: catDetails?.disability_bank_title || "" },
-    { label: "Bank Number (Stipend)", value: catDetails?.disability_bank_number || "" },
-  ].filter((d) => d.value);
-
-  const propertyDetails = [
-    { label: "Property Ownership", value: catDetails?.property_ownership === "rented" ? "Rented" : catDetails?.property_ownership === "owned" ? "Owned" : "" },
-  ].filter((d) => d.value);
-
-  const fileEntries: { key: string; label: string; url: string }[] = [];
-  const pushFile = (key: string, value: unknown) => {
-    if (typeof value !== "string") return;
-    const url = value.trim();
-    if (!url.startsWith("http")) return;
-    
-    let label = getDocLabel(key);
-    try {
-      const cleanUrl = url.split('?')[0];
-      const segments = cleanUrl.split('/');
-      const lastSeg = segments[segments.length - 1];
-      if (lastSeg) {
-        let decoded = decodeURIComponent(lastSeg);
-        // Remove numeric prefix hashes, uuids, or timestamps (e.g. 1724300000000-f2_photo.jpg or a0b1c2d3-file.png)
-        let cleaned = decoded
-          .replace(/^[0-9]{10,}[-_]/, '')
-          .replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]/i, '')
-          .replace(/^[0-9]+[-_]/, '');
-        if (cleaned && !cleaned.match(/^[0-9a-f]{8,}$/i)) {
-          label = cleaned.replace(/[_]/g, ' ');
-        }
-      }
-    } catch (e) {
-      // fallback
-    }
-    if (!label || label === key || label.match(/^[0-9a-f]{8,}$/i) || label.length > 40) {
-      label = getDocLabel(key);
-    }
-
-    if (!fileEntries.some((f) => f.url === url)) {
-      fileEntries.push({ key, label, url });
-    }
-  };
-
-  // Top-level evidence fields
-  pushFile("selfie_url", c.selfie_url);
-  pushFile("video_url", c.video_url);
-  pushFile("paid_receipt_url", c.paid_receipt_url);
-
-  // photo_urls array or object
-  if (Array.isArray(c.photo_urls)) {
-    c.photo_urls.forEach((val, idx) => pushFile(`photo_${idx + 1}`, val));
-  } else if (c.photo_urls && typeof c.photo_urls === "object") {
-    for (const [k, val] of Object.entries(c.photo_urls)) pushFile(k, val);
-  }
-
-  // Deep recursive walk over category_details for any document or URL field
-  const walkFilesDeep = (obj: any, prefix = "") => {
-    if (!obj || typeof obj !== "object") return;
-    if (Array.isArray(obj)) {
-      obj.forEach((item, idx) => walkFilesDeep(item, `${prefix}_${idx + 1}`));
-      return;
-    }
-    for (const [k, v] of Object.entries(obj)) {
-      if (typeof v === "string") {
-        const trimmed = v.trim();
-        if (trimmed.startsWith("http")) {
-          pushFile(prefix ? `${prefix}_${k}` : k, trimmed);
-        }
-      } else if (v && typeof v === "object") {
-        walkFilesDeep(v, prefix ? `${prefix}_${k}` : k);
-      }
-    }
-  };
-  walkFilesDeep(catDetails);
-
-  const seen = new Set<string>();
-  const uniqueFiles = fileEntries.filter((file) => {
-    if (seen.has(file.url)) return false;
-    seen.add(file.url);
-    return true;
-  });
-
-  const isRejected = c.status === "rejected";
-
-  return (
-    <div className={`rounded-xl border p-4 space-y-3 ${isRejected ? "border-red-300 bg-red-50/50 dark:bg-red-950/10" : "bg-card"}`}>
-      <div className="flex items-center gap-2 flex-wrap">
-        <StatusBadge status={c.status} />
-        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
-        <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{c.urgency}</span>
-        {c.was_free
-          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">FREE</span>
-          : <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">PAID</span>}
-        {c.closed_by_admin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">FUNDRAISED & PAID</span>}
-      </div>
-
-      {isRejected && c.rejection_reason && (
-        <div className="rounded-lg border-2 border-red-300 bg-red-100 dark:bg-red-950/30 p-4">
-          <div className="flex items-start gap-2">
-            <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-red-700">❌ Case Rejected</p>
-              <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{c.rejection_reason}</p>
-              {c.reviewed_at && <p className="text-xs text-red-500 mt-2">Reviewed on: {new Date(c.reviewed_at).toLocaleString()}</p>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="text-sm space-y-1">
-        <p className="font-semibold">{c.title}</p>
-        <p className="text-muted-foreground">{c.short_description}</p>
-        <p className="text-muted-foreground text-xs">📍 {c.city}, {c.country} {c.amount_needed && `· Needs: ${s} ${c.amount_needed} ${cur}`}</p>
-        {c.deadline && (
-          <p className="text-xs font-bold text-red-600 flex items-center gap-1">
-            ⏰ Bill / Case Due (Expiry) Date: {new Date(c.deadline).toLocaleDateString()}
-          </p>
-        )}
-        {c.amount_needed > 0 && <p className="text-xs text-green-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>}
-
-        {!isRejected && (
-          <div className="mt-2 rounded-lg bg-primary/5 border border-primary/10 p-3">
-            <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">📋 Full Case Description</p>
-            <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
-              {c.description || "No description provided"}
-            </p>
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs space-y-0.5">
-        <p className="font-semibold text-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Submitted by</p>
-        <p className="text-muted-foreground">{seeker?.full_name || "—"} · {seeker?.email || c.user_id?.slice(0, 8)}</p>
-      </div>
-
-      {personalDetails.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><User className="h-3 w-3" /> Personal Details</p>
-          {personalDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {receiverDetails.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><HandCoins className="h-3 w-3" /> Payment Receiver</p>
-          {receiverDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {disabilityDetails.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><Heart className="h-3 w-3" /> Disability Details</p>
-          {disabilityDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {propertyDetails.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><Building2 className="h-3 w-3" /> Property Details</p>
-          {propertyDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-          {catDetails?.rental_agreement_url && <Img url={catDetails.rental_agreement_url} label="Rental Agreement" />}
-          {catDetails?.landlord_cnic_url && <Img url={catDetails.landlord_cnic_url} label="Landlord's CNIC" />}
-        </div>
-      )}
-
-      {eduFields.length > 0 && (
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 p-3 space-y-1">
-          <p className="text-xs font-semibold text-blue-700 flex items-center gap-1"><BookOpen className="h-3 w-3" /> Education Details</p>
-          {eduFields.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {allFields.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><ClipboardCheck className="h-3 w-3" /> Other Details</p>
-          {allFields.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {uniqueFiles.length > 0 ? (
-        <div className="rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold flex items-center gap-1"><FileText className="h-4 w-4" /> Uploaded Files ({uniqueFiles.length})</p>
-            <div className="flex gap-1">
-              <button onClick={() => copyText(uniqueFiles.map((f) => f.url).join("\n"))} className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-                <Copy className="h-3 w-3" /> Copy URLs
-              </button>
-              <button onClick={() => copyText(JSON.stringify(c, null, 2))} className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-                <Copy className="h-3 w-3" /> Copy Raw Data
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {uniqueFiles.map(({ key, label, url }) => {
-              const isVideo = url.match(/\.(mp4|webm|mov|avi)$/i) || url.includes("video");
-              const isPdf = url.match(/\.pdf$/i);
-              return (
-                <div key={key + url} className="space-y-1 bg-background/80 p-1.5 rounded border">
-                  <p className="text-[10px] font-medium text-foreground truncate" title={label}>📎 {label}</p>
-                  {isVideo ? (
-                    <video src={url} controls className="w-full rounded border max-h-32 bg-black" />
-                  ) : isPdf ? (
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
-                      📄 View PDF
-                    </a>
-                  ) : (
-                    <a href={url} target="_blank" rel="noopener noreferrer">
-                      <img src={url} alt={label} className="w-full rounded border max-h-28 object-cover hover:opacity-95" />
-                    </a>
-                  )}
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="block text-[9px] text-primary hover:underline text-center">
-                    Open in Full Size ↗
-                  </a>
+      {activeSuspensions.length === 0 ? <Empty text="No active suspensions" /> :
+        activeSuspensions.map((s: any) => {
+          const profile = profiles.find((p: any) => p.user_id === s.user_id);
+          return (
+            <div key={s.id} className="rounded-xl border border-red-300 bg-red-50 dark:bg-red-950/20 p-4 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-red-600" />
+                  <span className="font-semibold">{profile?.full_name || "Unknown User"}</span>
+                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Suspended</span>
                 </div>
-              );
-            })}
-          </div>
-          <p className="text-[10px] text-muted-foreground">📌 Click any image to enlarge.</p>
-        </div>
-      ) : (
-        <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 p-3 text-xs text-yellow-700">
-          ⚠️ No files uploaded for this case.
-        </div>
-      )}
-
-      {hasPayment && (
-        <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-3 space-y-1">
-          <p className="font-semibold text-sm flex items-center gap-1 text-amber-700"><Building2 className="h-4 w-4" /> Institute Payment Details</p>
-          <DetailRow label="Institute / Provider" value={c.institute_name} />
-          <DetailRow label="Payment Method" value={c.payment_method} />
-          <DetailRow label="Account Title / Reference" value={c.account_title} />
-          <DetailRow label="Account / Bill Number" value={c.account_number} mono />
-          <DetailRow label="IBAN" value={c.account_iban} mono />
-          <DetailRow label="Institute Contact" value={c.institute_contact} mono />
-          <DetailRow label="Institute Address" value={c.institute_address} />
-        </div>
-      )}
-
-      {resolutions.length > 0 && (
-        <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-2">
-          <p className="font-semibold text-sm flex items-center gap-1"><Heart className="h-4 w-4 text-primary" /> All Helps on this case</p>
-          {resolutions.map((r: any) => (
-            <div key={r.id} className="text-xs space-y-0.5 border-b border-border/50 last:border-0 pb-2">
-              <p>
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.status === "completed" ? "bg-green-100 text-green-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>{r.status?.toUpperCase()}</span>
-                {" "}
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.paid_to === "givethra" ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"}`}>{r.paid_to === "givethra" ? "FUNDRAISING" : "DIRECT"}</span>
-              </p>
-              <p><span className="text-muted-foreground">Amount:</span> {s} {r.seeker_confirmed_amount ?? r.amount_paid} {cur} · <span className="text-muted-foreground">TXN:</span> <span className="font-mono">{r.transaction_id}</span></p>
-              {r.receipt_url && <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary"><ExternalLink className="h-3 w-3" /> Receipt</a>}
+                <span className="text-xs text-muted-foreground">Suspension #{s.suspension_count}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                <div><p className="text-xs text-muted-foreground">User ID</p><p className="font-mono text-xs">{s.user_id.slice(0, 12)}...</p></div>
+                <div><p className="text-xs text-muted-foreground">Email</p><p className="text-sm">{profile?.email || "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Rejections at Suspension</p><p className="text-sm font-semibold text-red-600">{s.rejection_count_at_suspension}</p></div>
+                <div><p className="text-xs text-muted-foreground">Suspended At</p><p className="text-sm">{new Date(s.suspended_at).toLocaleDateString()}</p></div>
+              </div>
+              <div className="flex gap-2 pt-2 border-t border-red-200">
+                <Button size="sm" variant="outline" className="text-green-600 border-green-300" onClick={() => onUnlock(s.user_id)}>
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" /> Manually Unlock
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(s.user_id); toast.success("User ID copied!"); }}>
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copy ID
+                </Button>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
-
-      {c.status === "pending" && (
-        <div className="space-y-2">
-          <Textarea placeholder="Rejection reason (e.g. 'video missing', 'bill not clear', 'account seems personal')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(c.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Publish</Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(c.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
-          </div>
-        </div>
-      )}
+          );
+        })
+      }
     </div>
   );
 }
 
-// ============================================================
-//  DEPOSIT CARD
-// ============================================================
-function DepositCard({ d, onApprove, onReject }: any) {
-  const [reason, setReason] = useState("");
-  const [credits, setCredits] = useState<string>(String(d.credits ?? d.amount ?? ""));
-  return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        <StatusBadge status={d.status} />
-        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{d.method}</span>
-      </div>
-      <div className="text-sm space-y-1">
-        <p className="font-semibold flex items-center gap-1"><Coins className="h-4 w-4 text-primary" /> User claims: ${d.amount} → {d.credits ?? d.amount} Credits</p>
-        <p className="text-muted-foreground text-xs font-mono">TXN: {d.transaction_id}</p>
-        <p className="text-muted-foreground text-xs">User: {d.user_id?.slice(0, 8)}...</p>
-      </div>
-      {d.proof_url && <Img url={d.proof_url} label="Payment Proof" />}
-      {d.status === "pending" && (
-        <div className="space-y-2">
-          <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5 space-y-1.5">
-            <label className="text-xs font-medium text-amber-700 dark:text-amber-400">Credits to add (verify against receipt):</label>
-            <input type="number" step="0.01" min="0" value={credits} onChange={(e) => setCredits(e.target.value)}
-              className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm" placeholder="e.g. 0.99 or 10.1" />
-          </div>
-          <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onApprove(d, parseFloat(credits) || 0)}>
-              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Add {credits || 0} Credits
-            </Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onReject(d.id, reason)}>
-              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-//  FEEDBACK CARD
-// ============================================================
-function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
-  const [reason, setReason] = useState("");
-  const p = profileMap[fb.user_id];
-  const c = caseList.find((cs: any) => cs.id === fb.case_id);
-  const status = fb.status || "pending_review";
-
-  return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status === "approved" ? "bg-green-100 text-green-700" : status === "rejected" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>{status.replace("_", " ").toUpperCase()}</span>
-        {c && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>}
-      </div>
-      <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs">
-        <p className="font-semibold">{p?.full_name || fb.first_name || "—"} · {p?.email || fb.user_id?.slice(0, 8)}</p>
-        {c && <p className="text-muted-foreground mt-0.5">Case: {c.title}</p>}
-      </div>
-      {fb.text_message && <p className="text-sm whitespace-pre-line">{fb.text_message}</p>}
-      {fb.video_url && <video src={fb.video_url} controls className="w-full rounded border max-h-56" />}
-      {status === "pending_review" && (
-        <div className="space-y-2 pt-1 border-t border-border">
-          <Textarea placeholder="Rejection reason (e.g. 'video too short', 'unrelated content')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve — Post to Wall</Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(fb.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-//  IMAGE COMPONENT
-// ============================================================
-function Img({ url, label }: { url: string; label: string }) {
-  return (
-    <div className="space-y-1">
-      <p className="text-[10px] font-medium text-muted-foreground truncate">{label}</p>
-      <a href={url} target="_blank" rel="noopener noreferrer">
-        <img src={url} alt={label} className="w-full rounded border max-h-24 object-cover" />
-      </a>
-    </div>
-  );
-}
-
-// ============================================================
-//  ICON HELPERS
-// ============================================================
+// ---------- BOOKOPEN ICON ----------
 function BookOpen({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-    </svg>
-  );
-}
-
-function Shield({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
     </svg>
   );
 }
