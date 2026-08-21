@@ -630,9 +630,9 @@ export default function HomePage() {
             <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm text-left">
               <div className="flex items-center gap-2 mb-2">
                 <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-sm font-semibold text-foreground">What's on your mind? (Any problem with Givethra?)</h3>
+                <h3 className="text-sm font-semibold text-foreground">What would you like to share with Givethra?</h3>
               </div>
-              <p className="mb-3 text-xs leading-5 text-muted-foreground">Report a problem with sign-in, sign-up, case submission, or any other part of Givethra.</p>
+              <p className="mb-3 text-xs leading-5 text-muted-foreground">Share a message, suggestion, question, or anything you would like us to know.</p>
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const formEl = e.currentTarget;
@@ -661,7 +661,7 @@ export default function HomePage() {
               }} className="space-y-2">
                 <input
                   name="feedbackText"
-                  placeholder="Describe the problem you are experiencing..."
+                  placeholder="Write a message..."
                   className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                   required
                 />

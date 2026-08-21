@@ -400,3 +400,24 @@
 - [x] Replace the public prompt with clear issue-reporting wording covering sign-in, sign-up, case submission, and any other Givethra problem.
 - [x] Remove internal visibility instructions from the public composer while preserving Admin Posts attribution and moderation context.
 - [x] Verify the revised English copy with tests and the production build before checkpointing.
+
+## User-Reported Guest Post Failure and Admin Posts Revision
+- [x] Make the homepage message box usable by every guest visitor without login or signup.
+- [x] Remove public-facing Admin, Support, Help, and visibility wording from the simple message box.
+- [x] Repair guest message persistence in the canonical Worker source so the send action succeeds and stores the message in D1 when deployed.
+- [x] Keep signed-in attribution when available without making authentication a requirement.
+- [x] Provide a standalone Posts tab in Admin Dashboard alongside Cases, KYC, Users, and Support.
+- [x] Ensure Admin Posts lists all public messages with a simple Public or user identity label.
+- [x] Add regression coverage for an unauthenticated guest submission and Admin Posts filtering.
+- [x] Run guest-flow tests and the canonical Cloudflare production build.
+- [ ] Save a checkpoint without publishing, deploying, or showing a preview/settings card.
+
+## Confirmed Live Guest Submission Failure
+- [x] Align the deployed-compatible Worker source so `/api/public-feedback` exists for anonymous POST requests.
+- [x] Verify the public composer sends a simple message without requiring login or signup.
+- [x] Keep public wording limited to Givethra message/reporting language with no Admin, Support, Help, or visibility instructions.
+- [x] Ensure Admin Dashboard has a clearly separate Posts tab alongside the existing Cases, KYC, Users, and Support tabs.
+- [x] Verify Posts loads messages from the same D1 feedback inbox with Public or user identity labels.
+- [x] Add an automated anonymous POST regression test that exercises the Worker handler without a Google token.
+- [x] Run the canonical frontend tests, repository tests, Worker syntax check, and Cloudflare production build.
+- [ ] Save a source checkpoint without deploying or publishing.

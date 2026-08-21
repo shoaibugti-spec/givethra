@@ -409,14 +409,14 @@ export default function AdminPage() {
   async function updateFeedback(fbId: string, status: string, reason = "") {
     const fb = feedbacks.find((f) => f.id === fbId);
     await adminUpdateFeedback(fbId, { status, reviewed_at: new Date().toISOString(), reviewed_by: user?.email, rejection_reason: reason });
-    if (fb?.user_id) {
+    if (fb?.user_id && fb.case_id) {
       if (status === "approved") {
         await sendNotification(fb.user_id, "system", "Feedback Approved 🎉", "Your feedback is now live on the Givethra community wall. You can now submit a new case!", "/my-cases");
       } else {
         await sendNotification(fb.user_id, "system", "Feedback Needs Improvement", reason ? `Reason: ${reason}. Please re-record your video and message.` : "Please re-record your video and message, then resubmit.", `/cases/${fb.case_id}`);
       }
     }
-    toast.success(`Feedback ${status}!`);
+    toast.success(`${fb?.case_id ? "Feedback" : "Post"} ${status}!`);
     loadData();
   }
 
@@ -786,7 +786,7 @@ export default function AdminPage() {
 
             <TabsContent value="posts" className="space-y-4 mt-4">
               {publicPosts.length === 0 ? <Empty text="No public posts yet" /> :
-                publicPosts.map((post) => <FeedbackCard key={post.id} fb={post} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} isPublicPost />)}
+                publicPosts.map((post) => <PublicPostCard key={post.id} post={post} profileMap={profileMap} onUpdate={updateFeedback} />)}
             </TabsContent>
 
             <TabsContent value="suspensions" className="space-y-4 mt-4">
@@ -2154,9 +2154,46 @@ function DepositCard({ d, onApprove, onReject }: any) {
 }
 
 // ============================================================
+//  PUBLIC POSTS CARD
+// ============================================================
+function PublicPostCard({ post, profileMap, onUpdate }: any) {
+  const [reason, setReason] = useState("");
+  const profile = profileMap[post.user_id];
+  const status = post.status || "pending_review";
+  const identityName = post.user_id === "public" ? "Public" : (profile?.full_name || post.first_name || "User");
+  const identityDetail = post.user_id === "public" ? "Public Visitor" : (profile?.email || post.user_id || "User");
+  const createdAt = post.created_at ? new Date(post.created_at).toLocaleString() : "Date unavailable";
+
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="font-semibold text-sm">{identityName}</p>
+          <p className="text-xs text-muted-foreground">{identityDetail}</p>
+        </div>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status === "approved" ? "bg-green-100 text-green-700" : status === "rejected" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>
+          {status.replace("_", " ").toUpperCase()}
+        </span>
+      </div>
+      <p className="text-sm whitespace-pre-line rounded-lg bg-muted/40 border border-border p-3">{post.text_message || "No message text"}</p>
+      <p className="text-xs text-muted-foreground">{createdAt}</p>
+      {status === "pending_review" && (
+        <div className="space-y-2 pt-1 border-t border-border">
+          <Textarea placeholder="Optional rejection reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex gap-2">
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(post.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Mark Resolved</Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(post.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 //  FEEDBACK CARD
 // ============================================================
-function FeedbackCard({ fb, profileMap, caseList, onUpdate, isPublicPost = false }: any) {
+function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
   const [reason, setReason] = useState("");
   const p = profileMap[fb.user_id];
   const c = caseList.find((cs: any) => cs.id === fb.case_id);

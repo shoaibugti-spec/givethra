@@ -5,9 +5,9 @@ const homePageSource = readFileSync(new URL("./HomePage.tsx", import.meta.url), 
 
 describe("homepage public feedback composer copy", () => {
   it("explains that users can report any Givethra problem", () => {
-    expect(homePageSource).toContain("What's on your mind? (Any problem with Givethra?)");
-    expect(homePageSource).toContain('placeholder="Describe the problem you are experiencing..."');
-    expect(homePageSource).toContain("Report a problem with sign-in, sign-up, case submission, or any other part of Givethra.");
+    expect(homePageSource).toContain("What would you like to share with Givethra?");
+    expect(homePageSource).toContain('placeholder="Write a message..."');
+    expect(homePageSource).toContain("Share a message, suggestion, question, or anything you would like us to know.");
   });
 
   it("does not expose internal dashboard visibility instructions", () => {

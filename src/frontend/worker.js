@@ -990,6 +990,8 @@ async function routeApi(request, env, user, url, origin) {
   return json({ error: "API route not implemented yet" }, 404, origin);
 }
 
+export { handlePublicFeedback };
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
