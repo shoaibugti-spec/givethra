@@ -1,6 +1,5 @@
-// ============================================================
-// FILE: src/frontend/src/pages/AdminPage.tsx
-// ============================================================
+// src/frontend/src/pages/AdminPage.tsx
+// COMPLETE FIXED - File names now display correctly
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -1196,6 +1195,9 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap }: any) {
   );
 }
 
+// ============================================================
+// CASE CARD - FIXED FILE NAMES
+// ============================================================
 function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const [reason, setReason] = useState("");
   const cur = c.currency || "USD";
@@ -1203,7 +1205,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const seeker = profileMap[c.user_id];
   const hasPayment = c.institute_name || c.account_number || c.account_title || c.account_iban;
   const catDetails = c.category_details && typeof c.category_details === "object" ? c.category_details : null;
-  const catDocs = catDetails?._documents && typeof catDetails._documents === "object" ? catDetails._documents : {};
 
   const allFields: { label: string; value: any }[] = [];
   if (catDetails) {
@@ -1274,35 +1275,102 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     { label: "Property Ownership", value: catDetails?.property_ownership === "rented" ? "Rented" : catDetails?.property_ownership === "owned" ? "Owned" : "" },
   ].filter((d) => d.value);
 
+  // ============================================================
+  // FIXED: File name extraction from URL
+  // ============================================================
   const fileEntries: { key: string; label: string; url: string }[] = [];
+
   const pushFile = (key: string, value: unknown) => {
     if (typeof value !== "string") return;
     const url = value.trim();
     if (!url.startsWith("http")) return;
 
     let label = getDocLabel(key);
+
     try {
+      // Try to get filename from URL
       const urlObj = new URL(url);
-      const filename = urlObj.pathname.split('/').pop() || '';
-      if (filename) {
-        let decoded = decodeURIComponent(filename);
-        let cleaned = decoded
-          .replace(/^[0-9]{10,}[-_]/, '')
-          .replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]/i, '')
-          .replace(/^[0-9]+[-_]/, '');
-        if (cleaned && cleaned.length > 1 && !cleaned.match(/^[0-9a-f]{8,}$/i)) {
-          label = cleaned.replace(/[_]/g, ' ');
+      let pathname = urlObj.pathname;
+
+      // If pathname is just "/uploads", try to get from search params
+      if (pathname === "/uploads" || pathname === "/") {
+        const keyParam = urlObj.searchParams.get("key");
+        if (keyParam) {
+          pathname = keyParam;
         }
       }
+
+      // Extract filename from path
+      let filename = pathname.split('/').pop() || '';
+
+      // Decode URL encoding
+      if (filename) {
+        try {
+          filename = decodeURIComponent(filename);
+        } catch { /* ignore */ }
+
+        // Remove timestamps, UUIDs, and other prefixes
+        let cleaned = filename
+          .replace(/^[0-9]{10,}[-_]/, '')                           // timestamp
+          .replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]/i, '') // UUID
+          .replace(/^[0-9]+[-_]/, '')                               // numeric prefix
+          .replace(/^users\/[^/]+\//, '')                          // users/xxx/ prefix
+          .replace(/^user-[^/]+\//, '');                           // user-xxx/ prefix
+
+        // If we have a meaningful name, use it
+        if (cleaned && cleaned.length > 2 && cleaned !== 'uploads' && cleaned !== 'file') {
+          // Convert underscores to spaces and clean up
+          cleaned = cleaned.replace(/[_]/g, ' ');
+          // Remove file extension for display
+          const extIndex = cleaned.lastIndexOf('.');
+          if (extIndex > 0) {
+            const ext = cleaned.substring(extIndex);
+            // Keep common extensions visible
+            if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.mp4', '.webm', '.mov', '.avi', '.doc', '.docx', '.txt'].includes(ext.toLowerCase())) {
+              // Keep extension
+            } else {
+              cleaned = cleaned.substring(0, extIndex);
+            }
+          }
+          label = cleaned.trim();
+        }
+      }
+
+      // If label is too generic or still "uploads", try to use the last part of the URL
+      if (label === "uploads" || label === "file" || label.length < 2) {
+        const segments = pathname.split('/').filter(Boolean);
+        const lastSeg = segments[segments.length - 1];
+        if (lastSeg && lastSeg.length > 3) {
+          try {
+            let decoded = decodeURIComponent(lastSeg);
+            decoded = decoded
+              .replace(/^[0-9]{10,}[-_]/, '')
+              .replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]/i, '')
+              .replace(/^[0-9]+[-_]/, '');
+            if (decoded && decoded.length > 2 && decoded !== 'uploads') {
+              label = decoded.replace(/[_]/g, ' ');
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
+      // Last resort: use the key from DOC_LABELS
+      if (label === "uploads" || label === "file" || label.length < 2) {
+        label = getDocLabel(key);
+      }
+
     } catch (e) {
-      // fallback
+      // If URL parsing fails, use the key label
+      label = getDocLabel(key);
     }
 
+    // Prevent duplicates
     if (!fileEntries.some((f) => f.url === url)) {
       fileEntries.push({ key, label, url });
     }
   };
 
+  // Collect all file URLs from case data
   pushFile("selfie_url", c.selfie_url);
   pushFile("video_url", c.video_url);
   pushFile("paid_receipt_url", c.paid_receipt_url);
@@ -1313,6 +1381,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     for (const [k, val] of Object.entries(c.photo_urls)) pushFile(k, val);
   }
 
+  // Deep walk for files in category_details
   const walkFilesDeep = (obj: any, prefix = "") => {
     if (!obj || typeof obj !== "object") return;
     if (Array.isArray(obj)) {
@@ -1332,6 +1401,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   };
   walkFilesDeep(catDetails);
 
+  // Remove duplicates
   const seen = new Set<string>();
   const uniqueFiles = fileEntries.filter((file) => {
     if (seen.has(file.url)) return false;
@@ -1375,7 +1445,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
             ⏰ Bill / Case Due (Expiry) Date: {new Date(c.deadline).toLocaleDateString()}
           </p>
         )}
-        {c.amount_needed > 0 && <p className="text-xs text-green-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>}
+        {c.amount_needed > 0 && <p className="text-xs text-green-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>
 
         {!isRejected && (
           <div className="mt-2 rounded-lg bg-primary/5 border border-primary/10 p-3">
@@ -1436,15 +1506,22 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
+      {/* ============================================================
+          FILES SECTION - Now shows proper names
+          ============================================================ */}
       {uniqueFiles.length > 0 ? (
         <div className="rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold flex items-center gap-1"><FileText className="h-4 w-4" /> Uploaded Files ({uniqueFiles.length})</p>
+            <p className="text-xs font-bold flex items-center gap-1">
+              <FileText className="h-4 w-4" /> Uploaded Files ({uniqueFiles.length})
+            </p>
             <div className="flex gap-1">
-              <button onClick={() => copyText(uniqueFiles.map((f) => f.url).join("\n"))} className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+              <button onClick={() => copyText(uniqueFiles.map((f) => f.url).join("\n"))} 
+                className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
                 <Copy className="h-3 w-3" /> Copy URLs
               </button>
-              <button onClick={() => copyText(JSON.stringify(c, null, 2))} className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+              <button onClick={() => copyText(JSON.stringify(c, null, 2))} 
+                className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
                 <Copy className="h-3 w-3" /> Copy Raw Data
               </button>
             </div>
@@ -1453,28 +1530,60 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
             {uniqueFiles.map(({ key, label, url }) => {
               const isVideo = url.match(/\.(mp4|webm|mov|avi)$/i) || url.includes("video");
               const isPdf = url.match(/\.pdf$/i);
+              const isImage = !isVideo && !isPdf;
+              
+              // Get file extension for badge
+              const ext = url.split('.').pop()?.slice(0, 4) || '';
+              const fileType = ext.toUpperCase();
+
               return (
                 <div key={key + url} className="space-y-1 bg-background/80 p-1.5 rounded border">
-                  <p className="text-[10px] font-medium text-foreground truncate" title={label}>📎 {label}</p>
+                  {/* File label with extension badge */}
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-[10px] font-medium text-foreground truncate" title={label}>
+                      📎 {label || "File"}
+                    </p>
+                    {fileType && (
+                      <span className="text-[8px] bg-muted px-1 py-0.5 rounded text-muted-foreground">
+                        {fileType}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* File preview */}
                   {isVideo ? (
                     <video src={url} controls className="w-full rounded border max-h-32 bg-black" />
                   ) : isPdf ? (
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
+                    <a href={url} target="_blank" rel="noopener noreferrer" 
+                      className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
                       📄 View PDF
                     </a>
-                  ) : (
+                  ) : isImage ? (
                     <a href={url} target="_blank" rel="noopener noreferrer">
                       <img src={url} alt={label} className="w-full rounded border max-h-28 object-cover hover:opacity-95" />
                     </a>
+                  ) : (
+                    <a href={url} target="_blank" rel="noopener noreferrer" 
+                      className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
+                      📎 Download File
+                    </a>
                   )}
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="block text-[9px] text-primary hover:underline text-center">
-                    Open in Full Size ↗
-                  </a>
+
+                  <div className="flex items-center justify-between gap-1">
+                    <a href={url} target="_blank" rel="noopener noreferrer" 
+                      className="block text-[9px] text-primary hover:underline text-center flex-1">
+                      Open ↗
+                    </a>
+                    <button onClick={() => copyText(url)} 
+                      className="text-[9px] text-muted-foreground hover:text-primary">
+                      <Copy className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
-          <p className="text-[10px] text-muted-foreground">📌 Click any image to enlarge.</p>
+          <p className="text-[10px] text-muted-foreground">📌 Click any image to enlarge. Hover over filenames to see full name.</p>
         </div>
       ) : (
         <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 p-3 text-xs text-yellow-700">
@@ -1516,14 +1625,23 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         <div className="space-y-2">
           <Textarea placeholder="Rejection reason (e.g. 'video missing', 'bill not clear', 'account seems personal')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(c.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Publish</Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(c.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(c.id, "approved")}>
+              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Publish
+            </Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(c.id, "rejected", reason)}>
+              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+            </Button>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+// ============================================================
+//  REMAINING COMPONENTS (Deposit, Feedback, Pay, Verify, Notify, Offers, Support, Suspensions)
+//  These are unchanged from before
+// ============================================================
 
 // ---------- DEPOSIT SEARCH BOX ----------
 function DepositSearchBox({ deposits, onApprove, onReject }: any) {
