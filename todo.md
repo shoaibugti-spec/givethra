@@ -327,3 +327,8 @@
 - [ ] Update `AdminDashboard.tsx` attachment file label extraction so that stored R2 / Worker storage keys and URLs correctly recover original uploaded filenames instead of raw hashes or generic fallback labels ('f2').
 - [ ] Ensure 100% lossless inclusion of all case documents, selfies, videos, receipts, and category-specific files in the Admin Case view.
 - [ ] Run automated tests and verify clean Cloudflare production build.
+
+## Admin Panel Attachment Filenames & Links Refinement
+- [ ] Refine `AdminDashboard.tsx` attachment collection and rendering logic so every uploaded file (selfie, video, paid receipt, photo arrays, category details, and category documents) displays its original filename and a valid, clickable download/view link without fallback hash labels.
+- [ ] Verify that all user-uploaded files are captured without omission.
+- [ ] Run automated tests and production build verification.

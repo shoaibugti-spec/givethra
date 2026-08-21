@@ -1837,35 +1837,27 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     const url = value.trim();
     if (!url.startsWith("http")) return;
     
-    // Extract original filename if present in url pathname or query
-        let label = getDocLabel(key);
+    let label = getDocLabel(key);
     try {
-      const parsedUrl = new URL(url);
-      // Check query parameter like filename or name if present
-      const qName = parsedUrl.searchParams.get("filename") || parsedUrl.searchParams.get("name");
-      let extracted = qName || "";
-      if (!extracted) {
-        const segments = parsedUrl.pathname.split("/");
-        const lastSeg = segments[segments.length - 1];
-        if (lastSeg) extracted = decodeURIComponent(lastSeg);
-      }
-      if (extracted) {
-        // Remove uuid/timestamp prefix e.g. "1724000000000-electricity_bill.pdf" -> "electricity_bill.pdf"
-        let cleanName = extracted
-          .replace(/^[0-9]{10,}[-_]/, "")
-          .replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]/i, "")
-          .replace(/^[0-9]+[-_]/, "");
-        if (cleanName && !cleanName.match(/^[0-9a-f]{8,}$/i)) {
-          label = cleanName.replace(/[_]/g, " ");
-        } else if (extracted && !extracted.match(/^[0-9a-f]{8,}$/i)) {
-          label = extracted.replace(/[_]/g, " ");
+      const cleanUrl = url.split('?')[0];
+      const segments = cleanUrl.split('/');
+      const lastSeg = segments[segments.length - 1];
+      if (lastSeg) {
+        let decoded = decodeURIComponent(lastSeg);
+        // Remove numeric prefix hashes, uuids, or timestamps (e.g. 1724300000000-f2_photo.jpg or a0b1c2d3-file.png)
+        let cleaned = decoded
+          .replace(/^[0-9]{10,}[-_]/, '')
+          .replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]/i, '')
+          .replace(/^[0-9]+[-_]/, '');
+        if (cleaned && !cleaned.match(/^[0-9a-f]{8,}$/i)) {
+          label = cleaned.replace(/[_]/g, ' ');
         }
       }
-      if (!label || label === key || label.match(/^[0-9a-f]{8,}$/i)) {
-        label = getDocLabel(key);
-      }
     } catch (e) {
-      // fallback to getDocLabel(key)
+      // fallback
+    }
+    if (!label || label === key || label.match(/^[0-9a-f]{8,}$/i) || label.length > 40) {
+      label = getDocLabel(key);
     }
 
     if (!fileEntries.some((f) => f.url === url)) {
