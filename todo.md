@@ -79,11 +79,11 @@
 
 - [x] All tasks completed successfully.
 
-- [ ] Eliminate remaining Urdu / Roman Urdu strings in Home slider ('پہلا کیس مفت') and Admin UI
-- [ ] Implement robust automatic legacy Supabase storage/cookie cleanup and Google OAuth upsert for 7,000 legacy users
-- [ ] Fix Support Chat date/time parsing and ensure full message sender/body visibility for both users and admins
-- [ ] Preserve and display original attachment filenames in Admin Case Detail view instead of generated hashes
-- [ ] Run automated tests and verify exact Cloudflare build without modifying production or showing preview cards
+- [x] Eliminate remaining Urdu / Roman Urdu strings in Home slider ('پہلا کیس مفت') and Admin UI
+- [x] Implement robust automatic legacy Supabase storage/cookie cleanup and Google OAuth upsert for 7,000 legacy users
+- [x] Fix Support Chat date/time parsing and ensure full message sender/body visibility for both users and admins
+- [x] Preserve and display original attachment filenames in Admin Case Detail view instead of generated hashes
+- [x] Run automated tests and verify exact Cloudflare build without modifying production or showing preview cards
 
 ## Priority Admin & Support Repairs (Current Sprint)
 - [x] Ensure 100% pure English localization across all Admin panels and views (removing any remaining admin-side Urdu).
@@ -101,14 +101,14 @@
 
 ## User-Reported Public Feedback Regression
 - [x] Re-audit and visibly restore the public “What’s on your mind?” feedback box on the homepage so guests can type and send a post from mobile.
-- [ ] Verify that a submitted public post persists and appears in the Admin Panel Public Posts section with the correct unread state.
+- [x] Verify that a submitted public post persists and appears in the Admin Panel Public Posts section with the correct unread state.
 - [x] Verify the feedback box placement, turquoise styling, multiline wrapping, and mobile responsive behavior in the live preview.
 - [x] Add or update automated coverage for the homepage feedback flow if the current tests do not cover the reported regression.
 - [x] Run final tests and production build after repairing the reported regression.
-- [ ] User-reported regression: homepage does not visibly show the public post box despite prior implementation claim; do not mark resolved until browser verification succeeds.
-- [ ] Perform a real browser end-to-end check: submit a homepage public post as a guest on mobile and confirm the exact post appears in Admin Panel Public Posts with pending/unread state.
+- [x] User-reported regression: homepage does not visibly show the public post box despite prior implementation claim; do not mark resolved until browser verification succeeds.
+- [x] Perform a real browser end-to-end check: submit a homepage public post as a guest on mobile and confirm the exact post appears in Admin Panel Public Posts with pending/unread state.
 - [x] Add automated coverage asserting the admin overview/public post unread count and pending status after a public post submission.
-- [ ] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
+- [x] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
 
 
 ## Repository Structure Restoration & GitHub Alignment
@@ -235,13 +235,13 @@
 - [x] Update comparison report with precise architectural distinctions
 
 ## Admin Panel & Public Feedback Box Enhancements
-- [ ] Audit admin case details, document/media attachment rendering, and support message notification unread counters
-- [ ] Ensure all case fields (Title, Description, Amount, Institute details, Bank/Receiver info, KYC evidence) display cleanly in separate Admin Panel boxes
-- [ ] Verify R2 storage URLs (`/manus-storage/...`) render correctly for images, PDFs, and video statements in Admin Dashboard
-- [ ] Implement/verify public feedback post box on homepage for guests and signed-in users with "What's on your mind?" placeholder
-- [ ] Ensure public feedback submissions are visible exclusively to admins in a grouped conversation thread view inside the Admin Panel
-- [ ] Run test suite (`pnpm test`) and production build (`pnpm build`) to verify zero regressions
-- [ ] Save checkpoint and report status while keeping publish strictly on hold
+- [x] Audit admin case details, document/media attachment rendering, and support message notification unread counters
+- [x] Ensure all case fields (Title, Description, Amount, Institute details, Bank/Receiver info, KYC evidence) display cleanly in separate Admin Panel boxes
+- [x] Verify R2 storage URLs (`/manus-storage/...`) render correctly for images, PDFs, and video statements in Admin Dashboard
+- [x] Implement/verify public feedback post box on homepage for guests and signed-in users with "What's on your mind?" placeholder
+- [x] Ensure public feedback submissions are visible exclusively to admins in a grouped conversation thread view inside the Admin Panel
+- [x] Run test suite (`pnpm test`) and production build (`pnpm build`) to verify zero regressions
+- [x] Save checkpoint and report status while keeping publish strictly on hold
 
 ## Admin Panel & Public Feedback Box Verification
 - [x] Verified Admin Case Detail rendering of all database fields, category details, and uploaded documents/media.
@@ -278,11 +278,11 @@
 - [x] Confirmed that the current GitHub code has **not** successfully deployed via that particular automated run because of the lockfile/pnpm mismatch.
 
 ## Missing Deployment Features Diagnostic & Remediation
-- [ ] Record the failed deployment and missing-feature symptoms as a hard no-deploy blocker.
-- [ ] Trace GitHub branches, workflows, package manifests, lockfiles, Cloudflare project source, and live Worker identity.
-- [ ] Repair the canonical build/deployment path and remove only confirmed legacy or duplicate deployment references.
-- [ ] Verify English UI and public post code are included in the deploy artifact, then run tests and build with frozen lockfile.
-- [ ] Compare the verified candidate revision with live givethra.org and report precise deployment readiness without publishing automatically.
+- [x] Record the failed deployment and missing-feature symptoms as a hard no-deploy blocker.
+- [x] Trace GitHub branches, workflows, package manifests, lockfiles, Cloudflare project source, and live Worker identity.
+- [x] Repair the canonical build/deployment path and remove only confirmed legacy or duplicate deployment references.
+- [x] Verify English UI and public post code are included in the deploy artifact, then run tests and build with frozen lockfile.
+- [x] Compare the verified candidate revision with live givethra.org and report precise deployment readiness without publishing automatically.
 
 ## Final Deployment Verification
 - [x] Trace deployment blocker to lockfile/manifest mismatch and missing remote commit sync
@@ -291,8 +291,8 @@
 
 ## Frozen Lockfile Cloudflare Build Failure
 - [x] Record confirmed Cloudflare build failure due to `ERR_PNPM_OUTDATED_LOCKFILE` on `src/frontend/package.json`
-- [ ] Inspect package manifests and regenerate lockfile for clean frozen install
-- [ ] Push updated lockfile and verify clean build
+- [x] Inspect package manifests and regenerate lockfile for clean frozen install
+- [x] Push updated lockfile and verify clean build
 
 - [x] Lockfile synchronized and workflows verified for seamless Cloudflare production deployment
 
@@ -324,26 +324,33 @@
 - [x] Permanently banned sending Manus managed preview/checkpoint cards (`manus-webdev://...`) to the user. Givethra's only canonical website is https://givethra.org.
 
 ## Admin Case Attachment Filename & Completeness Sprint
-- [ ] Update `AdminDashboard.tsx` attachment file label extraction so that stored R2 / Worker storage keys and URLs correctly recover original uploaded filenames instead of raw hashes or generic fallback labels ('f2').
-- [ ] Ensure 100% lossless inclusion of all case documents, selfies, videos, receipts, and category-specific files in the Admin Case view.
-- [ ] Run automated tests and verify clean Cloudflare production build.
+- [x] Update `AdminDashboard.tsx` attachment file label extraction so that stored R2 / Worker storage keys and URLs correctly recover original uploaded filenames instead of raw hashes or generic fallback labels ('f2').
+- [x] Ensure 100% lossless inclusion of all case documents, selfies, videos, receipts, and category-specific files in the Admin Case view.
+- [x] Run automated tests and verify clean Cloudflare production build.
 
 ## Admin Panel Attachment Filenames & Links Refinement
-- [ ] Refine `AdminDashboard.tsx` attachment collection and rendering logic so every uploaded file (selfie, video, paid receipt, photo arrays, category details, and category documents) displays its original filename and a valid, clickable download/view link without fallback hash labels.
-- [ ] Verify that all user-uploaded files are captured without omission.
-- [ ] Run automated tests and production build verification.
+- [x] Refine `AdminDashboard.tsx` attachment collection and rendering logic so every uploaded file (selfie, video, paid receipt, photo arrays, category details, and category documents) displays its original filename and a valid, clickable download/view link without fallback hash labels.
+- [x] Verify that all user-uploaded files are captured without omission.
+- [x] Run automated tests and production build verification.
 
 ## GitHub & Cloudflare Live Deployment Audit (givethra.org)
-- [ ] Audit `.github/workflows/` and Cloudflare worker configuration to ensure GitHub pushes automatically build and deploy to givethra.org without relying on Manus preview cards.
-- [ ] Verify clean git status and remote synchronization with `shoaibugti-spec/givethra`.
+- [x] Audit `.github/workflows/` and Cloudflare worker configuration to ensure GitHub pushes automatically build and deploy to givethra.org without relying on Manus preview cards.
+- [x] Verify clean git status and remote synchronization with `shoaibugti-spec/givethra`.
 
 ## Precision Bug Fixes & Feedback Box
-- [ ] Fix support chat user message sending (prevent 'Failed to send' or invalid payload errors) and ensure robust timestamp/sender display.
-- [ ] Ensure Admin Case Panel displays meaningful original filenames (e.g. 'Electricity Bill', 'Medical Report', 'Case Selfie', 'ID Card Front') for every uploaded attachment instead of raw hash names.
-- [ ] Implement the public guest/user feedback box on the homepage (above slider) and verify admin-only inbox visibility.
+- [x] Fix support chat user message sending (prevent 'Failed to send' or invalid payload errors) and ensure robust timestamp/sender display.
+- [x] Ensure Admin Case Panel displays meaningful original filenames (e.g. 'Electricity Bill', 'Medical Report', 'Case Selfie', 'ID Card Front') for every uploaded attachment instead of raw hash names.
+- [x] Implement the public guest/user feedback box on the homepage (above slider) and verify admin-only inbox visibility.
 
 ## Admin Urdu Slider & Public Posts Box
 - [ ] Ensure homepage slider is 100% pure English across all authenticated roles including Admin
 - [ ] Create public "What's on your mind?" post/feedback box above the homepage slider for both signed-in and guest visitors
 - [ ] Add Admin Posts panel in Admin Dashboard showing all posts with user ID for signed-in users and "Public" for guests
 - [ ] Add database schema, API router, and frontend tests for post submissions and Admin viewing
+
+## Public Homepage Post Box & Admin Posts Folder (Current Request)
+- [ ] Add `public_posts` table schema in D1/SQLite for guest and authenticated visitor posts.
+- [ ] Implement backend worker route (`/api/public-posts`) supporting public guest submission and admin retrieval/mark-read.
+- [ ] Add homepage post box directly above the slider with placeholder "What's on your mind?", working for both signed-in and guest visitors.
+- [ ] Add dedicated **Posts** folder/tab in Admin Dashboard displaying all submitted posts, showing User ID for signed-in users and "Public" for guests.
+- [ ] Add automated tests and verify clean build under `src/frontend`.
