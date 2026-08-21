@@ -665,7 +665,7 @@ export default function HomePage() {
             <div className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <MessageCircle className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-lg">💬 What's on your mind?</h3>
+                <h3 className="font-bold text-lg">What's on your mind?</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
                 Share your thoughts, suggestions, or any problem with Givethra.
