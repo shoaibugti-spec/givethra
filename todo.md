@@ -142,3 +142,15 @@
 - [x] Create `.github/workflows/deploy.yml` with test, build, and Cloudflare deploy steps
 - [x] Verify local test suite (`pnpm test`) and production build (`pnpm build`)
 - [x] Commit and push CI/CD workflow to remote repository (`shoaibugti-spec/givethra`)
+
+## Preview Diagnosis & GitHub Duplicate File Audit
+- [ ] Inspect dev-server logs (`.manus-logs/devserver.log`) and client console logs for path errors or module missing issues
+- [ ] Audit GitHub repository file tree for any duplicate, template boilerplates, or orphaned files
+- [ ] Verify that preview rendering and images load correctly without breaking the live Cloudflare site
+- [ ] Present audit findings to user and confirm publish readiness only when user is fully satisfied
+
+## Pre-Publication Audit & Hold
+- [x] Inspect dev-server logs and verify preview rendering via screenshot
+- [x] Audit GitHub repository for duplicate or orphaned files and clean working tree
+- [x] Generate pre-publication audit report (`/home/ubuntu/givethra-prepublication-audit.md`)
+- [x] Keep production publish on hold per user instructions until manual visual confirmation
