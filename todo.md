@@ -269,3 +269,13 @@
 - [ ] Repair the canonical build/deployment path and remove only confirmed legacy or duplicate deployment references.
 - [ ] Verify English UI and public post code are included in the deploy artifact, then run tests and build with frozen lockfile.
 - [ ] Compare the verified candidate revision with live givethra.org and report precise deployment readiness without publishing automatically.
+
+## Final Deployment Verification
+- [x] Trace deployment blocker to lockfile/manifest mismatch and missing remote commit sync
+- [x] Push clean commit removing legacy caffeine files and sync pnpm-lock.yaml
+- [x] Verify all 23 tests pass cleanly and production bundle builds without errors
+
+## Frozen Lockfile Cloudflare Build Failure
+- [x] Record confirmed Cloudflare build failure due to `ERR_PNPM_OUTDATED_LOCKFILE` on `src/frontend/package.json`
+- [ ] Inspect package manifests and regenerate lockfile for clean frozen install
+- [ ] Push updated lockfile and verify clean build
