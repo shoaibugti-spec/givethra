@@ -1305,7 +1305,12 @@ export default function SubmitRequestPage() {
           height: { ideal: 720 },
           frameRate: { ideal: 30 },
         },
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
       });
 
       setStream(s);

@@ -264,7 +264,10 @@ export default function KycPage() {
 
   async function startVideoRecording() {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
+      });
       setStream(s);
       setVideoRecording(true);
       setVideoTimer(0);

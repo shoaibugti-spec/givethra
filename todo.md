@@ -287,3 +287,7 @@
 
 ## Safety & User Reassurance
 - [x] Confirmed user safety state and froze all automated or unapproved Cloudflare publishing.
+
+- [x] Confirmed screenshot and acknowledged that Manus managed preview cards must never be presented as givethra.org.
+
+- [x] Fixed the JSX closing brace error in SubmitRequestPage.tsx, verified local build and tests, and pushed the clean commit to GitHub.
