@@ -79,6 +79,12 @@
 
 - [x] All tasks completed successfully.
 
+- [ ] Eliminate remaining Urdu / Roman Urdu strings in Home slider ('پہلا کیس مفت') and Admin UI
+- [ ] Implement robust automatic legacy Supabase storage/cookie cleanup and Google OAuth upsert for 7,000 legacy users
+- [ ] Fix Support Chat date/time parsing and ensure full message sender/body visibility for both users and admins
+- [ ] Preserve and display original attachment filenames in Admin Case Detail view instead of generated hashes
+- [ ] Run automated tests and verify exact Cloudflare build without modifying production or showing preview cards
+
 ## Priority Admin & Support Repairs (Current Sprint)
 - [x] Ensure 100% pure English localization across all Admin panels and views (removing any remaining admin-side Urdu).
 - [x] Fix support conversation message rendering so full message bodies and sender info are clearly visible to both admins and users.
@@ -314,3 +320,5 @@
 - [x] Fix support chat rendering so sent messages display cleanly as chat bubbles with correct timestamps without showing Wallet or Invalid Date placeholders.
 - [x] Ensure message input and reply controls are only visible where intended and never display confusing field errors on successful sends.
 - [x] Verify frontend test suite and production build pass successfully.
+
+- [x] Permanently banned sending Manus managed preview/checkpoint cards (`manus-webdev://...`) to the user. Givethra's only canonical website is https://givethra.org.

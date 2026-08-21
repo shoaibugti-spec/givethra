@@ -1378,15 +1378,7 @@ function OfferRow({ category, offer, onReload }: any) {
 function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   const [activeUser, setActiveUser] = useState<string | null>(null);
 
-  const openChat = async (uid: string) => {
-    setActiveUser(uid);
-    try {
-      await markSupportMessagesAsRead(uid);
-      if (onNewMessage) onNewMessage();
-    } catch (e) {
-      console.error("Failed to mark support messages as read:", e);
-    }
-  };
+
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
