@@ -419,6 +419,103 @@ async function handleAdminSupportReply(request, env, user, origin) {
   return json(await env.DB.prepare("SELECT * FROM support_messages WHERE id = ?").bind(messageId).first(), 201, origin);
 }
 
+// ===== PUBLIC FEEDBACK (no auth) =====
+async function handlePublicFeedback(request, env, origin) {
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed" }, 405, origin);
+  }
+  const body = await readJson(request);
+  const message = String(body?.message || "").trim();
+  if (!message) {
+    return json({ error: "Message is required" }, 400, origin);
+  }
+
+  const adminEmail = "shoaibahmedbugti5@gmail.com";
+  const adminUser = await env.DB.prepare(
+    "SELECT user_id FROM users WHERE lower(email) = lower(?) LIMIT 1"
+  ).bind(adminEmail).first();
+  if (!adminUser) {
+    return json({ error: "Admin not found" }, 500, origin);
+  }
+
+  const notificationId = id();
+  const nowTimestamp = now();
+  const title = "💬 New Public Feedback";
+  const msg = `${message}\n\nFrom: Guest (not logged in)`;
+  await env.DB.prepare(
+    `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    notificationId,
+    adminUser.user_id,
+    'public_feedback',
+    title,
+    msg,
+    '/admin?tab=feedback',
+    0,
+    nowTimestamp
+  ).run();
+
+  return json({ success: true, id: notificationId }, 201, origin);
+}
+
+// ===== COMMUNITY POSTS =====
+async function handleCommunityPosts(request, env, user, origin) {
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const message = String(body?.message || "").trim();
+    if (!message) {
+      return json({ error: "Message is required" }, 400, origin);
+    }
+    const displayName = String(body?.display_name || "Guest").trim();
+    const isGuest = body?.is_guest ? 1 : 0;
+    const userId = body?.user_id || null;
+    const postId = id();
+    const nowTimestamp = now();
+
+    await env.DB.prepare(
+      `INSERT INTO community_posts (id, user_id, display_name, message, is_guest, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(postId, userId, displayName, message, isGuest, nowTimestamp).run();
+
+    // Notify admin
+    const adminEmail = "shoaibahmedbugti5@gmail.com";
+    const adminUser = await env.DB.prepare(
+      "SELECT user_id FROM users WHERE lower(email) = lower(?) LIMIT 1"
+    ).bind(adminEmail).first();
+    if (adminUser) {
+      await env.DB.prepare(
+        `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id(),
+        adminUser.user_id,
+        'community_post',
+        `📢 New Community Post from ${displayName}`,
+        message.slice(0, 200) + (message.length > 200 ? "..." : ""),
+        '/admin?tab=posts',
+        0,
+        nowTimestamp
+      ).run();
+    }
+
+    return json({ success: true, id: postId }, 201, origin);
+  }
+
+  if (request.method === "GET") {
+    // Admin only
+    if (!user || !isAdmin(user)) {
+      return json({ error: "Admin access required" }, 403, origin);
+    }
+    const rows = await env.DB.prepare(
+      "SELECT * FROM community_posts ORDER BY created_at DESC LIMIT 100"
+    ).all();
+    return json(rows.results || [], 200, origin);
+  }
+
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+
 async function handleFeedbacks(request, env, user, url, parts, origin) {
   if (request.method === "GET") {
     const caseId = url.searchParams.get("case_id") || "";
@@ -936,6 +1033,24 @@ async function handleStoredUpload(request, env, url, origin) {
 
 async function routeApi(request, env, user, url, origin) {
   const parts = pathParts(url);
+
+  // Public feedback (no auth)
+  if (parts[1] === "feedback" && parts[2] === "public") {
+    return handlePublicFeedback(request, env, origin);
+  }
+
+  // Community posts (POST public, GET admin only)
+  if (parts[1] === "community-posts") {
+    if (request.method === "POST") {
+      return handleCommunityPosts(request, env, null, origin);
+    }
+    if (request.method === "GET") {
+      // Admin check will be inside handleCommunityPosts
+      return handleCommunityPosts(request, env, user, origin);
+    }
+    return json({ error: "Method not allowed" }, 405, origin);
+  }
+
   if (parts[1] === "upload") return handleUpload(request, env, user, origin);
   if (!env.DB) return json({ error: "D1 binding DB is not configured" }, 503, origin);
   if (parts[1] === "profiles") return handleProfile(request, env, user, parts, origin);
