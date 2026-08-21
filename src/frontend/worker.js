@@ -1084,24 +1084,24 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
 
     try {
+      // Auth routes
       if (url.pathname === "/auth/google") {
-        if (request.method !== "POST") return json({ error: "Use Google Identity Services and POST the returned credential." }, 405, origin);
-        const body = await readJson(request);
-        const credential = typeof body?.credential === "string" ? body.credential : "";
-        if (!credential) return json({ error: "Missing Google credential." }, 400, origin);
-        const identity = await verifyGoogleCredential(credential, clientId);
-        if (!identity) return json({ error: "Google credential is invalid, expired, or configured for another OAuth client." }, 401, origin);
-        const user = await findOrCreateUser(env, identity);
-        return json({ token: credential, user }, 200, origin);
+        // ... existing code ...
       }
 
       if (url.pathname === "/verify") {
-        const user = await authenticate(request, env, clientId, false);
-        return user ? json({ valid: true, user }, 200, origin) : json({ valid: false }, 401, origin);
+        // ... existing code ...
       }
 
       if (url.pathname === "/uploads") return handleStoredUpload(request, env, url, origin);
 
+      // ===== PUBLIC ROUTES (No authentication required) =====
+      // Allow public POST to community-posts
+      if (url.pathname === "/api/community-posts" && request.method === "POST") {
+        return routeApi(request, env, null, url, origin);
+      }
+
+      // Public GET routes
       const publicRead = request.method === "GET" && (
         url.pathname === "/api/cases/approved" ||
         url.pathname === "/api/cases/category-counts" ||
@@ -1114,18 +1114,14 @@ export default {
         return routeApi(request, env, publicUser, url, origin);
       }
 
-      // ===== PUBLIC ROUTES (No authentication required) =====
-if (url.pathname === "/api/community-posts" && request.method === "POST") {
-  return routeApi(request, env, null, url, origin);
-}
+      // ===== ALL OTHER API ROUTES (Require authentication) =====
+      if (url.pathname.startsWith("/api/")) {
+        const user = await authenticate(request, env, clientId, false);
+        if (!user) return json({ error: "Authentication required" }, 401, origin);
+        return routeApi(request, env, user, url, origin);
+      }
 
-// ===== ALL OTHER API ROUTES (Require authentication) =====
-if (url.pathname.startsWith("/api/")) {
-  const user = await authenticate(request, env, clientId, false);
-  if (!user) return json({ error: "Authentication required" }, 401, origin);
-  return routeApi(request, env, user, url, origin);
-}
-
+      // Static assets
       if (env.ASSETS) return env.ASSETS.fetch(request);
       return new Response("Not Found", { status: 404, headers: corsHeaders(origin) });
     } catch (error) {
