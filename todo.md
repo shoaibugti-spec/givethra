@@ -343,14 +343,19 @@
 - [x] Implement the public guest/user feedback box on the homepage (above slider) and verify admin-only inbox visibility.
 
 ## Admin Urdu Slider & Public Posts Box
-- [ ] Ensure homepage slider is 100% pure English across all authenticated roles including Admin
-- [ ] Create public "What's on your mind?" post/feedback box above the homepage slider for both signed-in and guest visitors
-- [ ] Add Admin Posts panel in Admin Dashboard showing all posts with user ID for signed-in users and "Public" for guests
-- [ ] Add database schema, API router, and frontend tests for post submissions and Admin viewing
+- [x] Ensure homepage slider is 100% pure English across all authenticated roles including Admin
+- [x] Create public "What's on your mind?" post/feedback box above the homepage slider for both signed-in and guest visitors
+- [x] Add Admin Posts panel in Admin Dashboard showing all posts with user ID for signed-in users and "Public" for guests
+- [x] Add database schema, API router, and frontend tests for post submissions and Admin viewing
 
 ## Public Homepage Post Box & Admin Posts Folder (Current Request)
-- [ ] Add `public_posts` table schema in D1/SQLite for guest and authenticated visitor posts.
-- [ ] Implement backend worker route (`/api/public-posts`) supporting public guest submission and admin retrieval/mark-read.
-- [ ] Add homepage post box directly above the slider with placeholder "What's on your mind?", working for both signed-in and guest visitors.
-- [ ] Add dedicated **Posts** folder/tab in Admin Dashboard displaying all submitted posts, showing User ID for signed-in users and "Public" for guests.
-- [ ] Add automated tests and verify clean build under `src/frontend`.
+- [x] Add `public_posts` table schema in D1/SQLite for guest and authenticated visitor posts.
+- [x] Implement backend worker route (`/api/public-posts`) supporting public guest submission and admin retrieval/mark-read.
+- [x] Add homepage post box directly above the slider with placeholder "What's on your mind?", working for both signed-in and guest visitors.
+- [x] Add dedicated **Posts** folder/tab in Admin Dashboard displaying all submitted posts, showing User ID for signed-in users and "Public" for guests.
+- [x] Add automated tests and verify clean build under `src/frontend`.
+
+## SubmitRequestPage JSX Build Fix (givethra.org)
+- [ ] Inspect `src/frontend/src/pages/SubmitRequestPage.tsx` around line 2090 for extra closing brace `</p>}`.
+- [ ] Remove extra brace to make it clean `</p>`.
+- [ ] Run `pnpm build` in `src/frontend` to verify 100% clean compilation.
