@@ -35,7 +35,7 @@ jobs:
           node-version: 22
 
       - name: Install frontend dependencies
-        run: pnpm install --no-frozen-lockfile --ignore-workspace
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build the production SPA
         run: pnpm run build

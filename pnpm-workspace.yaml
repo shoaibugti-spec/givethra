@@ -4,3 +4,5 @@ onlyBuiltDependencies:
   - '@biomejs/biome'
   - esbuild
   - sharp
+  - tesseract.js
+  - workerd

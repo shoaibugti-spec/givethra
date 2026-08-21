@@ -443,4 +443,16 @@
 - [x] Ensure the homepage label change does not hide or remove the composer or its send action.
 - [x] Add regression coverage for visible Public Post heading, textarea, and endpoint.
 - [x] Run the canonical frontend tests and Cloudflare production build.
-- [ ] Save a checkpoint without publishing, deploying, or showing preview/settings cards.
+- [x] Save a checkpoint without publishing, deploying, or showing preview/settings cards.
+
+## GitHub-to-Live Public Post Visibility Mismatch
+- [x] Compare the canonical GitHub branch and deployed givethra.org assets for the Public Post section.
+- [x] Identify whether the live site is using an older branch, stale build, or different homepage file; the live deployment is stale because validation/install failed before the current source could deploy.
+- [x] Ensure the Public Post section remains visible above the slider and its send endpoint is included in the canonical deploy source.
+- [x] Verify the exact deployment action needed without publishing or showing preview/settings cards: sync the verified source to main and rerun the existing deploy workflow.
+- [x] Run the relevant regression/build checks after the source correction; checkpointing remains pending until the final diff is reviewed.
+
+## Confirmed GitHub CI Blocker
+- [x] Fix the canonical GitHub Actions frontend install so pnpm v10 does not abort on ignored dependency build scripts.
+- [x] Preserve the existing Cloudflare deploy workflow and application behavior while allowing only required build dependencies.
+- [x] Re-run the exact canonical workflow-equivalent install/build checks locally after the workflow fix.
