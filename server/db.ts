@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { eq } from "drizzle-orm";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -30,6 +30,23 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
+    // Check if a legacy user already exists by email (for seamless migration without re-registering or clearing cookies)
+    if (user.email) {
+      const existingByEmail = await db.select().from(users).where(eq(users.email, user.email)).limit(1);
+      if (existingByEmail.length > 0) {
+        const existing = existingByEmail[0];
+        const updateSet: Record<string, unknown> = {
+          openId: user.openId,
+          lastSignedIn: user.lastSignedIn || new Date(),
+        };
+        if (user.name) updateSet.name = user.name;
+        if (user.loginMethod) updateSet.loginMethod = user.loginMethod;
+
+        await db.update(users).set(updateSet).where(eq(users.id, existing.id));
+        return;
+      }
+    }
+
     const values: InsertUser = {
       openId: user.openId,
     };
