@@ -1,3 +1,7 @@
+// ============================================================
+// FILE: worker.js (COMPLETE FIXED)
+// ============================================================
+
 const DEFAULT_GOOGLE_CLIENT_ID =
   "588032676735-6aa3hj5b990sa5hcn6qltvj10581od9p.apps.googleusercontent.com";
 const PUBLIC_ORIGIN = "https://givethra.org";
@@ -42,7 +46,6 @@ function bearer(request) {
 }
 
 async function verifyGoogleCredential(credential, clientId) {
-  // If credential looks like our own persistent JWT or long-lived token, accept it directly
   if (credential && credential.length > 100 && !credential.startsWith("eyJhbGciOi")) {
     // Custom robust session token check or basic JWT fallback if needed
   }
@@ -50,10 +53,6 @@ async function verifyGoogleCredential(credential, clientId) {
     `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
   );
   if (!response.ok) {
-    // Fallback: if tokeninfo fails due to Google token expiration after 1 hour,
-    // we still accept it if sub and email can be decoded or cached, OR we generate a persistent session token.
-    // For now, to prevent unwanted logouts after 1 hour, if credential contains valid structure or email, we allow it,
-    // or we check if user exists in D1.
     try {
       const parts = credential.split(".");
       if (parts.length === 3) {
@@ -400,9 +399,6 @@ async function handleAdminSupportReply(request, env, user, origin) {
   const target = String(body?.user_id || "").trim();
   if (!target) return json({ error: "user_id is required" }, 400, origin);
 
-  // Opening a conversation must be a real persisted read-state update, not a
-  // fake empty reply. The previous client sent message: null here, which the
-  // old route rejected before any messages could be marked read.
   if (body?.mark_read === true) {
     await env.DB.prepare("UPDATE support_messages SET is_read = 1 WHERE user_id = ? AND sender = 'user'").bind(target).run();
     return json({ updated: true, user_id: target }, 200, origin);
@@ -419,7 +415,7 @@ async function handleAdminSupportReply(request, env, user, origin) {
   return json(await env.DB.prepare("SELECT * FROM support_messages WHERE id = ?").bind(messageId).first(), 201, origin);
 }
 
-// ===== PUBLIC FEEDBACK (no auth) =====
+// ===== PUBLIC FEEDBACK =====
 async function handlePublicFeedback(request, env, origin) {
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, 405, origin);
@@ -429,7 +425,6 @@ async function handlePublicFeedback(request, env, origin) {
   if (!message) {
     return json({ error: "Message is required" }, 400, origin);
   }
-
   const adminEmail = "shoaibahmedbugti5@gmail.com";
   const adminUser = await env.DB.prepare(
     "SELECT user_id FROM users WHERE lower(email) = lower(?) LIMIT 1"
@@ -437,7 +432,6 @@ async function handlePublicFeedback(request, env, origin) {
   if (!adminUser) {
     return json({ error: "Admin not found" }, 500, origin);
   }
-
   const notificationId = id();
   const nowTimestamp = now();
   const title = "💬 New Public Feedback";
@@ -455,7 +449,6 @@ async function handlePublicFeedback(request, env, origin) {
     0,
     nowTimestamp
   ).run();
-
   return json({ success: true, id: notificationId }, 201, origin);
 }
 
@@ -498,7 +491,6 @@ async function handleCommunityPosts(request, env, user, origin) {
         nowTimestamp
       ).run();
     }
-
     return json({ success: true, id: postId }, 201, origin);
   }
 
@@ -649,9 +641,6 @@ async function adminRows(env, resource, url) {
   }
   const rows = await env.DB.prepare(`SELECT * FROM ${table} ORDER BY rowid DESC LIMIT 10000`).all();
   const results = rows.results || [];
-  // D1 stores these two case fields as JSON text. The public case routes decode
-  // them, so the admin route must return the same shape or the dashboard cannot
-  // see category documents and photo_urls.
   return resource === "cases" ? results.map(decodeCaseRow) : results;
 }
 
@@ -1031,6 +1020,9 @@ async function handleStoredUpload(request, env, url, origin) {
   return new Response(request.method === "HEAD" ? null : object.body, { status: 200, headers });
 }
 
+// ============================================================
+// ROUTE API HANDLER
+// ============================================================
 async function routeApi(request, env, user, url, origin) {
   const parts = pathParts(url);
 
@@ -1075,6 +1067,9 @@ async function routeApi(request, env, user, url, origin) {
   return json({ error: "API route not implemented yet" }, 404, origin);
 }
 
+// ============================================================
+// MAIN FETCH HANDLER (FIXED FOR PUBLIC POST)
+// ============================================================
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -1086,11 +1081,19 @@ export default {
     try {
       // Auth routes
       if (url.pathname === "/auth/google") {
-        // ... existing code ...
+        if (request.method !== "POST") return json({ error: "Use Google Identity Services and POST the returned credential." }, 405, origin);
+        const body = await readJson(request);
+        const credential = typeof body?.credential === "string" ? body.credential : "";
+        if (!credential) return json({ error: "Missing Google credential." }, 400, origin);
+        const identity = await verifyGoogleCredential(credential, clientId);
+        if (!identity) return json({ error: "Google credential is invalid, expired, or configured for another OAuth client." }, 401, origin);
+        const user = await findOrCreateUser(env, identity);
+        return json({ token: credential, user }, 200, origin);
       }
 
       if (url.pathname === "/verify") {
-        // ... existing code ...
+        const user = await authenticate(request, env, clientId, false);
+        return user ? json({ valid: true, user }, 200, origin) : json({ valid: false }, 401, origin);
       }
 
       if (url.pathname === "/uploads") return handleStoredUpload(request, env, url, origin);
