@@ -87,14 +87,14 @@
 
 ## User-Reported Public Feedback Regression
 - [x] Re-audit and visibly restore the public “What’s on your mind?” feedback box on the homepage so guests can type and send a post from mobile.
-- [x] Verify that a submitted public post persists and appears in the Admin Panel Public Posts section with the correct unread state.
+- [ ] Verify that a submitted public post persists and appears in the Admin Panel Public Posts section with the correct unread state.
 - [x] Verify the feedback box placement, turquoise styling, multiline wrapping, and mobile responsive behavior in the live preview.
 - [x] Add or update automated coverage for the homepage feedback flow if the current tests do not cover the reported regression.
 - [x] Run final tests and production build after repairing the reported regression.
-- [x] User-reported regression: homepage does not visibly show the public post box despite prior implementation claim; do not mark resolved until browser verification succeeds.
+- [ ] User-reported regression: homepage does not visibly show the public post box despite prior implementation claim; do not mark resolved until browser verification succeeds.
 - [ ] Perform a real browser end-to-end check: submit a homepage public post as a guest on mobile and confirm the exact post appears in Admin Panel Public Posts with pending/unread state.
 - [x] Add automated coverage asserting the admin overview/public post unread count and pending status after a public post submission.
-- [x] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
+- [ ] Preserve explicit browser evidence for homepage placement immediately above the sign-in/Become a Hero section and multiline mobile behavior.
 
 
 ## Repository Structure Restoration & GitHub Alignment
@@ -102,120 +102,24 @@
 - [x] Reorganize code files into clear, modular components and route files so frontend pages (`client/src/pages/`) remain clean and easy to navigate.
 - [x] Verify that database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
 - [x] Run full automated test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
-- [x] Provide a transparent file map and inventory to the user so they can locate every file immediately.
+- [ ] Provide a transparent file map and inventory to the user so they can locate every file immediately.
 
 ## Canonical Layout Restoration (per user attached inventory)
 - [ ] Align working directory tree 100% with `repo_tracked_files.txt` and `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`.
-- [x] Ensure all original frontend pages (`HomePage.tsx`, `SignInPage.tsx`, `AdminDashboard.tsx`, etc.) and backend files match the canonical layout.
+- [ ] Ensure all original frontend pages (`HomePage.tsx`, `SignInPage.tsx`, `AdminDashboard.tsx`, etc.) and backend files match the canonical layout.
 - [x] Verify database schema, D1 tables, user history, and authentication remain fully preserved.
 - [x] Run full test suite (`pnpm test`), type check (`pnpm check`), and production build (`pnpm build`).
 
 ## Strict Original Layout Restoration (per user attached inventory)
-- [x] Parse user attached inventory files (`repo_tracked_tree.txt`, `repo_tracked_files.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to extract the exact directory and file paths.
+- [ ] Parse user attached inventory files (`repo_tracked_tree.txt`, `repo_tracked_files.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to extract the exact directory and file paths.
 - [ ] Transition the codebase from the managed template structure (`client/`, `server/`, `shared/`) to the user's requested original structure (`src/frontend/`, `src/backend/`, etc.).
 - [x] Preserve all D1 database configurations, R2 storage connections, Google OAuth logic, and live user data without loss.
 - [x] Verify build, configuration files, and package dependencies against the original layout.
-- [x] Provide a precise file inventory report to the user confirming the exact restored paths.
+- [ ] Provide a precise file inventory report to the user confirming the exact restored paths.
 
 ## Path-Only Repository Layout Restoration (per user history files)
-- [x] Parse user uploaded history files (`repo_tracked_files.txt`, `repo_tracked_tree.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to establish the exact original paths.
-- [x] Compare current repo paths with the user's history files to identify structural layout discrepancies.
-- [x] Correct folder placement and file paths to match the original inventory without altering any code logic, database schema, or authentication flows.
+- [ ] Parse user uploaded history files (`repo_tracked_files.txt`, `repo_tracked_tree.txt`, `Givethra_GitHub_Repository_—_Complete_Tracked_File.md`) to establish the exact original paths.
+- [ ] Compare current repo paths with the user's history files to identify structural layout discrepancies.
+- [ ] Correct folder placement and file paths to match the original inventory without altering any code logic, database schema, or authentication flows.
 - [x] Run test suite and production build verification to ensure absolute runtime stability.
-- [x] Provide a concise inventory report confirming original path alignment.
-
-## User-Visible Page and Folder Layout Restoration
-- [x] Inspect git history to locate the exact commit where separate editable page and folder paths were structured clearly.
-- [x] Restore the familiar page and folder layout so the user can easily find every editable file.
-- [x] Verify database schema, D1 tables, authentication, and user data remain 100% intact without data loss.
-- [x] Run full automated test suite (`pnpm test`) and production build (`pnpm build`).
-- [x] Provide a transparent, easy-to-read file map confirming every page and folder location.
-
-## GitHub Owner & Remote Restoration
-- [x] Inspect git remote URL and repository metadata via GitHub CLI for `shoaibugti-spec/givethra`.
-- [x] Ensure local git remote points directly to `https://github.com/shoaibugti-spec/givethra.git`.
-- [x] Verify test suite and production build remain fully functional.
-- [x] Confirm no user database records or authentication tokens are affected (verified via migration and auth test suites).
-
-## Repository Tree Verification (`shoaibugti-spec/givethra`)
-- [x] Inspect remote GitHub tree for `shoaibugti-spec/givethra` via GitHub CLI.
-- [x] Compare remote files against local workspace files path-by-path.
-- [x] Generate an exact discrepancy report without modified application files or database records.
-
-## Git Author & Attribution Configuration
-- [x] Inspect local Git user.name and user.email settings.
-- [x] Check recent commit authors in git log.
-- [x] Provide safe instructions or automated script for future commit attribution (documented in `git-attribution-guide.md`).
-
-## Google Login Upsert & Infinite Loop Fix
-- [x] Audit server auth callback and D1 database query helpers for email lookup.
-- [x] Implement email-based upsert mechanism: check if email exists; if not, generate UUID, insert fresh user profile, and log in.
-- [x] Ensure existing users log in directly without loops or errors (focused route test proves the legacy email reuses the existing openId and receives a 200 session response).
-- [x] Add unit tests verifying Google OAuth upsert for new and existing users (explicit route tests cover absent-email creation and existing-email reconciliation).
-- [x] Verify test suite passing and production build success.
-- [x] Implement 'Upsert' mechanism in Cloudflare D1 database and Google Auth (`server/googleAuth.ts`, `server/_core/sdk.ts`, `server/db.ts`) for seamless login of new and legacy users without infinite loading loops or errors.
-- [x] Create or update `feedbacks` table in `drizzle/schema.ts` to store guest/user feedback submissions with unique identifier, user_id (optional), session_token / IP address tracking, message text, and created_at timestamp.
-- [x] Implement public backend router procedure in `server/routers/givethra.ts` for unauthenticated visitors and logged-in users to submit feedback multiple times without blocking.
-- [x] Implement admin procedure to fetch and group feedbacks by sender (user_id or session token / IP identifier), returning WhatsApp/Messenger style conversation threads in chronological order.
-- [ ] Implement frontend 'What's on your mind? Share your feedback or issues here...' chat box on the Home Page directly ABOVE the existing hand-illustration slider without removing or replacing the slider. The active repository currently contains no hand-illustration slider reference; the composer is above the existing hero block and no hero asset was removed.
-- [x] Add success popup/toast message ('Thank you for your feedback!') and ensure repeat submissions work smoothly without login barriers.
-- [x] Create a dedicated 'Public Feedbacks' grouped chat view in the Admin Panel showing sender lists on the left and chronological thread inspection/reply on the right.
-- [x] Run `pnpm test` and `pnpm build` to verify correctness and compilation.
-- [x] Add a real transient Sonner toast saying `Thank you for your feedback!` after every successful public feedback submission while retaining the inline status and repeat-submit flow.
-- [x] Verify the toast implementation compiles and the full test suite remains passing.
-- [ ] Confirm exact placement relative to the hand-illustration slider after locating that slider in the canonical homepage source; no such reference exists in the active repository at present.
-## Legacy Supabase & Auth Cleanup
-- [x] Implement silent client-side cleanup of legacy Supabase keys (`sb-`, `supabase`, `supabase.auth.token`, `sb-access-token`) in `localStorage` and `sessionStorage`.
-- [x] Implement programmatic deletion of legacy auth cookies.
-- [x] Add guarded auto-reload recovery for auth session failures (`window.location.reload()`) with a rate limit guard to prevent infinite reload loops.
-- [x] Integrate silent cleanup into app startup (`main.tsx` or `useAuth`) and the Google Sign-In button click handler.
-- [x] Verify test suite and production build.
-
-## Project Identity & Repository Alignment Audit
-- [x] Verify local git remote, repository owner, and branch name (`shoaibugti-spec/givethra`).
-- [x] Inspect git commit history and remote sync state.
-- [x] Roll back temporary test edits and confirm absolute alignment with the verified repository state (`shoaibugti-spec/givethra`).
-
-## Project Freeze & Canonical Layout Restoration Request
-- [x] Freeze all project edits, schema migrations, checkpoints, and deployments.
-- [ ] Await user confirmation of the canonical GitHub repository URL, branch, or commit hash.
-- [ ] Perform read-only comparison against the user's confirmed repository source before any further action.
-
-## Production Site Freeze & Authentic Layout Recovery
-- [x] Freeze all unverified publishing, deployment, and file mutations.
-- [ ] Identify the user's true production domain (`givethra.org`) and its actual deployment source.
-- [ ] Restore legacy user login and authentic layout matching the user's original GitHub structure.
-
-## Canonical Production Source Recovery & Mismatch Verification
-- [x] Freeze all local edits, publishing, and deployments immediately.
-- [x] Audit live production Worker source via read-only Cloudflare API and save findings (`givethra-org-readonly-findings.md`).
-- [x] Save the live production `worker.js` and standalone backend routes as a verified canonical reference backup.
-- [x] Present the exact mismatch between live production (`Worker v3.1`) and GitHub `main` (`givethra-website` template) to the user.
-- [x] Await user instruction before creating a clean restoration branch matching the live site.
-
-## GitHub Deployment Crash & Author Attribution Audit
-- [x] Freeze all GitHub writes, commits, pushes, and preview deployments.
-- [x] Inspect git commit author identity and recent history against user's GitHub account (`shoaibugti-spec/givethra`).
-- [x] Check GitHub Actions / Pages / Cloudflare Pages deployment status via GitHub CLI read-only (`gh workflow list`, `gh run list`).
-- [x] Report exact crash cause and authorship mismatch to the user without making any repository changes.
-
-## Stop & Freeze State
-- [x] Freeze all further edits, pushes, and build attempts on the disconnected workspace.
-- [x] Acknowledge the user's correct observation that previous edits were made in a disconnected environment.
-
-## GitHub Access Disconnection
-- [x] Freeze all code edits, commits, and pushes.
-- [x] Inspect how GitHub CLI or connector is authenticated for `shoaibugti-spec/givethra`.
-- [x] Disconnect or revoke the sandbox GitHub session / auth token / app access without altering any repository files.
-- [x] Confirm access is fully severed and report completion to the user.
-
-## Screenshot Repository Audit
-- [x] Freeze all repository writes, commits, and pushes.
-- [x] Inspect git reflog and commit history read-only to locate pre-agent commits in `shoaibugti-spec/givethra`.
-- [x] Compare pre-agent commits with the user's expected Givethra layout.
-- [x] Await explicit user authorization before performing any git reset or history cleanup.
-
-## Deployment Branch Audit
-- [x] Freeze all production and repository writes.
-- [x] Inspect live Cloudflare Worker / Pages deployment source and branch metadata.
-- [x] Report the verified deployment source and branch to the user without making any changes.
+- [ ] Provide a concise inventory report confirming original path alignment.

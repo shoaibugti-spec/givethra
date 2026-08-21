@@ -163,27 +163,3 @@ export const publicPosts = mysqlTable(
 
 export type PublicPost = typeof publicPosts.$inferSelect;
 export type InsertPublicPost = typeof publicPosts.$inferInsert;
-
-export const feedbacks = mysqlTable(
-  "feedbacks",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    userId: int("userId"), // null for guest visitors
-    sessionToken: varchar("sessionToken", { length: 128 }).notNull(), // visitor session cookie or device fingerprint token
-    senderName: varchar("senderName", { length: 160 }).notNull(),
-    senderEmail: varchar("senderEmail", { length: 320 }),
-    ipAddress: varchar("ipAddress", { length: 64 }),
-    content: text("content").notNull(),
-    status: mysqlEnum("status", ["unread", "read", "replied"]).default("unread").notNull(),
-    adminReply: text("adminReply"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    index("feedbacks_session_index").on(table.sessionToken),
-    index("feedbacks_user_index").on(table.userId),
-    index("feedbacks_created_index").on(table.createdAt),
-  ]
-);
-
-export type Feedback = typeof feedbacks.$inferSelect;
-export type InsertFeedback = typeof feedbacks.$inferInsert;

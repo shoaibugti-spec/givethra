@@ -1,0 +1,20 @@
+name = "givethra"
+main = "./worker.js"
+compatibility_date = "2024-11-01"
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+
+[[d1_databases]]
+binding = "DB"
+database_name = "givethra-auth"
+database_id = "5ad1094c-3288-4519-aeec-0446d82126f6"
+
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "givethra-user-uploads"
+
+[vars]
+GOOGLE_CLIENT_ID = "588032676735-6aa3hj5b990sa5hcn6qltvj10581od9p.apps.googleusercontent.com"

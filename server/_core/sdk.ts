@@ -289,25 +289,18 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically with email reconciliation
+    // If user not in DB, sync from OAuth server automatically
     if (!user) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
-        let targetOpenId = userInfo.openId;
-        if (userInfo.email) {
-          const existingByEmail = await db.getUserByEmail(userInfo.email);
-          if (existingByEmail) {
-            targetOpenId = existingByEmail.openId;
-          }
-        }
         await db.upsertUser({
-          openId: targetOpenId,
+          openId: userInfo.openId,
           name: userInfo.name || null,
           email: userInfo.email ?? null,
           loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
           lastSignedIn: signedInAt,
         });
-        user = await db.getUserByOpenId(targetOpenId);
+        user = await db.getUserByOpenId(userInfo.openId);
       } catch (error) {
         console.error("[Auth] Failed to sync user from OAuth:", error);
         throw ForbiddenError("Failed to sync user info");

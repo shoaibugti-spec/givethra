@@ -1,12 +1,9 @@
 import { TRPCError } from "@trpc/server";
-import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
-import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   caseFiles,
   cases,
-  feedbacks,
   kycSubmissions,
   notifications,
   profiles,
@@ -18,7 +15,6 @@ import {
 import { getDb } from "../db";
 import { notifyOwner } from "../_core/notification";
 import { storagePut } from "../storage";
-import { getSessionCookieOptions } from "../_core/cookies";
 import { adminProcedure, hasGivethraOwnerAccess, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
 const CASE_CATEGORIES = ["Medical", "Education", "Emergency", "Livelihood", "Housing", "Other"] as const;
@@ -79,33 +75,6 @@ function ownerAlert(title: string, content: string) {
   void notifyOwner({ title, content }).catch(error => {
     console.warn("[Givethra] Owner notification could not be sent", error);
   });
-}
-
-const FEEDBACK_SESSION_COOKIE = "givethra_feedback_session";
-
-function readCookie(req: ExpressRequest, name: string) {
-  const header = req.headers.cookie ?? "";
-  const pair = header.split(";").map(value => value.trim()).find(value => value.startsWith(`${name}=`));
-  return pair ? decodeURIComponent(pair.slice(name.length + 1)) : undefined;
-}
-
-function getClientIp(req: ExpressRequest) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.trim()) return forwarded.split(",")[0].trim().slice(0, 64);
-  if (Array.isArray(forwarded) && forwarded[0]) return forwarded[0].split(",")[0].trim().slice(0, 64);
-  return req.ip?.slice(0, 64) || null;
-}
-
-function getFeedbackSession(ctx: { req: ExpressRequest; res: ExpressResponse }) {
-  const existing = readCookie(ctx.req, FEEDBACK_SESSION_COOKIE);
-  if (existing) return existing;
-  const token = randomUUID();
-  ctx.res.cookie(FEEDBACK_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 365 });
-  return token;
-}
-
-function feedbackGroupKey(record: { userId: number | null; sessionToken: string; ipAddress: string | null }) {
-  return record.userId ? `user:${record.userId}` : `visitor:${record.sessionToken || record.ipAddress || "unknown"}`;
 }
 
 export const givethraRouter = router({
@@ -284,29 +253,6 @@ export const givethraRouter = router({
     }),
   }),
 
-  feedbacks: router({
-    submit: publicProcedure
-      .input(z.object({ content: z.string().trim().min(1).max(4000) }))
-      .mutation(async ({ ctx, input }) => {
-        const db = await requireDb();
-        const sessionToken = getFeedbackSession(ctx);
-        const userId = ctx.user?.id ?? null;
-        const senderName = ctx.user?.name?.trim() || "Guest Visitor";
-        const senderEmail = ctx.user?.email?.trim() || null;
-        const result = await db.insert(feedbacks).values({
-          userId,
-          sessionToken,
-          senderName,
-          senderEmail,
-          ipAddress: getClientIp(ctx.req),
-          content: input.content,
-          status: "unread",
-        });
-        ownerAlert("New public feedback", `${senderName} sent: "${input.content.slice(0, 120)}"`);
-        return { success: true, id: Number(result[0].insertId) };
-      }),
-  }),
-
   publicPosts: router({
     uploadImage: publicProcedure.input(uploadInput).mutation(async ({ ctx, input }) => {
       if (input.purpose !== "public" || !input.mimeType.startsWith("image/")) {
@@ -355,56 +301,21 @@ export const givethraRouter = router({
   admin: router({
     overview: adminProcedure.query(async () => {
       const db = await requireDb();
-        const [userCount, kycCount, caseCount, messageCount, publicPostCount, feedbackCount] = await Promise.all([
+      const [userCount, kycCount, caseCount, messageCount, publicPostCount] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(users),
         db.select({ count: sql<number>`count(*)` }).from(kycSubmissions).where(eq(kycSubmissions.status, "pending")),
         db.select({ count: sql<number>`count(*)` }).from(cases).where(eq(cases.status, "pending")),
         db.select({ count: sql<number>`count(*)` }).from(supportMessages).where(eq(supportMessages.senderRole, "user")),
-          db.select({ count: sql<number>`count(*)` }).from(publicPosts).where(eq(publicPosts.status, "pending")),
-          db.select({ count: sql<number>`count(*)` }).from(feedbacks).where(eq(feedbacks.status, "unread")),
-        ]);
+        db.select({ count: sql<number>`count(*)` }).from(publicPosts).where(eq(publicPosts.status, "pending")),
+      ]);
       return {
         users: Number(userCount[0]?.count ?? 0),
         pendingKyc: Number(kycCount[0]?.count ?? 0),
         pendingCases: Number(caseCount[0]?.count ?? 0),
         supportMessages: Number(messageCount[0]?.count ?? 0),
         publicPosts: Number(publicPostCount[0]?.count ?? 0),
-        publicFeedbacks: Number(feedbackCount[0]?.count ?? 0),
       };
     }),
-    feedbacks: adminProcedure.query(async () => {
-      const db = await requireDb();
-      const records = await db.select().from(feedbacks).orderBy(asc(feedbacks.createdAt));
-      const grouped = new Map<string, { key: string; senderName: string; senderEmail: string | null; userId: number | null; ipAddress: string | null; latestAt: Date; unreadCount: number; messages: typeof records }>();
-      for (const record of records) {
-        const key = feedbackGroupKey(record);
-        const existing = grouped.get(key);
-        if (existing) {
-          existing.messages.push(record);
-          existing.latestAt = record.createdAt;
-          if (record.status === "unread") existing.unreadCount += 1;
-        } else {
-          grouped.set(key, {
-            key,
-            senderName: record.senderName,
-            senderEmail: record.senderEmail,
-            userId: record.userId,
-            ipAddress: record.ipAddress,
-            latestAt: record.createdAt,
-            unreadCount: record.status === "unread" ? 1 : 0,
-            messages: [record],
-          });
-        }
-      }
-      return Array.from(grouped.values()).sort((a, b) => b.latestAt.getTime() - a.latestAt.getTime());
-    }),
-    updateFeedback: adminProcedure
-      .input(z.object({ id: z.number().int().positive(), status: z.enum(["unread", "read", "replied"]), adminReply: z.string().trim().max(4000).optional() }))
-      .mutation(async ({ input }) => {
-        const db = await requireDb();
-        await db.update(feedbacks).set({ status: input.status, adminReply: input.adminReply !== undefined ? input.adminReply || null : undefined }).where(eq(feedbacks.id, input.id));
-        return { success: true };
-      }),
     publicPosts: adminProcedure.query(async () => {
       const db = await requireDb();
       return db.select().from(publicPosts).orderBy(desc(publicPosts.createdAt));

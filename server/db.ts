@@ -89,15 +89,4 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function getUserByEmail(email: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user by email: database not available");
-    return undefined;
-  }
-
-  const normalized = email.trim().toLowerCase();
-  const result = await db.select().from(users).where(eq(users.email, normalized)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
-}
+// TODO: add feature queries here as your schema grows.

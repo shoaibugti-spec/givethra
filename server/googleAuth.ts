@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { COOKIE_NAME } from "../shared/const";
-import { upsertUser, getUserByEmail, getUserByOpenId } from "./db";
+import { upsertUser } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 
@@ -76,21 +76,8 @@ export function registerGoogleAuthRoutes(app: Express) {
     try {
       const identity = await verifyGoogleCredential(credential);
       const ownerEmail = (process.env.GIVETHRA_ADMIN_EMAIL || "").trim().toLowerCase();
-      let role: "admin" | "user" = ownerEmail && identity.email === ownerEmail ? "admin" : "user";
-      let openId = `google:${identity.sub}`;
-
-      // Check if user already exists by openId or email (reconciliation for legacy users)
-      let existingUser = await getUserByOpenId(openId);
-      if (!existingUser && identity.email) {
-        existingUser = await getUserByEmail(identity.email);
-        if (existingUser) {
-          // Reconcile legacy user record with new Google sub openId or preserve existing openId
-          openId = existingUser.openId;
-          if (existingUser.role === 'admin' || (ownerEmail && identity.email === ownerEmail)) {
-            role = 'admin';
-          }
-        }
-      }
+      const role = ownerEmail && identity.email === ownerEmail ? "admin" : "user";
+      const openId = `google:${identity.sub}`;
 
       await upsertUser({
         openId,

@@ -110,45 +110,4 @@ describe("Givethra workflow permissions and validation", () => {
       adminReply: "Thank you Ali, we have added a direct login link.",
     });
     expect(updateRes).toEqual({ success: true });
-  }, 15_000);
-
-
-describe("public feedback chat", () => {
-  it("accepts a guest message, groups it into an admin thread, and supports an admin reply", async () => {
-    let issuedSession = "";
-    const publicCaller = appRouter.createCaller({
-      user: null,
-      req: { protocol: "https", headers: { "x-forwarded-for": "203.0.113.44" } } as any,
-      res: { cookie: (_name: string, value: string) => { issuedSession = value; } } as any,
-    });
-    const adminCaller = appRouter.createCaller(createContext("admin", ENV.givethraOwnerEmail));
-    const marker = `Guest feedback ${Date.now()}`;
-
-    const submitted = await publicCaller.givethra.feedbacks.submit({ content: marker });
-    expect(submitted.success).toBe(true);
-    expect(issuedSession).toBeTruthy();
-
-    const threads = await adminCaller.givethra.admin.feedbacks();
-    const thread = threads.find(item => item.messages.some(message => message.content === marker));
-    expect(thread).toBeDefined();
-    expect(thread?.senderName).toBe("Guest Visitor");
-    expect(thread?.ipAddress).toBe("203.0.113.44");
-    expect(thread?.messages.some(message => message.status === "unread")).toBe(true);
-
-    const message = thread?.messages.find(item => item.content === marker);
-    expect(message).toBeDefined();
-    await expect(adminCaller.givethra.admin.updateFeedback({ id: message!.id, status: "replied", adminReply: "Thanks for letting us know." })).resolves.toEqual({ success: true });
   });
-});
-
-
-describe("public feedback validation", () => {
-  it("rejects empty messages before persistence", async () => {
-    const publicCaller = appRouter.createCaller({
-      user: null,
-      req: { protocol: "https", headers: {} } as any,
-      res: { cookie: () => undefined } as any,
-    });
-    await expect(publicCaller.givethra.feedbacks.submit({ content: "   " })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-  });
-});
