@@ -356,6 +356,12 @@
 - [x] Add automated tests and verify clean build under `src/frontend`.
 
 ## SubmitRequestPage JSX Build Fix (givethra.org)
-- [ ] Inspect `src/frontend/src/pages/SubmitRequestPage.tsx` around line 2090 for extra closing brace `</p>}`.
-- [ ] Remove extra brace to make it clean `</p>`.
-- [ ] Run `pnpm build` in `src/frontend` to verify 100% clean compilation.
+- [x] Inspect `src/frontend/src/pages/SubmitRequestPage.tsx` around line 2090 for extra closing brace `</p>}`.
+- [x] Remove extra brace to make it clean `</p>`.
+- [x] Run `pnpm build` in `src/frontend` to verify 100% clean compilation.
+
+## Givethra GitHub & Cloudflare Architecture Documentation (givethra.org)
+- [ ] Inventory complete file tree of the Givethra repository (`src/frontend/`, worker.js, wranger.toml / config, GitHub workflows).
+- [ ] Document Cloudflare Worker routing, D1 SQLite database tables and queries, R2 storage bucket bindings, and Google OAuth upsert for 7,000 legacy users.
+- [ ] Document GitHub Actions CI/CD deployment pipeline and live domain routing for givethra.org.
+- [ ] Produce a comprehensive, professional technical report in Urdu.
