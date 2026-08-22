@@ -2,7 +2,7 @@ import { fileURLToPath, URL } from "url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// 🔴 تمام ICP/caffeine سے متعلق env variables اور proxy ہٹا دیے گئے۔
+// ✅ تمام ICP/caffeine سے متعلق env variables اور proxy ہٹا دیے گئے۔
 // اب یہ ایک سادہ React + Vite config ہے جو Cloudflare Pages پر ڈپلے ہوگی۔
 
 export default defineConfig({
@@ -27,23 +27,41 @@ export default defineConfig({
       },
     },
   },
-  // 🔴 لوکل ڈیولپمنٹ کے لیے proxy اگر چاہیں تو ڈال سکتے ہیں،
-  // لیکن اب یہ worker کو target کرے گا (مثال کے طور پر):
-  // server: {
-  //   proxy: {
-  //     "/api": {
-  //       target: "https://givethra.shoaibugti.workers.dev",
-  //       changeOrigin: true,
-  //     },
-  //   },
-  // },
-  // اگر آپ کو لوکل ڈیولپمنٹ میں proxy کی ضرورت نہیں تو اسے کومنٹ کر دیں۔
-  // میں نے اسے ہٹا دیا ہے تاکہ کوئی الجھن نہ ہو۔
+  // ✅ لوکل ڈیولپمنٹ کے لیے PROXY شامل کیا گیا
+  server: {
+    proxy: {
+      // تمام /api درخواستیں Cloudflare Worker کی طرف بھیجیں
+      "/api": {
+        target: "https://givethra.org", // یا آپ کا Worker URL
+        changeOrigin: true,
+        secure: true,
+        // یہ rewrite ضروری نہیں، لیکن اگر مسائل ہوں تو استعمال کریں
+        // rewrite: (path) => path,
+      },
+      // /uploads کی درخواستیں
+      "/uploads": {
+        target: "https://givethra.org",
+        changeOrigin: true,
+        secure: true,
+      },
+      // /auth کی درخواستیں
+      "/auth": {
+        target: "https://givethra.org",
+        changeOrigin: true,
+        secure: true,
+      },
+      // /verify کی درخواستیں
+      "/verify": {
+        target: "https://givethra.org",
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 
   plugins: [
     react(),
-    // 🔴 environment plugin کی ضرورت نہیں، Vite .env فائلیں خود پڑھ لیتا ہے۔
-    // اگر آپ کو کوئی خاص env variable چاہیے تو اسے .env میں ڈالیں۔
+    // ✅ environment plugin کی ضرورت نہیں، Vite .env فائلیں خود پڑھ لیتا ہے۔
   ],
   resolve: {
     alias: [
@@ -52,8 +70,6 @@ export default defineConfig({
         find: "@",
         replacement: fileURLToPath(new URL("./src", import.meta.url)),
       },
-      // 🔴 "declarations" alias ہٹا دیا گیا (یہ ICP کا تھا)
     ],
-    // 🔴 dedupe بھی ہٹا دیا (یہ @icp-sdk/core کے لیے تھا)
   },
 });
