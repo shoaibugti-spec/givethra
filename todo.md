@@ -484,3 +484,12 @@
 
 ## CI-Equivalent pnpm v10 Build-Policy Repair
 - [x] Make the isolated GitHub Actions install explicitly allow only the required native build scripts; the exact `src/frontend` frozen-lockfile install now completes with the known pnpm v10 native-build warning and the production build succeeds.
+
+## Live Cloudflare Stale-Build Incident Follow-up
+- [x] Record the reported regression: after Cloudflare deployment, givethra.org serves an older homepage without the Public Post and other recent updates.
+- [x] Compare the exact GitHub main commit, local checkpoint, workflow working directory, build output, Wrangler entrypoint, and Cloudflare production target.
+- [x] Verify whether the deployed domain is receiving the current Pages/Worker asset bundle or a separate older deployment/custom-domain route.
+- [x] Confirm all current homepage, Admin Posts, Support Chat, and Worker/API changes are included in one deployment artifact without touching D1/R2 data.
+- [x] Repair only the source/workflow/routing mismatch responsible for the stale live build by preparing the verified single-workflow checkpoint for GitHub synchronization.
+- [x] Run the full regression and production build again, then provide exact givethra.org deployment and cache-verification steps.
+- [x] Refresh LIVE_FEEDBACK_DIAGNOSIS.md so it records the current checkpoint, GitHub main divergence, workflow failure, and live Worker markers without stale commit references.
