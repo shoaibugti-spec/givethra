@@ -562,7 +562,13 @@
 - [x] Verify live domain renders Public Post without altering D1/R2 data.
 
 ## Green Build & Deployment Repair — 2026-08-22
-- [ ] Inspect all local build, test, and workflow files for errors.
-- [ ] Fix any syntax, type, or workflow errors to ensure clean execution.
-- [ ] Run full test suite, type check, and production build.
-- [ ] Verify local Wrangler bundle and report status.
+- [x] Inspect all local build, test, and workflow files for errors.
+- [x] Fix any syntax, type, or workflow errors to ensure clean execution.
+- [x] Run full test suite, type check, and production build.
+- [x] Verify local Wrangler bundle and report status.
+
+## Absolute Error-Free & Green Deployment Repair — 2026-08-22
+- [ ] Analyze user-provided Cloudflare build log (`pnmp: not found`) and locate all config references.
+- [ ] Ensure every package.json, wrangler.toml, and GitHub workflow uses valid commands without typos (`pnmp` -> `pnpm`).
+- [ ] Run full test suite, strict type check, and production build in `src/frontend`.
+- [ ] Verify clean Wrangler packaging and confirm exact steps for Cloudflare dashboard build command fix.
