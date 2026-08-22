@@ -1,6 +1,5 @@
 // src/frontend/src/components/Layout.tsx
-// Clean header with brand, search, language switcher, community post icon, and notification
-// No duplicate navigation bar below the header
+// Clean header - no duplicate navigation below
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,20 +11,15 @@ import {
   Bell,
   Heart,
   Menu,
-  Moon,
   Search,
   Shield,
-  Sun,
-  User,
   X,
   Facebook,
   Instagram,
   Linkedin,
-  MessageCircle,
   Mail,
   MessageSquare,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 import {
   getUnreadNotificationsCount,
@@ -68,28 +62,21 @@ function NavLink({
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { theme, setTheme } = useTheme();
   const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notifCount, setNotifCount] = useState(0);
-  const [chatCount, setChatCount] = useState(0);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
-  const displayName = user?.fullName ?? "";
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
     const loadCounts = async () => {
       try {
-        const [nCount, cCount] = await Promise.all([
-          getUnreadNotificationsCount(user.id),
-          getUnreadChatMessagesCount(user.id),
-        ]);
+        const nCount = await getUnreadNotificationsCount(user.id);
         setNotifCount(nCount ?? 0);
-        setChatCount(cCount ?? 0);
       } catch (e) {
         // ignore
       }
@@ -106,7 +93,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     closeMenu();
     navigate({ to: "/" });
   };
-  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
