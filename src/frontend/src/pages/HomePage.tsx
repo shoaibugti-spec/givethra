@@ -456,7 +456,7 @@ export default function HomePage() {
       return (
         <img
           src={currentSlide.image}
-          alt="Givethra"
+          alt="GIVETHRA"
           className="w-full h-52 md:h-72 object-cover"
         />
       );
