@@ -1,5 +1,5 @@
 // src/frontend/src/pages/HomePage.tsx
-// Complete HomePage with Layout wrapper - NO duplicate navigation
+// Complete HomePage with Layout wrapper and post box
 
 import InstallButton from "@/components/InstallButton";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
@@ -310,6 +310,8 @@ export default function HomePage() {
         setPostSubmitted(true);
         setPostMessage("");
         toast.success("Thank you! Your post has been shared.");
+        // ✅ Dispatch event to update badge count immediately
+        window.dispatchEvent(new CustomEvent("post-updated"));
         setTimeout(() => setPostSubmitted(false), 4000);
       } else {
         const err = await res.json();
