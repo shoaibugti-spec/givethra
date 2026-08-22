@@ -1,10 +1,18 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Heart, MessageCircle, Send, User } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import {
+  getCommunityPosts,
+  toggleLike,
+  addComment,
+  getPostLikes,
+  getPostComments,
+  createNotification,
+} from "@/lib/api";
 
 interface Post {
   id: string;
@@ -34,142 +42,94 @@ export default function CommunityPage() {
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
 
-  const getToken = () => localStorage.getItem("auth_token") || "";
-
+  // --- پوسٹس لوڈ کریں ---
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      const token = getToken();
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-      if (isAuthenticated && token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-      const res = await fetch("/api/community-posts", { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setPosts(data || []);
-        data?.forEach((post: Post) => {
-          fetchLikes(post.id);
-          fetchComments(post.id);
-        });
-      } else {
-        console.error("Failed to fetch posts:", res.status);
-        toast.error("Could not load posts");
-      }
+      const data = await getCommunityPosts();
+      setPosts(data || []);
+      // ہر پوسٹ کے لیے لائکس اور کمنٹس لوڈ کریں
+      data?.forEach((post: Post) => {
+        fetchLikes(post.id);
+        fetchComments(post.id);
+      });
     } catch (error) {
       console.error("Error fetching posts:", error);
-      toast.error("Network error while loading posts");
+      toast.error("Failed to load posts");
     } finally {
       setLoading(false);
     }
   };
 
+  // --- لائکس لوڈ کریں ---
   const fetchLikes = async (postId: string) => {
     try {
-      const token = getToken();
-      const headers: HeadersInit = { "Content-Type": "application/json" };
-      if (isAuthenticated && token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-      const res = await fetch(`/api/post-likes/${postId}`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setLikeCounts((prev) => ({ ...prev, [postId]: data.length || 0 }));
-        if (isAuthenticated && user?.id) {
-          const userLiked = data.some((like: any) => like.user_id === user.id);
-          setLikedPosts((prev) => ({ ...prev, [postId]: userLiked }));
-        }
+      const data = await getPostLikes(postId);
+      setLikeCounts((prev) => ({ ...prev, [postId]: data.length || 0 }));
+      if (isAuthenticated && user?.id) {
+        const userLiked = data.some((like: any) => like.user_id === user.id);
+        setLikedPosts((prev) => ({ ...prev, [postId]: userLiked }));
       }
     } catch (error) {
       console.error("Error fetching likes:", error);
     }
   };
 
+  // --- کمنٹس لوڈ کریں ---
   const fetchComments = async (postId: string) => {
     try {
-      const token = getToken();
-      const headers: HeadersInit = { "Content-Type": "application/json" };
-      if (isAuthenticated && token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-      const res = await fetch(`/api/post-comments/${postId}`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId ? { ...post, comments: data || [] } : post
-          )
-        );
-      }
+      const data = await getPostComments(postId);
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId ? { ...post, comments: data || [] } : post
+        )
+      );
     } catch (error) {
       console.error("Error fetching comments:", error);
     }
   };
 
+  // --- لائک ٹوگل کریں ---
   const handleLike = async (postId: string) => {
     if (!isAuthenticated) {
       toast.error("Please sign in to like posts");
       return;
     }
 
-    const token = getToken();
-    if (!token) {
-      toast.error("You are not logged in. Please sign in again.");
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/post-likes/${postId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ post_id: postId }),
-      });
+      const result = await toggleLike(postId);
+      if (result.liked) {
+        setLikedPosts((prev) => ({ ...prev, [postId]: true }));
+        setLikeCounts((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.liked) {
-          setLikedPosts((prev) => ({ ...prev, [postId]: true }));
-          setLikeCounts((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-          const postOwner = posts.find(p => p.id === postId)?.user_id;
-          if (postOwner && postOwner !== user?.id) {
-            await fetch("/api/notifications", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                user_id: postOwner,
-                type: "like",
-                title: "New Like",
-                message: `${user?.fullName || "Someone"} liked your post.`,
-                link: `/community`,
-              }),
+        // پوسٹ کے مالک کو نوٹیفکیشن بھیجیں
+        const postOwner = posts.find((p) => p.id === postId)?.user_id;
+        if (postOwner && postOwner !== user?.id) {
+          try {
+            await createNotification({
+              user_id: postOwner,
+              type: "like",
+              title: "New Like",
+              message: `${user?.fullName || "Someone"} liked your post.`,
+              link: "/community",
             });
+          } catch (e) {
+            console.error("Failed to send notification:", e);
           }
-          toast.success("Liked!");
-        } else {
-          setLikedPosts((prev) => ({ ...prev, [postId]: false }));
-          setLikeCounts((prev) => ({ ...prev, [postId]: Math.max((prev[postId] || 0) - 1, 0) }));
-          toast.info("Unliked");
         }
-      } else if (res.status === 401) {
-        toast.error("Your session expired. Please sign in again.");
+        toast.success("Liked!");
       } else {
-        const error = await res.json();
-        toast.error(error?.error || "Failed to like post");
+        setLikedPosts((prev) => ({ ...prev, [postId]: false }));
+        setLikeCounts((prev) => ({ ...prev, [postId]: Math.max((prev[postId] || 0) - 1, 0) }));
+        toast.info("Unliked");
       }
-    } catch (error) {
-      console.error("Error liking post:", error);
-      toast.error("Network error. Please check your connection.");
+    } catch (error: any) {
+      console.error("Error toggling like:", error);
+      toast.error(error?.message || "Failed to like post");
     }
   };
 
+  // --- کمنٹ کریں ---
   const handleComment = async (postId: string) => {
     const comment = newComment[postId]?.trim();
     if (!comment) {
@@ -181,68 +141,50 @@ export default function CommunityPage() {
       return;
     }
 
-    const token = getToken();
-    if (!token) {
-      toast.error("You are not logged in. Please sign in again.");
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/post-comments/${postId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ post_id: postId, comment }),
-      });
+      const data = await addComment(postId, comment);
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? { ...post, comments: [...(post.comments || []), data] }
+            : post
+        )
+      );
+      setNewComment((prev) => ({ ...prev, [postId]: "" }));
 
-      if (res.ok) {
-        const data = await res.json();
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? { ...post, comments: [...(post.comments || []), data] }
-              : post
-          )
-        );
-        setNewComment((prev) => ({ ...prev, [postId]: "" }));
-        const postOwner = posts.find(p => p.id === postId)?.user_id;
-        if (postOwner && postOwner !== user?.id) {
-          await fetch("/api/notifications", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              user_id: postOwner,
-              type: "comment",
-              title: "New Comment",
-              message: `${user?.fullName || "Someone"} commented on your post: "${comment.slice(0, 50)}..."`,
-              link: `/community`,
-            }),
+      // پوسٹ کے مالک کو نوٹیفکیشن بھیجیں
+      const postOwner = posts.find((p) => p.id === postId)?.user_id;
+      if (postOwner && postOwner !== user?.id) {
+        try {
+          await createNotification({
+            user_id: postOwner,
+            type: "comment",
+            title: "New Comment",
+            message: `${user?.fullName || "Someone"} commented: "${comment.slice(0, 50)}..."`,
+            link: "/community",
           });
+        } catch (e) {
+          console.error("Failed to send notification:", e);
         }
-        toast.success("Comment added!");
-        setTimeout(() => {
-          const commentEl = document.getElementById(`comment-${data.id}`);
-          if (commentEl) commentEl.scrollIntoView({ behavior: "smooth" });
-        }, 100);
-      } else {
-        const error = await res.json();
-        toast.error(error?.error || "Failed to add comment");
       }
-    } catch (error) {
+
+      toast.success("Comment added!");
+      setTimeout(() => {
+        const commentEl = document.getElementById(`comment-${data.id}`);
+        if (commentEl) commentEl.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    } catch (error: any) {
       console.error("Error adding comment:", error);
-      toast.error("Network error. Please try again.");
+      toast.error(error?.message || "Failed to add comment");
     }
   };
 
+  // --- کمنٹس دکھائیں/چھپائیں ---
   const toggleComments = (postId: string) => {
     setShowComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
   };
 
+  // --- پہلی بار اور وقتاً فوقتاً لوڈ کریں ---
   useEffect(() => {
     fetchPosts();
     const interval = setInterval(fetchPosts, 30000);
