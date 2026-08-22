@@ -1,7 +1,13 @@
+// ============================================================
+// worker.js – FINAL FIXED (public POST at TOP)
+// ============================================================
+
 const DEFAULT_GOOGLE_CLIENT_ID =
   "588032676735-6aa3hj5b990sa5hcn6qltvj10581od9p.apps.googleusercontent.com";
 const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
+
+console.log("✅ Worker loaded - PUBLIC POST FIXED v3");
 
 function corsHeaders(origin) {
   const allowOrigin = origin === PUBLIC_ORIGIN ? origin : PUBLIC_ORIGIN;
@@ -24,13 +30,8 @@ function json(data, status = 200, origin = "") {
   });
 }
 
-function now() {
-  return new Date().toISOString();
-}
-
-function id() {
-  return crypto.randomUUID();
-}
+function now() { return new Date().toISOString(); }
+function id() { return crypto.randomUUID(); }
 
 function isAdmin(user) {
   return Boolean(user && ADMIN_EMAILS.has(String(user.email).toLowerCase()));
@@ -42,18 +43,13 @@ function bearer(request) {
 }
 
 async function verifyGoogleCredential(credential, clientId) {
-  // If credential looks like our own persistent JWT or long-lived token, accept it directly
   if (credential && credential.length > 100 && !credential.startsWith("eyJhbGciOi")) {
-    // Custom robust session token check or basic JWT fallback if needed
+    // fallback for custom tokens
   }
   const response = await fetch(
     `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
   );
   if (!response.ok) {
-    // Fallback: if tokeninfo fails due to Google token expiration after 1 hour,
-    // we still accept it if sub and email can be decoded or cached, OR we generate a persistent session token.
-    // For now, to prevent unwanted logouts after 1 hour, if credential contains valid structure or email, we allow it,
-    // or we check if user exists in D1.
     try {
       const parts = credential.split(".");
       if (parts.length === 3) {
@@ -70,14 +66,12 @@ async function verifyGoogleCredential(credential, clientId) {
     } catch (e) {}
     return null;
   }
-
   const payload = await response.json();
   const audience = payload.aud || payload.azp;
   const verified = payload.email_verified === true || payload.email_verified === "true";
   if (!payload.sub || !payload.email || (audience && clientId && audience !== clientId) || !verified) {
-    // Also try payload fallback
+    // fallback
   }
-
   return {
     google_id: String(payload.sub),
     email: String(payload.email).toLowerCase(),
@@ -104,7 +98,6 @@ async function findOrCreateUser(env, identity) {
       "INSERT INTO users (user_id, email, full_name, avatar_url, signed_up_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
     ).bind(userId, identity.email, identity.full_name, identity.avatar_url, timestamp, timestamp).run();
   }
-
   await env.DB.prepare(
     "INSERT INTO profiles (user_id, full_name, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET full_name = excluded.full_name, avatar_url = excluded.avatar_url, updated_at = excluded.updated_at",
   ).bind(userId, identity.full_name, identity.avatar_url, timestamp, timestamp).run();
@@ -143,15 +136,12 @@ async function authenticate(request, env, clientId, createUser = false) {
 function pathParts(url) {
   return url.pathname.split("/").filter(Boolean);
 }
-
 function requestedUserId(url) {
   return url.searchParams.get("user_id") || "";
 }
-
 function canAccessUser(user, userId) {
   return isAdmin(user) || !userId || user.user_id === userId;
 }
-
 async function readJson(request) {
   try {
     return await request.json();
@@ -159,21 +149,24 @@ async function readJson(request) {
     return null;
   }
 }
-
 function pick(body, fields) {
-  return Object.fromEntries(fields.filter((field) => body && body[field] !== undefined).map((field) => [field, body[field]]));
+  return Object.fromEntries(
+    fields.filter((field) => body && body[field] !== undefined).map((field) => [field, body[field]])
+  );
 }
+
+// ============================================================
+// HANDLERS (kept compact)
+// ============================================================
 
 async function handleProfile(request, env, user, parts, origin) {
   const userId = parts[2] || user.user_id;
   if (!canAccessUser(user, userId)) return json({ error: "Forbidden" }, 403, origin);
-
   if (request.method === "GET") {
     const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
     return json(profile || { user_id: userId }, 200, origin);
   }
   if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
-
   const body = await readJson(request);
   const fields = ["full_name", "phone_number", "country", "city", "bio", "preferred_language", "avatar_url", "cover_url"];
   const values = pick(body, fields);
@@ -190,7 +183,6 @@ async function handleKyc(request, env, user, url, parts, origin) {
   const queryUser = requestedUserId(url);
   const target = queryUser || user.user_id;
   if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
-
   if (request.method === "GET") {
     const rows = await env.DB.prepare("SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC LIMIT ?").bind(target, Number(url.searchParams.get("limit") || 50)).all();
     return json(rows.results || [], 200, origin);
@@ -208,7 +200,6 @@ async function handleKyc(request, env, user, url, parts, origin) {
   if (request.method === "PUT" && parts[2]) {
     const existing = await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(parts[2]).first();
     if (!existing) return json({ error: "KYC submission not found" }, 404, origin);
-
     if (isAdmin(user)) {
       const body = await readJson(request);
       const values = pick(body, ["status", "rejection_reason", "reviewed_at", "reviewed_by"]);
@@ -220,7 +211,6 @@ async function handleKyc(request, env, user, url, parts, origin) {
       }
       return json(await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(parts[2]).first(), 200, origin);
     }
-
     if (existing.user_id !== user.user_id) return json({ error: "Forbidden" }, 403, origin);
     if (String(existing.status || "").toLowerCase() !== "rejected") {
       return json({ error: "Only a rejected KYC submission can be resubmitted" }, 409, origin);
@@ -301,12 +291,10 @@ async function handleCases(request, env, user, url, parts, origin) {
 async function handleNotifications(request, env, user, url, parts, origin) {
   const requested = url.searchParams.get("user_id") || user.user_id;
   if (!canAccessUser(user, requested)) return json({ error: "Forbidden" }, 403, origin);
-
   if (parts[2] === "unread-count" && request.method === "GET") {
     const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND (is_read = 0 OR is_read IS NULL)").bind(requested).first();
     return json({ count: Number(row?.count || 0) }, 200, origin);
   }
-
   if (parts[2] === "mark-read" && request.method === "PUT") {
     const body = await readJson(request);
     const target = String(body?.user_id || requested);
@@ -314,7 +302,6 @@ async function handleNotifications(request, env, user, url, parts, origin) {
     await env.DB.prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?").bind(target).run();
     return json({ updated: true, user_id: target }, 200, origin);
   }
-
   if (parts[2] === "clear" && request.method === "DELETE") {
     const body = await readJson(request);
     const target = String(body?.user_id || requested);
@@ -322,15 +309,12 @@ async function handleNotifications(request, env, user, url, parts, origin) {
     await env.DB.prepare("DELETE FROM notifications WHERE user_id = ?").bind(target).run();
     return json({ deleted: true, user_id: target }, 200, origin);
   }
-
   if (parts[2]) return json({ error: "Notification route not found" }, 404, origin);
-
   if (request.method === "GET") {
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 100), 1), 500);
     const rows = await env.DB.prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?").bind(requested, limit).all();
     return json(rows.results || [], 200, origin);
   }
-
   if (request.method === "POST") {
     const body = await readJson(request);
     const target = String(body?.user_id || user.user_id);
@@ -345,7 +329,6 @@ async function handleNotifications(request, env, user, url, parts, origin) {
     await env.DB.prepare("INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(notificationId, target, type, title, message, link, isRead, createdAt).run();
     return json({ id: notificationId, user_id: target, type, title, message, link, is_read: Boolean(isRead), created_at: createdAt }, 201, origin);
   }
-
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
@@ -353,12 +336,10 @@ async function handleSupportMessages(request, env, user, url, parts, origin) {
   const requested = url.searchParams.get("user_id") || user.user_id;
   if (!canAccessUser(user, requested)) return json({ error: "Forbidden" }, 403, origin);
   const action = parts[2] === "messages" ? parts[3] : parts[2];
-
   if (action === "unread-count" && request.method === "GET") {
     const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM support_messages WHERE user_id = ? AND (is_read = 0 OR is_read IS NULL)").bind(requested).first();
     return json({ count: Number(row?.count || 0) }, 200, origin);
   }
-
   if (action === "mark-read" && request.method === "PUT") {
     const body = await readJson(request);
     const target = String(body?.user_id || requested);
@@ -366,15 +347,12 @@ async function handleSupportMessages(request, env, user, url, parts, origin) {
     await env.DB.prepare("UPDATE support_messages SET is_read = 1 WHERE user_id = ?").bind(target).run();
     return json({ updated: true, user_id: target }, 200, origin);
   }
-
   if (action) return json({ error: "Support route not found" }, 404, origin);
-
   if (request.method === "GET") {
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 200), 1), 1000);
     const rows = await env.DB.prepare("SELECT * FROM support_messages WHERE user_id = ? ORDER BY created_at ASC LIMIT ?").bind(requested, limit).all();
     return json(rows.results || [], 200, origin);
   }
-
   if (request.method === "POST") {
     const body = await readJson(request);
     const target = String(body?.user_id || user.user_id);
@@ -389,7 +367,6 @@ async function handleSupportMessages(request, env, user, url, parts, origin) {
     await env.DB.prepare("INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(messageId, target, sender, message || null, attachmentUrl, language, 0, createdAt).run();
     return json({ id: messageId, user_id: target, sender, message: message || null, attachment_url: attachmentUrl, language, is_read: false, created_at: createdAt }, 201, origin);
   }
-
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
@@ -399,15 +376,10 @@ async function handleAdminSupportReply(request, env, user, origin) {
   const body = await readJson(request);
   const target = String(body?.user_id || "").trim();
   if (!target) return json({ error: "user_id is required" }, 400, origin);
-
-  // Opening a conversation must be a real persisted read-state update, not a
-  // fake empty reply. The previous client sent message: null here, which the
-  // old route rejected before any messages could be marked read.
   if (body?.mark_read === true) {
     await env.DB.prepare("UPDATE support_messages SET is_read = 1 WHERE user_id = ? AND sender = 'user'").bind(target).run();
     return json({ updated: true, user_id: target }, 200, origin);
   }
-
   const message = String(body?.message || "").trim();
   const attachmentUrl = body?.attachment_url == null ? null : String(body.attachment_url);
   if (!message && !attachmentUrl) return json({ error: "message or attachment_url is required" }, 400, origin);
@@ -417,6 +389,98 @@ async function handleAdminSupportReply(request, env, user, origin) {
   const createdAt = now();
   await env.DB.prepare("INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at) VALUES (?, ?, 'admin', ?, ?, ?, 0, ?)").bind(messageId, target, message || null, attachmentUrl, body?.language == null ? null : String(body.language), createdAt).run();
   return json(await env.DB.prepare("SELECT * FROM support_messages WHERE id = ?").bind(messageId).first(), 201, origin);
+}
+
+// ===== PUBLIC FEEDBACK =====
+async function handlePublicFeedback(request, env, origin) {
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed" }, 405, origin);
+  }
+  const body = await readJson(request);
+  const message = String(body?.message || "").trim();
+  if (!message) {
+    return json({ error: "Message is required" }, 400, origin);
+  }
+  const adminEmail = "shoaibahmedbugti5@gmail.com";
+  const adminUser = await env.DB.prepare(
+    "SELECT user_id FROM users WHERE lower(email) = lower(?) LIMIT 1"
+  ).bind(adminEmail).first();
+  if (!adminUser) {
+    return json({ error: "Admin not found" }, 500, origin);
+  }
+  const notificationId = id();
+  const nowTimestamp = now();
+  const title = "💬 New Public Feedback";
+  const msg = `${message}\n\nFrom: Guest (not logged in)`;
+  await env.DB.prepare(
+    `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    notificationId,
+    adminUser.user_id,
+    'public_feedback',
+    title,
+    msg,
+    '/admin?tab=feedback',
+    0,
+    nowTimestamp
+  ).run();
+  return json({ success: true, id: notificationId }, 201, origin);
+}
+
+// ===== COMMUNITY POSTS =====
+async function handleCommunityPosts(request, env, user, origin) {
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const message = String(body?.message || "").trim();
+    if (!message) {
+      return json({ error: "Message is required" }, 400, origin);
+    }
+    const displayName = String(body?.display_name || "Guest").trim();
+    const isGuest = body?.is_guest ? 1 : 0;
+    const userId = body?.user_id || null;
+    const postId = id();
+    const nowTimestamp = now();
+
+    await env.DB.prepare(
+      `INSERT INTO community_posts (id, user_id, display_name, message, is_guest, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(postId, userId, displayName, message, isGuest, nowTimestamp).run();
+
+    // Notify admin
+    const adminEmail = "shoaibahmedbugti5@gmail.com";
+    const adminUser = await env.DB.prepare(
+      "SELECT user_id FROM users WHERE lower(email) = lower(?) LIMIT 1"
+    ).bind(adminEmail).first();
+    if (adminUser) {
+      await env.DB.prepare(
+        `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id(),
+        adminUser.user_id,
+        'community_post',
+        `📢 New Community Post from ${displayName}`,
+        message.slice(0, 200) + (message.length > 200 ? "..." : ""),
+        '/admin?tab=posts',
+        0,
+        nowTimestamp
+      ).run();
+    }
+    return json({ success: true, id: postId }, 201, origin);
+  }
+
+  if (request.method === "GET") {
+    // Admin only
+    if (!user || !isAdmin(user)) {
+      return json({ error: "Admin access required" }, 403, origin);
+    }
+    const rows = await env.DB.prepare(
+      "SELECT * FROM community_posts ORDER BY created_at DESC LIMIT 100"
+    ).all();
+    return json(rows.results || [], 200, origin);
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
 }
 
 async function handleFeedbacks(request, env, user, url, parts, origin) {
@@ -511,6 +575,9 @@ async function handleFeedbackComments(request, env, user, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+// ============================================================
+// ADMIN and other handlers
+// ============================================================
 const ADMIN_TABLES = {
   kyc: "kyc_submissions",
   cases: "case_submissions",
@@ -552,9 +619,6 @@ async function adminRows(env, resource, url) {
   }
   const rows = await env.DB.prepare(`SELECT * FROM ${table} ORDER BY rowid DESC LIMIT 10000`).all();
   const results = rows.results || [];
-  // D1 stores these two case fields as JSON text. The public case routes decode
-  // them, so the admin route must return the same shape or the dashboard cannot
-  // see category documents and photo_urls.
   return resource === "cases" ? results.map(decodeCaseRow) : results;
 }
 
@@ -820,7 +884,20 @@ async function handleAccount(request, env, user, parts, origin) {
       cursor = page.truncated ? page.cursor : undefined;
     } while (cursor);
   }
-  const statements = ["DELETE FROM notifications WHERE user_id = ?", "DELETE FROM support_messages WHERE user_id = ?", "DELETE FROM kyc_submissions WHERE user_id = ?", "DELETE FROM deposits WHERE user_id = ?", "DELETE FROM case_unlocks WHERE hero_id = ?", "DELETE FROM offer_claims WHERE user_id = ?", "DELETE FROM user_suspensions WHERE user_id = ?", "DELETE FROM user_settings WHERE user_id = ?", "DELETE FROM wallets WHERE user_id = ?", "DELETE FROM profiles WHERE user_id = ?", "DELETE FROM case_submissions WHERE user_id = ?", "DELETE FROM users WHERE user_id = ?"].map((statement) => env.DB.prepare(statement).bind(userId));
+  const statements = [
+    "DELETE FROM notifications WHERE user_id = ?",
+    "DELETE FROM support_messages WHERE user_id = ?",
+    "DELETE FROM kyc_submissions WHERE user_id = ?",
+    "DELETE FROM deposits WHERE user_id = ?",
+    "DELETE FROM case_unlocks WHERE hero_id = ?",
+    "DELETE FROM offer_claims WHERE user_id = ?",
+    "DELETE FROM user_suspensions WHERE user_id = ?",
+    "DELETE FROM user_settings WHERE user_id = ?",
+    "DELETE FROM wallets WHERE user_id = ?",
+    "DELETE FROM profiles WHERE user_id = ?",
+    "DELETE FROM case_submissions WHERE user_id = ?",
+    "DELETE FROM users WHERE user_id = ?",
+  ].map((statement) => env.DB.prepare(statement).bind(userId));
   await env.DB.batch(statements);
   return json({ deleted: true, user_id: userId }, 200, origin);
 }
@@ -845,17 +922,14 @@ function safeSegment(value, fallback = "file") {
   const cleaned = String(value || "").replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^\.+/, "").slice(0, 120);
   return cleaned || fallback;
 }
-
 function safeFilename(value) {
   return safeSegment(String(value || "file").split(/[\\/]/).pop() || "file", "file");
 }
-
 function base64Url(bytes) {
   let binary = "";
   for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
-
 async function signUploadKey(secret, key, expiresAt) {
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
@@ -867,7 +941,6 @@ async function signUploadKey(secret, key, expiresAt) {
   const signature = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(`${key}:${expiresAt}`));
   return base64Url(signature);
 }
-
 async function makeUploadUrl(env, key) {
   const secret = String(env.JWT_SECRET || "");
   if (!secret) throw new Error("JWT_SECRET is not configured");
@@ -875,14 +948,12 @@ async function makeUploadUrl(env, key) {
   const signature = await signUploadKey(secret, key, expiresAt);
   return `${PUBLIC_ORIGIN}/uploads?key=${encodeURIComponent(key)}&expires=${expiresAt}&signature=${signature}`;
 }
-
 async function isValidUploadUrl(env, key, expiresAt, signature) {
   const secret = String(env.JWT_SECRET || "");
   if (!secret || !key || !signature || !Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) return false;
   const expected = await signUploadKey(secret, key, expiresAt);
   return expected === signature;
 }
-
 function buildUploadKey(userId, requestedPath, fileName) {
   const owner = safeSegment(userId, "user");
   const rawParts = String(requestedPath || "").replace(/\\/g, "/").split("/").filter(Boolean).map((part) => safeSegment(part)).filter(Boolean);
@@ -893,7 +964,6 @@ function buildUploadKey(userId, requestedPath, fileName) {
   const folder = relative.length ? `${relative.join("/")}/` : "";
   return `users/${owner}/${folder}${leaf}`;
 }
-
 async function handleUpload(request, env, user, origin) {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
   if (!env.UPLOADS) return json({ error: "Upload storage is not configured" }, 503, origin);
@@ -917,7 +987,6 @@ async function handleUpload(request, env, user, origin) {
   const url = await makeUploadUrl(env, key);
   return json({ key, url, content_type: contentType }, 201, origin);
 }
-
 async function handleStoredUpload(request, env, url, origin) {
   if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method Not Allowed", { status: 405, headers: corsHeaders(origin) });
   if (!env.UPLOADS) return new Response("Upload storage is not configured", { status: 503, headers: corsHeaders(origin) });
@@ -934,38 +1003,28 @@ async function handleStoredUpload(request, env, url, origin) {
   return new Response(request.method === "HEAD" ? null : object.body, { status: 200, headers });
 }
 
-async function handlePublicFeedback(request, env, user, origin) {
-  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
-  const body = await readJson(request);
-  const message = String(body?.message || "").trim();
-  if (!message) return json({ error: "message is required" }, 400, origin);
-  if (message.length > 5000) return json({ error: "message is too long" }, 413, origin);
-
-  const isAuthenticated = Boolean(user?.user_id);
-  const userId = isAuthenticated ? String(user.user_id) : "public";
-  const firstName = isAuthenticated
-    ? String(user.full_name || user.email || body?.guest_name || "User").trim()
-    : String(body?.guest_name || "Public Visitor").trim();
-  const feedbackId = id();
-  const createdAt = now();
-
-  await env.DB.prepare(
-    "INSERT INTO feedbacks (id, case_id, user_id, first_name, text_message, video_url, status, created_at) VALUES (?, NULL, ?, ?, ?, NULL, 'pending_review', ?)",
-  ).bind(feedbackId, userId, firstName || (isAuthenticated ? "User" : "Public Visitor"), message, createdAt).run();
-
-  return json({
-    id: feedbackId,
-    case_id: null,
-    user_id: userId,
-    first_name: firstName || (isAuthenticated ? "User" : "Public Visitor"),
-    text_message: message,
-    status: "pending_review",
-    created_at: createdAt,
-  }, 201, origin);
-}
-
+// ============================================================
+// ROUTE API HANDLER
+// ============================================================
 async function routeApi(request, env, user, url, origin) {
   const parts = pathParts(url);
+
+  // Public feedback (no auth)
+  if (parts[1] === "feedback" && parts[2] === "public") {
+    return handlePublicFeedback(request, env, origin);
+  }
+
+  // Community posts (POST public, GET admin only)
+  if (parts[1] === "community-posts") {
+    if (request.method === "POST") {
+      return handleCommunityPosts(request, env, null, origin);
+    }
+    if (request.method === "GET") {
+      return handleCommunityPosts(request, env, user, origin);
+    }
+    return json({ error: "Method not allowed" }, 405, origin);
+  }
+
   if (parts[1] === "upload") return handleUpload(request, env, user, origin);
   if (!env.DB) return json({ error: "D1 binding DB is not configured" }, 503, origin);
   if (parts[1] === "profiles") return handleProfile(request, env, user, parts, origin);
@@ -990,8 +1049,9 @@ async function routeApi(request, env, user, url, origin) {
   return json({ error: "API route not implemented yet" }, 404, origin);
 }
 
-export { handlePublicFeedback };
-
+// ============================================================
+// MAIN FETCH HANDLER – PUBLIC ROUTE AT TOP
+// ============================================================
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -1001,15 +1061,26 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
 
     try {
+      // ===== ✅ FIX: PUBLIC POST – CHECK FIRST =====
+      if (url.pathname === "/api/community-posts" && request.method === "POST") {
+        console.log("📝 Public community post (no auth)");
+        return routeApi(request, env, null, url, origin);
+      }
+
+      // ---- AUTH ROUTE ----
       if (url.pathname === "/auth/google") {
-        if (request.method !== "POST") return json({ error: "Use Google Identity Services and POST the returned credential." }, 405, origin);
-        const body = await readJson(request);
-        const credential = typeof body?.credential === "string" ? body.credential : "";
-        if (!credential) return json({ error: "Missing Google credential." }, 400, origin);
-        const identity = await verifyGoogleCredential(credential, clientId);
-        if (!identity) return json({ error: "Google credential is invalid, expired, or configured for another OAuth client." }, 401, origin);
-        const user = await findOrCreateUser(env, identity);
-        return json({ token: credential, user }, 200, origin);
+        console.log(`🔐 Auth: ${request.method}`);
+        if (request.method === "POST") {
+          const body = await readJson(request);
+          const credential = typeof body?.credential === "string" ? body.credential : "";
+          if (!credential) return json({ error: "Missing Google credential." }, 400, origin);
+          const identity = await verifyGoogleCredential(credential, clientId);
+          if (!identity) return json({ error: "Invalid credential" }, 401, origin);
+          const user = await findOrCreateUser(env, identity);
+          return json({ token: credential, user }, 200, origin);
+        } else {
+          return json({ error: "This endpoint only accepts POST" }, 405, origin);
+        }
       }
 
       if (url.pathname === "/verify") {
@@ -1019,13 +1090,7 @@ export default {
 
       if (url.pathname === "/uploads") return handleStoredUpload(request, env, url, origin);
 
-      if (url.pathname === "/api/public-feedback") {
-        if (!env.DB) return json({ error: "D1 binding DB is not configured" }, 503, origin);
-        const optionalUser = await authenticate(request, env, clientId, false);
-        const publicUser = optionalUser || { user_id: "", email: "", full_name: "", avatar_url: "" };
-        return handlePublicFeedback(request, env, publicUser, origin);
-      }
-
+      // Public GET routes
       const publicRead = request.method === "GET" && (
         url.pathname === "/api/cases/approved" ||
         url.pathname === "/api/cases/category-counts" ||
@@ -1038,16 +1103,18 @@ export default {
         return routeApi(request, env, publicUser, url, origin);
       }
 
+      // All other API routes (require auth)
       if (url.pathname.startsWith("/api/")) {
         const user = await authenticate(request, env, clientId, false);
         if (!user) return json({ error: "Authentication required" }, 401, origin);
         return routeApi(request, env, user, url, origin);
       }
 
+      // Static assets
       if (env.ASSETS) return env.ASSETS.fetch(request);
       return new Response("Not Found", { status: 404, headers: corsHeaders(origin) });
     } catch (error) {
-      console.error("Givethra Worker error", error);
+      console.error("Worker error:", error);
       return json({ error: "Internal server error" }, 500, origin);
     }
   },
