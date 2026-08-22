@@ -1062,7 +1062,8 @@ export default {
 
     try {
       // ===== ✅ FIX: PUBLIC POST – CHECK FIRST =====
-      if (url.pathname === "/api/community-posts" && request.method === "POST") {
+      const isCommunityPost = url.pathname === "/api/community-posts" || url.pathname === "/api/community-posts/";
+if (isCommunityPost && request.method === "POST") {
         console.log("📝 Public community post (no auth)");
         return routeApi(request, env, null, url, origin);
       }
