@@ -167,7 +167,6 @@ function pick(body, fields) {
 
 // ============================================================
 // ALL HANDLER FUNCTIONS (profile, kyc, cases, etc.)
-// These are exactly as before - I'm keeping them compact.
 // ============================================================
 
 async function handleProfile(request, env, user, parts, origin) {
@@ -1081,7 +1080,6 @@ export default {
           return json({ token: credential, user }, 200, origin);
         } else {
           // If someone sends GET, respond with a message that it's POST only, but don't throw 405.
-          // This prevents the browser from showing a 405 error in the console.
           return json({ error: "This endpoint only accepts POST requests." }, 405, origin);
         }
       }
