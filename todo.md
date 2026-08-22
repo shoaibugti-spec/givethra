@@ -470,7 +470,7 @@
 - [x] Ensure the Cloudflare build includes the Public Post composer, guest API route, Admin Posts tab, and Support Chat updates together.
 - [x] Preserve all existing D1/R2 data and avoid destructive schema or storage changes.
 - [x] Run full regression, Worker syntax, and production build checks before the next deployment.
-- [ ] Save a synchronized source checkpoint without deploying or showing preview/settings cards.
+- [x] Save a synchronized source checkpoint without deploying or showing preview/settings cards.
 - [x] Repair the Admin FeedbackCard action label so the full dashboard type-checks and public Posts remain separate from case feedback.
 - [x] Align SupportChatPage imports and calls with the canonical support API helpers so user message loading, read marking, and sending are functional.
 
