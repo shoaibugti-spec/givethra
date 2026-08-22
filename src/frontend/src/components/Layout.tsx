@@ -1,4 +1,5 @@
 // src/frontend/src/components/Layout.tsx
+// Clean and organized header with hamburger menu, brand, search, and notification
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,6 @@ import {
   Linkedin,
   MessageCircle,
   Mail,
-  MessageSquare,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
@@ -36,8 +36,7 @@ const FACEBOOK_URL =
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 
-export { NavLink };
-
+// NavLink component for internal links (used in mobile menu)
 function NavLink({
   to,
   children,
@@ -56,8 +55,10 @@ function NavLink({
       to={to}
       onClick={onClick}
       className={cn(
-        "text-sm font-medium transition-colors hover:text-primary",
-        isActive ? "text-primary" : "text-muted-foreground"
+        "block w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+        isActive
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
     >
       {children}
@@ -73,12 +74,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [notifCount, setNotifCount] = useState(0);
   const [chatCount, setChatCount] = useState(0);
-  const [postCount, setPostCount] = useState(0);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
 
-  // Load counts on mount and when user changes
+  // Load notification counts
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
@@ -96,30 +96,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
 
     loadCounts();
-
-    // Poll every 20 seconds
     const interval = setInterval(loadCounts, 20000);
-
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
-
-  // Fetch post count
-  useEffect(() => {
-    async function fetchPostCount() {
-      try {
-        const res = await fetch("/api/community-posts");
-        if (res.ok) {
-          const data = await res.json();
-          setPostCount(Array.isArray(data) ? data.length : 0);
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-    fetchPostCount();
-    const interval = setInterval(fetchPostCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => {
@@ -127,26 +106,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     closeMenu();
     navigate({ to: "/" });
   };
-  const toggleTheme = () =>
-    setTheme(theme === "dark" ? "light" : "dark");
+  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) navigate({ to: "/cases" });
+    if (searchQuery.trim()) {
+      navigate({ to: "/cases" });
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* ===== TOP HEADER (clean) ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
-          <Link to="/" className="flex items-center gap-1.5 shrink-0">
-            <div className="h-7 w-7 md:h-8 md:w-8 rounded-lg bg-primary flex items-center justify-center">
-              <Heart className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary-foreground" />
-            </div>
-            <span className="font-display font-bold text-base md:text-lg text-foreground hidden sm:block">
-              Givethra
-            </span>
-          </Link>
+          {/* Left: Hamburger + Brand */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="Toggle menu"
+              className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+            <Link to="/" className="flex items-center gap-1.5 shrink-0">
+              <span className="font-display font-bold text-base md:text-lg text-foreground">
+                Givethra
+              </span>
+            </Link>
+          </div>
 
+          {/* Center: Search Bar */}
           <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto md:mx-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -155,179 +145,78 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 placeholder="Search verified cases..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 bg-muted/60 border-transparent focus:border-input focus:bg-background text-sm rounded-full"
+                className="pl-9 h-9 bg-muted/60 border-transparent focus:border-input focus:bg-background text-sm rounded-full w-full"
               />
             </div>
           </form>
 
+          {/* Right: Notification Icon */}
           <div className="flex items-center gap-1 shrink-0">
-            <LanguageSwitcher />
-
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label="Toggle theme"
-              className="hidden md:flex h-9 w-9 rounded-lg items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </button>
-
-            {/* Community icon with post count */}
-            <Link
-              to="/community"
-              aria-label="Community Posts"
-              className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
-            >
-              <MessageSquare className="h-5 w-5" />
-              {postCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-                  {postCount > 99 ? "99+" : postCount}
-                </span>
-              )}
-            </Link>
-
             {isAuthenticated ? (
-              <>
-                <Link
-                  to="/support"
-                  aria-label="Help & Support"
-                  className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  {chatCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                      {chatCount > 9 ? "9+" : chatCount}
-                    </span>
-                  )}
-                </Link>
-                <Link
-                  to="/notifications"
-                  aria-label="Notifications"
-                  className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
-                >
-                  <Bell className="h-5 w-5" />
-                  {notifCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                      {notifCount > 9 ? "9+" : notifCount}
-                    </span>
-                  )}
-                </Link>
-                <Link
-                  to="/profile/$id"
-                  params={{ id: "me" }}
-                  aria-label="Profile"
-                  className="h-9 flex items-center gap-2 px-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-smooth overflow-hidden"
-                >
-                  <User className="h-5 w-5" />
-                  <span className="hidden md:inline text-sm font-medium max-w-[120px] truncate">
-                    {displayName || "My Profile"}
+              <Link
+                to="/notifications"
+                aria-label="Notifications"
+                className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
+              >
+                <Bell className="h-5 w-5" />
+                {notifCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {notifCount > 9 ? "9+" : notifCount}
                   </span>
-                </Link>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="hidden md:flex ml-1"
-                >
-                  Logout
-                </Button>
-              </>
+                )}
+              </Link>
             ) : (
-              <>
-                <Link to="/sign-in" className="hidden md:block">
-                  <Button variant="ghost" size="sm">
-                    Sign in
-                  </Button>
-                </Link>
-                <Link to="/sign-up" className="hidden md:block">
-                  <Button size="sm" className="font-semibold">
-                    Get Started
-                  </Button>
-                </Link>
-              </>
+              <Link to="/sign-in" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+                Sign in
+              </Link>
             )}
-
-            <button
-              type="button"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="Toggle menu"
-              className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-smooth"
-            >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
           </div>
         </div>
 
-        <div className="hidden md:block border-t border-border/50">
-          <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
-            <NavLink to="/cases">Browse Cases</NavLink>
-            {isAuthenticated && <NavLink to="/my-cases">My Cases</NavLink>}
-            {isAuthenticated && <NavLink to="/submit-request">Submit a Case</NavLink>}
-            {isAuthenticated && <NavLink to="/support">Help & Support</NavLink>}
-            {isAdmin && <NavLink to="/admin">Admin</NavLink>}
-            <NavLink to="/about">About</NavLink>
-            <NavLink to="/faq">FAQ</NavLink>
-          </div>
-        </div>
-
+        {/* ===== MOBILE MENU (Hamburger) ===== */}
         {menuOpen && (
-          <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
+          <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1 max-h-[80vh] overflow-y-auto">
+            {/* Main Navigation Links */}
             <NavLink to="/cases" onClick={closeMenu}>
               Browse Cases
             </NavLink>
             {isAuthenticated && (
               <>
-                <div className="py-1">
-                  <NavLink to="/my-cases" onClick={closeMenu}>
-                    My Cases
-                  </NavLink>
-                </div>
-                <div className="py-1">
-                  <NavLink to="/submit-request" onClick={closeMenu}>
-                    Submit a Case
-                  </NavLink>
-                </div>
-                <div className="py-1">
-                  <NavLink to="/support" onClick={closeMenu}>
-                    Help & Support
-                  </NavLink>
-                </div>
-                <div className="py-1">
-                  <NavLink to="/community" onClick={closeMenu}>
-                    Community Posts
-                  </NavLink>
-                </div>
+                <NavLink to="/my-cases" onClick={closeMenu}>
+                  My Cases
+                </NavLink>
+                <NavLink to="/submit-request" onClick={closeMenu}>
+                  Submit a Case
+                </NavLink>
+                <NavLink to="/support" onClick={closeMenu}>
+                  Help & Support
+                </NavLink>
+                <NavLink to="/community" onClick={closeMenu}>
+                  Community Posts
+                </NavLink>
               </>
             )}
             {isAdmin && (
-              <div className="py-1">
-                <NavLink to="/admin" onClick={closeMenu}>
-                  Admin Panel
-                </NavLink>
-              </div>
+              <NavLink to="/admin" onClick={closeMenu}>
+                Admin Panel
+              </NavLink>
             )}
-            <div className="py-1">
-              <NavLink to="/about" onClick={closeMenu}>
-                About
-              </NavLink>
-            </div>
-            <div className="py-1">
-              <NavLink to="/faq" onClick={closeMenu}>
-                FAQ
-              </NavLink>
-            </div>
-            <div className="pt-1">
+            <NavLink to="/about" onClick={closeMenu}>
+              About
+            </NavLink>
+            <NavLink to="/faq" onClick={closeMenu}>
+              FAQ
+            </NavLink>
+
+            <div className="pt-3 border-t border-border mt-2 space-y-2">
+              {/* Theme Toggle */}
               <button
                 type="button"
                 onClick={() => {
                   toggleTheme();
                   closeMenu();
                 }}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors"
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors w-full text-left"
               >
                 {theme === "dark" ? (
                   <>
@@ -339,8 +228,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </>
                 )}
               </button>
-            </div>
-            <div className="pt-3 border-t border-border mt-2 space-y-2">
+
+              {/* Language Switcher */}
+              <div className="py-1">
+                <LanguageSwitcher />
+              </div>
+
+              {/* User actions (if authenticated) */}
               {isAuthenticated ? (
                 <>
                   <Link
@@ -381,8 +275,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
+      {/* ===== MAIN CONTENT ===== */}
       <main className="flex-1 has-bottom-nav">{children}</main>
 
+      {/* ===== FOOTER (unchanged) ===== */}
       <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
