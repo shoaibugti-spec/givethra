@@ -5,7 +5,7 @@ import InstallButton from "@/components/InstallButton";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import FeedbackWall from "@/components/FeedbackWall";
-import Layout from "@/components/Layout"; // ✅ Layout included
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -663,47 +663,40 @@ export default function HomePage() {
               transition={{ duration: 0.65, delay: 0.15 }}
               className="flex-1 w-full space-y-4"
             >
-              {/* ===== PUBLIC POST BOX ===== */}
-              <div className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
-                <div className="mb-3">
-                  <h3 className="font-bold text-lg">What's on your mind?</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Write your post...
+              {/* ===== POST BOX (compact) ===== */}
+              <div className="rounded-2xl border border-primary/20 bg-card p-3 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-sm">What's on your mind?</h3>
                   {isAuthenticated && (
-                    <span className="ml-1 text-xs font-medium text-green-600">
-                      (Logged in as {user?.full_name || user?.email})
+                    <span className="text-[10px] text-muted-foreground">
+                      {user?.full_name || user?.email}
                     </span>
                   )}
                   {!isAuthenticated && (
-                    <span className="ml-1 text-xs font-medium text-muted-foreground">
-                      (Posting as Guest)
-                    </span>
+                    <span className="text-[10px] text-muted-foreground">Guest</span>
                   )}
-                </p>
+                </div>
 
                 {postSubmitted ? (
-                  <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-6 text-center space-y-3">
-                    <CheckCircle className="h-10 w-10 text-green-600 mx-auto" />
-                    <h4 className="font-bold text-green-700 dark:text-green-400">Thank You! 🙏</h4>
-                    <p className="text-sm text-green-600 dark:text-green-400">
-                      Your post has been shared.
-                    </p>
-                    <Button variant="outline" size="sm" onClick={() => setPostSubmitted(false)}>
+                  <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-3 text-center">
+                    <CheckCircle className="h-8 w-8 text-green-600 mx-auto" />
+                    <p className="text-sm font-bold text-green-700 dark:text-green-400">Thank You! 🙏</p>
+                    <p className="text-xs text-green-600 dark:text-green-400">Your post has been shared.</p>
+                    <Button variant="outline" size="sm" onClick={() => setPostSubmitted(false)} className="mt-2">
                       Post Another
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <textarea
                       placeholder="Write your post..."
                       value={postMessage}
                       onChange={(e) => setPostMessage(e.target.value)}
-                      rows={3}
-                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      rows={2}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
                     <Button
-                      className="w-full"
+                      className="w-full h-9 text-sm"
                       onClick={handleSubmitPost}
                       disabled={postSubmitting || !postMessage.trim()}
                     >
