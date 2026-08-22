@@ -1,72 +1,204 @@
+import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { useAuth } from "@/contexts/AuthContext";
-import { cn } from "@/lib/utils";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import {
-  Bell, Heart, Menu, Search, Shield, X, Facebook, Instagram,
-  Linkedin, Mail, MessageSquare
-} from "lucide-react";
-import { useState, useEffect } from "react";
-import { getUnreadNotificationsCount } from "@/lib/api";
+import { Heart, MessageCircle, Send, User, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
 
-const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
-const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61590715263595";
-const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
-const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
-
-function NavLink({ to, children, onClick }) {
-  const router = useRouterState();
-  const isActive = router.location.pathname === to || router.location.pathname.startsWith(`${to}/`);
-  return (
-    <Link to={to} onClick={onClick} className={cn(
-      "block w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors",
-      isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-    )}>
-      {children}
-    </Link>
-  );
+interface Post {
+  id: string;
+  user_id: string | null;
+  display_name: string;
+  message: string;
+  is_guest: boolean;
+  created_at: string;
+  likes?: Like[];
+  comments?: Comment[];
 }
 
-export default function Layout({ children }) {
-  const { isAuthenticated, logout, user } = useAuth();
-  const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [notifCount, setNotifCount] = useState(0);
-  const [postCount, setPostCount] = useState(0);
-  const isAdmin = user?.email === ADMIN_EMAIL;
+interface Like {
+  id: string;
+  user_id: string;
+  post_id: string;
+  created_at: string;
+}
 
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
-    const loadCounts = async () => {
-      try {
-        const nCount = await getUnreadNotificationsCount(user.id);
-        setNotifCount(nCount ?? 0);
-      } catch (e) {}
-    };
-    loadCounts();
-    const interval = setInterval(loadCounts, 20000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, user]);
+interface Comment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  user_name: string;
+  comment: string;
+  created_at: string;
+}
 
-  const fetchPostCount = async () => {
-    if (!isAuthenticated) { setPostCount(0); return; }
+export default function CommunityPage() {
+  const { isAuthenticated, user } = useAuth();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newComment, setNewComment] = useState<Record<string, string>>({});
+  const [showComments, setShowComments] = useState<Record<string, boolean>>({});
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const token = localStorage.getItem("token") || "";
+
+  const fetchPosts = async () => {
+    setLoading(true);
     try {
-      const res = await fetch("/api/community-posts");
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      if (isAuthenticated && token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      const res = await fetch("/api/community-posts", { headers });
       if (res.ok) {
         const data = await res.json();
-        setPostCount(Array.isArray(data) ? data.length : 0);
+        setPosts(data || []);
+        // Fetch likes for each post
+        data?.forEach((post: Post) => {
+          fetchLikes(post.id);
+          fetchComments(post.id);
+        });
       }
-    } catch (e) {}
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLikes = async (postId: string) => {
+    try {
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (isAuthenticated && token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      const res = await fetch(`/api/post-likes/${postId}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setLikeCounts((prev) => ({ ...prev, [postId]: data.length || 0 }));
+        if (isAuthenticated && user?.id) {
+          const userLiked = data.some((like: Like) => like.user_id === user.id);
+          setLikedPosts((prev) => ({ ...prev, [postId]: userLiked }));
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching likes:", error);
+    }
+  };
+
+  const fetchComments = async (postId: string) => {
+    try {
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (isAuthenticated && token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      const res = await fetch(`/api/post-comments/${postId}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId ? { ...post, comments: data || [] } : post
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+    }
+  };
+
+  const handleLike = async (postId: string) => {
+    if (!isAuthenticated) {
+      toast.error("Please sign in to like posts");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/post-likes/${postId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ post_id: postId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.liked) {
+          setLikedPosts((prev) => ({ ...prev, [postId]: true }));
+          setLikeCounts((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
+          toast.success("Post liked!");
+        } else {
+          setLikedPosts((prev) => ({ ...prev, [postId]: false }));
+          setLikeCounts((prev) => ({ ...prev, [postId]: Math.max((prev[postId] || 0) - 1, 0) }));
+          toast.info("Post unliked");
+        }
+      } else {
+        const error = await res.json();
+        toast.error(error?.error || "Failed to like post");
+      }
+    } catch (error) {
+      console.error("Error liking post:", error);
+      toast.error("Network error. Please try again.");
+    }
+  };
+
+  const handleComment = async (postId: string) => {
+    const comment = newComment[postId]?.trim();
+    if (!comment) {
+      toast.error("Please write a comment");
+      return;
+    }
+    if (!isAuthenticated) {
+      toast.error("Please sign in to comment");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/post-comments/${postId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ post_id: postId, comment }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId
+              ? { ...post, comments: [...(post.comments || []), data] }
+              : post
+          )
+        );
+        setNewComment((prev) => ({ ...prev, [postId]: "" }));
+        toast.success("Comment added!");
+        // Scroll to the new comment
+        setTimeout(() => {
+          const commentEl = document.getElementById(`comment-${data.id}`);
+          if (commentEl) commentEl.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        const error = await res.json();
+        toast.error(error?.error || "Failed to add comment");
+      }
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      toast.error("Network error. Please try again.");
+    }
+  };
+
+  const toggleComments = (postId: string) => {
+    setShowComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
   };
 
   useEffect(() => {
-    if (!isAuthenticated) { setPostCount(0); return; }
-    fetchPostCount();
-    const interval = setInterval(fetchPostCount, 30000);
-    const handlePostUpdate = () => fetchPostCount();
+    fetchPosts();
+    const interval = setInterval(fetchPosts, 30000);
+    const handlePostUpdate = () => fetchPosts();
     window.addEventListener("post-updated", handlePostUpdate);
     return () => {
       clearInterval(interval);
@@ -74,141 +206,123 @@ export default function Layout({ children }) {
     };
   }, [isAuthenticated]);
 
-  const closeMenu = () => setMenuOpen(false);
-  const handleLogout = () => { logout(); closeMenu(); navigate({ to: "/" }); };
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) navigate({ to: "/cases" });
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading community posts...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
-          <div className="flex items-center gap-1 shrink-0">
-            <button type="button" onClick={() => setMenuOpen(!menuOpen)}
-              className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-            <Link to="/" className="flex items-center gap-1.5 shrink-0">
-              <span className="font-display font-bold text-base md:text-lg text-primary">Givethra</span>
-            </Link>
-          </div>
+    <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Community Posts</h1>
+        <span className="text-sm text-muted-foreground">{posts.length} posts</span>
+      </div>
 
-          <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto md:mx-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input type="search" placeholder="Search verified cases..." value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 bg-muted/60 border-transparent focus:border-input focus:bg-background text-sm rounded-full w-full" />
-            </div>
-          </form>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <LanguageSwitcher />
-            <Link to="/community" className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
-              <MessageSquare className="h-5 w-5" />
-              {postCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-                  {postCount > 99 ? "99+" : postCount}
-                </span>
-              )}
-            </Link>
-            {isAuthenticated ? (
-              <Link to="/notifications" className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
-                <Bell className="h-5 w-5" />
-                {notifCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
-                    {notifCount > 9 ? "9+" : notifCount}
-                  </span>
-                )}
-              </Link>
-            ) : (
-              <Link to="/sign-in" className="text-sm font-medium text-muted-foreground hover:text-foreground">Sign in</Link>
-            )}
-          </div>
+      {posts.length === 0 ? (
+        <div className="text-center py-12 border rounded-lg bg-muted/20">
+          <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
         </div>
-
-        {menuOpen && (
-          <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1 max-h-[80vh] overflow-y-auto">
-            <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
-            {isAuthenticated && (
-              <>
-                <NavLink to="/my-cases" onClick={closeMenu}>My Cases</NavLink>
-                <NavLink to="/submit-request" onClick={closeMenu}>Submit a Case</NavLink>
-                <NavLink to="/support" onClick={closeMenu}>Help & Support</NavLink>
-                <NavLink to="/community" onClick={closeMenu}>Community Posts</NavLink>
-              </>
-            )}
-            {isAdmin && <NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink>}
-            <NavLink to="/about" onClick={closeMenu}>About</NavLink>
-            <NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink>
-            <div className="pt-3 border-t border-border mt-2 space-y-2">
-              {isAuthenticated ? (
-                <>
-                  <Link to="/profile/$id" params={{ id: "me" }} onClick={closeMenu}>
-                    <Button variant="outline" size="sm" className="w-full"><Shield className="h-4 w-4 mr-2" /> Profile</Button>
-                  </Link>
-                  <Button variant="ghost" size="sm" className="w-full" onClick={handleLogout}>Logout</Button>
-                </>
-              ) : (
-                <>
-                  <Link to="/sign-in" onClick={closeMenu}><Button variant="outline" size="sm" className="w-full">Sign in</Button></Link>
-                  <Link to="/sign-up" onClick={closeMenu}><Button size="sm" className="w-full font-semibold">Get Started</Button></Link>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </header>
-
-      <main className="flex-1 has-bottom-nav">{children}</main>
-
-      <footer className="bg-card border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 py-10">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
-                  <Heart className="h-3.5 w-3.5 text-primary-foreground" />
+      ) : (
+        posts.map((post) => (
+          <div key={post.id} className="border rounded-lg p-5 bg-card space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{post.display_name || "User"}</span>
+                  {post.is_guest ? (
+                    <span className="text-xs bg-muted px-2 py-0.5 rounded-full">Guest</span>
+                  ) : (
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Verified</span>
+                  )}
                 </div>
-                <span className="font-display font-bold text-foreground">Givethra</span>
-              </div>
-              <p className="text-xs text-muted-foreground max-w-xs">Verified Help. Real Impact.</p>
-              <div className="flex items-center gap-3 pt-1">
-                <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground">
-                  <Facebook className="h-4 w-4" />
-                </a>
-                <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white">
-                  <Instagram className="h-4 w-4" />
-                </a>
-                <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white">
-                  <Linkedin className="h-4 w-4" />
-                </a>
-                <a href="mailto:info@givethra.org" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white">
-                  <Mail className="h-4 w-4" />
-                </a>
+                <p className="text-sm text-muted-foreground">
+                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                </p>
               </div>
             </div>
-            <nav className="flex flex-wrap gap-x-6 gap-y-2">
-              {[
-                { to: "/about", label: "About" },
-                { to: "/faq", label: "FAQ" },
-                { to: "/privacy", label: "Privacy Policy" },
-                { to: "/terms", label: "Terms" },
-                { to: "/community-guidelines", label: "Community Guidelines" },
-                { to: "/contact", label: "Contact Us" },
-              ].map(({ to, label }) => (
-                <Link key={to} to={to} className="text-sm text-muted-foreground hover:text-foreground">{label}</Link>
-              ))}
-            </nav>
+
+            <p className="text-foreground whitespace-pre-wrap break-words">{post.message}</p>
+
+            <div className="flex items-center gap-4 pt-2 border-t">
+              <button
+                onClick={() => handleLike(post.id)}
+                className={`flex items-center gap-1 text-sm transition-colors ${
+                  likedPosts[post.id] ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+                }`}
+              >
+                <Heart className={`h-5 w-5 ${likedPosts[post.id] ? "fill-red-500" : ""}`} />
+                <span>{likeCounts[post.id] || 0}</span>
+              </button>
+              <button
+                onClick={() => toggleComments(post.id)}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <MessageCircle className="h-5 w-5" />
+                <span>{post.comments?.length || 0}</span>
+              </button>
+            </div>
+
+            {showComments[post.id] && (
+              <div className="space-y-3 pt-2 border-t">
+                {post.comments && post.comments.length > 0 ? (
+                  post.comments.map((comment) => (
+                    <div key={comment.id} id={`comment-${comment.id}`} className="flex gap-2">
+                      <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{comment.user_name || "User"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                        <p className="text-sm">{comment.comment}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-2">No comments yet</p>
+                )}
+
+                {isAuthenticated && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Input
+                      ref={(el) => (commentInputRefs.current[post.id] = el)}
+                      placeholder="Write a comment..."
+                      value={newComment[post.id] || ""}
+                      onChange={(e) =>
+                        setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleComment(post.id);
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => handleComment(post.id)}
+                      disabled={!newComment[post.id]?.trim()}
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-1">
-            <p>&copy; {new Date().getFullYear()} Givethra. All rights reserved.</p>
-            <p>Givethra is a humanitarian platform connecting verified people with verified help.</p>
-          </div>
-        </div>
-      </footer>
+        ))
+      )}
     </div>
   );
 }
