@@ -1,5 +1,5 @@
 // ============================================================
-// FILE: src/frontend/src/lib/api.ts
+// FILE: src/lib/api.ts (COMPLETE - FINAL)
 // ============================================================
 
 // Cloudflare Worker API client – all backend calls go through this file
@@ -56,10 +56,7 @@ export async function getCaseById(id: string) {
 
 export async function getCasesByIds(ids: string[]) {
   if (!ids.length) return [];
-  const res = await fetch(
-    `/api/cases/by-ids?ids=${ids.join(",")}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/cases/by-ids?ids=${ids.join(",")}`, { headers: headers() });
   return res.json();
 }
 
@@ -73,9 +70,7 @@ export async function insertCaseSubmission(data: any) {
 }
 
 export async function getCaseCounts(userId: string) {
-  const res = await fetch(`/api/cases/counts?user_id=${userId}`, {
-    headers: headers(),
-  });
+  const res = await fetch(`/api/cases/counts?user_id=${userId}`, { headers: headers() });
   return res.json();
 }
 
@@ -86,19 +81,13 @@ export async function getCategoryCounts() {
 
 // ---------- CASE UNLOCKS ----------
 export async function getCaseUnlock(caseId: string, heroId: string) {
-  const res = await fetch(
-    `/api/case-unlocks?case_id=${caseId}&hero_id=${heroId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/case-unlocks?case_id=${caseId}&hero_id=${heroId}`, { headers: headers() });
   const data = await res.json();
   return data[0] || null;
 }
 
 export async function getUserUnlockCount(userId: string) {
-  const res = await fetch(
-    `/api/case-unlocks/count?hero_id=${userId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/case-unlocks/count?hero_id=${userId}`, { headers: headers() });
   const data = await res.json();
   return data.count ?? 0;
 }
@@ -108,9 +97,7 @@ export async function getUnlockCount(userId: string) {
 }
 
 export async function getUserSuspension(userId: string) {
-  const res = await fetch(`/api/user-suspension/${userId}`, {
-    headers: headers(),
-  });
+  const res = await fetch(`/api/user-suspension/${userId}`, { headers: headers() });
   if (res.status === 404) return null;
   return res.json();
 }
@@ -125,19 +112,13 @@ export async function upsertUserSuspension(data: Record<string, unknown>) {
 }
 
 export async function getCategoryOffer(category: string) {
-  const res = await fetch(
-    `/api/offers?category=${encodeURIComponent(category)}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/offers?category=${encodeURIComponent(category)}`, { headers: headers() });
   const data = await res.json();
   return Array.isArray(data) ? data[0] || null : data || null;
 }
 
 export async function getOfferClaimCount(userId: string) {
-  const res = await fetch(
-    `/api/offer-claims/count?user_id=${encodeURIComponent(userId)}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/offer-claims/count?user_id=${encodeURIComponent(userId)}`, { headers: headers() });
   const data = await res.json();
   return typeof data === "number" ? data : data?.count ?? 0;
 }
@@ -161,10 +142,7 @@ export async function updateCategoryOfferUsage(category: string, usedCount: numb
 }
 
 export async function getCaseUnlocksByHero(heroId: string) {
-  const res = await fetch(
-    `/api/case-unlocks?hero_id=${heroId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/case-unlocks?hero_id=${heroId}`, { headers: headers() });
   return res.json();
 }
 
@@ -205,10 +183,7 @@ export async function updateCaseResolution(id: string, data: any) {
 
 // ---------- KYC SUBMISSIONS ----------
 export async function getKycSubmission(userId: string) {
-  const res = await fetch(
-    `/api/kyc-submissions?user_id=${userId}&limit=1`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/kyc-submissions?user_id=${userId}&limit=1`, { headers: headers() });
   const data = await res.json();
   return data[0] || null;
 }
@@ -263,10 +238,7 @@ export async function updateWalletBalance(userId: string, newBalance: number) {
 
 // ---------- DEPOSITS ----------
 export async function getDeposits(userId: string) {
-  const res = await fetch(
-    `/api/deposits?user_id=${userId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/deposits?user_id=${userId}`, { headers: headers() });
   return res.json();
 }
 
@@ -281,10 +253,7 @@ export async function insertDeposit(data: any) {
 
 // ---------- FEEDBACK ----------
 export async function getFeedbacks(limit = 50) {
-  const res = await fetch(
-    `/api/feedbacks?limit=${limit}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/feedbacks?limit=${limit}`, { headers: headers() });
   return res.json();
 }
 
@@ -327,10 +296,7 @@ export async function createComment(data: any) {
 }
 
 export async function getFeedbackForCase(caseId: string, userId: string) {
-  const res = await fetch(
-    `/api/feedbacks?case_id=${caseId}&user_id=${userId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/feedbacks?case_id=${caseId}&user_id=${userId}`, { headers: headers() });
   const data = await res.json();
   return data[0] || null;
 }
@@ -346,18 +312,12 @@ export async function insertFeedback(data: any) {
 
 // ---------- NOTIFICATIONS ----------
 export async function getNotifications(userId: string) {
-  const res = await fetch(
-    `/api/notifications?user_id=${userId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/notifications?user_id=${userId}`, { headers: headers() });
   return res.json();
 }
 
 export async function getUnreadNotificationsCount(userId: string) {
-  const res = await fetch(
-    `/api/notifications/unread-count?user_id=${userId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/notifications/unread-count?user_id=${userId}`, { headers: headers() });
   const data = await res.json();
   return data.count ?? 0;
 }
@@ -396,10 +356,7 @@ export async function checkNotificationExists(userId: string, type: string) {
 
 // ---------- SUPPORT CHAT ----------
 export async function getSupportMessages(userId: string) {
-  const res = await fetch(
-    `/api/support/messages?user_id=${userId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/support/messages?user_id=${userId}`, { headers: headers() });
   return res.json();
 }
 
@@ -426,20 +383,14 @@ export async function markSupportMessagesAsRead(userId: string) {
 }
 
 export async function getUnreadChatMessagesCount(userId: string) {
-  const res = await fetch(
-    `/api/support/unread-count?user_id=${userId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/support/unread-count?user_id=${userId}`, { headers: headers() });
   const data = await res.json();
   return data.count ?? 0;
 }
 
 // ---------- USER SETTINGS ----------
 export async function getUserSettings(userId: string) {
-  const res = await fetch(
-    `/api/user-settings/${userId}`,
-    { headers: headers() }
-  );
+  const res = await fetch(`/api/user-settings/${userId}`, { headers: headers() });
   return res.json();
 }
 
@@ -595,9 +546,7 @@ export async function adminCloseCase(id: string, data: any) {
 }
 
 export async function adminGetUserSuspension(userId: string) {
-  const res = await fetch(`/api/admin/user-suspension/${userId}`, {
-    headers: headers(),
-  });
+  const res = await fetch(`/api/admin/user-suspension/${userId}`, { headers: headers() });
   return res.json();
 }
 
@@ -620,9 +569,7 @@ export async function adminUpdateProfile(userId: string, data: any) {
 }
 
 export async function adminGetWalletsByUser(userId: string) {
-  const res = await fetch(`/api/admin/wallets?user_id=${userId}`, {
-    headers: headers(),
-  });
+  const res = await fetch(`/api/admin/wallets?user_id=${userId}`, { headers: headers() });
   const data = await res.json();
   return data[0] || null;
 }
@@ -637,9 +584,7 @@ export async function adminUpsertWallet(userId: string, balance: number) {
 }
 
 export async function adminGetCategoryOffer(category: string) {
-  const res = await fetch(`/api/admin/offers?category=${category}`, {
-    headers: headers(),
-  });
+  const res = await fetch(`/api/admin/offers?category=${category}`, { headers: headers() });
   const data = await res.json();
   return data[0] || null;
 }
@@ -664,23 +609,17 @@ export async function adminDeleteFiles(urls: string[]) {
 
 // ---------- USER DATA (for privacy page) ----------
 export async function getUserCases(userId: string) {
-  const res = await fetch(`/api/cases?user_id=${userId}`, {
-    headers: headers(),
-  });
+  const res = await fetch(`/api/cases?user_id=${userId}`, { headers: headers() });
   return res.json();
 }
 
 export async function getUserKycSubmissions(userId: string) {
-  const res = await fetch(`/api/kyc-submissions?user_id=${userId}`, {
-    headers: headers(),
-  });
+  const res = await fetch(`/api/kyc-submissions?user_id=${userId}`, { headers: headers() });
   return res.json();
 }
 
 export async function getUserDeposits(userId: string) {
-  const res = await fetch(`/api/deposits?user_id=${userId}`, {
-    headers: headers(),
-  });
+  const res = await fetch(`/api/deposits?user_id=${userId}`, { headers: headers() });
   return res.json();
 }
 
@@ -722,9 +661,7 @@ export async function getCaseCount(userId: string): Promise<number> {
 }
 
 export async function getChatMessages(userId: string) {
-  const res = await fetch(`/api/support/messages?user_id=${userId}`, {
-    headers: headers(),
-  });
+  const res = await fetch(`/api/support/messages?user_id=${userId}`, { headers: headers() });
   return res.json();
 }
 
