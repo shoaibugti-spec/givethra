@@ -1,5 +1,5 @@
 // ============================================================
-// FILE: worker.js (COMPLETE – ALL FEATURES)
+// FILE: worker.js (COMPLETE – تمام تبدیلیوں کے ساتھ)
 // ============================================================
 
 const DEFAULT_GOOGLE_CLIENT_ID =
@@ -7,7 +7,7 @@ const DEFAULT_GOOGLE_CLIENT_ID =
 const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
 
-console.log("✅ Worker loaded - v5 (Complete)");
+console.log("✅ Worker loaded - v6 (with community post read tracking)");
 
 function corsHeaders(origin) {
   const allowOrigin = origin === PUBLIC_ORIGIN ? origin : PUBLIC_ORIGIN;
@@ -86,7 +86,7 @@ async function findOrCreateUser(env, identity) {
   if (!env.DB) return { ...identity, user_id: identity.google_id };
 
   const existing = await env.DB.prepare(
-    "SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases, pending_cases, active_or_completed_cases, rejected_cases, balance FROM users WHERE user_id = ? OR lower(email) = lower(?) LIMIT 1",
+    "SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases, pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit FROM users WHERE user_id = ? OR lower(email) = lower(?) LIMIT 1",
   ).bind(identity.google_id, identity.email).first();
 
   const timestamp = now();
@@ -97,8 +97,8 @@ async function findOrCreateUser(env, identity) {
     ).bind(identity.email, identity.full_name, identity.avatar_url, timestamp, userId).run();
   } else {
     await env.DB.prepare(
-      "INSERT INTO users (user_id, email, full_name, avatar_url, signed_up_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-    ).bind(userId, identity.email, identity.full_name, identity.avatar_url, timestamp, timestamp).run();
+      "INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ).bind(userId, identity.email, identity.full_name, identity.avatar_url, timestamp, timestamp, timestamp).run();
   }
 
   await env.DB.prepare(
@@ -112,6 +112,7 @@ async function findOrCreateUser(env, identity) {
     avatar_url: identity.avatar_url,
     kyc_status: existing?.kyc_status || "none",
     role: isAdmin(identity) ? "admin" : null,
+    last_community_visit: existing?.last_community_visit || timestamp,
   };
 }
 
@@ -124,7 +125,7 @@ async function authenticate(request, env, clientId, createUser = false) {
 
   if (!env.DB) return { ...identity, user_id: identity.google_id };
   const existing = await env.DB.prepare(
-    "SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases, pending_cases, active_or_completed_cases, rejected_cases, balance FROM users WHERE user_id = ? OR lower(email) = lower(?) LIMIT 1",
+    "SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases, pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit FROM users WHERE user_id = ? OR lower(email) = lower(?) LIMIT 1",
   ).bind(identity.google_id, identity.email).first();
   return {
     user_id: existing?.user_id || identity.google_id,
@@ -133,6 +134,7 @@ async function authenticate(request, env, clientId, createUser = false) {
     avatar_url: existing?.avatar_url || identity.avatar_url,
     kyc_status: existing?.kyc_status || "none",
     role: isAdmin(identity) ? "admin" : null,
+    last_community_visit: existing?.last_community_visit || null,
   };
 }
 
@@ -433,7 +435,7 @@ async function handlePublicFeedback(request, env, origin) {
   return json({ success: true, id: notificationId }, 201, origin);
 }
 
-// ===== COMMUNITY POSTS =====
+// ===== COMMUNITY POSTS (UPDATED) =====
 async function handleCommunityPosts(request, env, user, origin) {
   if (request.method === "POST") {
     const body = await readJson(request);
@@ -476,9 +478,22 @@ async function handleCommunityPosts(request, env, user, origin) {
   }
 
   if (request.method === "GET") {
-    const rows = await env.DB.prepare(
-      "SELECT * FROM community_posts ORDER BY created_at DESC LIMIT 100"
-    ).all();
+    // اگر صارف لاگ ان ہے تو اس کی آخری وزٹ حاصل کریں
+    let lastVisit = null;
+    if (user && user.user_id) {
+      const userRow = await env.DB.prepare(
+        "SELECT last_community_visit FROM users WHERE user_id = ?"
+      ).bind(user.user_id).first();
+      lastVisit = userRow?.last_community_visit || null;
+    }
+    let query = "SELECT * FROM community_posts";
+    const params = [];
+    if (lastVisit) {
+      query += " WHERE created_at > ?";
+      params.push(lastVisit);
+    }
+    query += " ORDER BY created_at DESC LIMIT 100";
+    const rows = await env.DB.prepare(query).bind(...params).all();
     return json(rows.results || [], 200, origin);
   }
   return json({ error: "Method not allowed" }, 405, origin);
@@ -572,6 +587,7 @@ async function handlePostComments(request, env, user, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+// ===== FEEDBACKS (existing) =====
 async function handleFeedbacks(request, env, user, url, parts, origin) {
   if (request.method === "GET") {
     const caseId = url.searchParams.get("case_id") || "";
@@ -665,7 +681,7 @@ async function handleFeedbackComments(request, env, user, parts, origin) {
 }
 
 // ============================================================
-// ADMIN and other handlers
+// ADMIN and other handlers (remaining)
 // ============================================================
 const ADMIN_TABLES = {
   kyc: "kyc_submissions",
@@ -1114,13 +1130,22 @@ async function routeApi(request, env, user, url, origin) {
     return handlePublicFeedback(request, env, origin);
   }
 
-  // Community posts (POST public, GET public)
+  // Community posts (POST public, GET public with last_community_visit filter)
   if (parts[1] === "community-posts") {
+    // mark-read endpoint
+    if (parts[2] === "mark-read" && request.method === "POST") {
+      if (!user) return json({ error: "Authentication required" }, 401, origin);
+      const nowStr = now();
+      await env.DB.prepare(
+        "UPDATE users SET last_community_visit = ? WHERE user_id = ?"
+      ).bind(nowStr, user.user_id).run();
+      return json({ success: true, last_community_visit: nowStr }, 200, origin);
+    }
     if (request.method === "POST") {
-      return handleCommunityPosts(request, env, null, origin);
+      return handleCommunityPosts(request, env, null, origin); // پبلک پوسٹ
     }
     if (request.method === "GET") {
-      return handleCommunityPosts(request, env, user, origin);
+      return handleCommunityPosts(request, env, user, origin); // user کو پاس کریں
     }
     return json({ error: "Method not allowed" }, 405, origin);
   }
@@ -1191,7 +1216,7 @@ export default {
         return routeApi(request, env, null, url, origin);
       }
 
-      // Public GET routes
+      // Public GET routes (including community-posts)
       const publicRead = request.method === "GET" && (
         url.pathname === "/api/cases/approved" ||
         url.pathname === "/api/cases/category-counts" ||
@@ -1204,6 +1229,7 @@ export default {
         url.pathname === "/api/feedback-comments"
       );
       if (publicRead) {
+        // ایک عارضی صارف بنائیں (مہمان کے لیے)
         const publicUser = { user_id: "", email: "", full_name: "", avatar_url: "" };
         return routeApi(request, env, publicUser, url, origin);
       }
