@@ -1,5 +1,5 @@
 // src/frontend/src/components/Layout.tsx
-// Clean header - no duplicate navigation below
+// Clean header - NO duplicate navigation below
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,6 @@ import {
 import { useState, useEffect } from "react";
 import {
   getUnreadNotificationsCount,
-  getUnreadChatMessagesCount,
 } from "@/lib/api";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
@@ -102,7 +101,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* ===== HEADER ===== */}
+      {/* ===== HEADER (ONLY THIS) ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
           {/* Left: Hamburger + Brand */}
