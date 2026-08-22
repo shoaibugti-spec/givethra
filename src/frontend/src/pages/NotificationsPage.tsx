@@ -1,6 +1,3 @@
-// src/frontend/src/pages/NotificationsPage.tsx
-// Replaces Supabase with Cloudflare Worker APIs
-
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -37,6 +34,8 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   support_reply: { icon: MessageCircle, color: "text-primary", bg: "bg-primary/10" },
   message: { icon: MessageCircle, color: "text-primary", bg: "bg-primary/10" },
   system: { icon: Bell, color: "text-primary", bg: "bg-primary/10" },
+  like: { icon: Heart, color: "text-red-500", bg: "bg-red-500/10" },
+  comment: { icon: MessageCircle, color: "text-blue-500", bg: "bg-blue-500/10" },
 };
 
 function relativeTime(iso: string): string {
@@ -59,7 +58,6 @@ export default function NotificationsPage() {
     try {
       const data = await getNotifications(user.id);
       setNotifs(data ?? []);
-      // Mark all as read because user opened the page
       await markAllNotificationsAsRead(user.id);
     } catch (e) {
       console.error("Failed to load notifications", e);
@@ -74,10 +72,7 @@ export default function NotificationsPage() {
       return;
     }
     loadNotifications();
-
-    // Poll for new notifications every 30 seconds
     const interval = setInterval(loadNotifications, 30000);
-
     return () => clearInterval(interval);
   }, [isAuthenticated, user, loadNotifications, navigate]);
 
