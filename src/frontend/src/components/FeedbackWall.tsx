@@ -52,11 +52,15 @@ export default function FeedbackWall() {
         getLikes(),
         getComments(),
       ]);
-      setFeedbacks(fbs ?? []);
-      setLikes(lks ?? []);
-      setComments(cms ?? []);
+      // ✅ یقینی بنائیں کہ سب Arrays ہیں
+      setFeedbacks(Array.isArray(fbs) ? fbs : []);
+      setLikes(Array.isArray(lks) ? lks : []);
+      setComments(Array.isArray(cms) ? cms : []);
     } catch (e) {
       console.error("Failed to load feedback wall:", e);
+      setFeedbacks([]);
+      setLikes([]);
+      setComments([]);
     } finally {
       setLoading(false);
     }
@@ -94,7 +98,8 @@ export default function FeedbackWall() {
     );
   }
 
-  if (feedbacks.length === 0) return null;
+  // ✅ اگر feedbacks خالی یا Array نہیں ہے تو کچھ نہ دکھائیں
+  if (!Array.isArray(feedbacks) || feedbacks.length === 0) return null;
 
   return (
     <section className="py-8 px-4 bg-muted/20 border-y border-border">
@@ -113,8 +118,8 @@ export default function FeedbackWall() {
             <FeedbackPost
               key={fb.id}
               fb={fb}
-              likes={likes.filter((l) => l.feedback_id === fb.id)}
-              comments={comments.filter((c) => c.feedback_id === fb.id)}
+              likes={Array.isArray(likes) ? likes.filter((l) => l.feedback_id === fb.id) : []}
+              comments={Array.isArray(comments) ? comments.filter((c) => c.feedback_id === fb.id) : []}
               currentUserId={user?.id}
               isAuthenticated={isAuthenticated}
               onToggleLike={() => handleToggleLike(fb.id)}
@@ -140,7 +145,11 @@ function FeedbackPost({
   const [commentText, setCommentText] = useState("");
   const [posting, setPosting] = useState(false);
 
-  const iLiked = likes.some((l: any) => l.user_id === currentUserId);
+  // ✅ likes اور comments کو محفوظ طریقے سے چیک کریں
+  const safeLikes = Array.isArray(likes) ? likes : [];
+  const safeComments = Array.isArray(comments) ? comments : [];
+  
+  const iLiked = safeLikes.some((l: any) => l.user_id === currentUserId);
   const firstName = fb.first_name || "A grateful person";
   const initial = firstName[0]?.toUpperCase() ?? "G";
 
@@ -152,7 +161,6 @@ function FeedbackPost({
     if (!commentText.trim()) return;
     setPosting(true);
     try {
-      // Get user's first name from profile
       const profile = await getProfile(currentUserId);
       const cFirst = (profile?.full_name || "User").split(" ")[0] || "User";
       const data = await createComment({
@@ -211,15 +219,15 @@ function FeedbackPost({
           }`}
         >
           <Heart className="h-4 w-4" fill={iLiked ? "currentColor" : "none"} />
-          Kindness {likes.length > 0 && <span>({likes.length})</span>}
+          Kindness {safeLikes.length > 0 && <span>({safeLikes.length})</span>}
         </button>
         <button
           onClick={() => setShowComments(!showComments)}
           className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors pt-2"
         >
           <MessageCircle className="h-4 w-4" />
-          Comment {comments.length > 0 && <span>({comments.length})</span>}
-          {comments.length > 0 &&
+          Comment {safeComments.length > 0 && <span>({safeComments.length})</span>}
+          {safeComments.length > 0 &&
             (showComments ? (
               <ChevronUp className="h-3.5 w-3.5" />
             ) : (
@@ -231,9 +239,9 @@ function FeedbackPost({
       {/* Comments section */}
       {showComments && (
         <div className="space-y-3 pt-1">
-          {comments.length > 0 && (
+          {safeComments.length > 0 && (
             <div className="space-y-2">
-              {comments.map((c: any) => (
+              {safeComments.map((c: any) => (
                 <div key={c.id} className="flex items-start gap-2">
                   <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[11px] font-bold text-muted-foreground shrink-0">
                     {(c.first_name?.[0] ?? "U").toUpperCase()}
