@@ -21,7 +21,7 @@ import {
   Linkedin,
   MessageCircle,
   Mail,
-  MessageSquare, // ✅ Community icon
+  MessageSquare,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
@@ -73,6 +73,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [notifCount, setNotifCount] = useState(0);
   const [chatCount, setChatCount] = useState(0);
+  const [postCount, setPostCount] = useState(0);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
@@ -101,6 +102,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
+
+  // Fetch post count
+  useEffect(() => {
+    async function fetchPostCount() {
+      try {
+        const res = await fetch("/api/community-posts");
+        if (res.ok) {
+          const data = await res.json();
+          setPostCount(Array.isArray(data) ? data.length : 0);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    fetchPostCount();
+    const interval = setInterval(fetchPostCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => {
@@ -157,13 +176,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             </button>
 
-            {/* ✅ Community icon — always visible */}
+            {/* Community icon with post count */}
             <Link
               to="/community"
               aria-label="Community Posts"
               className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
             >
               <MessageSquare className="h-5 w-5" />
+              {postCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                  {postCount > 99 ? "99+" : postCount}
+                </span>
+              )}
             </Link>
 
             {isAuthenticated ? (
