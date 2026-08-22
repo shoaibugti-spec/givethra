@@ -1,3 +1,5 @@
+// src/contexts/AuthContext.tsx
+
 import {
   type ReactNode,
   createContext,
@@ -54,6 +56,46 @@ function safeLocalRemove(key: string): void {
   try { localStorage.removeItem(key); } catch { }
 }
 
+// ===== ✅ LEGACY SUPABASE CLEANUP =====
+function cleanupLegacyAuth() {
+  try {
+    // 1. Clear localStorage keys containing supabase, sb-
+    const lsKeysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('sb-') || key.includes('supabase') || key.includes('sb-access-token'))) {
+        lsKeysToRemove.push(key);
+      }
+    }
+    lsKeysToRemove.forEach(key => localStorage.removeItem(key));
+
+    // 2. Clear sessionStorage similarly
+    const ssKeysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && (key.includes('sb-') || key.includes('supabase') || key.includes('sb-access-token'))) {
+        ssKeysToRemove.push(key);
+      }
+    }
+    ssKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+
+    // 3. Clear cookies containing supabase, sb-
+    document.cookie.split(';').forEach(cookie => {
+      const trimmed = cookie.trim();
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex !== -1) {
+        const name = trimmed.slice(0, eqIndex);
+        if (name.includes('sb-') || name.includes('supabase')) {
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+      }
+    });
+  } catch (e) {
+    // Ignore cleanup errors
+  }
+}
+// =================================
+
 /** Accept the token formats used by the Cloudflare OAuth worker and clean the URL. */
 function getTokenFromLocation(): string | null {
   if (typeof window === "undefined") return safeLocalGet("auth_token");
@@ -92,8 +134,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Initial verification on load
+  // ===== ✅ On initialization, clean legacy data and verify token =====
   useEffect(() => {
+    cleanupLegacyAuth(); // Clear old Supabase stuff
+
     const token = getTokenFromLocation();
     if (token) {
       fetch(`${WORKER_URL}/verify`, {
@@ -117,7 +161,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             safeLocalRemove(ROLE_KEY);
           }
         })
-        .catch(() => {})
+        .catch(() => {
+          // If verification fails, clean and reload once to break cache loops
+          cleanupLegacyAuth();
+          window.location.reload();
+        })
         .finally(() => setIsInitializing(false));
     } else {
       setIsInitializing(false);
@@ -157,7 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-    const finishGoogleLogin = useCallback(async (credential: string) => {
+  const finishGoogleLogin = useCallback(async (credential: string) => {
     setLoginError(null);
     try {
       const response = await fetch(`${WORKER_URL}/auth/google`, {
@@ -186,13 +234,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoginError(error instanceof Error ? error.message : "Google sign-in failed. Please try again.");
       safeLocalRemove("auth_token");
       safeLocalRemove("user_email");
+      // On error, clean and reload once to prevent stuck state
+      cleanupLegacyAuth();
+      window.location.reload();
     } finally {
       setIsLoggingIn(false);
     }
   }, []);
 
-  // Use Google Identity Services directly. No OAuth client secret is sent to the browser.
+  // ===== ✅ Updated loginWithGoogle: clean before starting =====
   const loginWithGoogle = useCallback(() => {
+    // Clean legacy data before attempting new login
+    cleanupLegacyAuth();
+
     const googleIdentity = (window as any).google;
     if (!GOOGLE_CLIENT_ID || !googleIdentity?.accounts?.id) {
       const message = "Google sign-in is not ready yet. Please wait a moment and try again.";
@@ -222,7 +276,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoggingIn(false);
         setLoginError("Google sign-in could not open. Please allow Google prompts/pop-ups and try again.");
       } else {
-        // Suppress false cancellation banners entirely to ensure clean UX
         setIsLoggingIn(false);
       }
     });
