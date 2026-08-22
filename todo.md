@@ -465,14 +465,14 @@
 - [x] Save a checkpoint without publishing, deploying, or showing preview/settings cards.
 
 ## Cloudflare Full-Source Synchronization Follow-up
-- [ ] Audit every updated homepage, Worker/API, Admin Posts, and Support Chat source file included by the canonical deployment workflow.
-- [ ] Confirm GitHub branch, workflow working directory, pnpm install, build output, and Worker entrypoint all target the same current source tree.
-- [ ] Ensure the Cloudflare build includes the Public Post composer, guest API route, Admin Posts tab, and Support Chat updates together.
-- [ ] Preserve all existing D1/R2 data and avoid destructive schema or storage changes.
-- [ ] Run full regression, Worker syntax, and production build checks before the next deployment.
+- [x] Audit every updated homepage, Worker/API, Admin Posts, and Support Chat source file included by the canonical deployment workflow.
+- [x] Confirm GitHub branch, workflow working directory, pnpm install, build output, and Worker entrypoint all target the same current source tree.
+- [x] Ensure the Cloudflare build includes the Public Post composer, guest API route, Admin Posts tab, and Support Chat updates together.
+- [x] Preserve all existing D1/R2 data and avoid destructive schema or storage changes.
+- [x] Run full regression, Worker syntax, and production build checks before the next deployment.
 - [ ] Save a synchronized source checkpoint without deploying or showing preview/settings cards.
-- [ ] Repair the Admin FeedbackCard action label so the full dashboard type-checks and public Posts remain separate from case feedback.
-- [ ] Align SupportChatPage imports and calls with the canonical support API helpers so user message loading, read marking, and sending are functional.
+- [x] Repair the Admin FeedbackCard action label so the full dashboard type-checks and public Posts remain separate from case feedback.
+- [x] Align SupportChatPage imports and calls with the canonical support API helpers so user message loading, read marking, and sending are functional.
 
 ## Final Strict Type-Check Reconciliation
 - [x] Restore the standalone CaseCard component's imports and helper definitions so it remains compile-safe.
