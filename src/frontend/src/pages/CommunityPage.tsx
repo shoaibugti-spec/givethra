@@ -34,10 +34,8 @@ export default function CommunityPage() {
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
 
-  // ✅ ٹوکن حاصل کرنے کا فنکشن
   const getToken = () => localStorage.getItem("auth_token") || "";
 
-  // --- پوسٹس لوڈ کریں ---
   const fetchPosts = async () => {
     setLoading(true);
     try {
@@ -45,7 +43,6 @@ export default function CommunityPage() {
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       };
-      // اگر ٹوکن ہے تو بھیجیں، ورنہ مہمان کی حیثیت سے
       if (isAuthenticated && token) {
         headers.Authorization = `Bearer ${token}`;
       }
@@ -53,7 +50,6 @@ export default function CommunityPage() {
       if (res.ok) {
         const data = await res.json();
         setPosts(data || []);
-        // ہر پوسٹ کے لیے لائکس اور کمنٹس لوڈ کریں
         data?.forEach((post: Post) => {
           fetchLikes(post.id);
           fetchComments(post.id);
@@ -70,7 +66,6 @@ export default function CommunityPage() {
     }
   };
 
-  // --- لائکس لوڈ کریں ---
   const fetchLikes = async (postId: string) => {
     try {
       const token = getToken();
@@ -92,7 +87,6 @@ export default function CommunityPage() {
     }
   };
 
-  // --- کمنٹس لوڈ کریں ---
   const fetchComments = async (postId: string) => {
     try {
       const token = getToken();
@@ -114,7 +108,6 @@ export default function CommunityPage() {
     }
   };
 
-  // --- لائک ٹوگل کریں ---
   const handleLike = async (postId: string) => {
     if (!isAuthenticated) {
       toast.error("Please sign in to like posts");
@@ -142,7 +135,6 @@ export default function CommunityPage() {
         if (data.liked) {
           setLikedPosts((prev) => ({ ...prev, [postId]: true }));
           setLikeCounts((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-          // اگر پوسٹ کا مالک خود نہیں ہے تو نوٹیفکیشن بھیجیں (بیک اینڈ کو)
           const postOwner = posts.find(p => p.id === postId)?.user_id;
           if (postOwner && postOwner !== user?.id) {
             await fetch("/api/notifications", {
@@ -178,7 +170,6 @@ export default function CommunityPage() {
     }
   };
 
-  // --- کمنٹ کریں ---
   const handleComment = async (postId: string) => {
     const comment = newComment[postId]?.trim();
     if (!comment) {
@@ -216,7 +207,6 @@ export default function CommunityPage() {
           )
         );
         setNewComment((prev) => ({ ...prev, [postId]: "" }));
-        // پوسٹ کے مالک کو نوٹیفکیشن
         const postOwner = posts.find(p => p.id === postId)?.user_id;
         if (postOwner && postOwner !== user?.id) {
           await fetch("/api/notifications", {
@@ -235,7 +225,6 @@ export default function CommunityPage() {
           });
         }
         toast.success("Comment added!");
-        // نئے کمنٹ پر اسکرول
         setTimeout(() => {
           const commentEl = document.getElementById(`comment-${data.id}`);
           if (commentEl) commentEl.scrollIntoView({ behavior: "smooth" });
@@ -250,12 +239,10 @@ export default function CommunityPage() {
     }
   };
 
-  // --- کمنٹس دکھائیں/چھپائیں ---
   const toggleComments = (postId: string) => {
     setShowComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
   };
 
-  // --- پہلی بار اور وقتاً فوقتاً لوڈ کریں ---
   useEffect(() => {
     fetchPosts();
     const interval = setInterval(fetchPosts, 30000);
