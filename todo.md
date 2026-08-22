@@ -528,3 +528,10 @@
 - [x] Compare the live artifact/API behavior with the canonical `src/frontend` source and active Worker deployment target.
 - [x] Apply only the minimum safe correction needed to restore the feature path by preparing the canonical source/deployment handoff, then re-run local checks.
 - [x] State clearly that a production deployment remains necessary and identify the exact action that activates the corrected homepage/Admin features.
+
+## User-Requested Homepage Public Post & Admin Posts Restoration
+- [ ] Inspect canonical Home.tsx and AdminDashboard.tsx to ensure Public Post box and Posts tab are fully present and correctly styled.
+- [ ] Verify guest message submission payload, success toast, and English copy ("Write your thoughts...", "Public Post").
+- [ ] Verify Admin Posts tab displays guest and user posts correctly without breaking D1/R2 data.
+- [ ] Run full test suite, strict type-check, and production build verification.
+- [ ] Provide clear steps to activate the deployment on givethra.org without sending any preview cards.
