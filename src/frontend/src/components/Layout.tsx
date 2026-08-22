@@ -1,5 +1,5 @@
 // src/frontend/src/components/Layout.tsx
-// Clean and organized header with hamburger menu, brand, search, and notification
+// Clean header with brand, search, language switcher, community post icon, and notification
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import {
   Linkedin,
   MessageCircle,
   Mail,
+  MessageSquare, // Post icon
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
@@ -36,7 +37,7 @@ const FACEBOOK_URL =
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 
-// NavLink component for internal links (used in mobile menu)
+// NavLink component for mobile menu
 function NavLink({
   to,
   children,
@@ -116,7 +117,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* ===== TOP HEADER (clean) ===== */}
+      {/* ===== TOP HEADER ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
           {/* Left: Hamburger + Brand */}
@@ -130,7 +131,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
             <Link to="/" className="flex items-center gap-1.5 shrink-0">
-              <span className="font-display font-bold text-base md:text-lg text-foreground">
+              <span className="font-display font-bold text-base md:text-lg text-primary">
                 Givethra
               </span>
             </Link>
@@ -150,8 +151,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </form>
 
-          {/* Right: Notification Icon */}
+          {/* Right: Language, Post, Notification */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* Language Switcher */}
+            <LanguageSwitcher />
+
+            {/* Community Post Icon */}
+            <Link
+              to="/community"
+              aria-label="Community Posts"
+              className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
+            >
+              <MessageSquare className="h-5 w-5" />
+            </Link>
+
+            {/* Notification Bell */}
             {isAuthenticated ? (
               <Link
                 to="/notifications"
@@ -229,12 +243,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 )}
               </button>
 
-              {/* Language Switcher */}
+              {/* Language Switcher (also in menu for convenience) */}
               <div className="py-1">
                 <LanguageSwitcher />
               </div>
 
-              {/* User actions (if authenticated) */}
+              {/* User actions */}
               {isAuthenticated ? (
                 <>
                   <Link
