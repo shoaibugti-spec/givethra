@@ -556,7 +556,13 @@
 - [x] Report the live result and provide the exact fix for the Cloudflare build setting.
 
 ## Definitive Live Deployment Recovery — 2026-08-22
-- [ ] Inspect active Cloudflare Worker and API capabilities via MCP.
-- [ ] Build canonical frontend and package Worker with static assets.
-- [ ] Deploy Worker directly to production to activate Public Post on givethra.org.
-- [ ] Verify live domain renders Public Post without altering D1/R2 data.
+- [x] Inspect active Cloudflare Worker and API capabilities via MCP.
+- [x] Build canonical frontend and package Worker with static assets.
+- [x] Deploy Worker directly to production to activate Public Post on givethra.org.
+- [x] Verify live domain renders Public Post without altering D1/R2 data.
+
+## Green Build & Deployment Repair — 2026-08-22
+- [ ] Inspect all local build, test, and workflow files for errors.
+- [ ] Fix any syntax, type, or workflow errors to ensure clean execution.
+- [ ] Run full test suite, type check, and production build.
+- [ ] Verify local Wrangler bundle and report status.
