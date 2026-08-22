@@ -530,8 +530,21 @@
 - [x] State clearly that a production deployment remains necessary and identify the exact action that activates the corrected homepage/Admin features.
 
 ## User-Requested Homepage Public Post & Admin Posts Restoration
-- [ ] Inspect canonical Home.tsx and AdminDashboard.tsx to ensure Public Post box and Posts tab are fully present and correctly styled.
-- [ ] Verify guest message submission payload, success toast, and English copy ("Write your thoughts...", "Public Post").
-- [ ] Verify Admin Posts tab displays guest and user posts correctly without breaking D1/R2 data.
-- [ ] Run full test suite, strict type-check, and production build verification.
-- [ ] Provide clear steps to activate the deployment on givethra.org without sending any preview cards.
+- [x] Inspect canonical Home.tsx and AdminDashboard.tsx to ensure Public Post box and Posts tab are fully present and correctly styled.
+- [x] Verify guest message submission payload, success toast, and English copy ("Write your thoughts...", "Public Post").
+- [x] Verify Admin Posts tab displays guest and user posts correctly without breaking D1/R2 data.
+- [x] Run full test suite, strict type-check, and production build verification.
+- [x] Provide clear steps to activate the deployment on givethra.org without sending any preview cards.
+
+## Live Homepage Verification — 2026-08-22
+- [x] Open the real `givethra.org` homepage and verify whether Public Post is rendered.
+- [x] Probe the live Public Post route safely without creating a production test record.
+- [x] Compare live asset identity and service-worker state with the canonical source/build.
+- [x] Record the exact finding and the only required production activation action.
+
+## Mobile Screenshot & Live Public Post Audit — 2026-08-22
+- [x] Inspect canonical HomePage.tsx to see where Public Post is placed relative to the slider and cards on mobile.
+- [x] Ensure Public Post is rendered prominently above the fold for mobile visitors without requiring scrolling past heroes or filters.
+- [x] Verify Admin Posts tab in AdminDashboard.tsx renders guest and user posts cleanly.
+- [x] Run full test suite, type check, and production build.
+- [x] Provide clear production deployment instruction.
