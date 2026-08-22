@@ -627,53 +627,45 @@ export default function HomePage() {
             transition={{ duration: 0.65, delay: 0.15 }}
             className="flex-1 w-full space-y-4"
           >
-            {/* Public message box above slider */}
-            <div id="public-post" className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm text-left">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-sm font-semibold text-foreground">Public Post</h3>
-              </div>
-              <p className="mb-3 text-xs leading-5 text-muted-foreground">Share any message about Givethra here.</p>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                const formEl = e.currentTarget;
-                const field = formEl.elements.namedItem("feedbackText") as HTMLInputElement | HTMLTextAreaElement;
-                const txt = field?.value?.trim();
-                if (!txt) return;
-                try {
-                  const token = localStorage.getItem("auth_token");
-                  const res = await fetch("/api/public-feedback", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    },
-                    body: JSON.stringify({ message: txt, guest_name: user?.fullName || "Public Visitor" })
-                  });
-                  const result = await res.json().catch(() => null);
-                  if (!res.ok) {
-                    throw new Error(result?.error || "Failed to send message.");
-                  }
-                  toast.success("Success! Your message has been sent to Givethra.");
-                  formEl.reset();
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "We could not send your message. Please try again.");
-                }
-              }} className="space-y-2">
-                <textarea
-                  name="feedbackText"
-                  rows={3}
-                  placeholder="Write your message..."
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
-                  required
-                />
-                <div className="flex justify-end items-center text-xs">
-                  <button type="submit" className="px-3 py-1.5 font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition">
-                    Post Message
-                  </button>
-                </div>
-              </form>
-            </div>
+            {/* ===== PUBLIC POST BOX ===== */}
+<div className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
+  <div className="mb-3">
+    <h3 className="font-bold text-lg">What's on your mind?</h3>
+  </div>
+  <p className="text-sm text-muted-foreground mb-4">
+    Write your post...
+  </p>
+
+  {postSubmitted ? (
+    <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-6 text-center space-y-3">
+      <CheckCircle className="h-10 w-10 text-green-600 mx-auto" />
+      <h4 className="font-bold text-green-700 dark:text-green-400">Thank You! 🙏</h4>
+      <p className="text-sm text-green-600 dark:text-green-400">
+        Your post has been shared.
+      </p>
+      <Button variant="outline" size="sm" onClick={() => setPostSubmitted(false)}>
+        Post Another
+      </Button>
+    </div>
+  ) : (
+    <div className="space-y-3">
+      <textarea
+        placeholder="Write your post..."
+        value={postMessage}
+        onChange={(e) => setPostMessage(e.target.value)}
+        rows={3}
+        className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+      />
+      <Button
+        className="w-full"
+        onClick={handleSubmitPost}
+        disabled={postSubmitting || !postMessage.trim()}
+      >
+        {postSubmitting ? "Posting..." : "Post"}
+      </Button>
+    </div>
+  )}
+</div>
 
             <div className="relative w-full rounded-2xl overflow-hidden shadow-xl">
               {renderSlideContent()}
