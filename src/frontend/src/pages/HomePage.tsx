@@ -1,5 +1,5 @@
 // src/frontend/src/pages/HomePage.tsx
-// Replaces Supabase with Cloudflare Worker APIs
+// Complete HomePage with Layout wrapper - NO duplicate navigation
 
 import InstallButton from "@/components/InstallButton";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
@@ -663,7 +663,7 @@ export default function HomePage() {
               transition={{ duration: 0.65, delay: 0.15 }}
               className="flex-1 w-full space-y-4"
             >
-              {/* ===== POST BOX (compact) ===== */}
+              {/* ===== POST BOX ===== */}
               <div className="rounded-2xl border border-primary/20 bg-card p-3 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-sm">What's on your mind?</h3>
