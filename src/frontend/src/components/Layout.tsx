@@ -32,12 +32,14 @@ function NavLink({ to, children, onClick }) {
 export default function Layout({ children }) {
   const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
-  const router = useRouterState(); // <-- router state لے رہے ہیں
+  const router = useRouterState();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notifCount, setNotifCount] = useState(0);
   const [postCount, setPostCount] = useState(0);
   const isAdmin = user?.email === ADMIN_EMAIL;
+
+  const getToken = () => localStorage.getItem("auth_token") || "";
 
   // --- نوٹیفکیشن کاؤنٹر ---
   useEffect(() => {
@@ -57,9 +59,11 @@ export default function Layout({ children }) {
   const fetchPostCount = async () => {
     if (!isAuthenticated) { setPostCount(0); return; }
     try {
+      const token = getToken();
       const res = await fetch("/api/community-posts", {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
       if (res.ok) {
@@ -82,21 +86,21 @@ export default function Layout({ children }) {
     };
   }, [isAuthenticated]);
 
-  // --- نیا: جب صارف /community روٹ پر جائے تو پوسٹس کو "پڑھا ہوا" مارک کریں ---
+  // --- جب صارف /community روٹ پر جائے تو پوسٹس کو "پڑھا ہوا" مارک کریں ---
   useEffect(() => {
     if (!isAuthenticated) return;
     const currentPath = router.location.pathname;
     if (currentPath === "/community" || currentPath.startsWith("/community/")) {
       const markAsRead = async () => {
         try {
+          const token = getToken();
           await fetch("/api/community-posts/mark-read", {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
               "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
           });
-          // مارک ریڈ کرنے کے بعد کاؤنٹر دوبارہ لوڈ کریں
           fetchPostCount();
         } catch (e) {
           console.error("Error marking community posts as read:", e);
@@ -104,7 +108,7 @@ export default function Layout({ children }) {
       };
       markAsRead();
     }
-  }, [router.location.pathname, isAuthenticated]); // <-- جب بھی روٹ بدلے، چیک کریں
+  }, [router.location.pathname, isAuthenticated]);
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => { logout(); closeMenu(); navigate({ to: "/" }); };
