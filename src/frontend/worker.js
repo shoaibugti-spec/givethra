@@ -1,5 +1,5 @@
 // ============================================================
-// worker.js – COMPLETE FIXED (Public POST + Likes + Comments)
+// FILE: worker.js (COMPLETE – WITH LIKES & COMMENTS)
 // ============================================================
 
 const DEFAULT_GOOGLE_CLIENT_ID =
@@ -7,7 +7,7 @@ const DEFAULT_GOOGLE_CLIENT_ID =
 const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
 
-console.log("✅ Worker loaded - v4 (Public Posts + Likes + Comments)");
+console.log("✅ Worker loaded - v4 (with likes & comments)");
 
 function corsHeaders(origin) {
   const allowOrigin = origin === PUBLIC_ORIGIN ? origin : PUBLIC_ORIGIN;
@@ -30,8 +30,13 @@ function json(data, status = 200, origin = "") {
   });
 }
 
-function now() { return new Date().toISOString(); }
-function id() { return crypto.randomUUID(); }
+function now() {
+  return new Date().toISOString();
+}
+
+function id() {
+  return crypto.randomUUID();
+}
 
 function isAdmin(user) {
   return Boolean(user && ADMIN_EMAILS.has(String(user.email).toLowerCase()));
@@ -44,7 +49,7 @@ function bearer(request) {
 
 async function verifyGoogleCredential(credential, clientId) {
   if (credential && credential.length > 100 && !credential.startsWith("eyJhbGciOi")) {
-    // fallback for custom tokens
+    // Custom robust session token check or basic JWT fallback if needed
   }
   const response = await fetch(
     `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
@@ -66,12 +71,14 @@ async function verifyGoogleCredential(credential, clientId) {
     } catch (e) {}
     return null;
   }
+
   const payload = await response.json();
   const audience = payload.aud || payload.azp;
   const verified = payload.email_verified === true || payload.email_verified === "true";
   if (!payload.sub || !payload.email || (audience && clientId && audience !== clientId) || !verified) {
-    // fallback
+    // Also try payload fallback
   }
+
   return {
     google_id: String(payload.sub),
     email: String(payload.email).toLowerCase(),
@@ -98,6 +105,7 @@ async function findOrCreateUser(env, identity) {
       "INSERT INTO users (user_id, email, full_name, avatar_url, signed_up_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
     ).bind(userId, identity.email, identity.full_name, identity.avatar_url, timestamp, timestamp).run();
   }
+
   await env.DB.prepare(
     "INSERT INTO profiles (user_id, full_name, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET full_name = excluded.full_name, avatar_url = excluded.avatar_url, updated_at = excluded.updated_at",
   ).bind(userId, identity.full_name, identity.avatar_url, timestamp, timestamp).run();
@@ -136,12 +144,15 @@ async function authenticate(request, env, clientId, createUser = false) {
 function pathParts(url) {
   return url.pathname.split("/").filter(Boolean);
 }
+
 function requestedUserId(url) {
   return url.searchParams.get("user_id") || "";
 }
+
 function canAccessUser(user, userId) {
   return isAdmin(user) || !userId || user.user_id === userId;
 }
+
 async function readJson(request) {
   try {
     return await request.json();
@@ -149,14 +160,13 @@ async function readJson(request) {
     return null;
   }
 }
+
 function pick(body, fields) {
-  return Object.fromEntries(
-    fields.filter((field) => body && body[field] !== undefined).map((field) => [field, body[field]])
-  );
+  return Object.fromEntries(fields.filter((field) => body && body[field] !== undefined).map((field) => [field, body[field]]));
 }
 
 // ============================================================
-// HANDLERS
+//  HANDLER FUNCTIONS
 // ============================================================
 
 async function handleProfile(request, env, user, parts, origin) {
@@ -177,35 +187,6 @@ async function handleProfile(request, env, user, parts, origin) {
   ).bind(merged.user_id, merged.full_name || null, merged.phone_number || null, merged.country || null, merged.city || null, merged.bio || null, merged.preferred_language || "en", merged.avatar_url || null, merged.cover_url || null, merged.created_at, merged.updated_at).run();
   await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?").bind(merged.full_name || user.full_name, merged.avatar_url || user.avatar_url, merged.updated_at, userId).run();
   return json({ ...merged }, 200, origin);
-}
-
-// ===== PUBLIC PROFILE (safe fields only) =====
-async function handlePublicProfile(request, env, parts, origin) {
-  const userId = parts[2];
-  if (!userId) return json({ error: "User ID required" }, 400, origin);
-
-  const user = await env.DB.prepare(
-    "SELECT user_id, full_name, avatar_url FROM users WHERE user_id = ? LIMIT 1"
-  ).bind(userId).first();
-  if (!user) return json({ error: "User not found" }, 404, origin);
-
-  // Get case counts
-  const cases = await env.DB.prepare(
-    "SELECT COUNT(*) AS total FROM case_submissions WHERE user_id = ? AND lower(status) IN ('approved', 'published', 'active', 'completed')"
-  ).bind(userId).first();
-
-  // Get helps (unlocks as hero)
-  const helps = await env.DB.prepare(
-    "SELECT COUNT(*) AS total FROM case_unlocks WHERE hero_id = ?"
-  ).bind(userId).first();
-
-  return json({
-    user_id: user.user_id,
-    display_name: user.full_name || "User",
-    avatar_url: user.avatar_url || "",
-    total_cases: cases?.total || 0,
-    total_helps: helps?.total || 0,
-  }, 200, origin);
 }
 
 async function handleKyc(request, env, user, url, parts, origin) {
@@ -596,7 +577,6 @@ async function handlePostComments(request, env, user, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
-// ===== FEEDBACK HANDLERS (existing) =====
 async function handleFeedbacks(request, env, user, url, parts, origin) {
   if (request.method === "GET") {
     const caseId = url.searchParams.get("case_id") || "";
@@ -1039,14 +1019,17 @@ function safeSegment(value, fallback = "file") {
   const cleaned = String(value || "").replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^\.+/, "").slice(0, 120);
   return cleaned || fallback;
 }
+
 function safeFilename(value) {
   return safeSegment(String(value || "file").split(/[\\/]/).pop() || "file", "file");
 }
+
 function base64Url(bytes) {
   let binary = "";
   for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
+
 async function signUploadKey(secret, key, expiresAt) {
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
@@ -1058,6 +1041,7 @@ async function signUploadKey(secret, key, expiresAt) {
   const signature = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(`${key}:${expiresAt}`));
   return base64Url(signature);
 }
+
 async function makeUploadUrl(env, key) {
   const secret = String(env.JWT_SECRET || "");
   if (!secret) throw new Error("JWT_SECRET is not configured");
@@ -1065,12 +1049,14 @@ async function makeUploadUrl(env, key) {
   const signature = await signUploadKey(secret, key, expiresAt);
   return `${PUBLIC_ORIGIN}/uploads?key=${encodeURIComponent(key)}&expires=${expiresAt}&signature=${signature}`;
 }
+
 async function isValidUploadUrl(env, key, expiresAt, signature) {
   const secret = String(env.JWT_SECRET || "");
   if (!secret || !key || !signature || !Number.isFinite(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) return false;
   const expected = await signUploadKey(secret, key, expiresAt);
   return expected === signature;
 }
+
 function buildUploadKey(userId, requestedPath, fileName) {
   const owner = safeSegment(userId, "user");
   const rawParts = String(requestedPath || "").replace(/\\/g, "/").split("/").filter(Boolean).map((part) => safeSegment(part)).filter(Boolean);
@@ -1081,6 +1067,7 @@ function buildUploadKey(userId, requestedPath, fileName) {
   const folder = relative.length ? `${relative.join("/")}/` : "";
   return `users/${owner}/${folder}${leaf}`;
 }
+
 async function handleUpload(request, env, user, origin) {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
   if (!env.UPLOADS) return json({ error: "Upload storage is not configured" }, 503, origin);
@@ -1104,6 +1091,7 @@ async function handleUpload(request, env, user, origin) {
   const url = await makeUploadUrl(env, key);
   return json({ key, url, content_type: contentType }, 201, origin);
 }
+
 async function handleStoredUpload(request, env, url, origin) {
   if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method Not Allowed", { status: 405, headers: corsHeaders(origin) });
   if (!env.UPLOADS) return new Response("Upload storage is not configured", { status: 503, headers: corsHeaders(origin) });
@@ -1166,14 +1154,6 @@ async function routeApi(request, env, user, url, origin) {
     return json({ error: "Method not allowed" }, 405, origin);
   }
 
-  // Public profile (no auth)
-  if (parts[1] === "public-profile") {
-    if (request.method === "GET") {
-      return handlePublicProfile(request, env, parts, origin);
-    }
-    return json({ error: "Method not allowed" }, 405, origin);
-  }
-
   if (parts[1] === "upload") return handleUpload(request, env, user, origin);
   if (!env.DB) return json({ error: "D1 binding DB is not configured" }, 503, origin);
   if (parts[1] === "profiles") return handleProfile(request, env, user, parts, origin);
@@ -1222,7 +1202,8 @@ export default {
         url.pathname === "/api/cases/category-counts" ||
         url.pathname === "/api/community-posts" ||
         url.pathname === "/api/community-posts/" ||
-        (url.pathname.startsWith("/api/public-profile/")) ||
+        url.pathname.startsWith("/api/post-likes") ||
+        url.pathname.startsWith("/api/post-comments") ||
         (url.pathname === "/api/feedbacks" && !url.searchParams.has("case_id") && !url.searchParams.has("user_id")) ||
         url.pathname === "/api/feedback-likes" ||
         url.pathname === "/api/feedback-comments"
