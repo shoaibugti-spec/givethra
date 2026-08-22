@@ -493,3 +493,11 @@
 - [x] Repair only the source/workflow/routing mismatch responsible for the stale live build by preparing the verified single-workflow checkpoint for GitHub synchronization.
 - [x] Run the full regression and production build again, then provide exact givethra.org deployment and cache-verification steps.
 - [x] Refresh LIVE_FEEDBACK_DIAGNOSIS.md so it records the current checkpoint, GitHub main divergence, workflow failure, and live Worker markers without stale commit references.
+
+## Manual Cloudflare Deployment Regression Follow-up
+- [x] Record that the known-good GitHub application accepted guest and signed-in Public Posts and showed them in Admin before the manual Cloudflare deployment.
+- [x] Inspect the currently active Cloudflare Worker version, custom-domain route, and asset bundle after the manual deployment.
+- [x] Compare the manual deployment's source directory, branch, build output, and Wrangler configuration with the known-good `src/frontend` source.
+- [x] Confirm the Worker and frontend assets are deployed together, with no Pages/Worker/custom-domain split serving an older bundle.
+- [x] Repair only the deployment source, directory, branch, or routing mismatch by preparing the verified canonical `src/frontend` deployment path; do not modify D1/R2 data.
+- [x] Re-run the complete regression/build checks and provide exact Cloudflare deployment steps that preserve the working Public Post and Admin behavior.
