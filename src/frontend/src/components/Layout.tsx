@@ -1,6 +1,4 @@
 // src/frontend/src/components/Layout.tsx
-// Complete clean layout - NO duplicate navigation
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -83,7 +81,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, user]);
 
   // Load post count for community icon badge
+  // Reset on logout, fetch on login
   useEffect(() => {
+    if (!isAuthenticated) {
+      setPostCount(0);
+      return;
+    }
     const fetchPostCount = async () => {
       try {
         const res = await fetch("/api/community-posts");
@@ -96,7 +99,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     fetchPostCount();
     const interval = setInterval(fetchPostCount, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated]); // Re-run when auth changes
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => {
@@ -111,10 +114,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* ===== HEADER - ONLY THIS ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
-          {/* Left: Hamburger + Brand */}
           <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
@@ -131,7 +132,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
-          {/* Center: Search */}
           <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto md:mx-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -145,7 +145,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </form>
 
-          {/* Right: Language, Post (with badge), Notification */}
           <div className="flex items-center gap-1 shrink-0">
             <LanguageSwitcher />
             <Link
@@ -181,7 +180,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* ===== MOBILE MENU ===== */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1 max-h-[80vh] overflow-y-auto">
             <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
@@ -196,7 +194,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {isAdmin && <NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink>}
             <NavLink to="/about" onClick={closeMenu}>About</NavLink>
             <NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink>
-
             <div className="pt-3 border-t border-border mt-2 space-y-2">
               {isAuthenticated ? (
                 <>
@@ -224,10 +221,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
-      {/* ===== MAIN CONTENT ===== */}
       <main className="flex-1 has-bottom-nav">{children}</main>
 
-      {/* ===== FOOTER ===== */}
       <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
