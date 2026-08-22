@@ -4,10 +4,8 @@
 
 // Cloudflare Worker API client – all backend calls go through this file
 
-// Use the public custom domain so browser requests are not sent through the
-// Cloudflare Access-protected workers.dev hostname.
-const WORKER_URL =
-  typeof window !== "undefined" ? window.location.origin : "https://givethra.org";
+// ✅ خالی رکھیں تاکہ Vite proxy استعمال ہو
+const WORKER_URL = "";
 
 // Helper to get auth token from localStorage
 function getAuthToken(): string | null {
@@ -21,17 +19,20 @@ function getAuthToken(): string | null {
 // Helper to build request headers with authorization
 function headers(): HeadersInit {
   const token = getAuthToken();
-  return {
+  const headers: HeadersInit = {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 // ---------- AUTH ----------
 export async function verifyToken(): Promise<{ valid: boolean; user?: any }> {
   const token = getAuthToken();
   if (!token) return { valid: false };
-  const res = await fetch(`${WORKER_URL}/verify`, {
+  const res = await fetch(`/verify`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return res.json();
@@ -39,31 +40,31 @@ export async function verifyToken(): Promise<{ valid: boolean; user?: any }> {
 
 // ---------- CASES ----------
 export async function getApprovedCases() {
-  const res = await fetch(`${WORKER_URL}/api/cases/approved`, { headers: headers() });
+  const res = await fetch(`/api/cases/approved`, { headers: headers() });
   return res.json();
 }
 
 export async function getCasesByUser(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/cases?user_id=${userId}`, { headers: headers() });
+  const res = await fetch(`/api/cases?user_id=${userId}`, { headers: headers() });
   return res.json();
 }
 
 export async function getCaseById(id: string) {
-  const res = await fetch(`${WORKER_URL}/api/cases/${id}`, { headers: headers() });
+  const res = await fetch(`/api/cases/${id}`, { headers: headers() });
   return res.json();
 }
 
 export async function getCasesByIds(ids: string[]) {
   if (!ids.length) return [];
   const res = await fetch(
-    `${WORKER_URL}/api/cases/by-ids?ids=${ids.join(",")}`,
+    `/api/cases/by-ids?ids=${ids.join(",")}`,
     { headers: headers() }
   );
   return res.json();
 }
 
 export async function insertCaseSubmission(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/cases`, {
+  const res = await fetch(`/api/cases`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -72,21 +73,21 @@ export async function insertCaseSubmission(data: any) {
 }
 
 export async function getCaseCounts(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/cases/counts?user_id=${userId}`, {
+  const res = await fetch(`/api/cases/counts?user_id=${userId}`, {
     headers: headers(),
   });
   return res.json();
 }
 
 export async function getCategoryCounts() {
-  const res = await fetch(`${WORKER_URL}/api/cases/category-counts`, { headers: headers() });
+  const res = await fetch(`/api/cases/category-counts`, { headers: headers() });
   return res.json();
 }
 
 // ---------- CASE UNLOCKS ----------
 export async function getCaseUnlock(caseId: string, heroId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/case-unlocks?case_id=${caseId}&hero_id=${heroId}`,
+    `/api/case-unlocks?case_id=${caseId}&hero_id=${heroId}`,
     { headers: headers() }
   );
   const data = await res.json();
@@ -95,7 +96,7 @@ export async function getCaseUnlock(caseId: string, heroId: string) {
 
 export async function getUserUnlockCount(userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/case-unlocks/count?hero_id=${userId}`,
+    `/api/case-unlocks/count?hero_id=${userId}`,
     { headers: headers() }
   );
   const data = await res.json();
@@ -107,7 +108,7 @@ export async function getUnlockCount(userId: string) {
 }
 
 export async function getUserSuspension(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/user-suspension/${userId}`, {
+  const res = await fetch(`/api/user-suspension/${userId}`, {
     headers: headers(),
   });
   if (res.status === 404) return null;
@@ -115,7 +116,7 @@ export async function getUserSuspension(userId: string) {
 }
 
 export async function upsertUserSuspension(data: Record<string, unknown>) {
-  const res = await fetch(`${WORKER_URL}/api/user-suspension`, {
+  const res = await fetch(`/api/user-suspension`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -125,7 +126,7 @@ export async function upsertUserSuspension(data: Record<string, unknown>) {
 
 export async function getCategoryOffer(category: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/offers?category=${encodeURIComponent(category)}`,
+    `/api/offers?category=${encodeURIComponent(category)}`,
     { headers: headers() }
   );
   const data = await res.json();
@@ -134,7 +135,7 @@ export async function getCategoryOffer(category: string) {
 
 export async function getOfferClaimCount(userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/offer-claims/count?user_id=${encodeURIComponent(userId)}`,
+    `/api/offer-claims/count?user_id=${encodeURIComponent(userId)}`,
     { headers: headers() }
   );
   const data = await res.json();
@@ -142,7 +143,7 @@ export async function getOfferClaimCount(userId: string) {
 }
 
 export async function insertOfferClaim(data: Record<string, unknown>) {
-  const res = await fetch(`${WORKER_URL}/api/offer-claims`, {
+  const res = await fetch(`/api/offer-claims`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -151,7 +152,7 @@ export async function insertOfferClaim(data: Record<string, unknown>) {
 }
 
 export async function updateCategoryOfferUsage(category: string, usedCount: number) {
-  const res = await fetch(`${WORKER_URL}/api/offers/usage`, {
+  const res = await fetch(`/api/offers/usage`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify({ category, used_count: usedCount }),
@@ -161,14 +162,14 @@ export async function updateCategoryOfferUsage(category: string, usedCount: numb
 
 export async function getCaseUnlocksByHero(heroId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/case-unlocks?hero_id=${heroId}`,
+    `/api/case-unlocks?hero_id=${heroId}`,
     { headers: headers() }
   );
   return res.json();
 }
 
 export async function insertCaseUnlock(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/case-unlocks`, {
+  const res = await fetch(`/api/case-unlocks`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -178,14 +179,14 @@ export async function insertCaseUnlock(data: any) {
 
 // ---------- CASE RESOLUTIONS ----------
 export async function getCaseResolutions(caseId: string, heroId?: string) {
-  let url = `${WORKER_URL}/api/case-resolutions?case_id=${caseId}`;
+  let url = `/api/case-resolutions?case_id=${caseId}`;
   if (heroId) url += `&hero_id=${heroId}`;
   const res = await fetch(url, { headers: headers() });
   return res.json();
 }
 
 export async function insertCaseResolution(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/case-resolutions`, {
+  const res = await fetch(`/api/case-resolutions`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -194,7 +195,7 @@ export async function insertCaseResolution(data: any) {
 }
 
 export async function updateCaseResolution(id: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/case-resolutions/${id}`, {
+  const res = await fetch(`/api/case-resolutions/${id}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -205,7 +206,7 @@ export async function updateCaseResolution(id: string, data: any) {
 // ---------- KYC SUBMISSIONS ----------
 export async function getKycSubmission(userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/kyc-submissions?user_id=${userId}&limit=1`,
+    `/api/kyc-submissions?user_id=${userId}&limit=1`,
     { headers: headers() }
   );
   const data = await res.json();
@@ -213,7 +214,7 @@ export async function getKycSubmission(userId: string) {
 }
 
 export async function insertKycSubmission(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/kyc-submissions`, {
+  const res = await fetch(`/api/kyc-submissions`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -222,7 +223,7 @@ export async function insertKycSubmission(data: any) {
 }
 
 export async function updateKycSubmission(id: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/kyc-submissions/${id}`, {
+  const res = await fetch(`/api/kyc-submissions/${id}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -232,12 +233,12 @@ export async function updateKycSubmission(id: string, data: any) {
 
 // ---------- PROFILES ----------
 export async function getProfile(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/profiles/${userId}`, { headers: headers() });
+  const res = await fetch(`/api/profiles/${userId}`, { headers: headers() });
   return res.json();
 }
 
 export async function updateProfile(userId: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/profiles/${userId}`, {
+  const res = await fetch(`/api/profiles/${userId}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -247,12 +248,12 @@ export async function updateProfile(userId: string, data: any) {
 
 // ---------- WALLET ----------
 export async function getWallet(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/wallets/${userId}`, { headers: headers() });
+  const res = await fetch(`/api/wallets/${userId}`, { headers: headers() });
   return res.json();
 }
 
 export async function updateWalletBalance(userId: string, newBalance: number) {
-  const res = await fetch(`${WORKER_URL}/api/wallets/${userId}`, {
+  const res = await fetch(`/api/wallets/${userId}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify({ balance: newBalance }),
@@ -263,14 +264,14 @@ export async function updateWalletBalance(userId: string, newBalance: number) {
 // ---------- DEPOSITS ----------
 export async function getDeposits(userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/deposits?user_id=${userId}`,
+    `/api/deposits?user_id=${userId}`,
     { headers: headers() }
   );
   return res.json();
 }
 
 export async function insertDeposit(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/deposits`, {
+  const res = await fetch(`/api/deposits`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -281,32 +282,32 @@ export async function insertDeposit(data: any) {
 // ---------- FEEDBACK ----------
 export async function getFeedbacks(limit = 50) {
   const res = await fetch(
-    `${WORKER_URL}/api/feedbacks?limit=${limit}`,
+    `/api/feedbacks?limit=${limit}`,
     { headers: headers() }
   );
   return res.json();
 }
 
 export async function getLikes() {
-  const res = await fetch(`${WORKER_URL}/api/feedback-likes`, { headers: headers() });
+  const res = await fetch(`/api/feedback-likes`, { headers: headers() });
   return res.json();
 }
 
 export async function getComments() {
-  const res = await fetch(`${WORKER_URL}/api/feedback-comments`, { headers: headers() });
+  const res = await fetch(`/api/feedback-comments`, { headers: headers() });
   return res.json();
 }
 
 export async function toggleFeedbackLike(feedbackId: string, userId: string, likeId?: string) {
   if (likeId) {
-    const res = await fetch(`${WORKER_URL}/api/feedback-likes/${likeId}`, {
+    const res = await fetch(`/api/feedback-likes/${likeId}`, {
       method: "DELETE",
       headers: headers(),
     });
     const data = await res.json();
     return { deleted: true, id: likeId };
   } else {
-    const res = await fetch(`${WORKER_URL}/api/feedback-likes`, {
+    const res = await fetch(`/api/feedback-likes`, {
       method: "POST",
       headers: headers(),
       body: JSON.stringify({ feedback_id: feedbackId, user_id: userId }),
@@ -317,7 +318,7 @@ export async function toggleFeedbackLike(feedbackId: string, userId: string, lik
 }
 
 export async function createComment(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/feedback-comments`, {
+  const res = await fetch(`/api/feedback-comments`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -327,7 +328,7 @@ export async function createComment(data: any) {
 
 export async function getFeedbackForCase(caseId: string, userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/feedbacks?case_id=${caseId}&user_id=${userId}`,
+    `/api/feedbacks?case_id=${caseId}&user_id=${userId}`,
     { headers: headers() }
   );
   const data = await res.json();
@@ -335,7 +336,7 @@ export async function getFeedbackForCase(caseId: string, userId: string) {
 }
 
 export async function insertFeedback(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/feedbacks`, {
+  const res = await fetch(`/api/feedbacks`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -346,7 +347,7 @@ export async function insertFeedback(data: any) {
 // ---------- NOTIFICATIONS ----------
 export async function getNotifications(userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/notifications?user_id=${userId}`,
+    `/api/notifications?user_id=${userId}`,
     { headers: headers() }
   );
   return res.json();
@@ -354,7 +355,7 @@ export async function getNotifications(userId: string) {
 
 export async function getUnreadNotificationsCount(userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/notifications/unread-count?user_id=${userId}`,
+    `/api/notifications/unread-count?user_id=${userId}`,
     { headers: headers() }
   );
   const data = await res.json();
@@ -362,7 +363,7 @@ export async function getUnreadNotificationsCount(userId: string) {
 }
 
 export async function markAllNotificationsAsRead(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/notifications/mark-read`, {
+  const res = await fetch(`/api/notifications/mark-read`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify({ user_id: userId }),
@@ -371,7 +372,7 @@ export async function markAllNotificationsAsRead(userId: string) {
 }
 
 export async function deleteAllNotifications(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/notifications/clear`, {
+  const res = await fetch(`/api/notifications/clear`, {
     method: "DELETE",
     headers: headers(),
     body: JSON.stringify({ user_id: userId }),
@@ -380,7 +381,7 @@ export async function deleteAllNotifications(userId: string) {
 }
 
 export async function createNotification(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/notifications`, {
+  const res = await fetch(`/api/notifications`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -396,14 +397,14 @@ export async function checkNotificationExists(userId: string, type: string) {
 // ---------- SUPPORT CHAT ----------
 export async function getSupportMessages(userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/support/messages?user_id=${userId}`,
+    `/api/support/messages?user_id=${userId}`,
     { headers: headers() }
   );
   return res.json();
 }
 
 export async function sendSupportMessage(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/support/messages`, {
+  const res = await fetch(`/api/support/messages`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -416,7 +417,7 @@ export async function sendSupportMessage(data: any) {
 }
 
 export async function markSupportMessagesAsRead(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/support/mark-read`, {
+  const res = await fetch(`/api/support/mark-read`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify({ user_id: userId }),
@@ -426,7 +427,7 @@ export async function markSupportMessagesAsRead(userId: string) {
 
 export async function getUnreadChatMessagesCount(userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/support/unread-count?user_id=${userId}`,
+    `/api/support/unread-count?user_id=${userId}`,
     { headers: headers() }
   );
   const data = await res.json();
@@ -436,14 +437,14 @@ export async function getUnreadChatMessagesCount(userId: string) {
 // ---------- USER SETTINGS ----------
 export async function getUserSettings(userId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/user-settings/${userId}`,
+    `/api/user-settings/${userId}`,
     { headers: headers() }
   );
   return res.json();
 }
 
 export async function updateUserSettings(userId: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/user-settings/${userId}`, {
+  const res = await fetch(`/api/user-settings/${userId}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -456,7 +457,7 @@ export async function uploadFileToStorage(file: File, path: string): Promise<str
   const formData = new FormData();
   formData.append("file", file);
   formData.append("path", path);
-  const res = await fetch(`${WORKER_URL}/api/upload`, {
+  const res = await fetch(`/api/upload`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
@@ -474,47 +475,47 @@ export async function uploadFileToStorage(file: File, path: string): Promise<str
 
 // ---------- ADMIN APIs ----------
 export async function adminGetAllKyc() {
-  const res = await fetch(`${WORKER_URL}/api/admin/kyc`, { headers: headers() });
+  const res = await fetch(`/api/admin/kyc`, { headers: headers() });
   return res.json();
 }
 
 export async function adminGetAllCases() {
-  const res = await fetch(`${WORKER_URL}/api/admin/cases`, { headers: headers() });
+  const res = await fetch(`/api/admin/cases`, { headers: headers() });
   return res.json();
 }
 
 export async function adminGetAllResolutions() {
-  const res = await fetch(`${WORKER_URL}/api/admin/resolutions`, { headers: headers() });
+  const res = await fetch(`/api/admin/resolutions`, { headers: headers() });
   return res.json();
 }
 
 export async function adminGetAllDeposits() {
-  const res = await fetch(`${WORKER_URL}/api/admin/deposits`, { headers: headers() });
+  const res = await fetch(`/api/admin/deposits`, { headers: headers() });
   return res.json();
 }
 
 export async function adminGetAllProfiles() {
-  const res = await fetch(`${WORKER_URL}/api/admin/profiles`, { headers: headers() });
+  const res = await fetch(`/api/admin/profiles`, { headers: headers() });
   return res.json();
 }
 
 export async function adminGetAllWallets() {
-  const res = await fetch(`${WORKER_URL}/api/admin/wallets`, { headers: headers() });
+  const res = await fetch(`/api/admin/wallets`, { headers: headers() });
   return res.json();
 }
 
 export async function adminGetAllUnlocks() {
-  const res = await fetch(`${WORKER_URL}/api/admin/unlocks`, { headers: headers() });
+  const res = await fetch(`/api/admin/unlocks`, { headers: headers() });
   return res.json();
 }
 
 export async function adminGetAllSupportMessages() {
-  const res = await fetch(`${WORKER_URL}/api/admin/support-messages`, { headers: headers() });
+  const res = await fetch(`/api/admin/support-messages`, { headers: headers() });
   return res.json();
 }
 
 export async function adminSendSupportReply(data: Record<string, unknown>) {
-  const res = await fetch(`${WORKER_URL}/api/admin/support/reply`, {
+  const res = await fetch(`/api/admin/support/reply`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -525,22 +526,22 @@ export async function adminSendSupportReply(data: Record<string, unknown>) {
 }
 
 export async function adminGetAllFeedbacks() {
-  const res = await fetch(`${WORKER_URL}/api/admin/feedbacks`, { headers: headers() });
+  const res = await fetch(`/api/admin/feedbacks`, { headers: headers() });
   return res.json();
 }
 
 export async function adminGetAllOffers() {
-  const res = await fetch(`${WORKER_URL}/api/admin/offers`, { headers: headers() });
+  const res = await fetch(`/api/admin/offers`, { headers: headers() });
   return res.json();
 }
 
 export async function adminGetAllSuspensions() {
-  const res = await fetch(`${WORKER_URL}/api/admin/suspensions`, { headers: headers() });
+  const res = await fetch(`/api/admin/suspensions`, { headers: headers() });
   return res.json();
 }
 
 export async function adminUpdateKyc(id: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/admin/kyc/${id}`, {
+  const res = await fetch(`/api/admin/kyc/${id}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -549,7 +550,7 @@ export async function adminUpdateKyc(id: string, data: any) {
 }
 
 export async function adminUpdateCase(id: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/admin/cases/${id}`, {
+  const res = await fetch(`/api/admin/cases/${id}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -558,7 +559,7 @@ export async function adminUpdateCase(id: string, data: any) {
 }
 
 export async function adminUpdateFeedback(id: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/admin/feedbacks/${id}`, {
+  const res = await fetch(`/api/admin/feedbacks/${id}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -567,7 +568,7 @@ export async function adminUpdateFeedback(id: string, data: any) {
 }
 
 export async function adminUpdateResolution(id: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/admin/resolutions/${id}`, {
+  const res = await fetch(`/api/admin/resolutions/${id}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -576,7 +577,7 @@ export async function adminUpdateResolution(id: string, data: any) {
 }
 
 export async function adminUpdateDeposit(id: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/admin/deposits/${id}`, {
+  const res = await fetch(`/api/admin/deposits/${id}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -585,7 +586,7 @@ export async function adminUpdateDeposit(id: string, data: any) {
 }
 
 export async function adminCloseCase(id: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/admin/cases/${id}/close`, {
+  const res = await fetch(`/api/admin/cases/${id}/close`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -594,14 +595,14 @@ export async function adminCloseCase(id: string, data: any) {
 }
 
 export async function adminGetUserSuspension(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/admin/user-suspension/${userId}`, {
+  const res = await fetch(`/api/admin/user-suspension/${userId}`, {
     headers: headers(),
   });
   return res.json();
 }
 
 export async function adminUpsertUserSuspension(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/admin/user-suspension`, {
+  const res = await fetch(`/api/admin/user-suspension`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -610,7 +611,7 @@ export async function adminUpsertUserSuspension(data: any) {
 }
 
 export async function adminUpdateProfile(userId: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/admin/profiles/${userId}`, {
+  const res = await fetch(`/api/admin/profiles/${userId}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
@@ -619,7 +620,7 @@ export async function adminUpdateProfile(userId: string, data: any) {
 }
 
 export async function adminGetWalletsByUser(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/admin/wallets?user_id=${userId}`, {
+  const res = await fetch(`/api/admin/wallets?user_id=${userId}`, {
     headers: headers(),
   });
   const data = await res.json();
@@ -627,7 +628,7 @@ export async function adminGetWalletsByUser(userId: string) {
 }
 
 export async function adminUpsertWallet(userId: string, balance: number) {
-  const res = await fetch(`${WORKER_URL}/api/admin/wallets`, {
+  const res = await fetch(`/api/admin/wallets`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ user_id: userId, balance }),
@@ -636,7 +637,7 @@ export async function adminUpsertWallet(userId: string, balance: number) {
 }
 
 export async function adminGetCategoryOffer(category: string) {
-  const res = await fetch(`${WORKER_URL}/api/admin/offers?category=${category}`, {
+  const res = await fetch(`/api/admin/offers?category=${category}`, {
     headers: headers(),
   });
   const data = await res.json();
@@ -644,7 +645,7 @@ export async function adminGetCategoryOffer(category: string) {
 }
 
 export async function adminUpsertCategoryOffer(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/admin/offers`, {
+  const res = await fetch(`/api/admin/offers`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -653,7 +654,7 @@ export async function adminUpsertCategoryOffer(data: any) {
 }
 
 export async function adminDeleteFiles(urls: string[]) {
-  const res = await fetch(`${WORKER_URL}/api/admin/delete-files`, {
+  const res = await fetch(`/api/admin/delete-files`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ urls }),
@@ -663,28 +664,28 @@ export async function adminDeleteFiles(urls: string[]) {
 
 // ---------- USER DATA (for privacy page) ----------
 export async function getUserCases(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/cases?user_id=${userId}`, {
+  const res = await fetch(`/api/cases?user_id=${userId}`, {
     headers: headers(),
   });
   return res.json();
 }
 
 export async function getUserKycSubmissions(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/kyc-submissions?user_id=${userId}`, {
+  const res = await fetch(`/api/kyc-submissions?user_id=${userId}`, {
     headers: headers(),
   });
   return res.json();
 }
 
 export async function getUserDeposits(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/deposits?user_id=${userId}`, {
+  const res = await fetch(`/api/deposits?user_id=${userId}`, {
     headers: headers(),
   });
   return res.json();
 }
 
 export async function deleteUserAccount(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/account/delete`, {
+  const res = await fetch(`/api/account/delete`, {
     method: "DELETE",
     headers: headers(),
     body: JSON.stringify({ user_id: userId }),
@@ -721,7 +722,7 @@ export async function getCaseCount(userId: string): Promise<number> {
 }
 
 export async function getChatMessages(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/support/messages?user_id=${userId}`, {
+  const res = await fetch(`/api/support/messages?user_id=${userId}`, {
     headers: headers(),
   });
   return res.json();
@@ -732,12 +733,12 @@ export async function sendChatMessage(data: any) {
 }
 
 // ============================================================
-// ========== NEW FUNCTIONS FOR COMMUNITY POSTS, LIKES, COMMENTS ==========
+// ========== COMMUNITY POSTS, LIKES, COMMENTS ==========
 // ============================================================
 
 // ---------- COMMUNITY POSTS ----------
 export async function getCommunityPosts(): Promise<any[]> {
-  const res = await fetch(`${WORKER_URL}/api/community-posts`, { headers: headers() });
+  const res = await fetch(`/api/community-posts`, { headers: headers() });
   return res.json();
 }
 
@@ -747,7 +748,7 @@ export async function createCommunityPost(data: {
   is_guest?: boolean;
   user_id?: string;
 }): Promise<any> {
-  const res = await fetch(`${WORKER_URL}/api/community-posts`, {
+  const res = await fetch(`/api/community-posts`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
@@ -756,7 +757,7 @@ export async function createCommunityPost(data: {
 }
 
 export async function markCommunityPostsAsRead(): Promise<void> {
-  await fetch(`${WORKER_URL}/api/community-posts/mark-read`, {
+  await fetch(`/api/community-posts/mark-read`, {
     method: "POST",
     headers: headers(),
   });
@@ -764,30 +765,42 @@ export async function markCommunityPostsAsRead(): Promise<void> {
 
 // ---------- POST LIKES ----------
 export async function toggleLike(postId: string): Promise<{ liked: boolean }> {
-  const res = await fetch(`${WORKER_URL}/api/post-likes/${postId}`, {
+  const res = await fetch(`/api/post-likes/${postId}`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ post_id: postId }),
   });
+  
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to toggle like: ${res.status} - ${text}`);
+  }
+  
   return res.json();
 }
 
 export async function getPostLikes(postId: string): Promise<any[]> {
-  const res = await fetch(`${WORKER_URL}/api/post-likes/${postId}`, { headers: headers() });
+  const res = await fetch(`/api/post-likes/${postId}`, { headers: headers() });
   return res.json();
 }
 
 // ---------- POST COMMENTS ----------
 export async function addComment(postId: string, comment: string): Promise<any> {
-  const res = await fetch(`${WORKER_URL}/api/post-comments/${postId}`, {
+  const res = await fetch(`/api/post-comments/${postId}`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ post_id: postId, comment }),
   });
+  
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to add comment: ${res.status} - ${text}`);
+  }
+  
   return res.json();
 }
 
 export async function getPostComments(postId: string): Promise<any[]> {
-  const res = await fetch(`${WORKER_URL}/api/post-comments/${postId}`, { headers: headers() });
+  const res = await fetch(`/api/post-comments/${postId}`, { headers: headers() });
   return res.json();
 }
