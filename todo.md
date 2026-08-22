@@ -548,3 +548,9 @@
 - [x] Verify Admin Posts tab in AdminDashboard.tsx renders guest and user posts cleanly.
 - [x] Run full test suite, type check, and production build.
 - [x] Provide clear production deployment instruction.
+
+## Fresh Live Domain Verification — 2026-08-22
+- [ ] Reload the actual `givethra.org` domain, not the local preview, in a mobile viewport.
+- [ ] Check the visible homepage text and Public Post marker in the live DOM.
+- [ ] Check the desktop live view and identify the served asset build.
+- [ ] Report the live result without claiming completion from local source alone.

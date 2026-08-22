@@ -25,3 +25,10 @@ A safe GET probe of `https://givethra.org/api/public-feedback` returned HTTP `40
 The live page has an activated service worker at `https://givethra.org/sw.js` controlling `/`, with cache `givethra-v1`. The cache currently contains the root document URLs (`/` and `/index.html`). This confirms a live client-side cache layer exists, but the served HTML and asset names still identify the old build. A normal reload may therefore continue to show the old homepage until the correct Worker/assets deployment is made and the service worker receives the updated artifact.
 
 No cache was cleared and no production resource was modified by this probe.
+
+
+## Fresh browser verification
+
+At 2026-08-22, a cache-busted browser visit to `https://givethra.org/?live_check=20260822_1` loaded the actual live domain. The visible page contains the announcement bar, GIVETHRA hero, Become a Hero / Request Help buttons, slider, filters, category chips, and the Verified Cases section. The exact string `Public Post` is absent from the live DOM; the keyword search returned no match. The current live homepage therefore does not render the requested composer, despite the canonical source containing it in `src/frontend/src/pages/HomePage.tsx`.
+
+This was a read-only inspection. No post was submitted and no D1/R2 data was changed.
