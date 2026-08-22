@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Heart, MessageCircle, Send, User, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Send, User } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -13,15 +13,7 @@ interface Post {
   message: string;
   is_guest: boolean;
   created_at: string;
-  likes?: Like[];
   comments?: Comment[];
-}
-
-interface Like {
-  id: string;
-  user_id: string;
-  post_id: string;
-  created_at: string;
 }
 
 interface Comment {
@@ -41,16 +33,19 @@ export default function CommunityPage() {
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
-  const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const token = localStorage.getItem("token") || "";
+  // ✅ ٹوکن حاصل کرنے کا فنکشن
+  const getToken = () => localStorage.getItem("auth_token") || "";
 
+  // --- پوسٹس لوڈ کریں ---
   const fetchPosts = async () => {
     setLoading(true);
     try {
+      const token = getToken();
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       };
+      // اگر ٹوکن ہے تو بھیجیں، ورنہ مہمان کی حیثیت سے
       if (isAuthenticated && token) {
         headers.Authorization = `Bearer ${token}`;
       }
@@ -58,21 +53,27 @@ export default function CommunityPage() {
       if (res.ok) {
         const data = await res.json();
         setPosts(data || []);
-        // Fetch likes for each post
+        // ہر پوسٹ کے لیے لائکس اور کمنٹس لوڈ کریں
         data?.forEach((post: Post) => {
           fetchLikes(post.id);
           fetchComments(post.id);
         });
+      } else {
+        console.error("Failed to fetch posts:", res.status);
+        toast.error("Could not load posts");
       }
     } catch (error) {
       console.error("Error fetching posts:", error);
+      toast.error("Network error while loading posts");
     } finally {
       setLoading(false);
     }
   };
 
+  // --- لائکس لوڈ کریں ---
   const fetchLikes = async (postId: string) => {
     try {
+      const token = getToken();
       const headers: HeadersInit = { "Content-Type": "application/json" };
       if (isAuthenticated && token) {
         headers.Authorization = `Bearer ${token}`;
@@ -82,7 +83,7 @@ export default function CommunityPage() {
         const data = await res.json();
         setLikeCounts((prev) => ({ ...prev, [postId]: data.length || 0 }));
         if (isAuthenticated && user?.id) {
-          const userLiked = data.some((like: Like) => like.user_id === user.id);
+          const userLiked = data.some((like: any) => like.user_id === user.id);
           setLikedPosts((prev) => ({ ...prev, [postId]: userLiked }));
         }
       }
@@ -91,8 +92,10 @@ export default function CommunityPage() {
     }
   };
 
+  // --- کمنٹس لوڈ کریں ---
   const fetchComments = async (postId: string) => {
     try {
+      const token = getToken();
       const headers: HeadersInit = { "Content-Type": "application/json" };
       if (isAuthenticated && token) {
         headers.Authorization = `Bearer ${token}`;
@@ -111,11 +114,19 @@ export default function CommunityPage() {
     }
   };
 
+  // --- لائک ٹوگل کریں ---
   const handleLike = async (postId: string) => {
     if (!isAuthenticated) {
       toast.error("Please sign in to like posts");
       return;
     }
+
+    const token = getToken();
+    if (!token) {
+      toast.error("You are not logged in. Please sign in again.");
+      return;
+    }
+
     try {
       const res = await fetch(`/api/post-likes/${postId}`, {
         method: "POST",
@@ -125,27 +136,49 @@ export default function CommunityPage() {
         },
         body: JSON.stringify({ post_id: postId }),
       });
+
       if (res.ok) {
         const data = await res.json();
         if (data.liked) {
           setLikedPosts((prev) => ({ ...prev, [postId]: true }));
           setLikeCounts((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-          toast.success("Post liked!");
+          // اگر پوسٹ کا مالک خود نہیں ہے تو نوٹیفکیشن بھیجیں (بیک اینڈ کو)
+          const postOwner = posts.find(p => p.id === postId)?.user_id;
+          if (postOwner && postOwner !== user?.id) {
+            await fetch("/api/notifications", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                user_id: postOwner,
+                type: "like",
+                title: "New Like",
+                message: `${user?.fullName || "Someone"} liked your post.`,
+                link: `/community`,
+              }),
+            });
+          }
+          toast.success("Liked!");
         } else {
           setLikedPosts((prev) => ({ ...prev, [postId]: false }));
           setLikeCounts((prev) => ({ ...prev, [postId]: Math.max((prev[postId] || 0) - 1, 0) }));
-          toast.info("Post unliked");
+          toast.info("Unliked");
         }
+      } else if (res.status === 401) {
+        toast.error("Your session expired. Please sign in again.");
       } else {
         const error = await res.json();
         toast.error(error?.error || "Failed to like post");
       }
     } catch (error) {
       console.error("Error liking post:", error);
-      toast.error("Network error. Please try again.");
+      toast.error("Network error. Please check your connection.");
     }
   };
 
+  // --- کمنٹ کریں ---
   const handleComment = async (postId: string) => {
     const comment = newComment[postId]?.trim();
     if (!comment) {
@@ -156,6 +189,13 @@ export default function CommunityPage() {
       toast.error("Please sign in to comment");
       return;
     }
+
+    const token = getToken();
+    if (!token) {
+      toast.error("You are not logged in. Please sign in again.");
+      return;
+    }
+
     try {
       const res = await fetch(`/api/post-comments/${postId}`, {
         method: "POST",
@@ -165,6 +205,7 @@ export default function CommunityPage() {
         },
         body: JSON.stringify({ post_id: postId, comment }),
       });
+
       if (res.ok) {
         const data = await res.json();
         setPosts((prev) =>
@@ -175,8 +216,26 @@ export default function CommunityPage() {
           )
         );
         setNewComment((prev) => ({ ...prev, [postId]: "" }));
+        // پوسٹ کے مالک کو نوٹیفکیشن
+        const postOwner = posts.find(p => p.id === postId)?.user_id;
+        if (postOwner && postOwner !== user?.id) {
+          await fetch("/api/notifications", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              user_id: postOwner,
+              type: "comment",
+              title: "New Comment",
+              message: `${user?.fullName || "Someone"} commented on your post: "${comment.slice(0, 50)}..."`,
+              link: `/community`,
+            }),
+          });
+        }
         toast.success("Comment added!");
-        // Scroll to the new comment
+        // نئے کمنٹ پر اسکرول
         setTimeout(() => {
           const commentEl = document.getElementById(`comment-${data.id}`);
           if (commentEl) commentEl.scrollIntoView({ behavior: "smooth" });
@@ -191,10 +250,12 @@ export default function CommunityPage() {
     }
   };
 
+  // --- کمنٹس دکھائیں/چھپائیں ---
   const toggleComments = (postId: string) => {
     setShowComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
   };
 
+  // --- پہلی بار اور وقتاً فوقتاً لوڈ کریں ---
   useEffect(() => {
     fetchPosts();
     const interval = setInterval(fetchPosts, 30000);
@@ -259,6 +320,7 @@ export default function CommunityPage() {
                 className={`flex items-center gap-1 text-sm transition-colors ${
                   likedPosts[post.id] ? "text-red-500" : "text-muted-foreground hover:text-red-500"
                 }`}
+                disabled={!isAuthenticated}
               >
                 <Heart className={`h-5 w-5 ${likedPosts[post.id] ? "fill-red-500" : ""}`} />
                 <span>{likeCounts[post.id] || 0}</span>
@@ -298,7 +360,6 @@ export default function CommunityPage() {
                 {isAuthenticated && (
                   <div className="flex items-center gap-2 mt-2">
                     <Input
-                      ref={(el) => (commentInputRefs.current[post.id] = el)}
                       placeholder="Write a comment..."
                       value={newComment[post.id] || ""}
                       onChange={(e) =>
