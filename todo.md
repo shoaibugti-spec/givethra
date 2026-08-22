@@ -501,3 +501,16 @@
 - [x] Confirm the Worker and frontend assets are deployed together, with no Pages/Worker/custom-domain split serving an older bundle.
 - [x] Repair only the deployment source, directory, branch, or routing mismatch by preparing the verified canonical `src/frontend` deployment path; do not modify D1/R2 data.
 - [x] Re-run the complete regression/build checks and provide exact Cloudflare deployment steps that preserve the working Public Post and Admin behavior.
+
+## Cloudflare Manual Build Command Error
+- [ ] Correct the Cloudflare manual build command from `pnmp run build` to `pnpm run build`; the failed build leaves the previous old deployment serving givethra.org.
+
+## Cloudflare Worker-vs-Pages Deployment Path Finding
+- [x] Record that Cloudflare reports no Workers Build configuration attached to script `givethra`; the `pnmp run build` error belongs to a separate manual build path and cannot update the active custom-domain Worker.
+- [x] Verify the current GitHub `main` commit and whether the canonical Worker deployment workflow is present on the remote branch.
+- [ ] Ensure the active `givethra.org` Worker is updated through the Wrangler deployment path, not an unrelated Pages/manual build project, without touching D1/R2.
+
+## Confirmed Manual Deploy Root Cause
+- [ ] Sync the verified local workflow to GitHub `main`; remote `deploy-givethra.yml` still uses the old non-frozen `--ignore-workspace` install and remote `deploy.yml` remains active as a duplicate root deployment path.
+- [ ] Correct the Cloudflare manual build setting from `pnmp run build` to `pnpm run build`, or remove that unrelated build project and use the Wrangler Worker deployment workflow.
+- [x] Do not treat the Cloudflare Pages/manual build log as the active production Worker: Cloudflare reports no Workers Build configuration for script `givethra`.

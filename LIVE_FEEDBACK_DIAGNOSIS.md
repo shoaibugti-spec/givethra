@@ -38,3 +38,19 @@ The stale live site is caused by **source and deployment lineage mismatch**, not
 The safe repair is to synchronize the verified checkpoint to GitHub `main`, confirm the two Cloudflare Actions secrets and GitHub Actions runner/billing availability, and run the single canonical `Deploy Givethra to Cloudflare` workflow. The workflow deploys the Worker and the built `dist` assets together using the existing D1/R2 bindings; it does not drop tables, migrate data, delete R2 objects, or change live records.
 
 After deployment, verify `https://givethra.org` in a private browser window or with a hard refresh, confirm the homepage contains **Public Post**, submit one harmless guest message, and confirm it appears in Admin **Posts**. Verify the deployed API with a real `POST` request rather than a `GET`, because the route is a write endpoint. Do not use any preview domain as evidence for the production result.
+
+## Manual deployment log received after the regression
+
+The user-provided Cloudflare build log confirms that the environment installed Node.js 20.20.2 and pnpm 10.4.1, then failed only at the configured user build command:
+
+```text
+Executing user build command: pnmp run build
+/bin/sh: 1: pnmp: not found
+Failed: error occurred while running build command
+```
+
+`pnmp` is a typo; the canonical frontend command is `pnpm run build`, executed from `src/frontend`. Because the build stopped before Vite generated the current `dist` assets and before Wrangler deployed the Worker, Cloudflare retained or continued serving the last successful older artifact. The dependency install completed; this is not a D1/R2 or application-code failure.
+
+A read-only Cloudflare API check also reports that no Workers Build configuration is attached to the active script tag `givethra`. Therefore the `pnmp` setting is not the active Worker build configuration. The production domain `givethra.org` is mapped to the `givethra` Worker, which must be updated through the canonical Wrangler deployment path. The repository root build must not be used because it targets the managed template rather than the canonical Givethra `src/frontend` application.
+
+No Cloudflare mutation, Worker deployment, D1 query, or R2 operation was performed during this diagnosis.
