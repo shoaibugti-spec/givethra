@@ -7,13 +7,23 @@ import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Heart, MessageCircle, Send, User } from "lucide-react";
 import { toast } from "sonner";
-import { getAuthToken } from "@/lib/api"; // helper to get token
 
-// Helper to get token
+// Helper to get token from localStorage
 function getToken() {
   try {
     return localStorage.getItem("auth_token");
   } catch { return null; }
+}
+
+// Authenticated fetch wrapper
+async function authFetch(url: string, options: RequestInit = {}) {
+  const token = getToken();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+  return fetch(url, { ...options, headers });
 }
 
 export default function CommunityPage() {
@@ -24,17 +34,6 @@ export default function CommunityPage() {
   const [submittingComment, setSubmittingComment] = useState<string | null>(null);
   const [liking, setLiking] = useState<string | null>(null);
 
-  // Helper for authenticated fetch
-  const authFetch = async (url: string, options: RequestInit = {}) => {
-    const token = getToken();
-    const headers = {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    };
-    return fetch(url, { ...options, headers });
-  };
-
   // Fetch all posts with likes and comments
   async function fetchPosts() {
     setLoading(true);
@@ -42,7 +41,7 @@ export default function CommunityPage() {
       const res = await authFetch("/api/community-posts");
       if (res.ok) {
         const data = await res.json();
-        // Fetch likes and comments for each post
+        // Fetch likes and comments for each post in parallel
         const postsWithMeta = await Promise.all(
           data.map(async (post: any) => {
             const [likesRes, commentsRes] = await Promise.all([
@@ -60,10 +59,13 @@ export default function CommunityPage() {
           })
         );
         setPosts(postsWithMeta);
+      } else {
+        const err = await res.json();
+        toast.error(err?.error || "Failed to load posts");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load posts");
+      toast.error("Network error loading posts");
     } finally {
       setLoading(false);
     }
@@ -71,7 +73,10 @@ export default function CommunityPage() {
 
   useEffect(() => {
     fetchPosts();
-  }, []);
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchPosts, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user?.id]); // Re-fetch when auth changes
 
   // Like / Unlike
   async function toggleLike(postId: string) {
@@ -87,7 +92,19 @@ export default function CommunityPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        await fetchPosts(); // refresh
+        // Update local state immediately without full refetch
+        setPosts(prev =>
+          prev.map(p => {
+            if (p.id === postId) {
+              const liked = data.liked;
+              const updatedLikes = liked
+                ? [...p.likes, { user_id: user?.id, id: data.id }]
+                : p.likes.filter((l: any) => l.user_id !== user?.id);
+              return { ...p, likes: updatedLikes, likedByUser: liked };
+            }
+            return p;
+          })
+        );
         toast.success(data.liked ? "Liked!" : "Unliked");
       } else {
         const err = await res.json();
@@ -118,8 +135,29 @@ export default function CommunityPage() {
         body: JSON.stringify({ post_id: postId, comment: text }),
       });
       if (res.ok) {
+        const newComment = await res.json();
+        // Add comment locally immediately
+        setPosts(prev =>
+          prev.map(p => {
+            if (p.id === postId) {
+              return {
+                ...p,
+                comments: [
+                  ...p.comments,
+                  {
+                    id: newComment.id,
+                    user_id: user?.id,
+                    user_name: user?.fullName || "User",
+                    comment: text,
+                    created_at: new Date().toISOString(),
+                  },
+                ],
+              };
+            }
+            return p;
+          })
+        );
         setCommentText(prev => ({ ...prev, [postId]: "" }));
-        await fetchPosts();
         toast.success("Comment added");
       } else {
         const err = await res.json();
