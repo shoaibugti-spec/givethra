@@ -1,4 +1,6 @@
 // src/frontend/src/components/Layout.tsx
+// Complete clean layout - NO duplicate navigation
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -80,7 +82,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
 
-  // Load post count (for community icon badge)
+  // Load post count for community icon badge
   useEffect(() => {
     const fetchPostCount = async () => {
       try {
@@ -109,7 +111,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* HEADER */}
+      {/* ===== HEADER - ONLY THIS ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
           {/* Left: Hamburger + Brand */}
@@ -179,7 +181,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* ===== MOBILE MENU ===== */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1 max-h-[80vh] overflow-y-auto">
             <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
@@ -194,6 +196,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {isAdmin && <NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink>}
             <NavLink to="/about" onClick={closeMenu}>About</NavLink>
             <NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink>
+
             <div className="pt-3 border-t border-border mt-2 space-y-2">
               {isAuthenticated ? (
                 <>
@@ -221,10 +224,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
-      {/* Main */}
+      {/* ===== MAIN CONTENT ===== */}
       <main className="flex-1 has-bottom-nav">{children}</main>
 
-      {/* Footer (unchanged) */}
+      {/* ===== FOOTER ===== */}
       <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
