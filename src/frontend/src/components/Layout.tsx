@@ -1,6 +1,6 @@
 // src/frontend/src/components/Layout.tsx
 // Clean header with brand, search, language switcher, community post icon, and notification
-// Mobile menu only contains navigation links - no duplicate language/theme toggles
+// No duplicate navigation bar below the header
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,6 @@ const FACEBOOK_URL =
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 
-// NavLink component for mobile menu
 function NavLink({
   to,
   children,
@@ -80,7 +79,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
 
-  // Load notification counts
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
@@ -118,7 +116,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* ===== TOP HEADER ===== */}
+      {/* ===== HEADER ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
           {/* Left: Hamburger + Brand */}
@@ -138,7 +136,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
-          {/* Center: Search Bar */}
+          {/* Center: Search */}
           <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto md:mx-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -183,7 +181,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* ===== MOBILE MENU (Hamburger) - CLEAN ===== */}
+        {/* ===== MOBILE MENU ===== */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1 max-h-[80vh] overflow-y-auto">
             <NavLink to="/cases" onClick={closeMenu}>
@@ -217,7 +215,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               FAQ
             </NavLink>
 
-            {/* User actions */}
             <div className="pt-3 border-t border-border mt-2 space-y-2">
               {isAuthenticated ? (
                 <>
@@ -262,7 +259,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* ===== MAIN CONTENT ===== */}
       <main className="flex-1 has-bottom-nav">{children}</main>
 
-      {/* ===== FOOTER (unchanged) ===== */}
+      {/* ===== FOOTER ===== */}
       <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
