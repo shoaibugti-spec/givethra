@@ -1,4 +1,7 @@
-// src/frontend/src/lib/api.ts
+// ============================================================
+// FILE: src/frontend/src/lib/api.ts
+// ============================================================
+
 // Cloudflare Worker API client – all backend calls go through this file
 
 // Use the public custom domain so browser requests are not sent through the
@@ -99,7 +102,6 @@ export async function getUserUnlockCount(userId: string) {
   return data.count ?? 0;
 }
 
-// Backwards-compatible name used by the home dashboard.
 export async function getUnlockCount(userId: string) {
   return getUserUnlockCount(userId);
 }
@@ -537,6 +539,7 @@ export async function adminGetAllSuspensions() {
   return res.json();
 }
 
+
 export async function adminUpdateKyc(id: string, data: any) {
   const res = await fetch(`${WORKER_URL}/api/admin/kyc/${id}`, {
     method: "PUT",
@@ -690,12 +693,7 @@ export async function deleteUserAccount(userId: string) {
   return res.json();
 }
 
-// ========== ✅ EXTRA FUNCTIONS FOR userGuide.ts ==========
-
-/**
- * Get KYC status for a user
- * Returns an object with status field (e.g., "none", "pending", "approved", "rejected")
- */
+// ========== EXTRA FUNCTIONS FOR userGuide.ts ==========
 export async function getKycStatus(userId: string): Promise<{ status: string }> {
   try {
     const submission = await getKycSubmission(userId);
@@ -705,9 +703,6 @@ export async function getKycStatus(userId: string): Promise<{ status: string }> 
   }
 }
 
-/**
- * Get count of cases a user has helped (as hero) - i.e., number of unlocks
- */
 export async function getHelpCount(userId: string): Promise<number> {
   try {
     const unlocks = await getCaseUnlocksByHero(userId);
@@ -717,9 +712,6 @@ export async function getHelpCount(userId: string): Promise<number> {
   }
 }
 
-/**
- * Get total count of cases submitted by a user
- */
 export async function getCaseCount(userId: string): Promise<number> {
   try {
     const counts = await getCaseCounts(userId);
@@ -728,7 +720,6 @@ export async function getCaseCount(userId: string): Promise<number> {
     return 0;
   }
 }
-
 
 export async function getChatMessages(userId: string) {
   const res = await fetch(`${WORKER_URL}/api/support/messages?user_id=${userId}`, {

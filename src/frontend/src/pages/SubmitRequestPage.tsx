@@ -2083,6 +2083,7 @@ export default function SubmitRequestPage() {
     );
   }
 
+  // ===== FIXED: Removed extra } at line 2090 =====
   function renderPaymentReceiverDetails() {
     if (!needsPaymentReceiver) return null;
 
