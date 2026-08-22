@@ -177,7 +177,6 @@ export default function HomePage() {
   const [detectedCity, setDetectedCity] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Public post state
   const [postMessage, setPostMessage] = useState("");
   const [postSubmitting, setPostSubmitting] = useState(false);
   const [postSubmitted, setPostSubmitted] = useState(false);
@@ -293,7 +292,6 @@ export default function HomePage() {
     }
   }
 
-  // Slides
   const HAND_SLIDE = {
     key: "hero",
     type: "image" as const,
@@ -533,7 +531,6 @@ export default function HomePage() {
             <div className="absolute bottom-0 -left-16 h-48 w-48 rounded-full bg-primary/8 blur-2xl" />
           </div>
           <div className="relative max-w-7xl mx-auto px-4 pt-8 pb-6 md:py-12 flex flex-col md:flex-row items-center gap-6 md:gap-12">
-            {/* Left side */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -581,7 +578,6 @@ export default function HomePage() {
               )}
             </motion.div>
 
-            {/* Right side: post box + slider */}
             <motion.div
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
