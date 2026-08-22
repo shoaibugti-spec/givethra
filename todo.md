@@ -481,3 +481,6 @@
 - [x] Reconcile the unused email-verification page with the current AuthContext so the full source type-checks without stale API assumptions.
 - [x] Disable the duplicate legacy root deployment workflow so GitHub main has one canonical src/frontend Cloudflare production workflow.
 - [x] Align the canonical workflow's pnpm install mode with the isolated src/frontend lockfile used by the successful build.
+
+## CI-Equivalent pnpm v10 Build-Policy Repair
+- [x] Make the isolated GitHub Actions install explicitly allow only the required native build scripts; the exact `src/frontend` frozen-lockfile install now completes with the known pnpm v10 native-build warning and the production build succeeds.
