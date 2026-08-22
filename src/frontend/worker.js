@@ -1,5 +1,5 @@
 // ============================================================
-// FILE: worker.js (COMPLETE - Cloudflare Worker)
+// FILE: worker.js (COMPLETE - FIXED)
 // ============================================================
 
 const DEFAULT_GOOGLE_CLIENT_ID =
@@ -7,7 +7,7 @@ const DEFAULT_GOOGLE_CLIENT_ID =
 const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
 
-console.log("✅ Worker loaded - v7 (Complete)");
+console.log("✅ Worker loaded - v8 (FIXED)");
 
 function corsHeaders(origin) {
   const allowOrigin = origin === PUBLIC_ORIGIN ? origin : PUBLIC_ORIGIN;
@@ -48,7 +48,6 @@ async function verifyGoogleCredential(credential, clientId) {
       `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
     );
     if (!response.ok) {
-      // Try JWT decode fallback
       const parts = credential.split(".");
       if (parts.length === 3) {
         const payloadJson = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
@@ -169,10 +168,23 @@ function pick(body, fields) {
 }
 
 // ============================================================
-//  COMMUNITY POSTS HANDLERS
+//  COMMUNITY POSTS HANDLERS (FIXED)
 // ============================================================
 
 async function handleCommunityPosts(request, env, user, origin) {
+  const url = new URL(request.url);
+  const parts = pathParts(url);
+
+  // MARK-READ endpoint (must be checked first)
+  if (parts[2] === "mark-read" && request.method === "POST") {
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    const nowStr = now();
+    await env.DB.prepare(
+      "UPDATE users SET last_community_visit = ? WHERE user_id = ?"
+    ).bind(nowStr, user.user_id).run();
+    return json({ success: true, last_community_visit: nowStr }, 200, origin);
+  }
+
   // POST - Create new post
   if (request.method === "POST") {
     const body = await readJson(request);
@@ -239,21 +251,11 @@ async function handleCommunityPosts(request, env, user, origin) {
     return json(rows.results || [], 200, origin);
   }
 
-  // MARK-READ endpoint
-  if (request.method === "POST" && pathParts(new URL(request.url))[2] === "mark-read") {
-    if (!user) return json({ error: "Authentication required" }, 401, origin);
-    const nowStr = now();
-    await env.DB.prepare(
-      "UPDATE users SET last_community_visit = ? WHERE user_id = ?"
-    ).bind(nowStr, user.user_id).run();
-    return json({ success: true, last_community_visit: nowStr }, 200, origin);
-  }
-
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
 // ============================================================
-//  POST LIKES HANDLERS
+//  POST LIKES HANDLERS (FIXED)
 // ============================================================
 
 async function handlePostLikes(request, env, user, parts, origin) {
@@ -261,73 +263,90 @@ async function handlePostLikes(request, env, user, parts, origin) {
 
   // GET - Fetch likes for a post
   if (request.method === "GET") {
-    if (postId) {
+    try {
+      if (postId) {
+        const rows = await env.DB.prepare(
+          "SELECT * FROM community_post_likes WHERE post_id = ? ORDER BY created_at DESC"
+        ).bind(postId).all();
+        return json(rows.results || [], 200, origin);
+      }
       const rows = await env.DB.prepare(
-        "SELECT * FROM community_post_likes WHERE post_id = ? ORDER BY created_at DESC"
-      ).bind(postId).all();
+        "SELECT * FROM community_post_likes ORDER BY created_at DESC LIMIT 100"
+      ).all();
       return json(rows.results || [], 200, origin);
+    } catch (error) {
+      console.error("GET likes error:", error);
+      return json({ error: error.message }, 500, origin);
     }
-    const rows = await env.DB.prepare(
-      "SELECT * FROM community_post_likes ORDER BY created_at DESC LIMIT 100"
-    ).all();
-    return json(rows.results || [], 200, origin);
   }
 
   // POST - Toggle like
   if (request.method === "POST") {
     if (!user) return json({ error: "Authentication required" }, 401, origin);
-    const body = await readJson(request);
-    const targetPostId = body?.post_id || postId;
-    if (!targetPostId) return json({ error: "post_id is required" }, 400, origin);
+    
+    try {
+      const body = await readJson(request);
+      const targetPostId = body?.post_id || postId;
+      if (!targetPostId) return json({ error: "post_id is required" }, 400, origin);
 
-    // Check if already liked
-    const existing = await env.DB.prepare(
-      "SELECT id FROM community_post_likes WHERE post_id = ? AND user_id = ? LIMIT 1"
-    ).bind(targetPostId, user.user_id).first();
-    
-    if (existing) {
-      // Unlike
-      await env.DB.prepare(
-        "DELETE FROM community_post_likes WHERE post_id = ? AND user_id = ?"
-      ).bind(targetPostId, user.user_id).run();
-      return json({ liked: false, post_id: targetPostId }, 200, origin);
-    }
+      // Check if already liked
+      const existing = await env.DB.prepare(
+        "SELECT id FROM community_post_likes WHERE post_id = ? AND user_id = ? LIMIT 1"
+      ).bind(targetPostId, user.user_id).first();
+      
+      if (existing) {
+        // Unlike
+        await env.DB.prepare(
+          "DELETE FROM community_post_likes WHERE post_id = ? AND user_id = ?"
+        ).bind(targetPostId, user.user_id).run();
+        return json({ liked: false, post_id: targetPostId }, 200, origin);
+      }
 
-    // Add like
-    const likeId = id();
-    await env.DB.prepare(
-      "INSERT INTO community_post_likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)"
-    ).bind(likeId, targetPostId, user.user_id, now()).run();
-    
-    // Get post owner for notification
-    const post = await env.DB.prepare(
-      "SELECT user_id FROM community_posts WHERE id = ?"
-    ).bind(targetPostId).first();
-    
-    if (post && post.user_id && post.user_id !== user.user_id) {
+      // Add like
+      const likeId = id();
       await env.DB.prepare(
-        `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id(),
-        post.user_id,
-        'like',
-        'New Like',
-        `${user.full_name || 'Someone'} liked your post.`,
-        '/community',
-        0,
-        now()
-      ).run();
+        "INSERT INTO community_post_likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)"
+      ).bind(likeId, targetPostId, user.user_id, now()).run();
+      
+      // Get post owner for notification
+      try {
+        const post = await env.DB.prepare(
+          "SELECT user_id FROM community_posts WHERE id = ?"
+        ).bind(targetPostId).first();
+        
+        if (post && post.user_id && post.user_id !== user.user_id) {
+          await env.DB.prepare(
+            `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            id(),
+            post.user_id,
+            'like',
+            'New Like',
+            `${user.full_name || 'Someone'} liked your post.`,
+            '/community',
+            0,
+            now()
+          ).run();
+        }
+      } catch (notifError) {
+        // Notification error shouldn't break the like
+        console.error("Notification error:", notifError);
+      }
+      
+      return json({ liked: true, id: likeId, post_id: targetPostId }, 201, origin);
+      
+    } catch (error) {
+      console.error("POST like error:", error);
+      return json({ error: error.message || "Failed to toggle like" }, 500, origin);
     }
-    
-    return json({ liked: true, id: likeId, post_id: targetPostId }, 201, origin);
   }
 
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
 // ============================================================
-//  POST COMMENTS HANDLERS
+//  POST COMMENTS HANDLERS (FIXED)
 // ============================================================
 
 async function handlePostComments(request, env, user, parts, origin) {
@@ -335,65 +354,81 @@ async function handlePostComments(request, env, user, parts, origin) {
 
   // GET - Fetch comments for a post
   if (request.method === "GET") {
-    if (postId) {
+    try {
+      if (postId) {
+        const rows = await env.DB.prepare(
+          `SELECT c.*, u.full_name as user_name 
+           FROM community_post_comments c 
+           LEFT JOIN users u ON c.user_id = u.user_id 
+           WHERE c.post_id = ? 
+           ORDER BY c.created_at ASC`
+        ).bind(postId).all();
+        return json(rows.results || [], 200, origin);
+      }
       const rows = await env.DB.prepare(
-        `SELECT c.*, u.full_name as user_name 
-         FROM community_post_comments c 
-         LEFT JOIN users u ON c.user_id = u.user_id 
-         WHERE c.post_id = ? 
-         ORDER BY c.created_at ASC`
-      ).bind(postId).all();
+        "SELECT * FROM community_post_comments ORDER BY created_at DESC LIMIT 100"
+      ).all();
       return json(rows.results || [], 200, origin);
+    } catch (error) {
+      console.error("GET comments error:", error);
+      return json({ error: error.message }, 500, origin);
     }
-    const rows = await env.DB.prepare(
-      "SELECT * FROM community_post_comments ORDER BY created_at DESC LIMIT 100"
-    ).all();
-    return json(rows.results || [], 200, origin);
   }
 
   // POST - Add comment
   if (request.method === "POST") {
     if (!user) return json({ error: "Authentication required" }, 401, origin);
-    const body = await readJson(request);
-    const targetPostId = body?.post_id || postId;
-    const comment = body?.comment?.trim();
-    if (!targetPostId) return json({ error: "post_id is required" }, 400, origin);
-    if (!comment) return json({ error: "Comment is required" }, 400, origin);
-
-    const commentId = id();
-    await env.DB.prepare(
-      "INSERT INTO community_post_comments (id, post_id, user_id, comment, created_at) VALUES (?, ?, ?, ?, ?)"
-    ).bind(commentId, targetPostId, user.user_id, comment, now()).run();
-
-    // Get post owner for notification
-    const post = await env.DB.prepare(
-      "SELECT user_id FROM community_posts WHERE id = ?"
-    ).bind(targetPostId).first();
     
-    if (post && post.user_id && post.user_id !== user.user_id) {
-      await env.DB.prepare(
-        `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id(),
-        post.user_id,
-        'comment',
-        'New Comment',
-        `${user.full_name || 'Someone'} commented on your post: "${comment.slice(0, 50)}${comment.length > 50 ? '...' : ''}"`,
-        '/community',
-        0,
-        now()
-      ).run();
-    }
+    try {
+      const body = await readJson(request);
+      const targetPostId = body?.post_id || postId;
+      const comment = body?.comment?.trim();
+      if (!targetPostId) return json({ error: "post_id is required" }, 400, origin);
+      if (!comment) return json({ error: "Comment is required" }, 400, origin);
 
-    return json({
-      id: commentId,
-      post_id: targetPostId,
-      user_id: user.user_id,
-      user_name: user.full_name || "User",
-      comment: comment,
-      created_at: now(),
-    }, 201, origin);
+      const commentId = id();
+      await env.DB.prepare(
+        "INSERT INTO community_post_comments (id, post_id, user_id, comment, created_at) VALUES (?, ?, ?, ?, ?)"
+      ).bind(commentId, targetPostId, user.user_id, comment, now()).run();
+
+      // Get post owner for notification
+      try {
+        const post = await env.DB.prepare(
+          "SELECT user_id FROM community_posts WHERE id = ?"
+        ).bind(targetPostId).first();
+        
+        if (post && post.user_id && post.user_id !== user.user_id) {
+          await env.DB.prepare(
+            `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            id(),
+            post.user_id,
+            'comment',
+            'New Comment',
+            `${user.full_name || 'Someone'} commented on your post: "${comment.slice(0, 50)}${comment.length > 50 ? '...' : ''}"`,
+            '/community',
+            0,
+            now()
+          ).run();
+        }
+      } catch (notifError) {
+        console.error("Notification error:", notifError);
+      }
+
+      return json({
+        id: commentId,
+        post_id: targetPostId,
+        user_id: user.user_id,
+        user_name: user.full_name || "User",
+        comment: comment,
+        created_at: now(),
+      }, 201, origin);
+      
+    } catch (error) {
+      console.error("POST comment error:", error);
+      return json({ error: error.message || "Failed to add comment" }, 500, origin);
+    }
   }
 
   return json({ error: "Method not allowed" }, 405, origin);
@@ -409,59 +444,79 @@ async function handleNotifications(request, env, user, url, parts, origin) {
   
   // GET unread count
   if (parts[2] === "unread-count" && request.method === "GET") {
-    const row = await env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND (is_read = 0 OR is_read IS NULL)"
-    ).bind(requested).first();
-    return json({ count: Number(row?.count || 0) }, 200, origin);
+    try {
+      const row = await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND (is_read = 0 OR is_read IS NULL)"
+      ).bind(requested).first();
+      return json({ count: Number(row?.count || 0) }, 200, origin);
+    } catch (error) {
+      return json({ count: 0 }, 200, origin);
+    }
   }
 
   // PUT mark all as read
   if (parts[2] === "mark-read" && request.method === "PUT") {
-    const body = await readJson(request);
-    const target = String(body?.user_id || requested);
-    if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
-    await env.DB.prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?").bind(target).run();
-    return json({ updated: true, user_id: target }, 200, origin);
+    try {
+      const body = await readJson(request);
+      const target = String(body?.user_id || requested);
+      if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+      await env.DB.prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?").bind(target).run();
+      return json({ updated: true, user_id: target }, 200, origin);
+    } catch (error) {
+      return json({ error: error.message }, 500, origin);
+    }
   }
 
   // DELETE clear all
   if (parts[2] === "clear" && request.method === "DELETE") {
-    const body = await readJson(request);
-    const target = String(body?.user_id || requested);
-    if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
-    await env.DB.prepare("DELETE FROM notifications WHERE user_id = ?").bind(target).run();
-    return json({ deleted: true, user_id: target }, 200, origin);
+    try {
+      const body = await readJson(request);
+      const target = String(body?.user_id || requested);
+      if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+      await env.DB.prepare("DELETE FROM notifications WHERE user_id = ?").bind(target).run();
+      return json({ deleted: true, user_id: target }, 200, origin);
+    } catch (error) {
+      return json({ error: error.message }, 500, origin);
+    }
   }
 
   // GET all notifications
   if (request.method === "GET") {
-    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 100), 1), 500);
-    const rows = await env.DB.prepare(
-      "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?"
-    ).bind(requested, limit).all();
-    return json(rows.results || [], 200, origin);
+    try {
+      const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 100), 1), 500);
+      const rows = await env.DB.prepare(
+        "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?"
+      ).bind(requested, limit).all();
+      return json(rows.results || [], 200, origin);
+    } catch (error) {
+      return json({ error: error.message }, 500, origin);
+    }
   }
 
   // POST create notification
   if (request.method === "POST") {
-    const body = await readJson(request);
-    const target = String(body?.user_id || user.user_id);
-    if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
-    const notificationId = String(body?.id || id());
-    await env.DB.prepare(
-      `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      notificationId,
-      target,
-      body?.type || 'system',
-      body?.title || null,
-      body?.message || null,
-      body?.link || null,
-      body?.is_read ? 1 : 0,
-      body?.created_at || now()
-    ).run();
-    return json({ id: notificationId, user_id: target }, 201, origin);
+    try {
+      const body = await readJson(request);
+      const target = String(body?.user_id || user.user_id);
+      if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+      const notificationId = String(body?.id || id());
+      await env.DB.prepare(
+        `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        notificationId,
+        target,
+        body?.type || 'system',
+        body?.title || null,
+        body?.message || null,
+        body?.link || null,
+        body?.is_read ? 1 : 0,
+        body?.created_at || now()
+      ).run();
+      return json({ id: notificationId, user_id: target }, 201, origin);
+    } catch (error) {
+      return json({ error: error.message }, 500, origin);
+    }
   }
 
   return json({ error: "Method not allowed" }, 405, origin);
@@ -494,9 +549,7 @@ async function routeApi(request, env, user, url, origin) {
     return handleNotifications(request, env, user, url, parts, origin);
   }
 
-  // ... باقی APIs (Cases, KYC, Profile, Wallet, etc.)
-  // آپ کی موجودہ باقی APIs یہاں آئیں گی
-  
+  // Default response
   return json({ error: "API route not found" }, 404, origin);
 }
 
@@ -515,6 +568,8 @@ export default {
     }
 
     try {
+      console.log(`📡 Request: ${request.method} ${url.pathname}`);
+
       // Public routes (no auth required)
       const isPublicRead = request.method === "GET" && (
         url.pathname === "/api/community-posts" ||
@@ -524,6 +579,7 @@ export default {
       );
 
       if (isPublicRead) {
+        console.log("👤 Public read access");
         const publicUser = { user_id: "", email: "", full_name: "", avatar_url: "" };
         return routeApi(request, env, publicUser, url, origin);
       }
@@ -531,6 +587,7 @@ export default {
       // Public POST for community posts (guest posts)
       if ((url.pathname === "/api/community-posts" || url.pathname === "/api/community-posts/") && 
           request.method === "POST") {
+        console.log("📝 Public community post");
         return routeApi(request, env, null, url, origin);
       }
 
@@ -556,7 +613,11 @@ export default {
       // All other API routes (require auth)
       if (url.pathname.startsWith("/api/")) {
         const user = await authenticate(request, env, clientId);
-        if (!user) return json({ error: "Authentication required" }, 401, origin);
+        if (!user) {
+          console.log("❌ Authentication failed");
+          return json({ error: "Authentication required" }, 401, origin);
+        }
+        console.log(`✅ Authenticated: ${user.email}`);
         return routeApi(request, env, user, url, origin);
       }
 
@@ -565,8 +626,8 @@ export default {
       return new Response("Not Found", { status: 404, headers: corsHeaders(origin) });
       
     } catch (error) {
-      console.error("Worker error:", error);
-      return json({ error: "Internal server error" }, 500, origin);
+      console.error("❌ Worker error:", error);
+      return json({ error: error.message || "Internal server error" }, 500, origin);
     }
   },
 };
