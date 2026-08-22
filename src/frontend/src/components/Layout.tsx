@@ -1,4 +1,3 @@
-// src/frontend/src/components/Layout.tsx
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -17,7 +16,7 @@ const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 
-function NavLink({ to, children, onClick }: { to: string; children: React.ReactNode; onClick?: () => void }) {
+function NavLink({ to, children, onClick }) {
   const router = useRouterState();
   const isActive = router.location.pathname === to || router.location.pathname.startsWith(`${to}/`);
   return (
@@ -30,7 +29,7 @@ function NavLink({ to, children, onClick }: { to: string; children: React.ReactN
   );
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({ children }) {
   const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -39,21 +38,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [postCount, setPostCount] = useState(0);
   const isAdmin = user?.email === ADMIN_EMAIL;
 
-  // Load notification count
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
     const loadCounts = async () => {
       try {
         const nCount = await getUnreadNotificationsCount(user.id);
         setNotifCount(nCount ?? 0);
-      } catch (e) { /* ignore */ }
+      } catch (e) {}
     };
     loadCounts();
     const interval = setInterval(loadCounts, 20000);
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
 
-  // Load post count for community icon badge
   const fetchPostCount = async () => {
     if (!isAuthenticated) { setPostCount(0); return; }
     try {
@@ -62,7 +59,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         setPostCount(Array.isArray(data) ? data.length : 0);
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -79,7 +76,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => { logout(); closeMenu(); navigate({ to: "/" }); };
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) navigate({ to: "/cases" });
   };
@@ -88,7 +85,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col bg-background">
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
-          {/* Left: Hamburger + Brand */}
           <div className="flex items-center gap-1 shrink-0">
             <button type="button" onClick={() => setMenuOpen(!menuOpen)}
               className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
@@ -99,7 +95,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
-          {/* Center: Search */}
           <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto md:mx-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -109,7 +104,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </form>
 
-          {/* Right: Language, Post (with badge), Notification */}
           <div className="flex items-center gap-1 shrink-0">
             <LanguageSwitcher />
             <Link to="/community" className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
@@ -135,7 +129,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Mobile Menu */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1 max-h-[80vh] overflow-y-auto">
             <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
@@ -212,7 +205,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-1">
             <p>&copy; {new Date().getFullYear()} Givethra. All rights reserved.</p>
-            <p>Givethra™ is a humanitarian platform connecting verified people with verified help.</p>
+            <p>Givethra is a humanitarian platform connecting verified people with verified help.</p>
           </div>
         </div>
       </footer>
