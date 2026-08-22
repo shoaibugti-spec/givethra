@@ -5,8 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { Heart, MessageCircle, Send, ThumbsUp, User } from "lucide-react";
+import { Heart, MessageCircle, Send, User } from "lucide-react";
 import { toast } from "sonner";
+import { getAuthToken } from "@/lib/api"; // helper to get token
+
+// Helper to get token
+function getToken() {
+  try {
+    return localStorage.getItem("auth_token");
+  } catch { return null; }
+}
 
 export default function CommunityPage() {
   const { user, isAuthenticated } = useAuth();
@@ -16,23 +24,39 @@ export default function CommunityPage() {
   const [submittingComment, setSubmittingComment] = useState<string | null>(null);
   const [liking, setLiking] = useState<string | null>(null);
 
-  // Fetch all posts
+  // Helper for authenticated fetch
+  const authFetch = async (url: string, options: RequestInit = {}) => {
+    const token = getToken();
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    };
+    return fetch(url, { ...options, headers });
+  };
+
+  // Fetch all posts with likes and comments
   async function fetchPosts() {
     setLoading(true);
     try {
-      const res = await fetch("/api/community-posts");
+      const res = await authFetch("/api/community-posts");
       if (res.ok) {
         const data = await res.json();
         // Fetch likes and comments for each post
         const postsWithMeta = await Promise.all(
           data.map(async (post: any) => {
             const [likesRes, commentsRes] = await Promise.all([
-              fetch(`/api/post-likes/${post.id}`),
-              fetch(`/api/post-comments/${post.id}`),
+              authFetch(`/api/post-likes/${post.id}`),
+              authFetch(`/api/post-comments/${post.id}`),
             ]);
             const likes = likesRes.ok ? await likesRes.json() : [];
             const comments = commentsRes.ok ? await commentsRes.json() : [];
-            return { ...post, likes, comments, likedByUser: isAuthenticated && likes.some((l: any) => l.user_id === user?.id) };
+            return {
+              ...post,
+              likes,
+              comments,
+              likedByUser: isAuthenticated && likes.some((l: any) => l.user_id === user?.id),
+            };
           })
         );
         setPosts(postsWithMeta);
@@ -57,15 +81,13 @@ export default function CommunityPage() {
     }
     setLiking(postId);
     try {
-      const res = await fetch(`/api/post-likes`, {
+      const res = await authFetch(`/api/post-likes`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ post_id: postId }),
       });
       if (res.ok) {
         const data = await res.json();
-        // Refresh posts to update likes
-        await fetchPosts();
+        await fetchPosts(); // refresh
         toast.success(data.liked ? "Liked!" : "Unliked");
       } else {
         const err = await res.json();
@@ -91,9 +113,8 @@ export default function CommunityPage() {
     }
     setSubmittingComment(postId);
     try {
-      const res = await fetch(`/api/post-comments`, {
+      const res = await authFetch(`/api/post-comments`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ post_id: postId, comment: text }),
       });
       if (res.ok) {
@@ -140,15 +161,16 @@ export default function CommunityPage() {
                     {post.display_name?.charAt(0)?.toUpperCase() || "U"}
                   </div>
                   <div>
-                    <Link
-                      to={`/profile/${post.user_id}`}
-                      className="font-semibold text-sm hover:underline"
-                      onClick={(e) => {
-                        if (!post.user_id) e.preventDefault();
-                      }}
-                    >
-                      {post.display_name || "Guest"}
-                    </Link>
+                    {post.user_id ? (
+                      <Link
+                        to={`/profile/${post.user_id}`}
+                        className="font-semibold text-sm hover:underline"
+                      >
+                        {post.display_name || "User"}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-sm">{post.display_name || "Guest"}</span>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {new Date(post.created_at).toLocaleString()}
                     </p>
