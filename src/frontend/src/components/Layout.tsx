@@ -160,7 +160,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {isAuthenticated ? (
               <>
-                {/* ✅ Community icon */}
+                {/* ✅ Community icon - appears only when logged in */}
                 <Link
                   to="/community"
                   aria-label="Community Posts"
@@ -273,7 +273,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     Help & Support
                   </NavLink>
                 </div>
-                {/* ✅ Community link in mobile menu */}
                 <div className="py-1">
                   <NavLink to="/community" onClick={closeMenu}>
                     Community Posts
