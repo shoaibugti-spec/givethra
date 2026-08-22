@@ -32,12 +32,14 @@ function NavLink({ to, children, onClick }) {
 export default function Layout({ children }) {
   const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
+  const router = useRouterState(); // <-- router state لے رہے ہیں
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notifCount, setNotifCount] = useState(0);
   const [postCount, setPostCount] = useState(0);
   const isAdmin = user?.email === ADMIN_EMAIL;
 
+  // --- نوٹیفکیشن کاؤنٹر ---
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
     const loadCounts = async () => {
@@ -51,10 +53,15 @@ export default function Layout({ children }) {
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
 
+  // --- پوسٹ کاؤنٹر لوڈ کرنے کا فنکشن ---
   const fetchPostCount = async () => {
     if (!isAuthenticated) { setPostCount(0); return; }
     try {
-      const res = await fetch("/api/community-posts");
+      const res = await fetch("/api/community-posts", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         setPostCount(Array.isArray(data) ? data.length : 0);
@@ -62,6 +69,7 @@ export default function Layout({ children }) {
     } catch (e) {}
   };
 
+  // --- پوسٹ کاؤنٹر کو باقاعدگی سے اپ ڈیٹ کریں ---
   useEffect(() => {
     if (!isAuthenticated) { setPostCount(0); return; }
     fetchPostCount();
@@ -73,6 +81,30 @@ export default function Layout({ children }) {
       window.removeEventListener("post-updated", handlePostUpdate);
     };
   }, [isAuthenticated]);
+
+  // --- نیا: جب صارف /community روٹ پر جائے تو پوسٹس کو "پڑھا ہوا" مارک کریں ---
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const currentPath = router.location.pathname;
+    if (currentPath === "/community" || currentPath.startsWith("/community/")) {
+      const markAsRead = async () => {
+        try {
+          await fetch("/api/community-posts/mark-read", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+              "Content-Type": "application/json",
+            },
+          });
+          // مارک ریڈ کرنے کے بعد کاؤنٹر دوبارہ لوڈ کریں
+          fetchPostCount();
+        } catch (e) {
+          console.error("Error marking community posts as read:", e);
+        }
+      };
+      markAsRead();
+    }
+  }, [router.location.pathname, isAuthenticated]); // <-- جب بھی روٹ بدلے، چیک کریں
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => { logout(); closeMenu(); navigate({ to: "/" }); };
