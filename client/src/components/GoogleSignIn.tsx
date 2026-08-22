@@ -1,3 +1,4 @@
+// src/components/GoogleSignIn.tsx
 import { useEffect, useRef, useState } from "react";
 import { Loader2, ShieldCheck, UserCheck, LogIn, AlertCircle } from "lucide-react";
 
@@ -20,6 +21,44 @@ function googleIdentity() {
   return Reflect.get(globalThis as object, "google") as unknown as GoogleIdentityApi | undefined;
 }
 
+// ===== ✅ CLEANUP HELPER =====
+function cleanupLegacyAuth() {
+  try {
+    // LocalStorage
+    const lsKeys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('sb-') || key.includes('supabase') || key.includes('sb-access-token'))) {
+        lsKeys.push(key);
+      }
+    }
+    lsKeys.forEach(key => localStorage.removeItem(key));
+
+    // SessionStorage
+    const ssKeys: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && (key.includes('sb-') || key.includes('supabase') || key.includes('sb-access-token'))) {
+        ssKeys.push(key);
+      }
+    }
+    ssKeys.forEach(key => sessionStorage.removeItem(key));
+
+    // Cookies
+    document.cookie.split(';').forEach(cookie => {
+      const trimmed = cookie.trim();
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex !== -1) {
+        const name = trimmed.slice(0, eqIndex);
+        if (name.includes('sb-') || name.includes('supabase')) {
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+      }
+    });
+  } catch (e) { /* ignore */ }
+}
+// =================================
+
 export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
   const buttonRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -41,6 +80,9 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
     if (!credential) return;
     setError("");
     setLoading(true);
+
+    // Cleanup legacy auth before attempting login
+    cleanupLegacyAuth();
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       const controller = new AbortController();
@@ -114,6 +156,8 @@ export function GoogleSignIn({ compact = false }: { compact?: boolean }) {
 
   const triggerDirectOAuth = () => {
     setError("");
+    // Cleanup before OAuth redirect
+    cleanupLegacyAuth();
     const redirectUri = window.location.origin;
     if (!clientId) {
       setError("Google client ID is missing.");
