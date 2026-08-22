@@ -554,3 +554,9 @@
 - [x] Check the visible homepage text and Public Post marker in the live DOM.
 - [x] Check the desktop live issue root cause (`pnmp` typo in Cloudflare dashboard and GitHub runner billing lock).
 - [x] Report the live result and provide the exact fix for the Cloudflare build setting.
+
+## Definitive Live Deployment Recovery — 2026-08-22
+- [ ] Inspect active Cloudflare Worker and API capabilities via MCP.
+- [ ] Build canonical frontend and package Worker with static assets.
+- [ ] Deploy Worker directly to production to activate Public Post on givethra.org.
+- [ ] Verify live domain renders Public Post without altering D1/R2 data.
