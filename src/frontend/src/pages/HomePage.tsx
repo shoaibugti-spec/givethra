@@ -244,9 +244,13 @@ export default function HomePage() {
     setLoading(true);
     try {
       const data = await getApprovedCases();
-      setCases(data ?? []);
-    } catch {}
-    finally { setLoading(false); }
+      // ✅ یقینی بنائیں کہ data ہمیشہ Array ہو
+      setCases(Array.isArray(data) ? data : []);
+    } catch {
+      setCases([]);
+    } finally {
+      setLoading(false);
+    }
   }
   async function loadCategoryCounts() {
     try {
@@ -385,17 +389,20 @@ export default function HomePage() {
     if (slideIndex >= guideSlides.length) setSlideIndex(0);
   }, [guideSlides.length, slideIndex]);
 
-  const countries = Array.from(new Set(cases.map((c) => c.country).filter(Boolean))).sort();
+  // ✅ cases کو محفوظ طریقے سے استعمال کریں
+  const safeCases = Array.isArray(cases) ? cases : [];
+  
+  const countries = Array.from(new Set(safeCases.map((c) => c.country).filter(Boolean))).sort();
   const cities = Array.from(
     new Set(
-      cases
+      safeCases
         .filter((c) => filterCountry === "all" || c.country === filterCountry)
         .map((c) => c.city)
         .filter(Boolean)
     )
   ).sort();
 
-  let filtered = cases.filter((c) => {
+  let filtered = safeCases.filter((c) => {
     if (filterCountry !== "all" && c.country !== filterCountry) return false;
     if (filterCity !== "all" && c.city !== filterCity) return false;
     if (filterCat !== "all" && c.category !== filterCat) return false;
