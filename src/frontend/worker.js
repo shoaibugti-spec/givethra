@@ -1,5 +1,5 @@
 // ============================================================
-// worker.js – FINAL FIXED (public POST at TOP)
+// worker.js – COMPLETE FIXED (Public POST + Likes + Comments)
 // ============================================================
 
 const DEFAULT_GOOGLE_CLIENT_ID =
@@ -7,7 +7,7 @@ const DEFAULT_GOOGLE_CLIENT_ID =
 const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
 
-console.log("✅ Worker loaded - PUBLIC POST FIXED v3");
+console.log("✅ Worker loaded - v4 (Public Posts + Likes + Comments)");
 
 function corsHeaders(origin) {
   const allowOrigin = origin === PUBLIC_ORIGIN ? origin : PUBLIC_ORIGIN;
@@ -156,7 +156,7 @@ function pick(body, fields) {
 }
 
 // ============================================================
-// HANDLERS (kept compact)
+// HANDLERS
 // ============================================================
 
 async function handleProfile(request, env, user, parts, origin) {
@@ -177,6 +177,35 @@ async function handleProfile(request, env, user, parts, origin) {
   ).bind(merged.user_id, merged.full_name || null, merged.phone_number || null, merged.country || null, merged.city || null, merged.bio || null, merged.preferred_language || "en", merged.avatar_url || null, merged.cover_url || null, merged.created_at, merged.updated_at).run();
   await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?").bind(merged.full_name || user.full_name, merged.avatar_url || user.avatar_url, merged.updated_at, userId).run();
   return json({ ...merged }, 200, origin);
+}
+
+// ===== PUBLIC PROFILE (safe fields only) =====
+async function handlePublicProfile(request, env, parts, origin) {
+  const userId = parts[2];
+  if (!userId) return json({ error: "User ID required" }, 400, origin);
+
+  const user = await env.DB.prepare(
+    "SELECT user_id, full_name, avatar_url FROM users WHERE user_id = ? LIMIT 1"
+  ).bind(userId).first();
+  if (!user) return json({ error: "User not found" }, 404, origin);
+
+  // Get case counts
+  const cases = await env.DB.prepare(
+    "SELECT COUNT(*) AS total FROM case_submissions WHERE user_id = ? AND lower(status) IN ('approved', 'published', 'active', 'completed')"
+  ).bind(userId).first();
+
+  // Get helps (unlocks as hero)
+  const helps = await env.DB.prepare(
+    "SELECT COUNT(*) AS total FROM case_unlocks WHERE hero_id = ?"
+  ).bind(userId).first();
+
+  return json({
+    user_id: user.user_id,
+    display_name: user.full_name || "User",
+    avatar_url: user.avatar_url || "",
+    total_cases: cases?.total || 0,
+    total_helps: helps?.total || 0,
+  }, 200, origin);
 }
 
 async function handleKyc(request, env, user, url, parts, origin) {
@@ -471,10 +500,6 @@ async function handleCommunityPosts(request, env, user, origin) {
   }
 
   if (request.method === "GET") {
-    // Admin only
-    if (!user || !isAdmin(user)) {
-      return json({ error: "Admin access required" }, 403, origin);
-    }
     const rows = await env.DB.prepare(
       "SELECT * FROM community_posts ORDER BY created_at DESC LIMIT 100"
     ).all();
@@ -483,6 +508,95 @@ async function handleCommunityPosts(request, env, user, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+// ===== COMMUNITY POST LIKES =====
+async function handlePostLikes(request, env, user, parts, origin) {
+  const postId = parts[2];
+
+  if (request.method === "GET") {
+    if (postId) {
+      const rows = await env.DB.prepare(
+        "SELECT * FROM community_post_likes WHERE post_id = ? ORDER BY created_at DESC"
+      ).bind(postId).all();
+      return json(rows.results || [], 200, origin);
+    }
+    const rows = await env.DB.prepare(
+      "SELECT * FROM community_post_likes ORDER BY created_at DESC LIMIT 100"
+    ).all();
+    return json(rows.results || [], 200, origin);
+  }
+
+  if (request.method === "POST") {
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    const body = await readJson(request);
+    const targetPostId = body?.post_id || postId;
+    if (!targetPostId) return json({ error: "post_id is required" }, 400, origin);
+
+    // Check if already liked
+    const existing = await env.DB.prepare(
+      "SELECT id FROM community_post_likes WHERE post_id = ? AND user_id = ? LIMIT 1"
+    ).bind(targetPostId, user.user_id).first();
+    if (existing) {
+      // Unlike (remove)
+      await env.DB.prepare(
+        "DELETE FROM community_post_likes WHERE post_id = ? AND user_id = ?"
+      ).bind(targetPostId, user.user_id).run();
+      return json({ liked: false, post_id: targetPostId }, 200, origin);
+    }
+
+    const likeId = id();
+    await env.DB.prepare(
+      "INSERT INTO community_post_likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)"
+    ).bind(likeId, targetPostId, user.user_id, now()).run();
+    return json({ liked: true, id: likeId, post_id: targetPostId }, 201, origin);
+  }
+
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+
+// ===== COMMUNITY POST COMMENTS =====
+async function handlePostComments(request, env, user, parts, origin) {
+  const postId = parts[2];
+
+  if (request.method === "GET") {
+    if (postId) {
+      const rows = await env.DB.prepare(
+        "SELECT c.*, u.full_name as user_name FROM community_post_comments c LEFT JOIN users u ON c.user_id = u.user_id WHERE c.post_id = ? ORDER BY c.created_at ASC"
+      ).bind(postId).all();
+      return json(rows.results || [], 200, origin);
+    }
+    const rows = await env.DB.prepare(
+      "SELECT * FROM community_post_comments ORDER BY created_at DESC LIMIT 100"
+    ).all();
+    return json(rows.results || [], 200, origin);
+  }
+
+  if (request.method === "POST") {
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    const body = await readJson(request);
+    const targetPostId = body?.post_id || postId;
+    const comment = body?.comment?.trim();
+    if (!targetPostId) return json({ error: "post_id is required" }, 400, origin);
+    if (!comment) return json({ error: "Comment is required" }, 400, origin);
+
+    const commentId = id();
+    await env.DB.prepare(
+      "INSERT INTO community_post_comments (id, post_id, user_id, comment, created_at) VALUES (?, ?, ?, ?, ?)"
+    ).bind(commentId, targetPostId, user.user_id, comment, now()).run();
+
+    return json({
+      id: commentId,
+      post_id: targetPostId,
+      user_id: user.user_id,
+      user_name: user.full_name || "User",
+      comment: comment,
+      created_at: now(),
+    }, 201, origin);
+  }
+
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+
+// ===== FEEDBACK HANDLERS (existing) =====
 async function handleFeedbacks(request, env, user, url, parts, origin) {
   if (request.method === "GET") {
     const caseId = url.searchParams.get("case_id") || "";
@@ -590,6 +704,9 @@ const ADMIN_TABLES = {
   feedbacks: "feedbacks",
   offers: "category_offers",
   suspensions: "user_suspensions",
+  "community-posts": "community_posts",
+  "post-likes": "community_post_likes",
+  "post-comments": "community_post_comments",
 };
 
 const ADMIN_UPDATE_FIELDS = {
@@ -1014,13 +1131,45 @@ async function routeApi(request, env, user, url, origin) {
     return handlePublicFeedback(request, env, origin);
   }
 
-  // Community posts (POST public, GET admin only)
+  // Community posts (POST public, GET public)
   if (parts[1] === "community-posts") {
     if (request.method === "POST") {
       return handleCommunityPosts(request, env, null, origin);
     }
     if (request.method === "GET") {
       return handleCommunityPosts(request, env, user, origin);
+    }
+    return json({ error: "Method not allowed" }, 405, origin);
+  }
+
+  // Post likes
+  if (parts[1] === "post-likes") {
+    if (request.method === "GET") {
+      return handlePostLikes(request, env, user, parts, origin);
+    }
+    if (request.method === "POST") {
+      if (!user) return json({ error: "Authentication required" }, 401, origin);
+      return handlePostLikes(request, env, user, parts, origin);
+    }
+    return json({ error: "Method not allowed" }, 405, origin);
+  }
+
+  // Post comments
+  if (parts[1] === "post-comments") {
+    if (request.method === "GET") {
+      return handlePostComments(request, env, user, parts, origin);
+    }
+    if (request.method === "POST") {
+      if (!user) return json({ error: "Authentication required" }, 401, origin);
+      return handlePostComments(request, env, user, parts, origin);
+    }
+    return json({ error: "Method not allowed" }, 405, origin);
+  }
+
+  // Public profile (no auth)
+  if (parts[1] === "public-profile") {
+    if (request.method === "GET") {
+      return handlePublicProfile(request, env, parts, origin);
     }
     return json({ error: "Method not allowed" }, 405, origin);
   }
@@ -1050,7 +1199,7 @@ async function routeApi(request, env, user, url, origin) {
 }
 
 // ============================================================
-// MAIN FETCH HANDLER – PUBLIC ROUTE AT TOP
+// MAIN FETCH HANDLER
 // ============================================================
 export default {
   async fetch(request, env) {
@@ -1061,11 +1210,26 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
 
     try {
-      // ===== ✅ FIX: PUBLIC POST – CHECK FIRST =====
-      const isCommunityPost = url.pathname === "/api/community-posts" || url.pathname === "/api/community-posts/";
-if (isCommunityPost && request.method === "POST") {
+      // ===== PUBLIC POST — CHECK FIRST =====
+      if ((url.pathname === "/api/community-posts" || url.pathname === "/api/community-posts/") && request.method === "POST") {
         console.log("📝 Public community post (no auth)");
         return routeApi(request, env, null, url, origin);
+      }
+
+      // Public GET routes
+      const publicRead = request.method === "GET" && (
+        url.pathname === "/api/cases/approved" ||
+        url.pathname === "/api/cases/category-counts" ||
+        url.pathname === "/api/community-posts" ||
+        url.pathname === "/api/community-posts/" ||
+        (url.pathname.startsWith("/api/public-profile/")) ||
+        (url.pathname === "/api/feedbacks" && !url.searchParams.has("case_id") && !url.searchParams.has("user_id")) ||
+        url.pathname === "/api/feedback-likes" ||
+        url.pathname === "/api/feedback-comments"
+      );
+      if (publicRead) {
+        const publicUser = { user_id: "", email: "", full_name: "", avatar_url: "" };
+        return routeApi(request, env, publicUser, url, origin);
       }
 
       // ---- AUTH ROUTE ----
@@ -1090,19 +1254,6 @@ if (isCommunityPost && request.method === "POST") {
       }
 
       if (url.pathname === "/uploads") return handleStoredUpload(request, env, url, origin);
-
-      // Public GET routes
-      const publicRead = request.method === "GET" && (
-        url.pathname === "/api/cases/approved" ||
-        url.pathname === "/api/cases/category-counts" ||
-        (url.pathname === "/api/feedbacks" && !url.searchParams.has("case_id") && !url.searchParams.has("user_id")) ||
-        url.pathname === "/api/feedback-likes" ||
-        url.pathname === "/api/feedback-comments"
-      );
-      if (publicRead) {
-        const publicUser = { user_id: "", email: "", full_name: "", avatar_url: "" };
-        return routeApi(request, env, publicUser, url, origin);
-      }
 
       // All other API routes (require auth)
       if (url.pathname.startsWith("/api/")) {
