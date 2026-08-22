@@ -1,5 +1,5 @@
 // ============================================================
-// FILE: worker.js (COMPLETE – WITH LIKES & COMMENTS)
+// FILE: worker.js (COMPLETE – ALL FEATURES)
 // ============================================================
 
 const DEFAULT_GOOGLE_CLIENT_ID =
@@ -7,7 +7,7 @@ const DEFAULT_GOOGLE_CLIENT_ID =
 const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
 
-console.log("✅ Worker loaded - v4 (with likes & comments)");
+console.log("✅ Worker loaded - v5 (Complete)");
 
 function corsHeaders(origin) {
   const allowOrigin = origin === PUBLIC_ORIGIN ? origin : PUBLIC_ORIGIN;
@@ -30,13 +30,8 @@ function json(data, status = 200, origin = "") {
   });
 }
 
-function now() {
-  return new Date().toISOString();
-}
-
-function id() {
-  return crypto.randomUUID();
-}
+function now() { return new Date().toISOString(); }
+function id() { return crypto.randomUUID(); }
 
 function isAdmin(user) {
   return Boolean(user && ADMIN_EMAILS.has(String(user.email).toLowerCase()));
@@ -49,7 +44,7 @@ function bearer(request) {
 
 async function verifyGoogleCredential(credential, clientId) {
   if (credential && credential.length > 100 && !credential.startsWith("eyJhbGciOi")) {
-    // Custom robust session token check or basic JWT fallback if needed
+    // custom fallback
   }
   const response = await fetch(
     `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
@@ -76,7 +71,7 @@ async function verifyGoogleCredential(credential, clientId) {
   const audience = payload.aud || payload.azp;
   const verified = payload.email_verified === true || payload.email_verified === "true";
   if (!payload.sub || !payload.email || (audience && clientId && audience !== clientId) || !verified) {
-    // Also try payload fallback
+    // fallback
   }
 
   return {
@@ -166,7 +161,7 @@ function pick(body, fields) {
 }
 
 // ============================================================
-//  HANDLER FUNCTIONS
+//  HANDLERS
 // ============================================================
 
 async function handleProfile(request, env, user, parts, origin) {
