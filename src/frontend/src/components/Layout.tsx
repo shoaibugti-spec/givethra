@@ -1,5 +1,6 @@
 // src/frontend/src/components/Layout.tsx
 // Clean header with brand, search, language switcher, community post icon, and notification
+// Mobile menu only contains navigation links - no duplicate language/theme toggles
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,7 @@ import {
   Linkedin,
   MessageCircle,
   Mail,
-  MessageSquare, // Post icon
+  MessageSquare,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
@@ -153,10 +154,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Right: Language, Post, Notification */}
           <div className="flex items-center gap-1 shrink-0">
-            {/* Language Switcher */}
             <LanguageSwitcher />
-
-            {/* Community Post Icon */}
             <Link
               to="/community"
               aria-label="Community Posts"
@@ -164,8 +162,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               <MessageSquare className="h-5 w-5" />
             </Link>
-
-            {/* Notification Bell */}
             {isAuthenticated ? (
               <Link
                 to="/notifications"
@@ -187,10 +183,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* ===== MOBILE MENU (Hamburger) ===== */}
+        {/* ===== MOBILE MENU (Hamburger) - CLEAN ===== */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1 max-h-[80vh] overflow-y-auto">
-            {/* Main Navigation Links */}
             <NavLink to="/cases" onClick={closeMenu}>
               Browse Cases
             </NavLink>
@@ -222,33 +217,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               FAQ
             </NavLink>
 
+            {/* User actions */}
             <div className="pt-3 border-t border-border mt-2 space-y-2">
-              {/* Theme Toggle */}
-              <button
-                type="button"
-                onClick={() => {
-                  toggleTheme();
-                  closeMenu();
-                }}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors w-full text-left"
-              >
-                {theme === "dark" ? (
-                  <>
-                    <Sun className="h-4 w-4" /> Light Mode
-                  </>
-                ) : (
-                  <>
-                    <Moon className="h-4 w-4" /> Dark Mode
-                  </>
-                )}
-              </button>
-
-              {/* Language Switcher (also in menu for convenience) */}
-              <div className="py-1">
-                <LanguageSwitcher />
-              </div>
-
-              {/* User actions */}
               {isAuthenticated ? (
                 <>
                   <Link
