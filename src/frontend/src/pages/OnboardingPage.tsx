@@ -49,7 +49,7 @@ export default function OnboardingPage() {
     setRole(selected);
     setTimeout(() => {
       if (selected === "hero") navigate({ to: "/cases" });
-      else navigate({ to: "/my-requests" });
+      else navigate({ to: "/my-cases" });
     }, 400);
   };
 

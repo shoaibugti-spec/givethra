@@ -40,6 +40,7 @@ import {
   Gift,
 } from "lucide-react";
 import { motion } from "motion/react";
+import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 import {
   getApprovedCases,

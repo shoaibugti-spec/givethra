@@ -1,3 +1,54 @@
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { CheckCircle, ClipboardCheck, Copy, ExternalLink, FileText, Heart, HandCoins, Building2, BookOpen, User, Users, XCircle } from "lucide-react";
+import { useState } from "react";
+
+const CURRENCY_SYMBOLS: Record<string, string> = { USD: "$", PKR: "Rs", GBP: "£", EUR: "€", INR: "₹", AED: "AED", SAR: "SAR" };
+
+function sym(currency?: string) {
+  return CURRENCY_SYMBOLS[currency || "USD"] ?? currency ?? "$";
+}
+
+function getDocLabel(key: string) {
+  const labels: Record<string, string> = {
+    selfie_url: "Case Selfie",
+    video_url: "Case Appeal Video",
+    paid_receipt_url: "Paid Receipt / Transaction Proof",
+    cnic_front_url: "CNIC Front",
+    cnic_back_url: "CNIC Back",
+    medical_report_url: "Medical Report / Bill",
+    fee_challan_url: "Fee Challan / Admission Letter",
+    rental_agreement_url: "Rental Agreement",
+    landlord_cnic_url: "Landlord CNIC",
+    bill: "Bill / Challan Photo",
+    salary_slip: "Salary Slip (6 Months)",
+    statement: "Bank Statement (6 Months)",
+    student_id: "Student ID / B-Form",
+    student_id_proof: "Student ID Proof",
+  };
+  return labels[key] ?? key.replace(/_/g, " ").replace(/([A-Z])/g, " $1").replace(/\\b\\w/g, (c) => c.toUpperCase()).trim();
+}
+
+async function copyText(text?: string) {
+  if (!text || typeof navigator === "undefined" || !navigator.clipboard) return;
+  try { await navigator.clipboard.writeText(text); } catch { /* Clipboard may be unavailable in restricted browsers. */ }
+}
+
+function StatusBadge({ status }: { status?: string }) {
+  const colors: Record<string, string> = { pending: "bg-orange-100 text-orange-700", approved: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", completed: "bg-blue-100 text-blue-700" };
+  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${colors[status || ""] ?? "bg-gray-100 text-gray-600"}`}>{status === "none" ? "NO KYC" : (status || "unknown").toUpperCase()}</span>;
+}
+
+function DetailRow({ label, value, mono }: { label: string; value?: unknown; mono?: boolean }) {
+  if (value === undefined || value === null || value === "") return null;
+  const text = String(value);
+  return <div className="flex items-center justify-between gap-2 py-1.5 border-b border-border/50 last:border-0"><div className="min-w-0"><p className="text-[10px] uppercase text-muted-foreground">{label}</p><p className={`text-sm font-medium break-all ${mono ? "font-mono" : ""}`}>{text}</p></div><button type="button" onClick={() => copyText(text)} className="shrink-0 h-7 w-7 rounded border border-border flex items-center justify-center text-muted-foreground hover:text-primary"><Copy className="h-3 w-3" /></button></div>;
+}
+
+function Img({ url, label }: { url: string; label: string }) {
+  return <div className="space-y-1"><p className="text-[10px] text-muted-foreground truncate" title={label}>{label}</p><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={label} className="w-full rounded border max-h-28 object-cover hover:opacity-95" /></a></div>;
+}
+
 // ============================================================
 //  CASE CARD - FULLY COMPLETE (ALL FIELDS VISIBLE)
 // ============================================================

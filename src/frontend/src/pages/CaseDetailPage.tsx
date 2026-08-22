@@ -494,11 +494,15 @@ export default function CaseDetailPage() {
   async function submitFeedback() {
     if (!fbText.trim() || !fbVideoFile) { toast.error("Please write a message AND record a 90-second video — both are required."); return; }
     if (recording) { toast.error("Please finish (Done) your video first."); return; }
+    if (!user?.id) {
+      toast.error("Please sign in before submitting feedback.");
+      return;
+    }
     setFbSubmitting(true);
     try {
       let fbVideoUrl = "";
       if (fbVideoFile) fbVideoUrl = await uploadFile(fbVideoFile, `feedbacks/${id}/${Date.now()}_video`);
-      const prof = await getProfile(user?.id);
+      const prof = await getProfile(user.id);
       const firstName = (prof?.full_name || seekerKyc?.full_name || "A grateful person").split(" ")[0];
       await insertFeedback({
         case_id: id,

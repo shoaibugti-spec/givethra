@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { sendNotification } from "@/lib/notify";
 import {
-  Shield, CheckCircle, XCircle, ClipboardCheck, FileText, ExternalLink, Heart, Coins, Users,
+  Shield as ShieldIcon, CheckCircle, XCircle, ClipboardCheck, FileText, ExternalLink, Heart, Coins, Users,
   ChevronDown, Wallet, Mail, Calendar, Send, ArrowLeft, Gift, AlertTriangle, Building2, Copy,
   Megaphone, HandCoins, Eye, User, Search, Paperclip, Loader2, X, RotateCw, Ban, MessageCircle,
 } from "lucide-react";
@@ -62,8 +62,6 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 };
 
 const DOC_LABELS: Record<string, string> = {
-  selfie_url: "Selfie",
-  video_url: "Video Appeal",
   salary_slip: "Salary Slip (6 Months)",
   statement: "Bank Statement (6 Months)",
   nikah_nama: "Nikah Nama",
@@ -89,7 +87,6 @@ const DOC_LABELS: Record<string, string> = {
   hospital_bill: "Hospital Bill",
   medical_report: "Medical Report",
   relation_proof: "Relation Proof",
-  paid_receipt_url: "Paid Receipt",
   photo_url: "Photo",
   admission_proof: "Admission / Selection Proof (Offer Letter)",
   fee_challan: "Fee Challan / Voucher",
@@ -620,7 +617,7 @@ export default function AdminPage() {
     <Layout>
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center gap-3">
-          <Shield className="h-6 w-6 text-primary" />
+          <ShieldIcon className="h-6 w-6 text-primary" />
           <h1 className="text-3xl font-bold">Admin Panel</h1>
         </div>
 
@@ -678,7 +675,7 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
                   { label: "Total Users", value: usersList.length, icon: Users },
-                  { label: "Verified KYC", value: approvedKyc.length, icon: Shield },
+                  { label: "Verified KYC", value: approvedKyc.length, icon: ShieldIcon },
                   { label: "Total Cases", value: caseList.length, icon: FileText },
                   { label: "Approved Cases", value: approvedCases.length, icon: CheckCircle },
                   { label: "Completed Cases", value: completedCases.length, icon: Heart },
@@ -686,7 +683,7 @@ export default function AdminPage() {
                   { label: "PAID Cases", value: paidCases.length, icon: Coins },
                   { label: "Hero Helps (Unlocks)", value: totalHeroHelps, icon: Heart },
                   { label: "Total Deposits", value: deposits.length, icon: Coins },
-                  { label: "Active Suspensions", value: activeSuspensions, icon: Shield },
+                  { label: "Active Suspensions", value: activeSuspensions, icon: ShieldIcon },
                 ].map(({ label, value, icon: Icon }) => (
                   <div key={label} className="rounded-xl border bg-card p-4 space-y-2">
                     <Icon className="h-5 w-5 text-primary" />
@@ -744,7 +741,7 @@ export default function AdminPage() {
 
             <TabsContent value="verify" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
-                <Shield className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <ShieldIcon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <p>Verify each help — check the receipt and amount, then confirm to add it to the case's collected total. <strong>Direct</strong> helps close the case when full. <strong>Fundraising</strong> contributions add up; when the goal is reached, go to "Pay & Close" to pay the institute yourself.</p>
               </div>
               {pendingResolutions.length === 0 ? <Empty text="No help awaiting verification" /> :
@@ -809,7 +806,7 @@ function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
-        <Shield className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+        <ShieldIcon className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
         <div>
           <p><strong>Total Suspensions:</strong> {totalSuspensions} · <strong>Active:</strong> {activeSuspensions.length}</p>
           <p className="text-xs mt-1">Each suspension costs 5 credits to unlock. Users can unlock themselves from the submit page.</p>
@@ -823,7 +820,7 @@ function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
             <div key={s.id} className="rounded-xl border border-red-300 bg-red-50 dark:bg-red-950/20 p-4 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-red-600" />
+                  <ShieldIcon className="h-5 w-5 text-red-600" />
                   <span className="font-semibold">{profile?.full_name || "Unknown User"}</span>
                   <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Suspended</span>
                 </div>
@@ -1016,7 +1013,7 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
       {open && (
         <div className="px-4 pb-4 pt-1 border-t border-border bg-muted/20 space-y-3">
           <div className="grid grid-cols-2 gap-2 pt-3">
-            <Stat icon={<Shield className="h-4 w-4" />} label="KYC Status" value={u.kycStatus === "none" ? "Not submitted" : u.kycStatus} />
+            <Stat icon={<ShieldIcon className="h-4 w-4" />} label="KYC Status" value={u.kycStatus === "none" ? "Not submitted" : u.kycStatus} />
             <Stat icon={<Wallet className="h-4 w-4" />} label="Wallet Balance" value={`${u.walletBalance} credits`} />
             <Stat icon={<FileText className="h-4 w-4" />} label="Cases Submitted" value={u.casesSubmitted} />
             <Stat icon={<XCircle className="h-4 w-4" />} label="Rejected Cases" value={u.rejectedCases} />
@@ -1513,7 +1510,7 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
             <p className="font-semibold text-sm truncate">{conv?.name}</p>
             <p className="text-xs text-muted-foreground truncate">{conv?.email}</p>
           </div>
-          {conv?.unread > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{conv.unread} new</span>}
+          {conv && conv.unread > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{conv.unread} new</span>}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/10">
@@ -2217,7 +2214,7 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
         <div className="space-y-2 pt-1 border-t border-border">
           <Textarea placeholder="Rejection reason (e.g. 'video too short', 'unrelated content')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex gap-2">
-              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> {isPublicPost ? "Mark Resolved" : "Approve — Post to Wall"}</Button>
+              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve — Post to Wall</Button>
             <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(fb.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
           </div>
         </div>

@@ -40,6 +40,7 @@ const SupportChatPage = lazy(() => import("@/pages/SupportChatPage").catch(() =>
 const ContactPage = lazy(() => import("@/pages/ContactPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const BecomeHeroPage = lazy(() => import("@/pages/BecomeHeroPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const NeedHelpPage = lazy(() => import("@/pages/NeedHelpPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
+const OnboardingPage = lazy(() => import("@/pages/OnboardingPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -100,6 +101,7 @@ const supportRoute = createRoute({ getParentRoute: () => rootRoute, path: "/supp
 const contactRoute = createRoute({ getParentRoute: () => rootRoute, path: "/contact", component: () => <Suspense fallback={<PageLoader />}><ContactPage /></Suspense> });
 const becomeHeroRoute = createRoute({ getParentRoute: () => rootRoute, path: "/become-hero", component: () => <Suspense fallback={<PageLoader />}><BecomeHeroPage /></Suspense> });
 const needHelpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/need-help", component: () => <Suspense fallback={<PageLoader />}><NeedHelpPage /></Suspense> });
+const onboardingRoute = createRoute({ getParentRoute: () => rootRoute, path: "/onboarding", component: () => <Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense> });
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -127,6 +129,7 @@ const routeTree = rootRoute.addChildren([
   contactRoute,
   becomeHeroRoute,
   needHelpRoute,
+  onboardingRoute,
 ]);
 const router = createRouter({ routeTree });
 

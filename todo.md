@@ -462,4 +462,22 @@
 - [x] Ensure the composer is rendered for mobile visitors as well as desktop visitors and is not hidden by an auth or viewport condition in the canonical source.
 - [x] Preserve the simple Public Post heading, textarea, Post Message button, and guest submission behavior.
 - [x] Add a mobile regression assertion for the visible composer and run the canonical tests/build.
-- [ ] Save a checkpoint without publishing, deploying, or showing preview/settings cards.
+- [x] Save a checkpoint without publishing, deploying, or showing preview/settings cards.
+
+## Cloudflare Full-Source Synchronization Follow-up
+- [ ] Audit every updated homepage, Worker/API, Admin Posts, and Support Chat source file included by the canonical deployment workflow.
+- [ ] Confirm GitHub branch, workflow working directory, pnpm install, build output, and Worker entrypoint all target the same current source tree.
+- [ ] Ensure the Cloudflare build includes the Public Post composer, guest API route, Admin Posts tab, and Support Chat updates together.
+- [ ] Preserve all existing D1/R2 data and avoid destructive schema or storage changes.
+- [ ] Run full regression, Worker syntax, and production build checks before the next deployment.
+- [ ] Save a synchronized source checkpoint without deploying or showing preview/settings cards.
+- [ ] Repair the Admin FeedbackCard action label so the full dashboard type-checks and public Posts remain separate from case feedback.
+- [ ] Align SupportChatPage imports and calls with the canonical support API helpers so user message loading, read marking, and sending are functional.
+
+## Final Strict Type-Check Reconciliation
+- [x] Restore the standalone CaseCard component's imports and helper definitions so it remains compile-safe.
+- [x] Add or correct canonical routes for onboarding, user requests, and dashboard navigation references.
+- [x] Guard authenticated feedback uploads against an absent user ID before calling profile APIs.
+- [x] Reconcile the unused email-verification page with the current AuthContext so the full source type-checks without stale API assumptions.
+- [x] Disable the duplicate legacy root deployment workflow so GitHub main has one canonical src/frontend Cloudflare production workflow.
+- [x] Align the canonical workflow's pnpm install mode with the isolated src/frontend lockfile used by the successful build.

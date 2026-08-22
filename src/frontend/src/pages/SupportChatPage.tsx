@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { getChatMessages, sendChatMessage, getUnreadChatMessagesCount } from "@/lib/api";
+import { getSupportMessages, sendSupportMessage, markSupportMessagesAsRead } from "@/lib/api";
 import { useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { Send, MessageCircle, ArrowLeft, BookOpen, ExternalLink, ShieldCheck, FileText, Sparkles } from "lucide-react";

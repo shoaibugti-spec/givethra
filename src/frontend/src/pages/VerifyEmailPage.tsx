@@ -10,8 +10,7 @@ import { MailCheck, RefreshCcw, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export default function VerifyEmailPage() {
-  const { pendingVerification, verifyEmailOtp, isLoggingIn, isAuthenticated } =
-    useAuth();
+  const { isLoggingIn, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -19,16 +18,14 @@ export default function VerifyEmailPage() {
   const [resendMessage, setResendMessage] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Resolve the email: prefer context state, fall back to sessionStorage
-  const email =
-    pendingVerification?.email ??
-    (() => {
-      try {
-        return sessionStorage.getItem("pending_verify_email") ?? "";
-      } catch {
-        return "";
-      }
-    })();
+  // This page is retained for old links, but current authentication uses Google Identity Services.
+  const email = (() => {
+    try {
+      return sessionStorage.getItem("pending_verify_email") ?? "";
+    } catch {
+      return "";
+    }
+  })();
 
   // If already authenticated, skip verification
   useEffect(() => {
@@ -56,9 +53,7 @@ export default function VerifyEmailPage() {
       return;
     }
     try {
-      await verifyEmailOtp(email, code.trim());
-      // storeSession has been called inside verifyEmailOtp — isAuthenticated will flip
-      // and the useEffect above will redirect to /onboarding
+      throw new Error("Email verification is no longer required. Please continue with Google sign-in.");
     } catch (err) {
       setError(
         err instanceof Error

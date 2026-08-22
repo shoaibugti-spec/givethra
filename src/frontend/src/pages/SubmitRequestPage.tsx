@@ -2526,7 +2526,7 @@ export default function SubmitRequestPage() {
             <h1 className="text-2xl font-bold">KYC Under Review</h1>
             <p className="text-muted-foreground">Your KYC is being reviewed. Please wait for approval before submitting a case.</p>
             <Button asChild>
-              <Link to="/dashboard">Go to Dashboard</Link>
+              <Link to="/">Go to Home</Link>
             </Button>
           </div>
         </div>
@@ -2614,7 +2614,7 @@ export default function SubmitRequestPage() {
               </ul>
             </div>
 
-            <Button variant="outline" className="w-full" onClick={() => navigate({ to: "/dashboard" })}>
+            <Button variant="outline" className="w-full" onClick={() => navigate({ to: "/" })}>
               Go to Dashboard
             </Button>
           </div>
