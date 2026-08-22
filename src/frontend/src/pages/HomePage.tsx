@@ -38,9 +38,9 @@ import {
   MessageCircle,
   ShieldCheck,
   Gift,
+  CheckCircle,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 import {
   getApprovedCases,
@@ -50,6 +50,7 @@ import {
   getUnlockCount,
   getUnreadNotificationsCount,
 } from "@/lib/api";
+import { toast } from "sonner";
 
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
@@ -184,6 +185,11 @@ export default function HomePage() {
   const [detectedCity, setDetectedCity] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  // ===== PUBLIC POST STATE =====
+  const [postMessage, setPostMessage] = useState("");
+  const [postSubmitting, setPostSubmitting] = useState(false);
+  const [postSubmitted, setPostSubmitted] = useState(false);
+
   // Load cases on mount
   useEffect(() => {
     loadCases();
@@ -215,10 +221,7 @@ export default function HomePage() {
       loadGuideStatus();
       loadUnlockCount();
 
-      // Poll for notifications every 20 seconds
       const interval = setInterval(loadNotifCount, 20000);
-
-      // Refresh cases periodically
       const caseInterval = setInterval(loadCases, 60000);
 
       return () => {
@@ -281,6 +284,43 @@ export default function HomePage() {
     }
   }
 
+  // ===== PUBLIC POST SUBMIT =====
+  async function handleSubmitPost() {
+    if (!postMessage.trim()) {
+      toast.error("Please write something before posting.");
+      return;
+    }
+    setPostSubmitting(true);
+    try {
+      const payload: any = {
+        message: postMessage.trim(),
+        display_name: isAuthenticated
+          ? user?.full_name || user?.name || user?.email?.split("@")[0] || "User"
+          : "Guest",
+        is_guest: !isAuthenticated,
+        user_id: isAuthenticated ? user?.id : null,
+      };
+      const res = await fetch("/api/community-posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setPostSubmitted(true);
+        setPostMessage("");
+        toast.success("Thank you! Your post has been shared.");
+        setTimeout(() => setPostSubmitted(false), 4000);
+      } else {
+        const err = await res.json();
+        toast.error(err?.error || "Failed to post. Please try again.");
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setPostSubmitting(false);
+    }
+  }
+
   // ====== SLIDE DEFINITIONS ======
   const HAND_SLIDE = {
     key: "hero",
@@ -288,14 +328,10 @@ export default function HomePage() {
     image: "/assets/generated/hero-givethra.dim_1200x500.jpg",
   };
 
-  // Build guide slides based on auth status
   const guideSlides: any[] = [];
-
-  // Always include the hand slide first
   guideSlides.push(HAND_SLIDE);
 
   if (!isAuthenticated) {
-    // For non-authenticated users: show two action slides
     guideSlides.push({
       key: "free_helps",
       type: "action",
@@ -319,7 +355,6 @@ export default function HomePage() {
       bg: "bg-primary/10",
     });
   } else {
-    // For authenticated users, keep the existing guide slides
     if (kycStatus !== "approved") {
       guideSlides.push({ key: "announce", type: "announce", to: "/kyc" });
       guideSlides.push({
@@ -371,7 +406,6 @@ export default function HomePage() {
     }
   }
 
-  // Auto-slide timer
   useEffect(() => {
     if (guideSlides.length <= 1) return;
     const t = setInterval(() => {
@@ -457,7 +491,6 @@ export default function HomePage() {
 
   const currentSlide = guideSlides[slideIndex] ?? HAND_SLIDE;
 
-  // Render slide content based on type
   function renderSlideContent() {
     if (currentSlide.type === "image") {
       return (
@@ -514,7 +547,6 @@ export default function HomePage() {
         </button>
       );
     }
-    // Default guide slide (for authenticated)
     return (
       <button
         type="button"
@@ -561,6 +593,7 @@ export default function HomePage() {
           <div className="absolute bottom-0 -left-16 h-48 w-48 rounded-full bg-primary/8 blur-2xl" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 pt-8 pb-6 md:py-12 flex flex-col md:flex-row items-center gap-6 md:gap-12">
+          {/* LEFT SIDE: TEXT & BUTTONS */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -621,6 +654,7 @@ export default function HomePage() {
             )}
           </motion.div>
 
+          {/* RIGHT SIDE: PUBLIC POST BOX + SLIDER */}
           <motion.div
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -628,45 +662,56 @@ export default function HomePage() {
             className="flex-1 w-full space-y-4"
           >
             {/* ===== PUBLIC POST BOX ===== */}
-<div className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
-  <div className="mb-3">
-    <h3 className="font-bold text-lg">What's on your mind?</h3>
-  </div>
-  <p className="text-sm text-muted-foreground mb-4">
-    Write your post...
-  </p>
+            <div className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
+              <div className="mb-3">
+                <h3 className="font-bold text-lg">What's on your mind?</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Write your post...
+                {isAuthenticated && (
+                  <span className="ml-1 text-xs font-medium text-green-600">
+                    (Logged in as {user?.full_name || user?.email})
+                  </span>
+                )}
+                {!isAuthenticated && (
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">
+                    (Posting as Guest)
+                  </span>
+                )}
+              </p>
 
-  {postSubmitted ? (
-    <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-6 text-center space-y-3">
-      <CheckCircle className="h-10 w-10 text-green-600 mx-auto" />
-      <h4 className="font-bold text-green-700 dark:text-green-400">Thank You! 🙏</h4>
-      <p className="text-sm text-green-600 dark:text-green-400">
-        Your post has been shared.
-      </p>
-      <Button variant="outline" size="sm" onClick={() => setPostSubmitted(false)}>
-        Post Another
-      </Button>
-    </div>
-  ) : (
-    <div className="space-y-3">
-      <textarea
-        placeholder="Write your post..."
-        value={postMessage}
-        onChange={(e) => setPostMessage(e.target.value)}
-        rows={3}
-        className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
-      />
-      <Button
-        className="w-full"
-        onClick={handleSubmitPost}
-        disabled={postSubmitting || !postMessage.trim()}
-      >
-        {postSubmitting ? "Posting..." : "Post"}
-      </Button>
-    </div>
-  )}
-</div>
+              {postSubmitted ? (
+                <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-6 text-center space-y-3">
+                  <CheckCircle className="h-10 w-10 text-green-600 mx-auto" />
+                  <h4 className="font-bold text-green-700 dark:text-green-400">Thank You! 🙏</h4>
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    Your post has been shared.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => setPostSubmitted(false)}>
+                    Post Another
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <textarea
+                    placeholder="Write your post..."
+                    value={postMessage}
+                    onChange={(e) => setPostMessage(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  <Button
+                    className="w-full"
+                    onClick={handleSubmitPost}
+                    disabled={postSubmitting || !postMessage.trim()}
+                  >
+                    {postSubmitting ? "Posting..." : "Post"}
+                  </Button>
+                </div>
+              )}
+            </div>
 
+            {/* SLIDER */}
             <div className="relative w-full rounded-2xl overflow-hidden shadow-xl">
               {renderSlideContent()}
 
@@ -750,8 +795,7 @@ export default function HomePage() {
                 setFilterCountry(detectedCountry);
                 if (detectedCity) setFilterCity(detectedCity);
                 setTimeout(
-                  () =>
-                    resultsRef.current?.scrollIntoView({ behavior: "smooth" }),
+                  () => resultsRef.current?.scrollIntoView({ behavior: "smooth" }),
                   100
                 );
               }}
@@ -944,10 +988,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section
-        ref={resultsRef}
-        className="py-8 px-4 bg-background scroll-mt-32"
-      >
+      <section ref={resultsRef} className="py-8 px-4 bg-background scroll-mt-32">
         <div className="max-w-7xl mx-auto space-y-5">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-bold">
@@ -967,9 +1008,7 @@ export default function HomePage() {
           </div>
 
           {loading ? (
-            <div className="text-center py-16 text-muted-foreground">
-              Loading...
-            </div>
+            <div className="text-center py-16 text-muted-foreground">Loading...</div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 rounded-xl border border-dashed border-border bg-muted/20">
               <p className="text-foreground font-semibold">No cases found.</p>
@@ -977,12 +1016,7 @@ export default function HomePage() {
                 Try changing your filters or location.
               </p>
               {activeFilterCount > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={resetFilters}
-                >
+                <Button variant="outline" size="sm" className="mt-4" onClick={resetFilters}>
                   Clear Filters
                 </Button>
               )}
@@ -997,8 +1031,7 @@ export default function HomePage() {
                 const percent =
                   needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
                 const remaining = Math.max(needed - collected, 0);
-                const appeal =
-                  CATEGORY_APPEAL[c.category] ?? "Be someone's hope today 🤲";
+                const appeal = CATEGORY_APPEAL[c.category] ?? "Be someone's hope today 🤲";
                 const isDone = needed > 0 && collected >= needed;
                 return (
                   <motion.div
@@ -1341,37 +1374,22 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
-            <Link
-              to="/about"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/about" className="hover:text-primary transition-colors">
               About
             </Link>
             <Link to="/faq" className="hover:text-primary transition-colors">
               FAQ
             </Link>
-            <Link
-              to="/privacy"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/privacy" className="hover:text-primary transition-colors">
               Privacy Policy
             </Link>
-            <Link
-              to="/terms"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/terms" className="hover:text-primary transition-colors">
               Terms
             </Link>
-            <Link
-              to="/community-guidelines"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/community-guidelines" className="hover:text-primary transition-colors">
               Community Guidelines
             </Link>
-            <Link
-              to="/contact"
-              className="hover:text-primary transition-colors"
-            >
+            <Link to="/contact" className="hover:text-primary transition-colors">
               Contact Us
             </Link>
           </div>
