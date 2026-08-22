@@ -22,6 +22,7 @@ import {
   Linkedin,
   MessageCircle,
   Mail,
+  MessageSquare, // ✅ added for community icon
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
@@ -159,6 +160,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {isAuthenticated ? (
               <>
+                {/* ✅ Community icon */}
+                <Link
+                  to="/community"
+                  aria-label="Community Posts"
+                  className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
+                >
+                  <MessageSquare className="h-5 w-5" />
+                </Link>
+
                 <Link
                   to="/support"
                   aria-label="Help & Support"
@@ -247,25 +257,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               Browse Cases
             </NavLink>
             {isAuthenticated && (
-              <div className="py-1">
-                <NavLink to="/my-cases" onClick={closeMenu}>
-                  My Cases
-                </NavLink>
-              </div>
-            )}
-            {isAuthenticated && (
-              <div className="py-1">
-                <NavLink to="/submit-request" onClick={closeMenu}>
-                  Submit a Case
-                </NavLink>
-              </div>
-            )}
-            {isAuthenticated && (
-              <div className="py-1">
-                <NavLink to="/support" onClick={closeMenu}>
-                  Help & Support
-                </NavLink>
-              </div>
+              <>
+                <div className="py-1">
+                  <NavLink to="/my-cases" onClick={closeMenu}>
+                    My Cases
+                  </NavLink>
+                </div>
+                <div className="py-1">
+                  <NavLink to="/submit-request" onClick={closeMenu}>
+                    Submit a Case
+                  </NavLink>
+                </div>
+                <div className="py-1">
+                  <NavLink to="/support" onClick={closeMenu}>
+                    Help & Support
+                  </NavLink>
+                </div>
+                {/* ✅ Community link in mobile menu */}
+                <div className="py-1">
+                  <NavLink to="/community" onClick={closeMenu}>
+                    Community Posts
+                  </NavLink>
+                </div>
+              </>
             )}
             {isAdmin && (
               <div className="py-1">
