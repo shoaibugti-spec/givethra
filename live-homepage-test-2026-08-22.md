@@ -32,3 +32,12 @@ No cache was cleared and no production resource was modified by this probe.
 At 2026-08-22, a cache-busted browser visit to `https://givethra.org/?live_check=20260822_1` loaded the actual live domain. The visible page contains the announcement bar, GIVETHRA hero, Become a Hero / Request Help buttons, slider, filters, category chips, and the Verified Cases section. The exact string `Public Post` is absent from the live DOM; the keyword search returned no match. The current live homepage therefore does not render the requested composer, despite the canonical source containing it in `src/frontend/src/pages/HomePage.tsx`.
 
 This was a read-only inspection. No post was submitted and no D1/R2 data was changed.
+
+
+## Deployment blocker found after synchronization
+
+The verified source was pushed to `shoaibugti-spec/givethra` `main` at commit `c67828269fa3c7e56bdd3ec9f578b4284c45fba9`. The workflow run `32566536329` failed before any steps started. GitHub’s run annotation states: `The job was not started because your account is locked due to a billing issue.` This explains why the live Worker did not update after the push; the source sync itself succeeded.
+
+The active Cloudflare Worker metadata is `givethra` with script id `ef46f7f5db354917bbcc0bb01572c4ea`. The canonical Wrangler configuration keeps the existing bindings: D1 `givethra-auth` (`5ad1094c-3288-4519-aeec-0446d82126f6`) as `DB`, R2 `givethra-user-uploads` as `UPLOADS`, and static assets from `src/frontend/dist` via `ASSETS`. No D1 or R2 mutation was performed.
+
+Cloudflare’s official direct-upload documentation consulted: https://developers.cloudflare.com/workers/static-assets/direct-upload/ . The Cloudflare API search identified `PUT /accounts/{account_id}/workers/scripts/{script_name}` (Upload Worker Module), `PUT /accounts/{account_id}/workers/scripts/{script_name}/content` (Put script content), and the asset upload/session endpoints as the direct-deployment API family. A direct deployment must preserve the existing Worker bindings and asset manifest rather than replace the Worker with a script-only upload.
