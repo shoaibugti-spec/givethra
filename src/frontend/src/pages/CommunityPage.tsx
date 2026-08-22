@@ -7,10 +7,12 @@ import { Link } from "@tanstack/react-router";
 import { Heart, MessageCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 
+// Helper to get token from localStorage
 function getToken() {
   try { return localStorage.getItem("auth_token"); } catch { return null; }
 }
 
+// Authenticated fetch wrapper
 async function authFetch(url, options = {}) {
   const token = getToken();
   const headers = {
@@ -18,7 +20,12 @@ async function authFetch(url, options = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };
-  return fetch(url, { ...options, headers });
+  const res = await fetch(url, { ...options, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || `HTTP ${res.status}`);
+  }
+  return res;
 }
 
 export default function CommunityPage() {
@@ -33,28 +40,30 @@ export default function CommunityPage() {
     setLoading(true);
     try {
       const res = await authFetch("/api/community-posts");
-      if (res.ok) {
-        const data = await res.json();
-        const postsWithMeta = await Promise.all(
-          data.map(async (post) => {
-            const [likesRes, commentsRes] = await Promise.all([
-              authFetch(`/api/post-likes/${post.id}`),
-              authFetch(`/api/post-comments/${post.id}`),
-            ]);
-            const likes = likesRes.ok ? await likesRes.json() : [];
-            const comments = commentsRes.ok ? await commentsRes.json() : [];
-            return {
-              ...post,
-              likes,
-              comments,
-              likedByUser: isAuthenticated && likes.some((l) => l.user_id === user?.id),
-            };
-          })
-        );
-        setPosts(postsWithMeta);
-      }
-    } catch (err) { toast.error("Network error loading posts"); }
-    finally { setLoading(false); }
+      const data = await res.json();
+      const postsWithMeta = await Promise.all(
+        data.map(async (post) => {
+          const [likesRes, commentsRes] = await Promise.all([
+            authFetch(`/api/post-likes/${post.id}`),
+            authFetch(`/api/post-comments/${post.id}`),
+          ]);
+          const likes = await likesRes.json();
+          const comments = await commentsRes.json();
+          return {
+            ...post,
+            likes,
+            comments,
+            likedByUser: isAuthenticated && likes.some((l) => l.user_id === user?.id),
+          };
+        })
+      );
+      setPosts(postsWithMeta);
+    } catch (err) {
+      toast.error("Network error loading posts");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -64,16 +73,20 @@ export default function CommunityPage() {
   }, [isAuthenticated, user?.id]);
 
   async function toggleLike(postId) {
-    if (!isAuthenticated) { toast.error("Please login to like posts"); return; }
+    if (!isAuthenticated) {
+      toast.error("Please login to like posts");
+      return;
+    }
     setLiking(postId);
     try {
       const res = await authFetch(`/api/post-likes`, {
         method: "POST",
         body: JSON.stringify({ post_id: postId }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setPosts(prev => prev.map(p => {
+      const data = await res.json();
+      // Update local state immediately
+      setPosts(prev =>
+        prev.map((p) => {
           if (p.id === postId) {
             const liked = data.liked;
             const updatedLikes = liked
@@ -82,51 +95,60 @@ export default function CommunityPage() {
             return { ...p, likes: updatedLikes, likedByUser: liked };
           }
           return p;
-        }));
-        toast.success(data.liked ? "Liked!" : "Unliked");
-      } else {
-        const err = await res.json();
-        toast.error(err?.error || "Failed to like");
-      }
-    } catch { toast.error("Network error"); }
-    finally { setLiking(null); }
+        })
+      );
+      toast.success(data.liked ? "Liked!" : "Unliked");
+    } catch (err) {
+      toast.error(err.message || "Network error");
+    } finally {
+      setLiking(null);
+    }
   }
 
   async function addComment(postId) {
     const text = commentText[postId]?.trim();
-    if (!text) { toast.error("Please write a comment"); return; }
-    if (!isAuthenticated) { toast.error("Please login to comment"); return; }
+    if (!text) {
+      toast.error("Please write a comment");
+      return;
+    }
+    if (!isAuthenticated) {
+      toast.error("Please login to comment");
+      return;
+    }
     setSubmittingComment(postId);
     try {
       const res = await authFetch(`/api/post-comments`, {
         method: "POST",
         body: JSON.stringify({ post_id: postId, comment: text }),
       });
-      if (res.ok) {
-        const newComment = await res.json();
-        setPosts(prev => prev.map(p => {
+      const newComment = await res.json();
+      setPosts((prev) =>
+        prev.map((p) => {
           if (p.id === postId) {
             return {
               ...p,
-              comments: [...p.comments, {
-                id: newComment.id,
-                user_id: user?.id,
-                user_name: user?.fullName || "User",
-                comment: text,
-                created_at: new Date().toISOString(),
-              }],
+              comments: [
+                ...p.comments,
+                {
+                  id: newComment.id,
+                  user_id: user?.id,
+                  user_name: user?.fullName || "User",
+                  comment: text,
+                  created_at: new Date().toISOString(),
+                },
+              ],
             };
           }
           return p;
-        }));
-        setCommentText(prev => ({ ...prev, [postId]: "" }));
-        toast.success("Comment added");
-      } else {
-        const err = await res.json();
-        toast.error(err?.error || "Failed to comment");
-      }
-    } catch { toast.error("Network error"); }
-    finally { setSubmittingComment(null); }
+        })
+      );
+      setCommentText((prev) => ({ ...prev, [postId]: "" }));
+      toast.success("Comment added");
+    } catch (err) {
+      toast.error(err.message || "Network error");
+    } finally {
+      setSubmittingComment(null);
+    }
   }
 
   if (loading) {
@@ -167,12 +189,20 @@ export default function CommunityPage() {
                 </div>
                 <p className="text-sm whitespace-pre-line mb-3">{post.message}</p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground border-t border-border pt-3">
-                  <button onClick={() => toggleLike(post.id)} disabled={liking === post.id}
-                    className={`flex items-center gap-1 hover:text-primary transition-colors ${post.likedByUser ? "text-primary" : ""}`}>
+                  <button
+                    onClick={() => toggleLike(post.id)}
+                    disabled={liking === post.id}
+                    className={`flex items-center gap-1 hover:text-primary transition-colors ${
+                      post.likedByUser ? "text-primary" : ""
+                    }`}
+                  >
                     <Heart className={`h-4 w-4 ${post.likedByUser ? "fill-primary" : ""}`} />
                     <span>{post.likes?.length || 0}</span>
                   </button>
-                  <div className="flex items-center gap-1"><MessageCircle className="h-4 w-4" /><span>{post.comments?.length || 0}</span></div>
+                  <div className="flex items-center gap-1">
+                    <MessageCircle className="h-4 w-4" />
+                    <span>{post.comments?.length || 0}</span>
+                  </div>
                 </div>
                 {post.comments && post.comments.length > 0 && (
                   <div className="mt-3 space-y-2 border-t border-border pt-3">
@@ -185,11 +215,19 @@ export default function CommunityPage() {
                   </div>
                 )}
                 <div className="mt-3 flex gap-2">
-                  <Input placeholder="Write a comment..." value={commentText[post.id] || ""}
-                    onChange={(e) => setCommentText(prev => ({ ...prev, [post.id]: e.target.value }))}
-                    className="flex-1 text-sm" />
-                  <Button size="sm" onClick={() => addComment(post.id)}
-                    disabled={submittingComment === post.id || !commentText[post.id]?.trim()}>
+                  <Input
+                    placeholder="Write a comment..."
+                    value={commentText[post.id] || ""}
+                    onChange={(e) =>
+                      setCommentText((prev) => ({ ...prev, [post.id]: e.target.value }))
+                    }
+                    className="flex-1 text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => addComment(post.id)}
+                    disabled={submittingComment === post.id || !commentText[post.id]?.trim()}
+                  >
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
