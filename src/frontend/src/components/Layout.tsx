@@ -1,5 +1,4 @@
 // src/frontend/src/components/Layout.tsx
-// Replaces Supabase with Cloudflare Worker APIs
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +21,7 @@ import {
   Linkedin,
   MessageCircle,
   Mail,
-  MessageSquare, // ✅ added for community icon
+  MessageSquare, // ✅ Community icon
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
@@ -158,17 +157,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             </button>
 
+            {/* ✅ Community icon — always visible */}
+            <Link
+              to="/community"
+              aria-label="Community Posts"
+              className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
+            >
+              <MessageSquare className="h-5 w-5" />
+            </Link>
+
             {isAuthenticated ? (
               <>
-                {/* ✅ Community icon - appears only when logged in */}
-                <Link
-                  to="/community"
-                  aria-label="Community Posts"
-                  className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
-                >
-                  <MessageSquare className="h-5 w-5" />
-                </Link>
-
                 <Link
                   to="/support"
                   aria-label="Help & Support"
