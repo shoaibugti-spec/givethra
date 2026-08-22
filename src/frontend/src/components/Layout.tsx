@@ -1,6 +1,4 @@
 // src/frontend/src/components/Layout.tsx
-// Clean header - NO duplicate navigation below
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -21,9 +19,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import {
-  getUnreadNotificationsCount,
-} from "@/lib/api";
+import { getUnreadNotificationsCount } from "@/lib/api";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
 const FACEBOOK_URL =
@@ -66,25 +62,39 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notifCount, setNotifCount] = useState(0);
+  const [postCount, setPostCount] = useState(0);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
 
+  // Load notification count
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
-
     const loadCounts = async () => {
       try {
         const nCount = await getUnreadNotificationsCount(user.id);
         setNotifCount(nCount ?? 0);
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) { /* ignore */ }
     };
-
     loadCounts();
     const interval = setInterval(loadCounts, 20000);
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
+
+  // Load post count (for community icon badge)
+  useEffect(() => {
+    const fetchPostCount = async () => {
+      try {
+        const res = await fetch("/api/community-posts");
+        if (res.ok) {
+          const data = await res.json();
+          setPostCount(Array.isArray(data) ? data.length : 0);
+        }
+      } catch (e) { /* ignore */ }
+    };
+    fetchPostCount();
+    const interval = setInterval(fetchPostCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => {
@@ -94,14 +104,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate({ to: "/cases" });
-    }
+    if (searchQuery.trim()) navigate({ to: "/cases" });
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* ===== HEADER (ONLY THIS) ===== */}
+      {/* HEADER */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
           {/* Left: Hamburger + Brand */}
@@ -135,15 +143,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </form>
 
-          {/* Right: Language, Post, Notification */}
+          {/* Right: Language, Post (with badge), Notification */}
           <div className="flex items-center gap-1 shrink-0">
             <LanguageSwitcher />
             <Link
               to="/community"
               aria-label="Community Posts"
-              className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
+              className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
             >
               <MessageSquare className="h-5 w-5" />
+              {postCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                  {postCount > 99 ? "99+" : postCount}
+                </span>
+              )}
             </Link>
             {isAuthenticated ? (
               <Link
@@ -166,73 +179,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* ===== MOBILE MENU ===== */}
+        {/* Mobile Menu */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1 max-h-[80vh] overflow-y-auto">
-            <NavLink to="/cases" onClick={closeMenu}>
-              Browse Cases
-            </NavLink>
+            <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
             {isAuthenticated && (
               <>
-                <NavLink to="/my-cases" onClick={closeMenu}>
-                  My Cases
-                </NavLink>
-                <NavLink to="/submit-request" onClick={closeMenu}>
-                  Submit a Case
-                </NavLink>
-                <NavLink to="/support" onClick={closeMenu}>
-                  Help & Support
-                </NavLink>
-                <NavLink to="/community" onClick={closeMenu}>
-                  Community Posts
-                </NavLink>
+                <NavLink to="/my-cases" onClick={closeMenu}>My Cases</NavLink>
+                <NavLink to="/submit-request" onClick={closeMenu}>Submit a Case</NavLink>
+                <NavLink to="/support" onClick={closeMenu}>Help & Support</NavLink>
+                <NavLink to="/community" onClick={closeMenu}>Community Posts</NavLink>
               </>
             )}
-            {isAdmin && (
-              <NavLink to="/admin" onClick={closeMenu}>
-                Admin Panel
-              </NavLink>
-            )}
-            <NavLink to="/about" onClick={closeMenu}>
-              About
-            </NavLink>
-            <NavLink to="/faq" onClick={closeMenu}>
-              FAQ
-            </NavLink>
-
+            {isAdmin && <NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink>}
+            <NavLink to="/about" onClick={closeMenu}>About</NavLink>
+            <NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink>
             <div className="pt-3 border-t border-border mt-2 space-y-2">
               {isAuthenticated ? (
                 <>
-                  <Link
-                    to="/profile/$id"
-                    params={{ id: "me" }}
-                    onClick={closeMenu}
-                  >
+                  <Link to="/profile/$id" params={{ id: "me" }} onClick={closeMenu}>
                     <Button variant="outline" size="sm" className="w-full">
-                      <Shield className="h-4 w-4 mr-2" />
-                      Profile
+                      <Shield className="h-4 w-4 mr-2" /> Profile
                     </Button>
                   </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleLogout}
-                  >
+                  <Button variant="ghost" size="sm" className="w-full" onClick={handleLogout}>
                     Logout
                   </Button>
                 </>
               ) : (
                 <>
                   <Link to="/sign-in" onClick={closeMenu}>
-                    <Button variant="outline" size="sm" className="w-full">
-                      Sign in
-                    </Button>
+                    <Button variant="outline" size="sm" className="w-full">Sign in</Button>
                   </Link>
                   <Link to="/sign-up" onClick={closeMenu}>
-                    <Button size="sm" className="w-full font-semibold">
-                      Get Started
-                    </Button>
+                    <Button size="sm" className="w-full font-semibold">Get Started</Button>
                   </Link>
                 </>
               )}
@@ -241,10 +221,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
-      {/* ===== MAIN CONTENT ===== */}
+      {/* Main */}
       <main className="flex-1 has-bottom-nav">{children}</main>
 
-      {/* ===== FOOTER ===== */}
+      {/* Footer (unchanged) */}
       <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
@@ -253,46 +233,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
                   <Heart className="h-3.5 w-3.5 text-primary-foreground" />
                 </div>
-                <span className="font-display font-bold text-foreground">
-                  Givethra
-                </span>
+                <span className="font-display font-bold text-foreground">Givethra</span>
               </div>
-              <p className="text-xs text-muted-foreground max-w-xs">
-                Verified Help. Real Impact.
-              </p>
+              <p className="text-xs text-muted-foreground max-w-xs">Verified Help. Real Impact.</p>
               <div className="flex items-center gap-3 pt-1">
-                <a
-                  href={FACEBOOK_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Facebook"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
+                <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                   <Facebook className="h-4 w-4" />
                 </a>
-                <a
-                  href={INSTAGRAM_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Instagram"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
+                <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                   <Instagram className="h-4 w-4" />
                 </a>
-                <a
-                  href={LINKEDIN_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="LinkedIn"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
+                <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                   <Linkedin className="h-4 w-4" />
                 </a>
-                <a
-                  href="mailto:info@givethra.org"
-                  aria-label="Email"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
+                <a href="mailto:info@givethra.org" aria-label="Email" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                   <Mail className="h-4 w-4" />
                 </a>
               </div>
@@ -306,11 +260,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 { to: "/community-guidelines", label: "Community Guidelines" },
                 { to: "/contact", label: "Contact Us" },
               ].map(({ to, label }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
+                <Link key={to} to={to} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   {label}
                 </Link>
               ))}
@@ -318,10 +268,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-1">
             <p>&copy; {new Date().getFullYear()} Givethra. All rights reserved.</p>
-            <p>
-              Givethra™ is a humanitarian platform connecting verified people
-              with verified help.
-            </p>
+            <p>Givethra™ is a humanitarian platform connecting verified people with verified help.</p>
           </div>
         </div>
       </footer>
