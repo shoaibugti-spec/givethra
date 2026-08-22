@@ -520,3 +520,11 @@
 - [x] Determine whether the safe fix is a repository/workflow change or an external Cloudflare build-setting correction.
 - [x] Apply only non-destructive configuration/source repairs; do not alter D1/R2 or trigger production deployment from the agent.
 - [x] Re-run the final source verification and report the one unavoidable live action clearly.
+
+## Renewed Live Public Post Regression
+- [x] Record that `givethra.org` currently omits the homepage Public Post and Admin Posts even though the feature previously worked before the latest deployment attempt.
+- [x] Capture the live HTML, JavaScript asset identity, and feature markers currently served by `givethra.org`.
+- [x] Safely test the live public-feedback endpoint and the Admin Posts data path without inserting test data or altering D1/R2.
+- [x] Compare the live artifact/API behavior with the canonical `src/frontend` source and active Worker deployment target.
+- [x] Apply only the minimum safe correction needed to restore the feature path by preparing the canonical source/deployment handoff, then re-run local checks.
+- [x] State clearly that a production deployment remains necessary and identify the exact action that activates the corrected homepage/Admin features.
