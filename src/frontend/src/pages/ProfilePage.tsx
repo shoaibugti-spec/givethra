@@ -57,7 +57,7 @@ export default function ProfilePage() {
       return;
     }
     loadData();
-  }, [isAuthenticated, location.key]); // ✅ Added location.key as dependency
+  }, [isAuthenticated, location.pathname]);
 
   async function loadData() {
     if (!user) return;

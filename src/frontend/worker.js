@@ -385,6 +385,14 @@ async function handleCases(request, env, user, url, parts, origin) {
 // ============================================================
 //  COMMUNITY POSTS HANDLER
 // ============================================================
+function guestIdentity(request, body = null) {
+  const raw = request.headers.get("X-Guest-ID") || body?.guest_id || "";
+  const normalized = String(raw).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
+  if (!normalized) return null;
+  const suffix = normalized.replace(/[^0-9]/g, "").slice(-6) || normalized.slice(-6);
+  return { id: `guest:${normalized}`, name: `Guest ${suffix}` };
+}
+
 async function handleCommunityPosts(request, env, user, url, parts, origin) {
   if (request.method === "GET" && parts.length === 3) {
     const posts = await env.DB.prepare(
@@ -404,8 +412,8 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
       ).bind(post.id).all();
       
       const comments = await env.DB.prepare(
-        `SELECT cl.*, 
-          u.full_name as user_name
+        `SELECT cl.*,
+        CASE WHEN cl.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cl.user_id, 7) ELSE u.full_name END as user_name
          FROM community_comments cl
          LEFT JOIN users u ON cl.user_id = u.user_id
          WHERE cl.post_id = ?
@@ -425,20 +433,20 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
     return json(results, 200, origin);
   }
 
-  if (request.method === "POST" && parts.length === 3) {
-    if (!user) return json({ error: "Authentication required" }, 401, origin);
-    
+    if (request.method === "POST" && parts.length === 3) {
     const body = await readJson(request);
     const message = String(body?.message || "").trim();
     if (!message) return json({ error: "Message is required" }, 400, origin);
-
+    const guest = user ? null : guestIdentity(request, body);
+    if (!user && !guest) return json({ error: "Guest identity is required" }, 400, origin);
     const postId = id();
-    const displayName = body?.display_name || user.full_name || user.email?.split("@")[0] || "User";
-    
+    const displayName = user
+      ? (user.full_name || user.email?.split("@")[0] || "User")
+      : guest.name;
     await env.DB.prepare(
       `INSERT INTO community_posts (id, user_id, display_name, message, created_at)
        VALUES (?, ?, ?, ?, ?)`
-    ).bind(postId, user.user_id, displayName, message, now()).run();
+    ).bind(postId, user?.user_id || null, displayName, message, now()).run();
 
     const newPost = await env.DB.prepare(
       `SELECT cp.*, u.full_name as user_name, u.kyc_status as user_kyc_status
@@ -449,7 +457,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
 
     return json({
       ...newPost,
-      is_guest: false,
+      is_guest: !user,
       display_name: displayName,
       is_verified: newPost?.user_kyc_status === "approved",
       likes_count: 0,
@@ -475,23 +483,24 @@ async function handleCommunityLikes(request, env, user, url, parts, origin) {
     return json(likes.results || [], 200, origin);
   }
 
-  if (request.method === "POST") {
-    if (!user) return json({ error: "Authentication required" }, 401, origin);
-
+    if (request.method === "POST") {
+    const guest = user ? null : guestIdentity(request);
+    const actorId = user?.user_id || guest?.id;
+    if (!actorId) return json({ error: "Guest identity is required" }, 400, origin);
     const existing = await env.DB.prepare(
       "SELECT id FROM community_likes WHERE post_id = ? AND user_id = ?"
-    ).bind(postId, user.user_id).first();
+    ).bind(postId, actorId).first();
 
     if (existing) {
       await env.DB.prepare(
         "DELETE FROM community_likes WHERE post_id = ? AND user_id = ?"
-      ).bind(postId, user.user_id).run();
+      ).bind(postId, actorId).run();
       return json({ liked: false, post_id: postId }, 200, origin);
     } else {
       const likeId = id();
       await env.DB.prepare(
         "INSERT INTO community_likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)"
-      ).bind(likeId, postId, user.user_id, now()).run();
+      ).bind(likeId, postId, actorId, now()).run();
       return json({ liked: true, post_id: postId, id: likeId }, 201, origin);
     }
   }
@@ -508,8 +517,8 @@ async function handleCommunityComments(request, env, user, url, parts, origin) {
 
   if (request.method === "GET") {
     const comments = await env.DB.prepare(
-      `SELECT cc.*, 
-        u.full_name as user_name
+      `SELECT cc.*,
+        CASE WHEN cc.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cc.user_id, 7) ELSE u.full_name END as user_name
        FROM community_comments cc
        LEFT JOIN users u ON cc.user_id = u.user_id
        WHERE cc.post_id = ?
@@ -519,16 +528,17 @@ async function handleCommunityComments(request, env, user, url, parts, origin) {
   }
 
   if (request.method === "POST") {
-    if (!user) return json({ error: "Authentication required" }, 401, origin);
-
     const body = await readJson(request);
+    const guest = user ? null : guestIdentity(request, body);
+    const actorId = user?.user_id || guest?.id;
+    if (!actorId) return json({ error: "Guest identity is required" }, 400, origin);
     const commentText = String(body?.comment || "").trim();
     if (!commentText) return json({ error: "Comment is required" }, 400, origin);
 
     const commentId = id();
     await env.DB.prepare(
       "INSERT INTO community_comments (id, post_id, user_id, comment, created_at) VALUES (?, ?, ?, ?, ?)"
-    ).bind(commentId, postId, user.user_id, commentText, now()).run();
+    ).bind(commentId, postId, actorId, commentText, now()).run();
 
     const newComment = await env.DB.prepare(
       `SELECT cc.*, u.full_name as user_name

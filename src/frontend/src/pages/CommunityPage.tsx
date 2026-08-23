@@ -16,6 +16,7 @@ import {
   getPostComments,
   createNotification,
   createCommunityPost,
+  getGuestId,
 } from "@/lib/api";
 
 interface Post {
@@ -73,8 +74,9 @@ export default function CommunityPage() {
     try {
       const data = await getPostLikes(postId);
       setLikeCounts((prev) => ({ ...prev, [postId]: data.length || 0 }));
-      if (isAuthenticated && user?.id) {
-        const userLiked = data.some((like: any) => like.user_id === user.id);
+      const actorId = isAuthenticated && user?.id ? user.id : `guest:${getGuestId()}`;
+      if (actorId) {
+        const userLiked = data.some((like: any) => like.user_id === actorId);
         setLikedPosts((prev) => ({ ...prev, [postId]: userLiked }));
       }
     } catch (error) {
@@ -98,10 +100,6 @@ export default function CommunityPage() {
 
   // --- نئی پوسٹ کریں ---
   const handleCreatePost = async () => {
-    if (!isAuthenticated) {
-      toast.error("Please sign in to post.");
-      return;
-    }
     const message = newPost.trim();
     if (!message) {
       toast.error("Please write something.");
@@ -111,9 +109,10 @@ export default function CommunityPage() {
     try {
       const payload = {
         message,
-        display_name: user?.full_name || user?.email?.split("@")[0] || "User",
-        is_guest: false,
-        user_id: user?.id || null,
+        display_name: isAuthenticated ? (user?.fullName || user?.email?.split("@")[0] || "User") : undefined,
+        is_guest: !isAuthenticated,
+        user_id: isAuthenticated ? (user?.id || null) : null,
+        guest_id: isAuthenticated ? undefined : getGuestId(),
       };
       const result = await createCommunityPost(payload);
       if (result?.id) {
@@ -122,9 +121,9 @@ export default function CommunityPage() {
         const newPostObj: Post = {
           id: result.id,
           user_id: user?.id || null,
-          display_name: payload.display_name,
+          display_name: result.display_name || payload.display_name || `Guest ${getGuestId().slice(-6)}`,
           message,
-          is_guest: false,
+          is_guest: !isAuthenticated,
           created_at: new Date().toISOString(),
           comments: [],
         };
@@ -143,10 +142,6 @@ export default function CommunityPage() {
 
   // --- لائک ٹوگل کریں ---
   const handleLike = async (postId: string) => {
-    if (!isAuthenticated) {
-      toast.error("Please sign in to like.");
-      return;
-    }
     try {
       const result = await toggleLike(postId);
       if (result.liked) {
@@ -159,7 +154,7 @@ export default function CommunityPage() {
               user_id: postOwner,
               type: "like",
               title: "New Like ❤️",
-              message: `${user?.full_name || "Someone"} liked your post.`,
+              message: `${user?.fullName || "Someone"} liked your post.`,
               link: "/community",
             });
           } catch (e) {}
@@ -181,10 +176,6 @@ export default function CommunityPage() {
       toast.error("Please write a comment.");
       return;
     }
-    if (!isAuthenticated) {
-      toast.error("Please sign in to comment.");
-      return;
-    }
     try {
       const data = await addComment(postId, comment);
       setPosts((prev) =>
@@ -202,7 +193,7 @@ export default function CommunityPage() {
             user_id: postOwner,
             type: "comment",
             title: "New Comment 💬",
-            message: `${user?.full_name || "Someone"} commented: "${comment.slice(0, 50)}${comment.length > 50 ? "..." : ""}"`,
+            message: `${user?.fullName || "Someone"} commented: "${comment.slice(0, 50)}${comment.length > 50 ? "..." : ""}"`,
             link: "/community",
           });
         } catch (e) {}
@@ -280,17 +271,21 @@ export default function CommunityPage() {
           </span>
         </div>
 
-        {/* New Post Box (only for authenticated users) */}
-        {isAuthenticated ? (
+        {/* Public New Post Box: guests and signed-in users can post */}
+        {true ? (
           <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm space-y-3">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <User className="h-5 w-5 text-primary" />
               </div>
-              <span className="font-medium text-sm">{user?.full_name || "User"}</span>
-              <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" /> Verified
+              <span className="font-medium text-sm">
+                {isAuthenticated ? (user?.fullName || "User") : `Guest ${getGuestId().slice(-6)}`}
               </span>
+              {isAuthenticated && (
+                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Verified
+                </span>
+              )}
             </div>
             <Textarea
               placeholder="What's on your mind? Share your thoughts..."
@@ -378,7 +373,6 @@ export default function CommunityPage() {
                         ? "text-red-500"
                         : "text-muted-foreground hover:text-red-500"
                     }`}
-                    disabled={!isAuthenticated}
                   >
                     <Heart
                       className={`h-5 w-5 transition-all ${
@@ -442,8 +436,8 @@ export default function CommunityPage() {
                       </p>
                     )}
 
-                    {/* Comment Input */}
-                    {isAuthenticated ? (
+                    {/* Public Comment Input */}
+                    {true ? (
                       <div className="flex items-center gap-2 mt-2">
                         <Input
                           placeholder="Write a comment..."
@@ -470,13 +464,7 @@ export default function CommunityPage() {
                       </div>
                     ) : (
                       <p className="text-xs text-muted-foreground text-center">
-                        <button
-                          onClick={() => window.location.href = "/sign-in"}
-                          className="text-primary hover:underline"
-                        >
-                          Sign in
-                        </button>{" "}
-                        to comment.
+                        Public comments are welcome.
                       </p>
                     )}
                   </div>

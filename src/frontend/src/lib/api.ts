@@ -16,11 +16,26 @@ function getAuthToken(): string | null {
   }
 }
 
-// Helper to build request headers with authorization
+// Keep a non-sensitive browser-only identity for public Community actions.
+// The Worker stores it as a guest actor key; it is not an account credential.
+export function getGuestId(): string {
+  try {
+    const existing = localStorage.getItem("givethra_guest_id");
+    if (existing) return existing;
+    const generated = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem("givethra_guest_id", generated);
+    return generated;
+  } catch {
+    return "session-guest";
+  }
+}
+
+// Helper to build request headers with authorization and public guest identity.
 function headers(): HeadersInit {
   const token = getAuthToken();
   return {
     "Content-Type": "application/json",
+    "X-Guest-ID": getGuestId(),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
