@@ -9,6 +9,9 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { GOOGLE_CLIENT_ID } from "../config/auth";
 
+const WORKER_URL =
+  typeof window !== "undefined" ? window.location.origin : "https://givethra.org";
+
 export type UserRole = "hero" | "help_seeker" | "admin" | null;
 
 export interface UserPublic {
@@ -84,22 +87,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // ✅ صرف Express Backend کو verify کریں
+  // ✅ Worker کو verify کریں
   useEffect(() => {
     const token = getTokenFromLocation();
     if (token) {
-      fetch(`/api/auth/verify`, {
+      fetch(`${WORKER_URL}/verify`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
         .then((data) => {
           if (data.valid && data.user) {
             const u: UserPublic = {
-              id: data.user.id || data.user.openId || data.user.user_id,
+              id: data.user.user_id,
               email: data.user.email,
-              fullName: data.user.name || data.user.full_name || data.user.email,
-              photo: data.user.picture || data.user.avatar_url || "",
-              role: (safeLocalGet(ROLE_KEY) as UserRole) || data.user.role || null,
+              fullName: data.user.full_name || data.user.email,
+              photo: data.user.avatar_url || "",
+              role: (safeLocalGet(ROLE_KEY) as UserRole) || null,
             };
             setUser(u);
             setUserId(u.id);
@@ -124,17 +127,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const res = await fetch(`/api/auth/verify`, {
+      const res = await fetch(`${WORKER_URL}/verify`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.valid && data.user) {
         const u: UserPublic = {
-          id: data.user.id || data.user.openId || data.user.user_id,
+          id: data.user.user_id,
           email: data.user.email,
-          fullName: data.user.name || data.user.full_name || data.user.email,
-          photo: data.user.picture || data.user.avatar_url || "",
-          role: (safeLocalGet(ROLE_KEY) as UserRole) || data.user.role || null,
+          fullName: data.user.full_name || data.user.email,
+          photo: data.user.avatar_url || "",
+          role: (safeLocalGet(ROLE_KEY) as UserRole) || null,
         };
         setUser(u);
         setUserId(u.id);
@@ -152,32 +155,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const finishGoogleLogin = useCallback(async (credential: string) => {
     setLoginError(null);
     try {
-      const response = await fetch(`/api/auth/google`, {
+      const response = await fetch(`${WORKER_URL}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential }),
       });
       const data = await response.json().catch(() => ({}));
-      
-      if (!response.ok || !data.user) {
+      if (!response.ok || !data.token || !data.user) {
         throw new Error(data.error || `Google sign-in could not be verified (HTTP ${response.status}).`);
       }
 
-      const authenticatedUser: UserPublic = {
-        id: data.user.id || data.user.openId || `google_${Date.now()}`,
-        email: data.user.email,
-        fullName: data.user.name || data.user.full_name || data.user.email,
-        photo: data.user.picture || data.user.avatar_url || "",
-        role: (safeLocalGet(ROLE_KEY) as UserRole) || data.user.role || null,
-      };
-      
-      const token = data.token || credential;
-      safeLocalSet("auth_token", token);
+      safeLocalSet("auth_token", data.token);
       safeLocalSet("user_email", data.user.email);
+      const authenticatedUser: UserPublic = {
+        id: data.user.user_id,
+        email: data.user.email,
+        fullName: data.user.full_name || data.user.email,
+        photo: data.user.avatar_url || "",
+        role: (safeLocalGet(ROLE_KEY) as UserRole) || null,
+      };
       setUser(authenticatedUser);
       setUserId(authenticatedUser.id);
-      
-      window.location.href = "/";
     } catch (error) {
       console.error("Google sign-in failed:", error);
       setLoginError(error instanceof Error ? error.message : "Google sign-in failed. Please try again.");
