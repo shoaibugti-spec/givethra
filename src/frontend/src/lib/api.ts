@@ -53,7 +53,9 @@ export async function verifyToken(): Promise<{ valid: boolean; user?: any }> {
 // ---------- COMMUNITY POSTS ----------
 export async function getCommunityPosts() {
   const res = await fetch(`${WORKER_URL}/api/community/posts`, { headers: headers() });
-  return res.json();
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || `Community request failed (${res.status})`);
+  return Array.isArray(data) ? data : [];
 }
 
 export async function markCommunityPostsAsRead() {

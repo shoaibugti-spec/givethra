@@ -28,7 +28,7 @@ import {
   getUnreadNotificationsCount,
   getUnreadChatMessagesCount,
   getCommunityPosts,
-  markCommunityPostsAsRead,
+  getGuestId,
 } from "@/lib/api";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
@@ -87,41 +87,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
 
-  const fetchPostCount = async () => {
-    if (!isAuthenticated) { setPostCount(0); return; }
+    const fetchPostCount = async () => {
     try {
       const data = await getCommunityPosts();
-      setPostCount(Array.isArray(data) ? data.length : 0);
-    } catch {}
+      if (!Array.isArray(data)) { setPostCount(0); return; }
+      const actorKey = isAuthenticated && user?.id ? user.id : getGuestId();
+      const seenKey = `givethra_community_seen_at:${actorKey}`;
+      const currentPath = router.location.pathname;
+      const newestPostAt = data.reduce((latest: number, post: any) => {
+        const timestamp = Date.parse(post?.created_at || "");
+        return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+      }, 0);
+      if (currentPath === "/community" || currentPath.startsWith("/community/")) {
+        if (newestPostAt) localStorage.setItem(seenKey, String(newestPostAt));
+        setPostCount(0);
+        return;
+      }
+      const seenAt = Number(localStorage.getItem(seenKey) || 0);
+      setPostCount(data.filter((post: any) => Date.parse(post?.created_at || "") > seenAt).length);
+    } catch {
+      // Keep the current badge stable if a transient refresh fails.
+    }
   };
-
   useEffect(() => {
-    if (!isAuthenticated) { setPostCount(0); return; }
     fetchPostCount();
-    const interval = setInterval(fetchPostCount, 30000);
+    const interval = setInterval(fetchPostCount, 600000);
     const handlePostUpdate = () => fetchPostCount();
     window.addEventListener("post-updated", handlePostUpdate);
     return () => {
       clearInterval(interval);
       window.removeEventListener("post-updated", handlePostUpdate);
     };
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const currentPath = router.location.pathname;
-    if (currentPath === "/community" || currentPath.startsWith("/community/")) {
-      const markAsRead = async () => {
-        try {
-          await markCommunityPostsAsRead();
-          fetchPostCount();
-        } catch (e) {
-          console.error("Error marking community posts as read:", e);
-        }
-      };
-      markAsRead();
-    }
-  }, [router.location.pathname, isAuthenticated]);
+  }, [isAuthenticated, user?.id, router.location.pathname]);
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => {
