@@ -602,3 +602,10 @@
 - [x] Ensure valid like/comment activity creates the recipient’s notification and appears through the bell unread count without blocking Community actions.
 - [x] Strengthen origin-scoped automatic cleanup of stale legacy cache, local/session storage, cookies, and service-worker state while preserving current Givethra auth/session data.
 - [x] Add regression coverage, run strict TypeScript and production build checks, and visually verify the focused changes without modifying D1/R2 data.
+
+## Profile Name Persistence Across Sessions — 2026-08-24
+- [x] Reproduce and trace why a saved profile name is replaced by the previous name after logout and Google sign-in.
+- [x] Ensure profile save writes the canonical name consistently to the existing D1 user/profile records without deleting or migrating data.
+- [x] Ensure `/verify`, Google sign-in hydration, profile reload, and Community post/comment identity all use the latest saved profile name.
+- [x] Add regression coverage for save, logout/login hydration, and Community display-name persistence.
+- [x] Run strict TypeScript, production build, and visual/flow verification without modifying unrelated repaired features or D1/R2 data.

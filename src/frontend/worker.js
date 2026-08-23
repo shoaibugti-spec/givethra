@@ -112,7 +112,7 @@ async function verifyGoogleCredential(credential, clientId) {
   return {
     google_id: String(payload.sub),
     email: String(payload.email).toLowerCase(),
-    full_name: payload.name || payload.email,
+    full_name: payload.name || "User",
     avatar_url: payload.picture || "",
   };
 }
@@ -128,40 +128,83 @@ async function findOrCreateUser(env, identity) {
 
   const timestamp = now();
   const userId = existing?.user_id || identity.google_id;
+  const existingProfile = await env.DB.prepare(
+    "SELECT full_name, avatar_url FROM profiles WHERE user_id = ?"
+  ).bind(userId).first();
+  const savedName = String(existingProfile?.full_name || existing?.full_name || "").trim();
+  const savedAvatar = String(existingProfile?.avatar_url || existing?.avatar_url || "").trim();
+  const canonicalName = savedName && !savedName.includes("@") ? savedName : identity.full_name;
+  const canonicalAvatar = savedAvatar || identity.avatar_url;
+
   if (existing) {
     await env.DB.prepare(
       `UPDATE users SET email = ?, full_name = ?, avatar_url = ?, updated_at = ? 
        WHERE user_id = ?`
-    ).bind(identity.email, identity.full_name, identity.avatar_url, timestamp, userId).run();
+    ).bind(identity.email, canonicalName, canonicalAvatar, timestamp, userId).run();
   } else {
     await env.DB.prepare(
       `INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at) 
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(userId, identity.email, identity.full_name, identity.avatar_url, timestamp, timestamp, timestamp).run();
+    ).bind(userId, identity.email, canonicalName, canonicalAvatar, timestamp, timestamp, timestamp).run();
   }
 
   await env.DB.prepare(
     `INSERT INTO profiles (user_id, full_name, avatar_url, created_at, updated_at) 
      VALUES (?, ?, ?, ?, ?) 
      ON CONFLICT(user_id) DO UPDATE SET full_name = excluded.full_name, avatar_url = excluded.avatar_url, updated_at = excluded.updated_at`
-  ).bind(userId, identity.full_name, identity.avatar_url, timestamp, timestamp).run();
+  ).bind(userId, canonicalName, canonicalAvatar, timestamp, timestamp).run();
 
   return {
     user_id: userId,
     email: identity.email,
-    full_name: identity.full_name,
-    avatar_url: identity.avatar_url,
+    full_name: canonicalName,
+    avatar_url: canonicalAvatar,
     kyc_status: existing?.kyc_status || "none",
     role: isAdmin(identity) ? "admin" : null,
     last_community_visit: existing?.last_community_visit || timestamp,
   };
 }
 
+async function hydrateAuthenticatedUser(env, session) {
+  if (!env.DB || !session?.user_id) return session;
+  try {
+    const row = await env.DB.prepare(
+      `SELECT u.user_id, u.email, u.full_name, u.avatar_url, u.kyc_status,
+              u.total_cases, u.pending_cases, u.active_or_completed_cases, u.rejected_cases,
+              u.balance, u.last_community_visit,
+              p.full_name AS profile_full_name, p.avatar_url AS profile_avatar_url
+       FROM users u
+       LEFT JOIN profiles p ON p.user_id = u.user_id
+       WHERE u.user_id = ? LIMIT 1`
+    ).bind(session.user_id).first();
+    if (!row) return session;
+    const candidateName = String(row.profile_full_name || row.full_name || session.full_name || "").trim();
+    const fullName = candidateName && !candidateName.includes("@") ? candidateName : "User";
+    return {
+      ...session,
+      user_id: String(row.user_id || session.user_id),
+      email: String(row.email || session.email).toLowerCase(),
+      full_name: fullName,
+      avatar_url: row.profile_avatar_url || row.avatar_url || session.avatar_url || "",
+      kyc_status: row.kyc_status || session.kyc_status || "none",
+      total_cases: row.total_cases,
+      pending_cases: row.pending_cases,
+      active_or_completed_cases: row.active_or_completed_cases,
+      rejected_cases: row.rejected_cases,
+      balance: row.balance,
+      last_community_visit: row.last_community_visit,
+      role: isAdmin(row) ? "admin" : session.role || null,
+    };
+  } catch {
+    return session;
+  }
+}
+
 async function authenticate(request, env, clientId, createUser = false) {
   const credential = bearer(request);
   if (!credential) return null;
   const session = await verifySession(credential, env.JWT_SECRET);
-  if (session) return session;
+  if (session) return hydrateAuthenticatedUser(env, session);
   const identity = await verifyGoogleCredential(credential, clientId);
   if (!identity) return null;
   if (createUser) return findOrCreateUser(env, identity);
@@ -172,7 +215,7 @@ async function authenticate(request, env, clientId, createUser = false) {
             pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit 
      FROM users WHERE user_id = ? OR lower(email) = lower(?) LIMIT 1`
   ).bind(identity.google_id, identity.email).first();
-  return {
+  return hydrateAuthenticatedUser(env, {
     user_id: existing?.user_id || identity.google_id,
     email: identity.email,
     full_name: existing?.full_name || identity.full_name,
@@ -180,7 +223,7 @@ async function authenticate(request, env, clientId, createUser = false) {
     kyc_status: existing?.kyc_status || "none",
     role: isAdmin(identity) ? "admin" : null,
     last_community_visit: existing?.last_community_visit || null,
-  };
+  });
 }
 
 function pathParts(url) {
