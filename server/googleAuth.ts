@@ -80,7 +80,7 @@ export function registerGoogleAuthRoutes(app: Express) {
       const openId = `google:${identity.sub}`;
 
       // ✅ upsertUser خودکار طور پر نیا صارف بنا دے گا اگر موجود نہیں
-      const user = await upsertUser({
+      await upsertUser({
         openId,
         name: identity.name,
         email: identity.email,
@@ -96,7 +96,7 @@ export function registerGoogleAuthRoutes(app: Express) {
       return res.status(200).json({
         token,
         user: {
-          id: user.id || user.user_id || openId,
+          id: openId,
           email: identity.email,
           name: identity.name,
           role,
