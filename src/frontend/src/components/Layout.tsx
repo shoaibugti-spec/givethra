@@ -1,6 +1,4 @@
 // src/frontend/src/components/Layout.tsx
-// Replaces Supabase with Cloudflare Worker APIs
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -41,19 +39,9 @@ const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 
 export { NavLink };
 
-function NavLink({
-  to,
-  children,
-  onClick,
-}: {
-  to: string;
-  children: React.ReactNode;
-  onClick?: () => void;
-}) {
+function NavLink({ to, children, onClick }: { to: string; children: React.ReactNode; onClick?: () => void }) {
   const router = useRouterState();
-  const isActive =
-    router.location.pathname === to ||
-    router.location.pathname.startsWith(`${to}/`);
+  const isActive = router.location.pathname === to || router.location.pathname.startsWith(`${to}/`);
   return (
     <Link
       to={to}
@@ -84,7 +72,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
-
     const loadCounts = async () => {
       try {
         const [nCount, cCount] = await Promise.all([
@@ -93,30 +80,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         ]);
         setNotifCount(nCount ?? 0);
         setChatCount(cCount ?? 0);
-      } catch (e) {}
+      } catch {}
     };
-
     loadCounts();
     const interval = setInterval(loadCounts, 20000);
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
 
   const fetchPostCount = async () => {
-    if (!isAuthenticated) {
-      setPostCount(0);
-      return;
-    }
+    if (!isAuthenticated) { setPostCount(0); return; }
     try {
       const data = await getCommunityPosts();
       setPostCount(Array.isArray(data) ? data.length : 0);
-    } catch (e) {}
+    } catch {}
   };
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setPostCount(0);
-      return;
-    }
+    if (!isAuthenticated) { setPostCount(0); return; }
     fetchPostCount();
     const interval = setInterval(fetchPostCount, 30000);
     const handlePostUpdate = () => fetchPostCount();
@@ -149,8 +129,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     closeMenu();
     navigate({ to: "/" });
   };
-  const toggleTheme = () =>
-    setTheme(theme === "dark" ? "light" : "dark");
+  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) navigate({ to: "/cases" });
@@ -158,10 +137,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* ===== HEADER ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
-          
-          {/* ===== LEFT: Logo ===== */}
+          {/* Left: Logo */}
           <Link to="/" className="flex items-center gap-1.5 shrink-0">
             <div className="h-7 w-7 md:h-8 md:w-8 rounded-lg bg-primary flex items-center justify-center">
               <Heart className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary-foreground" />
@@ -171,7 +150,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          {/* ===== CENTER: Search ===== */}
+          {/* Center: Search */}
           <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto md:mx-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -185,10 +164,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </form>
 
-          {/* ===== RIGHT: Icons ===== */}
+          {/* Right: Icons */}
           <div className="flex items-center gap-1 shrink-0">
             <LanguageSwitcher />
 
+            {/* Community Icon with counter */}
             <Link
               to="/community"
               aria-label="Community"
@@ -202,6 +182,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             </Link>
 
+            {/* Theme toggle */}
             <button
               type="button"
               onClick={toggleTheme}
@@ -213,6 +194,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {isAuthenticated ? (
               <>
+                {/* Support */}
                 <Link
                   to="/support"
                   aria-label="Help & Support"
@@ -225,6 +207,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </Link>
+                {/* Notifications */}
                 <Link
                   to="/notifications"
                   aria-label="Notifications"
@@ -237,6 +220,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </Link>
+                {/* Profile */}
                 <Link
                   to="/profile/$id"
                   params={{ id: "me" }}
@@ -268,6 +252,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </>
             )}
 
+            {/* Mobile menu toggle */}
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
@@ -279,7 +264,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* ===== Desktop Navigation Links ===== */}
+        {/* Desktop Navigation Links */}
         <div className="hidden md:block border-t border-border/50">
           <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
             <NavLink to="/cases">Browse Cases</NavLink>
@@ -292,7 +277,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* ===== Mobile Menu ===== */}
+        {/* Mobile Menu */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
             <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
@@ -334,9 +319,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
+      {/* ===== MAIN CONTENT ===== */}
       <main className="flex-1 has-bottom-nav">{children}</main>
 
-      {/* ===== Footer ===== */}
+      {/* ===== FOOTER ===== */}
       <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
@@ -372,7 +358,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 { to: "/community-guidelines", label: "Community Guidelines" },
                 { to: "/contact", label: "Contact Us" },
               ].map(({ to, label }) => (
-                <Link key={to} to={to} className="text-sm text-muted-foreground hover:text-foreground transition-colors">{label}</Link>
+                <Link key={to} to={to} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  {label}
+                </Link>
               ))}
             </nav>
           </div>
