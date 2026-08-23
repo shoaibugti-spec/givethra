@@ -124,7 +124,7 @@ const CATEGORIES = [
 ];
 
 // ============================================================
-//  COUNTRIES LIST (moved outside component)
+//  COUNTRIES LIST (moved outside component - FIXED)
 // ============================================================
 const COUNTRIES = [
   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda",
@@ -2856,7 +2856,9 @@ export default function SubmitRequestPage() {
                 placeholder="One line summary"
               />
             </div>
-            {/* Step 1: Country + City */}
+            {/* ============================================================
+                COUNTRY & CITY - FIXED: Side by side, same as before
+                ============================================================ */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Country *</Label>
