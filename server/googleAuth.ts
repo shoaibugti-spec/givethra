@@ -105,7 +105,7 @@ export function registerGoogleAuthRoutes(app: Express) {
     }
   });
 
-  // ✅ نیا: Verify Token Route
+  // ✅ Verify Token Route
   app.get("/api/auth/verify", async (req: Request, res: Response) => {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -131,7 +131,7 @@ export function registerGoogleAuthRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          picture: "", // optional
+          picture: "",
         },
       });
     } catch (error) {
