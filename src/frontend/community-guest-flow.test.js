@@ -26,11 +26,29 @@ describe("public Community Posts flow", () => {
     expect(workerSource).toContain("ctx.waitUntil");
   });
 
+  it("provides public For You and My Posts tabs without changing guest access", () => {
+    expect(pageSource).toContain('useState<"for-you" | "my-posts">("for-you")');
+    expect(pageSource).toContain('aria-label="Community post feeds"');
+    expect(pageSource).toContain("For You");
+    expect(pageSource).toContain("My Posts");
+    expect(pageSource).toContain("currentActorId");
+    expect(pageSource).toContain("visiblePosts");
+  });
+
   it("keeps the guest composer and public interactions enabled in the UI", () => {
     expect(pageSource).toContain("Public New Post Box: guests and signed-in users can post");
     expect(pageSource).toContain("Public Comment Input");
     expect(pageSource).not.toContain('toast.error("Please sign in to post.")');
     expect(pageSource).not.toContain('toast.error("Please sign in to like.")');
     expect(pageSource).not.toContain('toast.error("Please sign in to comment.")');
+  });
+
+  it("keeps serialized case document maps and Admin replies covered", () => {
+    const adminSource = fs.readFileSync(path.join(root, "src/pages/AdminDashboard.tsx"), "utf8");
+    expect(adminSource).toContain("parseObject(c.photo_urls)");
+    expect(adminSource).toContain('walkFilesDeep(catDocs, "documents")');
+    expect(adminSource).toContain('walkFilesDeep(parseObject(catDetails?.edu_documents) || {}, "education_documents")');
+    expect(workerSource).toContain("await env.DB.batch([");
+    expect(workerSource).toContain("'support_reply', 'New message from Givethra'");
   });
 });

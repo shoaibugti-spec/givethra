@@ -633,3 +633,9 @@
 - [x] Make bell unread counts include Admin notifications and Community likes/comments, clear after viewing, and reappear for new events.
 - [x] Verify all case submission fields and original attachment filenames are visible in Admin review without silent omissions.
 - [x] Add regression tests, run strict checks/build, and preserve existing D1/R2 data.
+
+## Community Tabs, Case Attachments, and Admin Replies — 2026-08-24
+- [x] Add public Community Posts tabs for For You and My Posts, with guest-safe behavior and fast switching.
+- [x] Expand Admin case attachment collection to include `_documents`, `edu_documents`, every nested URL, required documents, original metadata names, and duplicate-by-URL filtering.
+- [x] Repair Admin-to-user support reply persistence/delivery, including recipient identity, attachment URL, multiline message, and reload verification.
+- [x] Add regression tests and run Worker syntax, strict TypeScript, and production build checks without changing D1/R2 data.

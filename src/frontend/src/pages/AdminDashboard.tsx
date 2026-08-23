@@ -1965,11 +1965,12 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   pushFile("video_url", c.video_url);
   pushFile("paid_receipt_url", c.paid_receipt_url);
 
-  // photo_urls array or object
-  if (Array.isArray(c.photo_urls)) {
-    c.photo_urls.forEach((val, idx) => pushFile(`photo_${idx + 1}`, val));
-  } else if (c.photo_urls && typeof c.photo_urls === "object") {
-    for (const [k, val] of Object.entries(c.photo_urls)) pushFile(k, val);
+  // photo_urls may arrive as an array, object, or JSON string from D1
+  const photoPayload = Array.isArray(c.photo_urls) ? c.photo_urls : parseObject(c.photo_urls);
+  if (Array.isArray(photoPayload)) {
+    photoPayload.forEach((val, idx) => pushFile(`photo_${idx + 1}`, val));
+  } else if (photoPayload && typeof photoPayload === "object") {
+    for (const [k, val] of Object.entries(photoPayload)) pushFile(k, val);
   }
 
   // Deep recursive walk over every case payload branch for any document or URL field
@@ -1997,6 +1998,9 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     }
   };
   walkFilesDeep(c);
+  // D1 commonly stores these nested document maps as JSON strings; walk their parsed values explicitly.
+  walkFilesDeep(catDocs, "documents");
+  walkFilesDeep(parseObject(catDetails?.edu_documents) || {}, "education_documents");
 
   // Remove duplicates by URL
   const seen = new Set<string>();

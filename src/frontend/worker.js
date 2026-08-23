@@ -1089,15 +1089,17 @@ async function handleRequest(request, env, ctx) {
           return json({ error: "A reply message or attachment is required" }, 400, origin);
         }
         const msgId = body?.id || id();
-        await env.DB.prepare(
-          `INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at)
-           VALUES (?, ?, 'admin', ?, ?, ?, 1, ?)`
-        ).bind(msgId, body.user_id, body.message ? String(body.message).trim() : null, body.attachment_url || null, body.language || "en", now()).run();
+        await env.DB.batch([
+          env.DB.prepare(
+            `INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at)
+             VALUES (?, ?, 'admin', ?, ?, ?, 1, ?)`
+          ).bind(msgId, body.user_id, body.message ? String(body.message).trim() : null, body.attachment_url || null, body.language || "en", now()),
+          env.DB.prepare(
+            `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+             VALUES (?, ?, 'support_reply', 'New message from Givethra', ?, '/support', 0, ?)`
+          ).bind(id(), body.user_id, body.message ? String(body.message).trim() : "A support attachment was sent.", now()),
+        ]);
         const created = await env.DB.prepare("SELECT * FROM support_messages WHERE id = ?").bind(msgId).first();
-        queueCommunityNotification(ctx, env.DB.prepare(
-          `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
-           VALUES (?, ?, 'support_reply', 'New message from Givethra', ?, '/support', 0, ?)`
-        ).bind(id(), body.user_id, body.message ? String(body.message).trim() : "A support attachment was sent.", now()).run());
         return json(created || { id: msgId, ...body, sender: "admin", is_read: 1 }, 201, origin);
       }
 

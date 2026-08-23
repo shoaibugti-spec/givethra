@@ -104,6 +104,12 @@ export default function CommunityPage() {
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [liking, setLiking] = useState<string | null>(null);
   const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({});
+  const [feedTab, setFeedTab] = useState<"for-you" | "my-posts">("for-you");
+
+  const currentActorId = isAuthenticated && user?.id ? user.id : `guest:${getGuestId()}`;
+  const visiblePosts = feedTab === "for-you"
+    ? posts
+    : posts.filter((post) => post.user_id === currentActorId || (post.is_guest && !isAuthenticated && post.user_id === currentActorId));
 
   // New post state
   const [newPost, setNewPost] = useState("");
@@ -314,6 +320,27 @@ export default function CommunityPage() {
           </span>
         </div>
 
+        <div className="grid grid-cols-2 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Community post feeds">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={feedTab === "for-you"}
+            onClick={() => setFeedTab("for-you")}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${feedTab === "for-you" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            For You
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={feedTab === "my-posts"}
+            onClick={() => setFeedTab("my-posts")}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${feedTab === "my-posts" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            My Posts
+          </button>
+        </div>
+
         {/* Public New Post Box: guests and signed-in users can post */}
         {true ? (
           <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm space-y-3">
@@ -371,14 +398,14 @@ export default function CommunityPage() {
             <Loader2 className="h-7 w-7 animate-spin text-primary mx-auto" />
             <p className="mt-3 text-sm text-muted-foreground">Loading posts...</p>
           </div>
-        ) : posts.length === 0 ? (
+        ) : visiblePosts.length === 0 ? (
           <div className="text-center py-16 border rounded-2xl bg-muted/10">
             <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
+            <p className="text-muted-foreground">{feedTab === "my-posts" ? "You have not shared a post yet." : "No posts yet. Be the first to share!"}</p>
           </div>
         ) : (
           <div className="space-y-6">
-            {posts.map((post) => (
+            {visiblePosts.map((post) => (
               <div
                 key={post.id}
                 className="rounded-2xl border border-border bg-card p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow"
