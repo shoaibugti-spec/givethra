@@ -889,21 +889,22 @@ async function handleRequest(request, env) {
 
       if (request.method === "GET") {
         const tableMap = {
-          kyc: "kyc_submissions",
-          cases: "case_submissions",
-          resolutions: "case_resolutions",
-          deposits: "deposits",
-          profiles: "profiles",
-          wallets: "wallets",
-          unlocks: "case_unlocks",
-          "support-messages": "support_messages",
-          feedbacks: "feedbacks",
-          offers: "category_offers",
-          suspensions: "user_suspensions",
+          users: { table: "users", order: "updated_at" },
+          kyc: { table: "kyc_submissions", order: "submitted_at" },
+          cases: { table: "case_submissions", order: "submitted_at" },
+          resolutions: { table: "case_resolutions", order: "created_at" },
+          deposits: { table: "deposits", order: "submitted_at" },
+          profiles: { table: "profiles", order: "updated_at" },
+          wallets: { table: "wallets", order: "updated_at" },
+          unlocks: { table: "case_unlocks", order: "unlocked_at" },
+          "support-messages": { table: "support_messages", order: "created_at" },
+          feedbacks: { table: "feedbacks", order: "created_at" },
+          offers: { table: "category_offers", order: "updated_at" },
+          suspensions: { table: "user_suspensions", order: "suspended_at" },
         };
-        const table = tableMap[parts[2]];
-        if (table) {
-          const rows = await env.DB.prepare(`SELECT * FROM ${table} ORDER BY created_at DESC`).all();
+        const entry = tableMap[parts[2]];
+        if (entry) {
+          const rows = await env.DB.prepare(`SELECT * FROM ${entry.table} ORDER BY ${entry.order} DESC`).all();
           return json(rows.results || [], 200, origin);
         }
       }
