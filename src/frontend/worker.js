@@ -839,7 +839,7 @@ async function handleRequest(request, env) {
       try {
         const key = String(path);
         const arrayBuffer = await file.arrayBuffer();
-        await env.BUCKET.put(key, arrayBuffer, {
+        await env.UPLOADS.put(key, arrayBuffer, {
           httpMetadata: {
             contentType: file.type || "application/octet-stream",
           },
@@ -1014,7 +1014,7 @@ async function handleRequest(request, env) {
   if (url.pathname.startsWith("/uploads/")) {
     const key = url.pathname.slice(9);
     try {
-      const object = await env.BUCKET.get(key);
+      const object = await env.UPLOADS.get(key);
       if (!object) return new Response("File not found", { status: 404 });
       return new Response(object.body, {
         headers: {
