@@ -1032,10 +1032,27 @@ async function handleRequest(request, env) {
       }
       if (request.method === "POST") {
         const body = await readJson(request);
-        await env.DB.prepare(
-          "INSERT INTO user_suspensions (user_id, is_active, suspension_count, rejection_count_at_suspension, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET is_active = excluded.is_active, suspension_count = COALESCE(excluded.suspension_count, suspension_count), rejection_count_at_suspension = COALESCE(excluded.rejection_count_at_suspension, rejection_count_at_suspension), updated_at = excluded.updated_at"
-        ).bind(parts[2], body.is_active ? 1 : 0, body.suspension_count || 1, body.rejection_count_at_suspension || 0, now(), now()).run();
-        const updated = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(parts[2]).first();
+        const userId = parts[2];
+        const existing = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(userId).first();
+
+        if (body.is_active === false) {
+          if (!existing?.is_active) return json(existing || { user_id: userId, is_active: false }, 200, origin);
+          const wallet = await env.DB.prepare("SELECT balance FROM wallets WHERE user_id = ?").bind(userId).first();
+          const balance = Number(wallet?.balance || 0);
+          const unlockCost = 5;
+          if (balance < unlockCost) {
+            return json({ error: `Insufficient credits. ${unlockCost} credits are required to unlock this account.`, required: unlockCost, balance }, 402, origin);
+          }
+          await env.DB.batch([
+            env.DB.prepare("UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?").bind(unlockCost, now(), userId, unlockCost),
+            env.DB.prepare("UPDATE user_suspensions SET is_active = 0, unlocked_at = ?, credits_used_to_unlock = COALESCE(credits_used_to_unlock, 0) + ? WHERE user_id = ? AND is_active = 1").bind(now(), unlockCost, userId),
+          ]);
+        } else {
+          await env.DB.prepare(
+            "INSERT INTO user_suspensions (user_id, is_active, suspension_count, suspended_at, rejection_count_at_suspension, unlocked_at, credits_used_to_unlock) VALUES (?, 1, ?, ?, ?, NULL, 0) ON CONFLICT(user_id) DO UPDATE SET is_active = 1, suspension_count = excluded.suspension_count, suspended_at = excluded.suspended_at, rejection_count_at_suspension = excluded.rejection_count_at_suspension"
+          ).bind(userId, body.suspension_count || 1, body.suspended_at || now(), body.rejection_count_at_suspension || 0).run();
+        }
+        const updated = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(userId).first();
         return json(updated, 201, origin);
       }
       return json({ error: "Method not allowed" }, 405, origin);

@@ -183,7 +183,7 @@ const SS_KEY = "givethra_submit_draft_v4";
 const COMMON_GUIDE_TAIL = [
   "Upload clear documents so Givethra can verify your case.",
   "Take a live selfie and record a video explaining your need in your own words.",
-  "Your first case is FREE. After that, a 1 credit listing fee applies.",
+  "Your first two cases are FREE. From the third case onward, a 1 credit listing fee applies.",
 ];
 
 // ===== SUSPENSION CONSTANTS =====
@@ -704,7 +704,6 @@ export default function SubmitRequestPage() {
     if (isSuspended) return false;
     if (isFreeDisabled) return false;
     if (userFreeCasesUsed >= MAX_FREE_CASES) return false;
-    if (userRejectionCount >= 3) return false;
     return true;
   };
 
@@ -775,7 +774,7 @@ export default function SubmitRequestPage() {
       setUserFreeCasesUsed(freeCasesUsed);
 
       // Free disabled if free cases used >= 2 OR rejections >= 3
-      const freeDisabled = freeCasesUsed >= MAX_FREE_CASES || rejectedCases >= 3;
+      const freeDisabled = freeCasesUsed >= MAX_FREE_CASES;
       setIsFreeDisabled(freeDisabled);
 
       const suspensionData = await getUserSuspension(user.id);
@@ -813,7 +812,7 @@ export default function SubmitRequestPage() {
       });
 
       setIsSuspended(false);
-      setSuspensionCount(suspensionCount + 1);
+      setSuspensionCount(0);
       setUserRejectionCount(0);
       // Reset free cases used when unlocked
       setUserFreeCasesUsed(0);
@@ -1151,7 +1150,7 @@ export default function SubmitRequestPage() {
     setHasClaimedOfferBefore((count ?? 0) > 0);
   }
 
-  const isFirstCaseFree = activeCaseCount === 0 && canUseFreeCase();
+  const isFirstCaseFree = userFreeCasesUsed < MAX_FREE_CASES && canUseFreeCase();
   const offerApplies =
     !!offer &&
     offer.is_active &&
@@ -1733,7 +1732,7 @@ export default function SubmitRequestPage() {
       // Count all free cases regardless of status
       const freshFreeUsed = freshCases?.filter((c: any) => c.was_free === true).length || 0;
 
-      const freeDisabled = freshFreeUsed >= MAX_FREE_CASES || freshRejections >= 3;
+      const freeDisabled = freshFreeUsed >= MAX_FREE_CASES;
       const userSuspended = freshRejections >= MAX_REJECTIONS_BEFORE_SUSPENSION;
 
       if (userSuspended) {
@@ -1750,8 +1749,8 @@ export default function SubmitRequestPage() {
         return;
       }
 
-      // First case free if no cases submitted yet
-      const firstFree = (freshCases?.length || 0) === 0 && !freeDisabled;
+      // The first two submitted cases are free, regardless of review status.
+      const firstFree = freshFreeUsed < MAX_FREE_CASES && !freeDisabled;
 
       let offerFree = false;
       let currentOffer: any = null;
@@ -2700,7 +2699,7 @@ export default function SubmitRequestPage() {
             </div>
             {isFreeDisabled && !isSuspended && (
               <div className="mt-2 text-xs text-center text-red-600 bg-red-50 dark:bg-red-950/20 rounded-lg p-2">
-                ⚠️ Your free case access has been disabled (used {userFreeCasesUsed}/{MAX_FREE_CASES} free cases or rejections ≥3). You can still submit cases using credits.
+                ⚠️ Your free case access has been used ({userFreeCasesUsed}/{MAX_FREE_CASES} free cases). You can still submit cases using credits.
               </div>
             )}
             {userRejectionCount >= 3 && userRejectionCount < MAX_REJECTIONS_BEFORE_SUSPENSION && (
