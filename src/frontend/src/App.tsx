@@ -1,6 +1,6 @@
 import BottomNav from "@/components/BottomNav";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import Layout from "@/components/Layout";
+import Layout from "@/components/Layout"; // ✅ یہ شامل کریں
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Toaster } from "@/components/ui/sonner";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
@@ -41,9 +41,7 @@ const ContactPage = lazy(() => import("@/pages/ContactPage").catch(() => ({ defa
 const BecomeHeroPage = lazy(() => import("@/pages/BecomeHeroPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const NeedHelpPage = lazy(() => import("@/pages/NeedHelpPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const OnboardingPage = lazy(() => import("@/pages/OnboardingPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
-
-// ✅ نیا: CommunityPage درآمد کریں
-const CommunityPage = lazy(() => import("@/pages/CommunityPage").catch(() => ({ default: () => <div>Failed to load community page</div> })));
+const CommunityPage = lazy(() => import("@/pages/CommunityPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -66,14 +64,15 @@ function BottomNavFallback() {
   );
 }
 
+// ✅ RootLayout میں Layout شامل کریں
 function RootLayout() {
   return (
-    <>
+    <Layout>
       <Outlet />
       <ErrorBoundary fallback={<BottomNavFallback />}>
         <BottomNav />
       </ErrorBoundary>
-    </>
+    </Layout>
   );
 }
 
@@ -106,7 +105,6 @@ const becomeHeroRoute = createRoute({ getParentRoute: () => rootRoute, path: "/b
 const needHelpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/need-help", component: () => <Suspense fallback={<PageLoader />}><NeedHelpPage /></Suspense> });
 const onboardingRoute = createRoute({ getParentRoute: () => rootRoute, path: "/onboarding", component: () => <Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense> });
 
-// ✅ نیا: کمیونٹی روٹ
 const communityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/community",
@@ -140,7 +138,7 @@ const routeTree = rootRoute.addChildren([
   becomeHeroRoute,
   needHelpRoute,
   onboardingRoute,
-  communityRoute, // ✅ یہاں شامل کریں
+  communityRoute,
 ]);
 const router = createRouter({ routeTree });
 
