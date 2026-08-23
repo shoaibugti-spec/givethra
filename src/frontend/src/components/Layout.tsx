@@ -133,132 +133,95 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     if (searchQuery.trim()) navigate({ to: "/cases" });
   };
 
+  const isRouteActive = (to: string) =>
+    router.location.pathname === to || router.location.pathname.startsWith(`${to}/`);
+
+  const iconLinkClass = (to: string) => cn(
+    "relative h-10 w-10 flex items-center justify-center rounded-full transition-colors duration-200",
+    isRouteActive(to)
+      ? "bg-primary text-primary-foreground shadow-sm"
+      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* ===== HEADER ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
-          {/* Left: Logo */}
-          <Link to="/" className="flex items-center gap-1.5 shrink-0">
-            <div className="h-7 w-7 md:h-8 md:w-8 rounded-lg bg-primary flex items-center justify-center">
-              <Heart className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary-foreground" />
+        <div className="max-w-7xl mx-auto px-3 md:px-4 h-16 flex items-center gap-2 md:gap-4">
+          {/* Reference layout: hamburger, brand, centered search */}
+          <button
+            type="button"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Toggle menu"
+            aria-expanded={menuOpen}
+            className="md:hidden h-10 w-10 shrink-0 flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
+          >
+            {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+          <Link to="/" aria-label="Givethra home" className="flex items-center gap-1.5 shrink-0">
+            <div className="hidden md:flex h-8 w-8 rounded-lg bg-primary items-center justify-center">
+              <Heart className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-base md:text-lg text-foreground hidden sm:block">
-              Givethra
-            </span>
+            <span className="font-display font-bold text-lg text-primary">Givethra</span>
           </Link>
 
-          {/* Center: Search */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto md:mx-4">
+          <form onSubmit={handleSearch} className="flex-1 min-w-0 max-w-xl mx-auto">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
               <Input
                 type="search"
                 placeholder="Search verified cases..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 bg-muted/60 border-transparent focus:border-input focus:bg-background text-sm rounded-full"
+                aria-label="Search verified cases"
+                className="pl-11 h-10 bg-muted/60 border-transparent focus:border-input focus:bg-background text-sm rounded-full"
               />
             </div>
           </form>
 
-          {/* Right: Icons */}
+          {/* Reference layout: translation, Community, notifications */}
           <div className="flex items-center gap-1 shrink-0">
             <LanguageSwitcher />
-
-            {/* Community Icon with counter */}
-            <Link
-              to="/community"
-              aria-label="Community"
-              className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
-            >
+            <Link to="/community" aria-label="Community" aria-current={isRouteActive("/community") ? "page" : undefined} className={iconLinkClass("/community")}>
               <MessageSquare className="h-5 w-5" />
               {postCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
                   {postCount > 99 ? "99+" : postCount}
                 </span>
               )}
             </Link>
 
-            {/* Theme toggle */}
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label="Toggle theme"
-              className="hidden md:flex h-9 w-9 rounded-lg items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            {isAuthenticated ? (
+            {isAuthenticated && (
               <>
-                {/* Support */}
-                <Link
-                  to="/support"
-                  aria-label="Help & Support"
-                  className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  {chatCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                      {chatCount > 9 ? "9+" : chatCount}
-                    </span>
-                  )}
-                </Link>
-                {/* Notifications */}
-                <Link
-                  to="/notifications"
-                  aria-label="Notifications"
-                  className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
-                >
+                <Link to="/notifications" aria-label="Notifications" aria-current={isRouteActive("/notifications") ? "page" : undefined} className={iconLinkClass("/notifications")}>
                   <Bell className="h-5 w-5" />
                   {notifCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                       {notifCount > 9 ? "9+" : notifCount}
                     </span>
                   )}
                 </Link>
-                {/* Profile */}
-                <Link
-                  to="/profile/$id"
-                  params={{ id: "me" }}
-                  aria-label="Profile"
-                  className="h-9 flex items-center gap-2 px-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-smooth overflow-hidden"
-                >
+                {/* Desktop-only utilities stay available without crowding the mobile reference layout */}
+                <Link to="/support" aria-label="Help & Support" aria-current={isRouteActive("/support") ? "page" : undefined} className={cn("relative hidden md:flex", iconLinkClass("/support").replace("relative ", ""))}>
+                  <MessageCircle className="h-5 w-5" />
+                  {chatCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{chatCount > 9 ? "9+" : chatCount}</span>}
+                </Link>
+                <button type="button" onClick={toggleTheme} aria-label="Toggle theme" className="hidden md:flex h-10 w-10 rounded-full items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
+                <Link to="/profile/$id" params={{ id: "me" }} aria-label="Profile" aria-current={isRouteActive("/profile") ? "page" : undefined} className="hidden md:flex h-10 items-center gap-2 px-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors overflow-hidden">
                   <User className="h-5 w-5" />
-                  <span className="hidden md:inline text-sm font-medium max-w-[120px] truncate">
-                    {displayName || "My Profile"}
-                  </span>
+                  <span className="text-sm font-medium max-w-[120px] truncate">{displayName || "My Profile"}</span>
                 </Link>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="hidden md:flex ml-1"
-                >
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <>
-                <Link to="/sign-in" className="hidden md:block">
-                  <Button variant="ghost" size="sm">Sign in</Button>
-                </Link>
-                <Link to="/sign-up" className="hidden md:block">
-                  <Button size="sm" className="font-semibold">Get Started</Button>
-                </Link>
+                <Button variant="outline" size="sm" onClick={handleLogout} className="hidden md:flex ml-1">Logout</Button>
               </>
             )}
-
-            {/* Mobile menu toggle */}
-            <button
-              type="button"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="Toggle menu"
-              className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-smooth"
-            >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+            {!isAuthenticated && (
+              <div className="hidden md:flex items-center gap-1">
+                <Link to="/sign-in"><Button variant="ghost" size="sm">Sign in</Button></Link>
+                <Link to="/sign-up"><Button size="sm" className="font-semibold">Get Started</Button></Link>
+              </div>
+            )}
           </div>
         </div>
 
@@ -290,20 +253,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="py-1"><NavLink to="/about" onClick={closeMenu}>About</NavLink></div>
             <div className="py-1"><NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink></div>
             <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => { toggleTheme(); closeMenu(); }}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors"
-              >
+              <button type="button" onClick={() => { toggleTheme(); closeMenu(); }} className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors">
                 {theme === "dark" ? <><Sun className="h-4 w-4" /> Light Mode</> : <><Moon className="h-4 w-4" /> Dark Mode</>}
               </button>
             </div>
             <div className="pt-3 border-t border-border mt-2 space-y-2">
               {isAuthenticated ? (
                 <>
-                  <Link to="/profile/$id" params={{ id: "me" }} onClick={closeMenu}>
-                    <Button variant="outline" size="sm" className="w-full"><Shield className="h-4 w-4 mr-2" /> Profile</Button>
-                  </Link>
+                  <Link to="/profile/$id" params={{ id: "me" }} onClick={closeMenu}><Button variant="outline" size="sm" className="w-full"><Shield className="h-4 w-4 mr-2" /> Profile</Button></Link>
                   <Button variant="ghost" size="sm" className="w-full" onClick={handleLogout}>Logout</Button>
                 </>
               ) : (

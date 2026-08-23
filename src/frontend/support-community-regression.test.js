@@ -7,6 +7,7 @@ const worker = fs.readFileSync(path.join(root, "worker.js"), "utf8");
 const support = fs.readFileSync(path.join(root, "src/pages/SupportChatPage.tsx"), "utf8");
 const community = fs.readFileSync(path.join(root, "src/pages/CommunityPage.tsx"), "utf8");
 const layout = fs.readFileSync(path.join(root, "src/components/Layout.tsx"), "utf8");
+const bottomNav = fs.readFileSync(path.join(root, "src/components/BottomNav.tsx"), "utf8");
 
 describe("support, community performance, and footer regressions", () => {
   it("uses production support_messages columns for user and admin messages", () => {
@@ -24,10 +25,28 @@ describe("support, community performance, and footer regressions", () => {
     expect(support).toContain("rows={3}");
   });
 
-  it("does not show a full-page spinner during background Community refresh", () => {
+  it("keeps Community shell interactive while deferring comment requests", () => {
     expect(community).toContain("const fetchPosts = async (showLoader = false)");
     expect(community).toContain("setInterval(() => { void fetchPosts(false); }, 600000)");
     expect(community).toContain("void fetchPosts(true)");
+    expect(community).toContain("data?.forEach((post: Post) => { fetchLikes(post.id); });");
+    expect(community).toContain("const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({})");
+    expect(community).toContain("{loading ? (");
+    expect(community).toContain("Loading posts...");
+    expect(community).toContain("Loading comments...");
+  });
+
+  it("matches the requested reference header and marks active icon routes", () => {
+    expect(layout).toContain("aria-label=\"Toggle menu\"");
+    expect(layout).toContain("aria-label=\"Givethra home\"");
+    expect(layout).toContain("aria-label=\"Search verified cases\"");
+    expect(layout).toContain("aria-label=\"Community\"");
+    expect(layout).toContain("aria-label=\"Notifications\"");
+    expect(layout).toContain("aria-current={isRouteActive(\"/community\") ? \"page\" : undefined}");
+    expect(layout).toContain("aria-current={isRouteActive(\"/notifications\") ? \"page\" : undefined}");
+    expect(layout).toContain("Reference layout: translation, Community, notifications");
+    expect(bottomNav).toContain('aria-current={isActive ? "page" : undefined}');
+    expect(bottomNav).toContain('data-active={isActive ? "true" : "false"}');
   });
 
   it("keeps the configured WhatsApp channel in the footer", () => {

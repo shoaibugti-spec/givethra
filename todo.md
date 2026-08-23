@@ -579,3 +579,11 @@
 - [x] Execute direct deployment to the production givethra Worker.
 - [x] Verify givethra.org live domainrices rendered or pending manual Cloudflare API token.
 - [x] Provide clear confirmation of successful deployment without altering D1/R2.
+
+## Reference Navigation & Community Performance — 2026-08-24
+- [x] Replace the legacy mobile/header navigation with the supplied Givethra reference layout: hamburger, brand, centered search, translation, Community, and notification controls.
+- [x] Make the active route visibly highlighted in the top navigation and any bottom navigation without changing existing route destinations.
+- [x] Ensure navigation controls remain functional across homepage, Community, Support, Profile, Cases, Submit Request, Wallet, and Admin routes.
+- [x] Reduce Community initial blocking loading so the page shell and posts render promptly, while keeping periodic refresh and preserving guest/user posting, likes, and comments.
+- [x] Add regression coverage for active navigation state and non-blocking Community interaction/loading behavior.
+- [x] Run full tests, strict TypeScript checks, production build, and visual verification; do not modify D1/R2 data.

@@ -30,6 +30,8 @@ export default function BottomNav() {
               to={to}
               data-ocid={ocid}
               aria-label={label}
+              aria-current={isActive ? "page" : undefined}
+              data-active={isActive ? "true" : "false"}
               className={cn(
                 "flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] transition-colors duration-200",
                 isPrimary ? "text-primary" : isActive ? "text-primary" : "text-muted-foreground hover:text-foreground",

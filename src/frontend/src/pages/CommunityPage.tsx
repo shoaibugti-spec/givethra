@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Heart, MessageCircle, Send, User, Loader2, CheckCircle2, Share2 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,6 +46,7 @@ export default function CommunityPage() {
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [liking, setLiking] = useState<string | null>(null);
+  const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({});
 
   // New post state
   const [newPost, setNewPost] = useState("");
@@ -58,10 +58,8 @@ export default function CommunityPage() {
     try {
       const data = await getCommunityPosts();
       setPosts(data || []);
-      data?.forEach((post: Post) => {
-        fetchLikes(post.id);
-        fetchComments(post.id);
-      });
+      // Like counts are shown on every card; comments are fetched lazily when opened.
+      data?.forEach((post: Post) => { fetchLikes(post.id); });
     } catch (error) {
       console.error("Error fetching posts:", error);
       toast.error("Failed to load posts");
@@ -215,8 +213,16 @@ export default function CommunityPage() {
   };
 
   // --- کمنٹس دکھائیں/چھپائیں ---
-  const toggleComments = (postId: string) => {
-    setShowComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
+  const toggleComments = async (postId: string) => {
+    const shouldOpen = !showComments[postId];
+    setShowComments((prev) => ({ ...prev, [postId]: shouldOpen }));
+    if (!shouldOpen || posts.find((post) => post.id === postId)?.comments !== undefined || commentsLoading[postId]) return;
+    setCommentsLoading((prev) => ({ ...prev, [postId]: true }));
+    try {
+      await fetchComments(postId);
+    } finally {
+      setCommentsLoading((prev) => ({ ...prev, [postId]: false }));
+    }
   };
 
   // --- پہلی بار اور وقتاً فوقتاً لوڈ کریں ---
@@ -248,19 +254,6 @@ export default function CommunityPage() {
       });
     }
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-            <p className="mt-4 text-muted-foreground">Loading community...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -327,8 +320,13 @@ export default function CommunityPage() {
           </div>
         )}
 
-        {/* Posts List */}
-        {posts.length === 0 ? (
+        {/* Posts List: the shell and composer stay interactive while the feed request is pending */}
+        {loading ? (
+          <div className="rounded-2xl border border-border bg-card p-8 text-center" role="status" aria-live="polite">
+            <Loader2 className="h-7 w-7 animate-spin text-primary mx-auto" />
+            <p className="mt-3 text-sm text-muted-foreground">Loading posts...</p>
+          </div>
+        ) : posts.length === 0 ? (
           <div className="text-center py-16 border rounded-2xl bg-muted/10">
             <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
@@ -407,7 +405,11 @@ export default function CommunityPage() {
                 {/* Comments Section */}
                     {showComments[post.id] && (
                   <div className="space-y-4 pt-2 border-t border-border">
-                    {post.comments && post.comments.length > 0 ? (
+                    {commentsLoading[post.id] ? (
+                      <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground" role="status">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading comments...
+                      </div>
+                    ) : post.comments && post.comments.length > 0 ? (
                       <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                         {post.comments.map((comment) => (
                           <div
