@@ -72,9 +72,6 @@ export function registerGoogleAuthRoutes(app: Express) {
     if (!credential) return res.status(400).json({ error: "Google credential is required" });
 
     try {
-      // ✅ پہلے پرانی کوکیز اور کیشے صاف کریں
-      await sdk.clearUserSession(req, res);
-
       const identity = await verifyGoogleCredential(credential);
       const ownerEmail = (process.env.GIVETHRA_ADMIN_EMAIL || "").trim().toLowerCase();
       const role = ownerEmail && identity.email === ownerEmail ? "admin" : "user";
