@@ -152,7 +152,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // ✅ درست شدہ finishGoogleLogin - Express Backend کو کال کرتا ہے
   const finishGoogleLogin = useCallback(async (credential: string) => {
     setLoginError(null);
     try {
@@ -162,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ credential }),
       });
       const data = await response.json().catch(() => ({}));
+      
       if (!response.ok || !data.user) {
         throw new Error(data.error || `Google sign-in could not be verified (HTTP ${response.status}).`);
       }
@@ -191,7 +191,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Use Google Identity Services directly. No OAuth client secret is sent to the browser.
   const loginWithGoogle = useCallback(() => {
     const googleIdentity = (window as any).google;
     if (!GOOGLE_CLIENT_ID || !googleIdentity?.accounts?.id) {
