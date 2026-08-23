@@ -48,16 +48,12 @@ import {
 
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
-
 const INSTAGRAM_URL =
   "https://www.instagram.com/givethra.community";
-
 const WHATSAPP_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
-
 const LINKEDIN_URL =
   "https://www.linkedin.com/company/givethra-org/";
-
 const CONTACT_EMAIL = "info@givethra.org";
 
 const ANNOUNCEMENT =
@@ -153,39 +149,15 @@ const CATEGORY_APPEAL: Record<string, string> = {
 const URGENCIES = ["Low", "Medium", "High", "Emergency"];
 
 const TRUST_BADGES = [
-  {
-    icon: MailCheck,
-    label: "Email Verified",
-    color: "text-emerald-600",
-  },
-  {
-    icon: Phone,
-    label: "Mobile Verified",
-    color: "text-blue-600",
-  },
-  {
-    icon: BadgeCheck,
-    label: "Identity Verified",
-    color: "text-violet-600",
-  },
-  {
-    icon: Building2,
-    label: "Institution Verified",
-    color: "text-orange-600",
-  },
+  { icon: MailCheck, label: "Email Verified", color: "text-emerald-600" },
+  { icon: Phone, label: "Mobile Verified", color: "text-blue-600" },
+  { icon: BadgeCheck, label: "Identity Verified", color: "text-violet-600" },
+  { icon: Building2, label: "Institution Verified", color: "text-orange-600" },
 ];
 
 type GuideSlide =
-  | {
-      key: string;
-      type: "image";
-      image: string;
-    }
-  | {
-      key: string;
-      type: "announce";
-      to: string;
-    }
+  | { key: string; type: "image"; image: string }
+  | { key: string; type: "announce"; to: string }
   | {
       key: string;
       type: "action" | "guide";
@@ -234,13 +206,10 @@ export default function HomePage() {
           const response = await fetch(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
           );
-
           const data = await response.json();
-
           if (data?.countryName) {
             setDetectedCountry(data.countryName);
           }
-
           if (data?.city || data?.locality) {
             setDetectedCity(data.city || data.locality);
           }
@@ -277,7 +246,6 @@ export default function HomePage() {
 
   async function loadCases() {
     setLoading(true);
-
     try {
       const data = await getApprovedCases();
       setCases(data ?? []);
@@ -299,11 +267,9 @@ export default function HomePage() {
 
   async function loadGuideStatus() {
     if (!user?.id) return;
-
     try {
       const kyc = await getKycStatus(user.id);
       setKycStatus(kyc?.status ?? "none");
-
       await getWallet(user.id);
       await getUnreadNotificationsCount(user.id);
     } catch {
@@ -313,7 +279,6 @@ export default function HomePage() {
 
   async function loadUnlockCount() {
     if (!user?.id) return;
-
     try {
       const count = await getUnlockCount(user.id);
       setUnlockCount(count ?? 0);
@@ -421,11 +386,9 @@ export default function HomePage() {
 
   useEffect(() => {
     if (guideSlides.length <= 1) return;
-
     const interval = window.setInterval(() => {
       setSlideIndex((current) => (current + 1) % guideSlides.length);
     }, 7000);
-
     return () => window.clearInterval(interval);
   }, [guideSlides.length]);
 
@@ -455,26 +418,20 @@ export default function HomePage() {
 
   const filteredCases = useMemo(() => {
     const query = search.trim().toLowerCase();
-
     const result = cases.filter((item) => {
       if (filterCountry !== "all" && item.country !== filterCountry) {
         return false;
       }
-
       if (filterCity !== "all" && item.city !== filterCity) {
         return false;
       }
-
       if (filterCat !== "all" && item.category !== filterCat) {
         return false;
       }
-
       if (filterUrgency !== "all" && item.urgency !== filterUrgency) {
         return false;
       }
-
       if (!query) return true;
-
       return [
         item.title,
         item.short_description,
@@ -491,22 +448,18 @@ export default function HomePage() {
           new Date(a.submitted_at).getTime()
         );
       }
-
       if (sortBy === "oldest") {
         return (
           new Date(a.submitted_at).getTime() -
           new Date(b.submitted_at).getTime()
         );
       }
-
       if (sortBy === "amount_low") {
         return Number(a.amount_needed ?? 0) - Number(b.amount_needed ?? 0);
       }
-
       if (sortBy === "amount_high") {
         return Number(b.amount_needed ?? 0) - Number(a.amount_needed ?? 0);
       }
-
       if (sortBy === "urgent") {
         const urgencyOrder: Record<string, number> = {
           Emergency: 4,
@@ -514,12 +467,10 @@ export default function HomePage() {
           Medium: 2,
           Low: 1,
         };
-
         return (
           (urgencyOrder[b.urgency] ?? 0) - (urgencyOrder[a.urgency] ?? 0)
         );
       }
-
       return 0;
     });
   }, [
@@ -550,7 +501,6 @@ export default function HomePage() {
 
   function selectCategory(category: string) {
     setFilterCat((current) => (current === category ? "all" : category));
-
     window.setTimeout(() => {
       resultsRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -561,7 +511,6 @@ export default function HomePage() {
 
   function renderSlideContent() {
     const slide = guideSlides[slideIndex] ?? guideSlides[0];
-
     if (!slide) return null;
 
     if (slide.type === "image") {
@@ -582,15 +531,12 @@ export default function HomePage() {
           className="flex h-52 w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary to-primary/80 px-6 text-center text-white md:h-72"
         >
           <span className="text-4xl">🎉</span>
-
           <div className="text-2xl font-black tracking-wide md:text-3xl">
             First Case FREE! 🎉
           </div>
-
           <p className="text-sm font-semibold opacity-90">
             Complete your KYC and submit your first request with zero fees.
           </p>
-
           <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-4 py-1.5 text-sm font-bold">
             Complete your KYC now
             <ChevronRight className="h-4 w-4" />
@@ -600,7 +546,6 @@ export default function HomePage() {
     }
 
     const Icon = slide.icon;
-
     return (
       <button
         type="button"
@@ -612,15 +557,12 @@ export default function HomePage() {
         >
           <Icon className={`h-8 w-8 ${slide.color}`} />
         </div>
-
         <h3 className="font-display text-xl font-bold text-foreground">
           {slide.title}
         </h3>
-
         <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
           {slide.desc}
         </p>
-
         <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary">
           {slide.cta ?? "Tap to continue"}
           <ChevronRight className="h-4 w-4" />
@@ -638,12 +580,10 @@ export default function HomePage() {
           <div className="absolute inset-y-0 left-0 z-10 flex items-center bg-primary px-3 shadow-[8px_0_14px_rgba(0,0,0,0.08)]">
             <Gift className="h-4 w-4 shrink-0" />
           </div>
-
           <div className="flex h-full w-max items-center animate-marquee pl-10">
             <span className="whitespace-nowrap px-6 text-sm font-semibold">
               {ANNOUNCEMENT}
             </span>
-
             <span
               aria-hidden="true"
               className="whitespace-nowrap px-6 text-sm font-semibold"
@@ -658,7 +598,6 @@ export default function HomePage() {
             <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
             <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-primary/10 blur-2xl" />
           </div>
-
           <div className="relative mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 pb-6 pt-8 md:flex-row md:gap-12 md:py-12">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -671,12 +610,10 @@ export default function HomePage() {
                 <br />
                 <span className="text-primary">Real Impact.</span>
               </h1>
-
               <p className="max-w-md text-base text-muted-foreground">
                 Connect with verified people, support genuine needs, and create
                 meaningful impact.
               </p>
-
               {!isAuthenticated && (
                 <div className="flex flex-col justify-center gap-3 sm:flex-row md:justify-start">
                   <Button
@@ -686,7 +623,6 @@ export default function HomePage() {
                   >
                     Become a Hero
                   </Button>
-
                   <Button
                     size="lg"
                     variant="outline"
@@ -707,7 +643,6 @@ export default function HomePage() {
             >
               <div className="relative w-full overflow-hidden rounded-2xl shadow-xl">
                 {renderSlideContent()}
-
                 {guideSlides.length > 1 && (
                   <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5">
                     {guideSlides.map((slide, index) => (
@@ -741,13 +676,11 @@ export default function HomePage() {
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                   <Heart className="h-6 w-6 text-primary" />
                 </div>
-
                 <div className="min-w-0 flex-1">
                   <h3 className="flex items-center gap-1 font-bold text-foreground">
                     Become a Hero
                     <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </h3>
-
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     Browse verified cases and help someone directly by paying
                     their institute.
@@ -763,13 +696,11 @@ export default function HomePage() {
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                   <FileText className="h-6 w-6 text-primary" />
                 </div>
-
                 <div className="min-w-0 flex-1">
                   <h3 className="flex items-center gap-1 font-bold text-foreground">
                     Need Help?
                     <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </h3>
-
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     Submit your first case FREE with documents and get
                     verified, direct support.
@@ -784,23 +715,18 @@ export default function HomePage() {
           <section className="border-b border-border bg-primary/5 px-4 py-2.5">
             <div className="mx-auto flex max-w-7xl items-center gap-2 text-sm">
               <MapPin className="h-4 w-4 shrink-0 text-primary" />
-
               <span className="text-muted-foreground">Your location:</span>
-
               <span className="font-semibold text-foreground">
                 {detectedCity ? `${detectedCity}, ` : ""}
                 {detectedCountry}
               </span>
-
               <button
                 type="button"
                 onClick={() => {
                   setFilterCountry(detectedCountry);
-
                   if (detectedCity) {
                     setFilterCity(detectedCity);
                   }
-
                   window.setTimeout(() => {
                     resultsRef.current?.scrollIntoView({
                       behavior: "smooth",
@@ -819,7 +745,6 @@ export default function HomePage() {
           <div className="mx-auto max-w-7xl space-y-3">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
               <Input
                 type="text"
                 placeholder="Search hospital, school, city, title..."
@@ -837,7 +762,6 @@ export default function HomePage() {
               >
                 <SlidersHorizontal className="h-4 w-4" />
                 Filters
-
                 {activeFilterCount > 0 && (
                   <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">
                     {activeFilterCount}
@@ -849,7 +773,6 @@ export default function HomePage() {
                 <SelectTrigger className="flex-1">
                   <SelectValue placeholder="Sort cases" />
                 </SelectTrigger>
-
                 <SelectContent>
                   <SelectItem value="newest">Newest First</SelectItem>
                   <SelectItem value="oldest">Oldest First</SelectItem>
@@ -868,7 +791,6 @@ export default function HomePage() {
               <div className="space-y-4 rounded-2xl border bg-card p-5">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">Filters</h3>
-
                   {activeFilterCount > 0 && (
                     <button
                       type="button"
@@ -883,7 +805,6 @@ export default function HomePage() {
 
                 <div className="space-y-2">
                   <Label className="text-xs">Country</Label>
-
                   <Select
                     value={filterCountry}
                     onValueChange={(value) => {
@@ -894,10 +815,8 @@ export default function HomePage() {
                     <SelectTrigger>
                       <SelectValue placeholder="Select country" />
                     </SelectTrigger>
-
                     <SelectContent className="max-h-60">
                       <SelectItem value="all">All Countries</SelectItem>
-
                       {countries.map((country) => (
                         <SelectItem key={country} value={country}>
                           {country}
@@ -909,7 +828,6 @@ export default function HomePage() {
 
                 <div className="space-y-2">
                   <Label className="text-xs">City</Label>
-
                   <Select
                     value={filterCity}
                     onValueChange={setFilterCity}
@@ -918,10 +836,8 @@ export default function HomePage() {
                     <SelectTrigger>
                       <SelectValue placeholder="Select city" />
                     </SelectTrigger>
-
                     <SelectContent className="max-h-60">
                       <SelectItem value="all">All Cities</SelectItem>
-
                       {cities.map((city) => (
                         <SelectItem key={city} value={city}>
                           {city}
@@ -933,15 +849,12 @@ export default function HomePage() {
 
                 <div className="space-y-2">
                   <Label className="text-xs">Category</Label>
-
                   <Select value={filterCat} onValueChange={setFilterCat}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
-
                     <SelectContent className="max-h-60">
                       <SelectItem value="all">All Categories</SelectItem>
-
                       {FILTER_CATEGORIES.map((category) => (
                         <SelectItem key={category} value={category}>
                           {category}
@@ -953,7 +866,6 @@ export default function HomePage() {
 
                 <div className="space-y-2">
                   <Label className="text-xs">Urgency</Label>
-
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                     <button
                       type="button"
@@ -966,7 +878,6 @@ export default function HomePage() {
                     >
                       All
                     </button>
-
                     {URGENCIES.map((urgency) => (
                       <button
                         key={urgency}
@@ -993,7 +904,6 @@ export default function HomePage() {
             <p className="mb-3 text-xs font-semibold uppercase text-muted-foreground">
               Tap a category to filter
             </p>
-
             <div className="scrollbar-hide flex gap-4 overflow-x-auto pb-1">
               {FILTER_CATEGORIES.map((category) => (
                 <button
@@ -1009,11 +919,9 @@ export default function HomePage() {
                   <span className="text-xl">
                     {CATEGORY_EMOJI[category] ?? "📌"}
                   </span>
-
                   <span className="font-bold text-foreground">
                     {categoryCounts[category] ?? 0}
                   </span>
-
                   <span className="text-center text-[10px] leading-tight text-muted-foreground">
                     {category}
                   </span>
@@ -1031,12 +939,10 @@ export default function HomePage() {
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-bold">
                 {filterCat !== "all" ? `${filterCat} Cases` : "Verified Cases"}
-
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
                   ({filteredCases.length})
                 </span>
               </h2>
-
               {activeFilterCount > 0 && (
                 <button
                   type="button"
@@ -1057,11 +963,9 @@ export default function HomePage() {
                 <p className="font-semibold text-foreground">
                   No cases found.
                 </p>
-
                 <p className="mt-1 text-sm text-muted-foreground">
                   Try changing your filters or location.
                 </p>
-
                 {activeFilterCount > 0 && (
                   <Button
                     variant="outline"
@@ -1120,7 +1024,6 @@ export default function HomePage() {
                               </span>
                               {item.category}
                             </span>
-
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                                 item.urgency === "Emergency"
@@ -1133,7 +1036,6 @@ export default function HomePage() {
                               {item.urgency}
                             </span>
                           </div>
-
                           <p className="text-sm font-bold leading-snug text-foreground">
                             {appeal}
                           </p>
@@ -1144,7 +1046,6 @@ export default function HomePage() {
                             <h3 className="line-clamp-2 text-lg font-bold leading-snug text-foreground">
                               {item.title}
                             </h3>
-
                             <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                               {item.short_description}
                             </p>
@@ -1155,7 +1056,6 @@ export default function HomePage() {
                               <span className="text-2xl font-black text-primary">
                                 {currencySymbol} {needed}
                               </span>
-
                               <span className="text-xs font-medium text-muted-foreground">
                                 {currency} needed
                               </span>
@@ -1168,7 +1068,6 @@ export default function HomePage() {
                                 <span className="font-bold text-green-600">
                                   {currencySymbol} {collected} raised
                                 </span>
-
                                 <span className="text-muted-foreground">
                                   {isDone
                                     ? "Fully helped 🎉"
@@ -1192,7 +1091,6 @@ export default function HomePage() {
                                     {currencySymbol} {needed}
                                   </strong>
                                 </span>
-
                                 {!isDone && (
                                   <span className="font-semibold text-primary">
                                     {currencySymbol} {remaining} left
@@ -1209,9 +1107,7 @@ export default function HomePage() {
                                   Date.now()) /
                                   (1000 * 60 * 60 * 24),
                               );
-
                               if (daysLeft < 0) return null;
-
                               return (
                                 <div
                                   className={`rounded-lg px-2 py-1 text-center text-xs font-bold ${
@@ -1235,7 +1131,6 @@ export default function HomePage() {
                               <MapPin className="h-3 w-3" />
                               {item.city}, {item.country}
                             </span>
-
                             <span className="inline-flex items-center gap-1 font-semibold text-primary">
                               Help now
                               <ChevronRight className="h-3.5 w-3.5" />
@@ -1256,7 +1151,6 @@ export default function HomePage() {
             <h2 className="mb-5 text-center font-display text-lg font-bold">
               Built on Trust &amp; Verification
             </h2>
-
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {TRUST_BADGES.map(({ icon: Icon, label, color }, index) => (
                 <motion.div
@@ -1270,13 +1164,11 @@ export default function HomePage() {
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card">
                     <Icon className={`h-5 w-5 ${color}`} />
                   </div>
-
                   <div>
                     <div className="flex items-center gap-1">
                       <BadgeCheck className="h-3 w-3 text-emerald-500" />
                       <span className="text-xs font-semibold">{label}</span>
                     </div>
-
                     <p className="text-[10px] text-muted-foreground">
                       Verified
                     </p>
@@ -1293,12 +1185,10 @@ export default function HomePage() {
               <h3 className="font-bold text-foreground">
                 📱 Get the Givethra Android App
               </h3>
-
               <p className="mt-0.5 text-sm text-muted-foreground">
                 Verified cases, anytime — right on your phone.
               </p>
             </div>
-
             <a
               href="/Givethra.apk"
               download
@@ -1316,7 +1206,6 @@ export default function HomePage() {
             <h2 className="text-center font-display text-lg font-bold">
               How Givethra Works
             </h2>
-
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
                 {
@@ -1349,11 +1238,8 @@ export default function HomePage() {
                   <span className="absolute -top-3 left-4 text-xs font-black text-primary/30">
                     {step}
                   </span>
-
                   <span className="text-3xl">{emoji}</span>
-
                   <h3 className="text-sm font-bold">{title}</h3>
-
                   <p className="text-xs text-muted-foreground">{desc}</p>
                 </motion.div>
               ))}
@@ -1367,11 +1253,9 @@ export default function HomePage() {
               <h2 className="font-display text-2xl font-bold">
                 Ready to make a difference?
               </h2>
-
               <p className="text-sm text-primary-foreground/80">
                 Join Heroes changing lives through verified, direct support.
               </p>
-
               <div className="flex flex-col justify-center gap-3 sm:flex-row">
                 <Button
                   size="lg"
@@ -1381,7 +1265,6 @@ export default function HomePage() {
                 >
                   Become a Hero
                 </Button>
-
                 <Button
                   size="lg"
                   onClick={() => navigate({ to: "/sign-up" })}
@@ -1400,7 +1283,6 @@ export default function HomePage() {
               <h2 className="font-display text-lg font-bold text-foreground">
                 Connect with Givethra
               </h2>
-
               <p className="text-sm text-muted-foreground">
                 Follow us and reach out — we're here to help.
               </p>
@@ -1416,7 +1298,6 @@ export default function HomePage() {
               >
                 <Facebook className="h-5 w-5" />
               </a>
-
               <a
                 href={INSTAGRAM_URL}
                 target="_blank"
@@ -1426,7 +1307,6 @@ export default function HomePage() {
               >
                 <Instagram className="h-5 w-5" />
               </a>
-
               <a
                 href={LINKEDIN_URL}
                 target="_blank"
@@ -1436,7 +1316,6 @@ export default function HomePage() {
               >
                 <Linkedin className="h-5 w-5" />
               </a>
-
               <a
                 href={WHATSAPP_URL}
                 target="_blank"
@@ -1446,7 +1325,6 @@ export default function HomePage() {
               >
                 <MessageCircle className="h-5 w-5" />
               </a>
-
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
                 aria-label="Email"
@@ -1483,35 +1361,30 @@ export default function HomePage() {
               >
                 About
               </Link>
-
               <Link
                 to="/faq"
                 className="transition-colors hover:text-primary"
               >
                 FAQ
               </Link>
-
               <Link
                 to="/privacy"
                 className="transition-colors hover:text-primary"
               >
                 Privacy Policy
               </Link>
-
               <Link
                 to="/terms"
                 className="transition-colors hover:text-primary"
               >
                 Terms
               </Link>
-
               <Link
                 to="/community-guidelines"
                 className="transition-colors hover:text-primary"
               >
                 Community Guidelines
               </Link>
-
               <Link
                 to="/contact"
                 className="transition-colors hover:text-primary"
