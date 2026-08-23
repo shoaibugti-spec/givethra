@@ -1,6 +1,6 @@
 import BottomNav from "@/components/BottomNav";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import Layout from "@/components/Layout"; // ✅ یہ شامل کریں
+import Layout from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Toaster } from "@/components/ui/sonner";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
@@ -64,15 +64,14 @@ function BottomNavFallback() {
   );
 }
 
-// ✅ RootLayout میں Layout شامل کریں
 function RootLayout() {
   return (
-    <Layout>
+    <>
       <Outlet />
       <ErrorBoundary fallback={<BottomNavFallback />}>
         <BottomNav />
       </ErrorBoundary>
-    </Layout>
+    </>
   );
 }
 
@@ -104,7 +103,6 @@ const contactRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cont
 const becomeHeroRoute = createRoute({ getParentRoute: () => rootRoute, path: "/become-hero", component: () => <Suspense fallback={<PageLoader />}><BecomeHeroPage /></Suspense> });
 const needHelpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/need-help", component: () => <Suspense fallback={<PageLoader />}><NeedHelpPage /></Suspense> });
 const onboardingRoute = createRoute({ getParentRoute: () => rootRoute, path: "/onboarding", component: () => <Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense> });
-
 const communityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/community",
