@@ -284,7 +284,7 @@ export default function AdminPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [kyc, cases, res, deps, profs, wals, unl, sup, fbs, offs, susp] = await Promise.all([
+      const results = await Promise.allSettled([
         adminGetAllKyc(),
         adminGetAllCases(),
         adminGetAllResolutions(),
@@ -297,18 +297,33 @@ export default function AdminPage() {
         adminGetAllOffers(),
         adminGetAllSuspensions(),
       ]);
-      setKycList(asRows(kyc));
-      setCaseList(asRows(cases));
-      setResolutions(asRows(res));
-      setDeposits(asRows(deps));
-      setProfiles(asRows(profs));
-      setWallets(asRows(wals));
-      setUnlocks(asRows(unl));
-      setSupportMsgs(asRows(sup));
-      setFeedbacks(asRows(fbs));
-      setOffers(asRows(offs));
-      setSuspensions(asRows(susp));
-      setUnreadSupport(asRows(sup).filter((m: any) => m.sender === "user" && !m.is_read).length);
+      const rowsAt = (index: number) => {
+        const result = results[index];
+        return result?.status === "fulfilled" ? asRows(result.value) : [];
+      };
+      const kyc = rowsAt(0);
+      const cases = rowsAt(1);
+      const res = rowsAt(2);
+      const deps = rowsAt(3);
+      const profs = rowsAt(4);
+      const wals = rowsAt(5);
+      const unl = rowsAt(6);
+      const sup = rowsAt(7);
+      const fbs = rowsAt(8);
+      const offs = rowsAt(9);
+      const susp = rowsAt(10);
+      setKycList(kyc);
+      setCaseList(cases);
+      setResolutions(res);
+      setDeposits(deps);
+      setProfiles(profs);
+      setWallets(wals);
+      setUnlocks(unl);
+      setSupportMsgs(sup);
+      setFeedbacks(fbs);
+      setOffers(offs);
+      setSuspensions(susp);
+      setUnreadSupport(sup.filter((m: any) => m.sender === "user" && !m.is_read).length);
     } catch (err) {
       console.error("Admin data load error:", err);
       toast.error("Failed to load admin data.");

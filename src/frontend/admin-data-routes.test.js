@@ -24,6 +24,12 @@ describe("Admin production data routes", () => {
     expect(adminBlock).not.toContain("ORDER BY created_at DESC");
   });
 
+  it("keeps Admin loading resilient when one endpoint fails", () => {
+    const dashboardSource = fs.readFileSync(path.join(process.cwd(), "src/pages/AdminDashboard.tsx"), "utf8");
+    expect(dashboardSource).toContain("Promise.allSettled");
+    expect(dashboardSource).toContain("const rowsAt = (index: number)");
+  });
+
   it("keeps Admin authentication before data access", () => {
     const adminIndex = workerSource.indexOf('if (parts[1] === "admin")');
     const authIndex = workerSource.indexOf('if (!isAdmin(user)) return json({ error: "Admin access required" }', adminIndex);
