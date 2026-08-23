@@ -64,6 +64,7 @@ function BottomNavFallback() {
   );
 }
 
+// ✅ RootLayout میں Layout نہیں ڈالا (صرف Outlet اور BottomNav)
 function RootLayout() {
   return (
     <>
