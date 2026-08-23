@@ -1,11 +1,9 @@
 // src/frontend/src/pages/HomePage.tsx
-// Replaces Supabase with Cloudflare Worker APIs
-
 import InstallButton from "@/components/InstallButton";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import FeedbackWall from "@/components/FeedbackWall";
-import Layout from "@/components/Layout";
+import Layout from "@/components/Layout"; // ✅ یہ شامل کریں
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,45 +57,15 @@ const WHATSAPP_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
 
-// ====== ANNOUNCEMENT ======
 const ANNOUNCEMENT =
   "🎉 Big Offer for Everyone! Complete your KYC and submit your FIRST CASE completely FREE — no fee! After review & approval, Heroes will help you. Start now at givethra.org 🤲   •   🎉 Heroes: Your first 3 helps are FREE! After that, 1 credit per help. Become a Hero and change lives today.";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: "$",
-  PKR: "Rs",
-  SAR: "SAR",
-  AED: "AED",
-  GBP: "£",
-  EUR: "€",
-  INR: "₹",
-  TRY: "₺",
-  BDT: "৳",
-  EGP: "E£",
-  NGN: "₦",
-  KES: "KSh",
-  ZAR: "R",
-  BRL: "R$",
-  CAD: "C$",
-  AUD: "A$",
-  JPY: "¥",
-  CNY: "¥",
-  KRW: "₩",
-  IDR: "Rp",
-  MYR: "RM",
-  THB: "฿",
-  PHP: "₱",
-  VND: "₫",
-  SGD: "S$",
-  AFN: "؋",
-  NPR: "Rs",
-  LKR: "Rs",
-  QAR: "QAR",
-  KWD: "KWD",
-  BHD: "BHD",
-  OMR: "OMR",
-  JOD: "JOD",
-  MAD: "MAD",
+  USD: "$", PKR: "Rs", SAR: "SAR", AED: "AED", GBP: "£", EUR: "€", INR: "₹",
+  TRY: "₺", BDT: "৳", EGP: "E£", NGN: "₦", KES: "KSh", ZAR: "R", BRL: "R$",
+  CAD: "C$", AUD: "A$", JPY: "¥", CNY: "¥", KRW: "₩", IDR: "Rp", MYR: "RM",
+  THB: "฿", PHP: "₱", VND: "₫", SGD: "S$", AFN: "؋", NPR: "Rs", LKR: "Rs",
+  QAR: "QAR", KWD: "KWD", BHD: "BHD", OMR: "OMR", JOD: "JOD", MAD: "MAD",
 };
 
 function sym(cur?: string) {
@@ -105,26 +73,12 @@ function sym(cur?: string) {
 }
 
 const FILTER_CATEGORIES = [
-  "Electricity Bill",
-  "Gas Bill",
-  "Water Bill",
-  "House Rent",
-  "School Fees",
-  "Education & Books",
-  "Medical & Treatment",
-  "Medicines",
-  "Food & Groceries",
-  "Child Support",
-  "Widow & Elderly Support",
-  "Disability Support",
-  "Marriage Support",
-  "Business / Work Help",
-  "Home Repair",
-  "Funeral Expenses",
-  "Livestock / Farming",
-  "Debt Relief",
-  "Emergency Help",
-  "Other",
+  "Electricity Bill", "Gas Bill", "Water Bill", "House Rent",
+  "School Fees", "Education & Books", "Medical & Treatment", "Medicines",
+  "Food & Groceries", "Child Support", "Widow & Elderly Support",
+  "Disability Support", "Marriage Support", "Business / Work Help",
+  "Home Repair", "Funeral Expenses", "Livestock / Farming",
+  "Debt Relief", "Emergency Help", "Other",
 ];
 
 const CATEGORY_APPEAL: Record<string, string> = {
@@ -151,7 +105,6 @@ const CATEGORY_APPEAL: Record<string, string> = {
 };
 
 const URGENCIES = ["Low", "Medium", "High", "Emergency"];
-
 const TRUST_BADGES = [
   { icon: MailCheck, label: "Email Verified", color: "text-emerald-600" },
   { icon: Phone, label: "Mobile Verified", color: "text-blue-600" },
@@ -163,17 +116,13 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const [cases, setCases] = useState<any[]>([]);
-  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>(
-    {}
-  );
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [notifCount, setNotifCount] = useState(0);
-
   const [kycStatus, setKycStatus] = useState<string>("none");
   const [balance, setBalance] = useState(0);
   const [unlockCount, setUnlockCount] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
-
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterCountry, setFilterCountry] = useState("all");
@@ -185,7 +134,6 @@ export default function HomePage() {
   const [detectedCity, setDetectedCity] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Load cases on mount
   useEffect(() => {
     loadCases();
     loadCategoryCounts();
@@ -198,8 +146,7 @@ export default function HomePage() {
             );
             const data = await res.json();
             if (data?.countryName) setDetectedCountry(data.countryName);
-            if (data?.city || data?.locality)
-              setDetectedCity(data.city || data.locality);
+            if (data?.city || data?.locality) setDetectedCity(data.city || data.locality);
           } catch {}
         },
         () => {},
@@ -208,20 +155,14 @@ export default function HomePage() {
     }
   }, []);
 
-  // Load user-specific data when authenticated
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       runUserGuide(user.id);
       loadNotifCount();
       loadGuideStatus();
       loadUnlockCount();
-
-      // Poll for notifications every 20 seconds
       const interval = setInterval(loadNotifCount, 20000);
-
-      // Refresh cases periodically
       const caseInterval = setInterval(loadCases, 60000);
-
       return () => {
         clearInterval(interval);
         clearInterval(caseInterval);
@@ -234,9 +175,7 @@ export default function HomePage() {
     try {
       const count = await getUnreadNotificationsCount(user.id);
       setNotifCount(count ?? 0);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   async function loadGuideStatus() {
@@ -246,9 +185,7 @@ export default function HomePage() {
       setKycStatus(kyc?.status ?? "none");
       const wallet = await getWallet(user.id);
       setBalance(wallet?.balance ?? 0);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   async function loadUnlockCount() {
@@ -256,9 +193,7 @@ export default function HomePage() {
     try {
       const count = await getUnlockCount(user.id);
       setUnlockCount(count ?? 0);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   async function loadCases() {
@@ -266,9 +201,7 @@ export default function HomePage() {
     try {
       const data = await getApprovedCases();
       setCases(data ?? []);
-    } catch {
-      // ignore
-    } finally {
+    } catch {} finally {
       setLoading(false);
     }
   }
@@ -277,26 +210,17 @@ export default function HomePage() {
     try {
       const counts = await getCategoryCounts();
       setCategoryCounts(counts ?? {});
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
-  // ====== SLIDE DEFINITIONS ======
   const HAND_SLIDE = {
     key: "hero",
     type: "image" as const,
     image: "/assets/generated/hero-givethra.dim_1200x500.jpg",
   };
-
-  // Build guide slides based on auth status
-  const guideSlides: any[] = [];
-
-  // Always include the hand slide first
-  guideSlides.push(HAND_SLIDE);
+  const guideSlides: any[] = [HAND_SLIDE];
 
   if (!isAuthenticated) {
-    // For non-authenticated users: show two action slides
     guideSlides.push({
       key: "free_helps",
       type: "action",
@@ -320,7 +244,6 @@ export default function HomePage() {
       bg: "bg-primary/10",
     });
   } else {
-    // For authenticated users, keep the existing guide slides
     if (kycStatus !== "approved") {
       guideSlides.push({ key: "announce", type: "announce", to: "/kyc" });
       guideSlides.push({
@@ -345,7 +268,6 @@ export default function HomePage() {
         color: "text-primary",
         bg: "bg-primary/10",
       });
-
       if (unlockCount < 3) {
         guideSlides.push({
           key: "free_helps_auth",
@@ -358,7 +280,6 @@ export default function HomePage() {
           bg: "bg-green-500/10",
         });
       }
-
       guideSlides.push({
         key: "help",
         type: "guide",
@@ -372,7 +293,6 @@ export default function HomePage() {
     }
   }
 
-  // Auto-slide timer
   useEffect(() => {
     if (guideSlides.length <= 1) return;
     const t = setInterval(() => {
@@ -385,9 +305,7 @@ export default function HomePage() {
     if (slideIndex >= guideSlides.length) setSlideIndex(0);
   }, [guideSlides.length, slideIndex]);
 
-  const countries = Array.from(
-    new Set(cases.map((c) => c.country).filter(Boolean))
-  ).sort();
+  const countries = Array.from(new Set(cases.map((c) => c.country).filter(Boolean))).sort();
   const cities = Array.from(
     new Set(
       cases
@@ -410,21 +328,16 @@ export default function HomePage() {
         !c.description?.toLowerCase().includes(q) &&
         !c.institute_name?.toLowerCase().includes(q) &&
         !c.city?.toLowerCase().includes(q)
-      )
-        return false;
+      ) return false;
     }
     return true;
   });
 
   filtered = [...filtered].sort((a, b) => {
-    if (sortBy === "newest")
-      return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
-    if (sortBy === "oldest")
-      return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
-    if (sortBy === "amount_low")
-      return (a.amount_needed ?? 0) - (b.amount_needed ?? 0);
-    if (sortBy === "amount_high")
-      return (b.amount_needed ?? 0) - (a.amount_needed ?? 0);
+    if (sortBy === "newest") return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+    if (sortBy === "oldest") return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
+    if (sortBy === "amount_low") return (a.amount_needed ?? 0) - (b.amount_needed ?? 0);
+    if (sortBy === "amount_high") return (b.amount_needed ?? 0) - (a.amount_needed ?? 0);
     if (sortBy === "urgent") {
       const order: any = { Emergency: 4, High: 3, Medium: 2, Low: 1 };
       return (order[b.urgency] ?? 0) - (order[a.urgency] ?? 0);
@@ -432,12 +345,7 @@ export default function HomePage() {
     return 0;
   });
 
-  const activeFilterCount = [
-    filterCountry,
-    filterCity,
-    filterCat,
-    filterUrgency,
-  ].filter((f) => f !== "all").length;
+  const activeFilterCount = [filterCountry, filterCity, filterCat, filterUrgency].filter((f) => f !== "all").length;
 
   function resetFilters() {
     setFilterCountry("all");
@@ -450,24 +358,14 @@ export default function HomePage() {
 
   function selectCategory(cat: string) {
     setFilterCat(filterCat === cat ? "all" : cat);
-    setTimeout(
-      () => resultsRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100
-    );
+    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   }
 
   const currentSlide = guideSlides[slideIndex] ?? HAND_SLIDE;
 
-  // Render slide content based on type
   function renderSlideContent() {
     if (currentSlide.type === "image") {
-      return (
-        <img
-          src={currentSlide.image}
-          alt="Givethra"
-          className="w-full h-52 md:h-72 object-cover"
-        />
-      );
+      return <img src={currentSlide.image} alt="Givethra" className="w-full h-52 md:h-72 object-cover" />;
     }
     if (currentSlide.type === "announce") {
       return (
@@ -477,13 +375,10 @@ export default function HomePage() {
           className="w-full h-52 md:h-72 bg-gradient-to-br from-primary to-primary/80 text-white flex flex-col items-center justify-center text-center px-6 gap-2 cursor-pointer"
         >
           <span className="text-4xl">🎉</span>
-          <div className="text-2xl md:text-3xl font-black tracking-wide">
-            First Case FREE! 🎉
-          </div>
+          <div className="text-2xl md:text-3xl font-black tracking-wide">First Case FREE! 🎉</div>
           <p className="text-sm font-semibold opacity-90">Complete your KYC & submit your first request with zero fees</p>
           <p className="text-sm max-w-sm leading-relaxed opacity-95">
-            Complete your KYC and submit your{" "}
-            <strong>first case completely FREE</strong> — no fee!
+            Complete your KYC and submit your <strong>first case completely FREE</strong> — no fee!
           </p>
           <span className="inline-flex items-center gap-1 text-sm font-bold bg-white/20 rounded-full px-4 py-1.5 mt-1">
             Complete your KYC now <ChevronRight className="h-4 w-4" />
@@ -498,41 +393,28 @@ export default function HomePage() {
           onClick={() => navigate({ to: currentSlide.to })}
           className="w-full h-52 md:h-72 bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
         >
-          <div
-            className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}
-          >
+          <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}>
             <currentSlide.icon className={`h-8 w-8 ${currentSlide.color}`} />
           </div>
-          <h3 className="font-display text-xl font-bold text-foreground">
-            {currentSlide.title}
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-            {currentSlide.desc}
-          </p>
+          <h3 className="font-display text-xl font-bold text-foreground">{currentSlide.title}</h3>
+          <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{currentSlide.desc}</p>
           <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">
             {currentSlide.cta} <ChevronRight className="h-4 w-4" />
           </span>
         </button>
       );
     }
-    // Default guide slide (for authenticated)
     return (
       <button
         type="button"
         onClick={() => navigate({ to: currentSlide.to })}
         className="w-full h-52 md:h-72 bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
       >
-        <div
-          className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}
-        >
+        <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}>
           <currentSlide.icon className={`h-8 w-8 ${currentSlide.color}`} />
         </div>
-        <h3 className="font-display text-xl font-bold text-foreground">
-          {currentSlide.title}
-        </h3>
-        <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-          {currentSlide.desc}
-        </p>
+        <h3 className="font-display text-xl font-bold text-foreground">{currentSlide.title}</h3>
+        <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{currentSlide.desc}</p>
         <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">
           Tap to continue <ChevronRight className="h-4 w-4" />
         </span>
@@ -541,10 +423,9 @@ export default function HomePage() {
   }
 
   return (
-    <Layout>
+    <Layout> {/* ✅ یہ شامل کریں */}
       <div className="bg-background pb-20 md:pb-0">
         <InstallButton />
-
         {ANNOUNCEMENT && (
           <div className="bg-primary text-primary-foreground overflow-hidden relative h-9 flex items-center border-b border-primary/30">
             <div className="absolute left-0 top-0 bottom-0 z-10 bg-primary px-2 flex items-center">
@@ -574,25 +455,14 @@ export default function HomePage() {
                 <span className="text-primary">Real Impact.</span>
               </h1>
               <p className="text-base text-muted-foreground max-w-md">
-                Connect with verified people, support genuine needs, and create
-                meaningful impact.
+                Connect with verified people, support genuine needs, and create meaningful impact.
               </p>
-
               {!isAuthenticated && (
                 <div className="flex gap-3 justify-center md:justify-start">
-                  <Button
-                    size="lg"
-                    onClick={() => navigate({ to: "/become-hero" })}
-                    className="h-11 px-6 font-semibold flex-1 sm:flex-none"
-                  >
+                  <Button size="lg" onClick={() => navigate({ to: "/become-hero" })} className="h-11 px-6 font-semibold flex-1 sm:flex-none">
                     Become a Hero
                   </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={() => navigate({ to: "/need-help" })}
-                    className="h-11 px-6 font-semibold flex-1 sm:flex-none"
-                  >
+                  <Button size="lg" variant="outline" onClick={() => navigate({ to: "/need-help" })} className="h-11 px-6 font-semibold flex-1 sm:flex-none">
                     Request Help
                   </Button>
                 </div>
@@ -607,7 +477,6 @@ export default function HomePage() {
             >
               <div className="relative w-full rounded-2xl overflow-hidden shadow-xl">
                 {renderSlideContent()}
-
                 {guideSlides.length > 1 && (
                   <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
                     {guideSlides.map((s, i) => (
@@ -616,9 +485,7 @@ export default function HomePage() {
                         type="button"
                         onClick={() => setSlideIndex(i)}
                         className={`h-2 rounded-full transition-all ${
-                          i === slideIndex
-                            ? "w-6 bg-primary"
-                            : "w-2 bg-white/70 border border-border"
+                          i === slideIndex ? "w-6 bg-primary" : "w-2 bg-white/70 border border-border"
                         }`}
                         aria-label={`Slide ${i + 1}`}
                       />
@@ -642,16 +509,13 @@ export default function HomePage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="font-bold text-foreground flex items-center gap-1">
-                    Become a Hero{" "}
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                    Become a Hero <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
                   </h3>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    Browse verified cases and help someone directly by paying
-                    their institute.
+                    Browse verified cases and help someone directly by paying their institute.
                   </p>
                 </div>
               </button>
-
               <button
                 onClick={() => navigate({ to: "/need-help" })}
                 className="text-left rounded-2xl border border-border bg-card hover:border-primary hover:shadow-md transition-all p-5 flex items-start gap-4 group"
@@ -661,12 +525,10 @@ export default function HomePage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="font-bold text-foreground flex items-center gap-1">
-                    Need Help?{" "}
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                    Need Help? <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
                   </h3>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    Submit your first case FREE with documents and get verified,
-                    direct support.
+                    Submit your first case FREE with documents and get verified, direct support.
                   </p>
                 </div>
               </button>
@@ -680,18 +542,13 @@ export default function HomePage() {
               <MapPin className="h-4 w-4 text-primary shrink-0" />
               <span className="text-muted-foreground">Your location:</span>
               <span className="font-semibold text-foreground">
-                {detectedCity ? `${detectedCity}, ` : ""}
-                {detectedCountry}
+                {detectedCity ? `${detectedCity}, ` : ""}{detectedCountry}
               </span>
               <button
                 onClick={() => {
                   setFilterCountry(detectedCountry);
                   if (detectedCity) setFilterCity(detectedCity);
-                  setTimeout(
-                    () =>
-                      resultsRef.current?.scrollIntoView({ behavior: "smooth" }),
-                    100
-                  );
+                  setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
                 }}
                 className="ml-auto text-xs bg-primary text-white px-3 py-1 rounded-full font-medium shrink-0"
               >
@@ -714,22 +571,14 @@ export default function HomePage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-                className="gap-2 flex-1"
-              >
+              <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="gap-2 flex-1">
                 <SlidersHorizontal className="h-4 w-4" /> Filters{" "}
                 {activeFilterCount > 0 && (
-                  <span className="bg-primary text-white text-[10px] rounded-full px-1.5">
-                    {activeFilterCount}
-                  </span>
+                  <span className="bg-primary text-white text-[10px] rounded-full px-1.5">{activeFilterCount}</span>
                 )}
               </Button>
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="newest">Newest First</SelectItem>
                   <SelectItem value="oldest">Oldest First</SelectItem>
@@ -739,16 +588,12 @@ export default function HomePage() {
                 </SelectContent>
               </Select>
             </div>
-
             {showFilters && (
               <div className="rounded-2xl border bg-card p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">Filters</h3>
                   {activeFilterCount > 0 && (
-                    <button
-                      onClick={resetFilters}
-                      className="text-xs text-red-600 flex items-center gap-1"
-                    >
+                    <button onClick={resetFilters} className="text-xs text-red-600 flex items-center gap-1">
                       <X className="h-3 w-3" /> Clear all
                     </button>
                   )}
@@ -757,20 +602,13 @@ export default function HomePage() {
                   <Label className="text-xs">Country</Label>
                   <Select
                     value={filterCountry}
-                    onValueChange={(v) => {
-                      setFilterCountry(v);
-                      setFilterCity("all");
-                    }}
+                    onValueChange={(v) => { setFilterCountry(v); setFilterCity("all"); }}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent className="max-h-60">
                       <SelectItem value="all">All Countries</SelectItem>
                       {countries.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -782,38 +620,23 @@ export default function HomePage() {
                     onValueChange={setFilterCity}
                     disabled={filterCountry === "all"}
                   >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          filterCountry === "all"
-                            ? "Select country first"
-                            : "All cities"
-                        }
-                      />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={filterCountry === "all" ? "Select country first" : "All cities"} /></SelectTrigger>
                     <SelectContent className="max-h-60">
                       <SelectItem value="all">All Cities</SelectItem>
                       {cities.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="space-y-2">
                   <Label className="text-xs">Category</Label>
                   <Select value={filterCat} onValueChange={setFilterCat}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent className="max-h-60">
                       <SelectItem value="all">All Categories</SelectItem>
                       {FILTER_CATEGORIES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -825,9 +648,7 @@ export default function HomePage() {
                       type="button"
                       onClick={() => setFilterUrgency("all")}
                       className={`px-1 py-2 rounded-lg border text-xs font-medium ${
-                        filterUrgency === "all"
-                          ? "bg-primary text-white border-primary"
-                          : "border-border"
+                        filterUrgency === "all" ? "bg-primary text-white border-primary" : "border-border"
                       }`}
                     >
                       All
@@ -838,9 +659,7 @@ export default function HomePage() {
                         type="button"
                         onClick={() => setFilterUrgency(u)}
                         className={`px-1 py-2 rounded-lg border text-xs font-medium ${
-                          filterUrgency === u
-                            ? "bg-primary text-white border-primary"
-                            : "border-border"
+                          filterUrgency === u ? "bg-primary text-white border-primary" : "border-border"
                         }`}
                       >
                         {u}
@@ -855,72 +674,45 @@ export default function HomePage() {
 
         <section className="bg-muted/30 border-b border-border py-4 px-4">
           <div className="max-w-7xl mx-auto">
-            <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">
-              Tap a category to filter
-            </p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">Tap a category to filter</p>
             <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-1">
               {FILTER_CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => selectCategory(cat)}
                   className={`flex flex-col items-center shrink-0 min-w-[68px] p-2 rounded-xl transition-colors ${
-                    filterCat === cat
-                      ? "bg-primary/10 ring-1 ring-primary"
-                      : "hover:bg-muted"
+                    filterCat === cat ? "bg-primary/10 ring-1 ring-primary" : "hover:bg-muted"
                   }`}
                 >
                   <span className="text-xl">{CATEGORY_EMOJI[cat] ?? "📌"}</span>
-                  <span className="text-sm font-bold text-foreground">
-                    {categoryCounts[cat] ?? 0}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground text-center leading-tight">
-                    {cat}
-                  </span>
+                  <span className="text-sm font-bold text-foreground">{categoryCounts[cat] ?? 0}</span>
+                  <span className="text-[10px] text-muted-foreground text-center leading-tight">{cat}</span>
                 </button>
               ))}
             </div>
           </div>
         </section>
 
-        <section
-          ref={resultsRef}
-          className="py-8 px-4 bg-background scroll-mt-32"
-        >
+        <section ref={resultsRef} className="py-8 px-4 bg-background scroll-mt-32">
           <div className="max-w-7xl mx-auto space-y-5">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-bold">
                 {filterCat !== "all" ? `${filterCat} Cases` : "Verified Cases"}
-                <span className="ml-2 text-sm text-muted-foreground font-normal">
-                  ({filtered.length})
-                </span>
+                <span className="ml-2 text-sm text-muted-foreground font-normal">({filtered.length})</span>
               </h2>
               {activeFilterCount > 0 && (
-                <button
-                  onClick={resetFilters}
-                  className="text-xs text-primary font-semibold"
-                >
-                  Clear filters
-                </button>
+                <button onClick={resetFilters} className="text-xs text-primary font-semibold">Clear filters</button>
               )}
             </div>
 
             {loading ? (
-              <div className="text-center py-16 text-muted-foreground">
-                Loading...
-              </div>
+              <div className="text-center py-16 text-muted-foreground">Loading...</div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-16 rounded-xl border border-dashed border-border bg-muted/20">
                 <p className="text-foreground font-semibold">No cases found.</p>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Try changing your filters or location.
-                </p>
+                <p className="text-muted-foreground text-sm mt-1">Try changing your filters or location.</p>
                 {activeFilterCount > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    onClick={resetFilters}
-                  >
+                  <Button variant="outline" size="sm" className="mt-4" onClick={resetFilters}>
                     Clear Filters
                   </Button>
                 )}
@@ -932,11 +724,9 @@ export default function HomePage() {
                   const s = sym(cur);
                   const needed = Number(c.amount_needed ?? 0);
                   const collected = Number(c.amount_collected ?? 0);
-                  const percent =
-                    needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
+                  const percent = needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
                   const remaining = Math.max(needed - collected, 0);
-                  const appeal =
-                    CATEGORY_APPEAL[c.category] ?? "Be someone's hope today 🤲";
+                  const appeal = CATEGORY_APPEAL[c.category] ?? "Be someone's hope today 🤲";
                   const isDone = needed > 0 && collected >= needed;
                   return (
                     <motion.div
@@ -947,18 +737,12 @@ export default function HomePage() {
                     >
                       <div
                         className="rounded-2xl border border-border bg-card overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all h-full flex flex-col"
-                        onClick={() =>
-                          navigate({
-                            to: "/cases/$id",
-                            params: { id: c.id },
-                          })
-                        }
+                        onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}
                       >
                         <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-4 border-b border-border">
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <span className="inline-flex items-center gap-1 text-xs font-semibold bg-card text-primary px-2.5 py-1 rounded-full border border-primary/20">
-                              <span>{CATEGORY_EMOJI[c.category] ?? "📌"}</span>{" "}
-                              {c.category}
+                              <span>{CATEGORY_EMOJI[c.category] ?? "📌"}</span> {c.category}
                             </span>
                             <span
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -972,61 +756,40 @@ export default function HomePage() {
                               {c.urgency}
                             </span>
                           </div>
-                          <p className="text-sm font-bold text-foreground leading-snug">
-                            {appeal}
-                          </p>
+                          <p className="text-sm font-bold text-foreground leading-snug">{appeal}</p>
                         </div>
 
                         <div className="p-4 space-y-3 flex-1 flex flex-col">
                           <div>
-                            <h3 className="font-bold text-lg leading-snug line-clamp-2 text-foreground">
-                              {c.title}
-                            </h3>
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                              {c.short_description}
-                            </p>
+                            <h3 className="font-bold text-lg leading-snug line-clamp-2 text-foreground">{c.title}</h3>
+                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{c.short_description}</p>
                           </div>
 
                           {needed > 0 && (
                             <div className="flex items-baseline gap-1.5">
-                              <span className="text-2xl font-black text-primary">
-                                {s} {needed}
-                              </span>
-                              <span className="text-xs font-medium text-muted-foreground">
-                                {cur} needed
-                              </span>
+                              <span className="text-2xl font-black text-primary">{s} {needed}</span>
+                              <span className="text-xs font-medium text-muted-foreground">{cur} needed</span>
                             </div>
                           )}
 
                           {needed > 0 && (
                             <div className="space-y-1.5">
                               <div className="flex items-center justify-between text-xs">
-                                <span className="font-bold text-green-600">
-                                  {s} {collected} raised
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {isDone ? "Fully helped 🎉" : `${percent}%`}
-                                </span>
+                                <span className="font-bold text-green-600">{s} {collected} raised</span>
+                                <span className="text-muted-foreground">{isDone ? "Fully helped 🎉" : `${percent}%`}</span>
                               </div>
                               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                 <div
-                                  className={`h-2 rounded-full transition-all ${
-                                    isDone ? "bg-green-500" : "bg-primary"
-                                  }`}
+                                  className={`h-2 rounded-full transition-all ${isDone ? "bg-green-500" : "bg-primary"}`}
                                   style={{ width: `${percent}%` }}
                                 />
                               </div>
                               <div className="flex items-center justify-between text-[11px]">
                                 <span className="text-muted-foreground">
-                                  Goal:{" "}
-                                  <strong className="text-foreground">
-                                    {s} {needed}
-                                  </strong>
+                                  Goal: <strong className="text-foreground">{s} {needed}</strong>
                                 </span>
                                 {!isDone && (
-                                  <span className="text-primary font-semibold">
-                                    {s} {remaining} left
-                                  </span>
+                                  <span className="text-primary font-semibold">{s} {remaining} left</span>
                                 )}
                               </div>
                             </div>
@@ -1035,16 +798,13 @@ export default function HomePage() {
                           {c.deadline &&
                             (() => {
                               const daysLeft = Math.ceil(
-                                (new Date(c.deadline).getTime() - Date.now()) /
-                                  (1000 * 60 * 60 * 24)
+                                (new Date(c.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
                               );
                               if (daysLeft < 0) return null;
                               return (
                                 <div
                                   className={`text-xs font-bold px-2 py-1 rounded-lg text-center ${
-                                    daysLeft <= 3
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-amber-100 text-amber-700"
+                                    daysLeft <= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
                                   }`}
                                 >
                                   ⏳{" "}
@@ -1077,9 +837,7 @@ export default function HomePage() {
 
         <section className="py-8 px-4 bg-muted/30 border-y border-border">
           <div className="max-w-7xl mx-auto">
-            <h2 className="font-display text-lg font-bold mb-5 text-center">
-              Built on Trust &amp; Verification
-            </h2>
+            <h2 className="font-display text-lg font-bold mb-5 text-center">Built on Trust &amp; Verification</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {TRUST_BADGES.map(({ icon: Icon, label, color }, i) => (
                 <motion.div
@@ -1109,12 +867,8 @@ export default function HomePage() {
         <section className="max-w-3xl mx-auto px-4 pt-8">
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-center sm:text-left">
-              <h3 className="font-bold text-foreground">
-                📱 Get the Givethra Android App
-              </h3>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Verified cases, anytime — right on your phone.
-              </p>
+              <h3 className="font-bold text-foreground">📱 Get the Givethra Android App</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">Verified cases, anytime — right on your phone.</p>
             </div>
             <a
               href="/Givethra.apk"
@@ -1130,29 +884,12 @@ export default function HomePage() {
 
         <section className="py-10 px-4 bg-background">
           <div className="max-w-4xl mx-auto space-y-6">
-            <h2 className="font-display text-lg font-bold text-center">
-              How Givethra Works
-            </h2>
+            <h2 className="font-display text-lg font-bold text-center">How Givethra Works</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                {
-                  step: "01",
-                  title: "Request Help",
-                  desc: "Complete KYC and submit your first case FREE with documents.",
-                  emoji: "📝",
-                },
-                {
-                  step: "02",
-                  title: "Get Verified",
-                  desc: "Our team reviews documents and approves your case for Heroes.",
-                  emoji: "✅",
-                },
-                {
-                  step: "03",
-                  title: "Receive Direct Support",
-                  desc: "Heroes unlock your case and pay institutions directly.",
-                  emoji: "🌟",
-                },
+                { step: "01", title: "Request Help", desc: "Complete KYC and submit your first case FREE with documents.", emoji: "📝" },
+                { step: "02", title: "Get Verified", desc: "Our team reviews documents and approves your case for Heroes.", emoji: "✅" },
+                { step: "03", title: "Receive Direct Support", desc: "Heroes unlock your case and pay institutions directly.", emoji: "🌟" },
               ].map(({ step, title, desc, emoji }, i) => (
                 <motion.div
                   key={step}
@@ -1162,9 +899,7 @@ export default function HomePage() {
                   transition={{ delay: i * 0.12 }}
                   className="relative flex flex-col items-center text-center gap-3 rounded-xl bg-card border border-border p-5"
                 >
-                  <span className="absolute -top-3 left-4 text-xs font-black text-primary/30">
-                    {step}
-                  </span>
+                  <span className="absolute -top-3 left-4 text-xs font-black text-primary/30">{step}</span>
                   <span className="text-3xl">{emoji}</span>
                   <h3 className="font-bold text-sm">{title}</h3>
                   <p className="text-xs text-muted-foreground">{desc}</p>
@@ -1177,26 +912,13 @@ export default function HomePage() {
         {!isAuthenticated && (
           <section className="py-10 px-4 bg-primary text-primary-foreground">
             <div className="max-w-xl mx-auto text-center space-y-4">
-              <h2 className="font-display text-2xl font-bold">
-                Ready to make a difference?
-              </h2>
-              <p className="text-primary-foreground/80 text-sm">
-                Join Heroes changing lives through verified, direct support.
-              </p>
+              <h2 className="font-display text-2xl font-bold">Ready to make a difference?</h2>
+              <p className="text-primary-foreground/80 text-sm">Join Heroes changing lives through verified, direct support.</p>
               <div className="flex gap-3 justify-center">
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  onClick={() => navigate({ to: "/become-hero" })}
-                  className="h-11 px-6 font-semibold"
-                >
+                <Button size="lg" variant="secondary" onClick={() => navigate({ to: "/become-hero" })} className="h-11 px-6 font-semibold">
                   Become a Hero
                 </Button>
-                <Button
-                  size="lg"
-                  onClick={() => navigate({ to: "/sign-up" })}
-                  className="h-11 px-6 font-semibold bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                >
+                <Button size="lg" onClick={() => navigate({ to: "/sign-up" })} className="h-11 px-6 font-semibold bg-primary-foreground text-primary hover:bg-primary-foreground/90">
                   Request Help
                 </Button>
               </div>
@@ -1207,118 +929,48 @@ export default function HomePage() {
         <section className="py-10 px-4 bg-card border-t border-border">
           <div className="max-w-2xl mx-auto text-center space-y-5">
             <div className="space-y-1">
-              <h2 className="font-display text-lg font-bold text-foreground">
-                Connect with Givethra
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Follow us and reach out — we're here to help.
-              </p>
+              <h2 className="font-display text-lg font-bold text-foreground">Connect with Givethra</h2>
+              <p className="text-sm text-muted-foreground">Follow us and reach out — we're here to help.</p>
             </div>
             <div className="flex items-center justify-center gap-3">
-              <a
-                href={FACEBOOK_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
+              <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a
-                href={INSTAGRAM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
+              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white">
                 <Instagram className="h-5 w-5" />
               </a>
-              <a
-                href="https://www.linkedin.com/company/givethra-org/"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="LinkedIn"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
+              <a href="https://www.linkedin.com/company/givethra-org/" target="_blank" rel="noopener noreferrer" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white">
                 <Linkedin className="h-5 w-5" />
               </a>
-              <a
-                href={WHATSAPP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="WhatsApp Channel"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white">
                 <MessageCircle className="h-5 w-5" />
               </a>
-              <a
-                href={`mailto:${CONTACT_EMAIL}`}
-                aria-label="Email"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
+              <a href={`mailto:${CONTACT_EMAIL}`} className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white">
                 <Mail className="h-5 w-5" />
               </a>
             </div>
-
-            <a
-              href={WHATSAPP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline"
-            >
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline">
               <MessageCircle className="h-4 w-4" /> Follow our WhatsApp Channel
             </a>
-
             <div>
-              <a
-                href={`mailto:${CONTACT_EMAIL}`}
-                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-              >
+              <a href={`mailto:${CONTACT_EMAIL}`} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
                 <Mail className="h-4 w-4" /> {CONTACT_EMAIL}
               </a>
             </div>
-
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
-              <Link
-                to="/about"
-                className="hover:text-primary transition-colors"
-              >
-                About
-              </Link>
-              <Link to="/faq" className="hover:text-primary transition-colors">
-                FAQ
-              </Link>
-              <Link
-                to="/privacy"
-                className="hover:text-primary transition-colors"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                to="/terms"
-                className="hover:text-primary transition-colors"
-              >
-                Terms
-              </Link>
-              <Link
-                to="/community-guidelines"
-                className="hover:text-primary transition-colors"
-              >
-                Community Guidelines
-              </Link>
-              <Link
-                to="/contact"
-                className="hover:text-primary transition-colors"
-              >
-                Contact Us
-              </Link>
+              <Link to="/about" className="hover:text-primary transition-colors">About</Link>
+              <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
+              <Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="hover:text-primary transition-colors">Terms</Link>
+              <Link to="/community-guidelines" className="hover:text-primary transition-colors">Community Guidelines</Link>
+              <Link to="/contact" className="hover:text-primary transition-colors">Contact Us</Link>
             </div>
             <p className="text-xs text-muted-foreground pt-1">
-              © {new Date().getFullYear()} Givethra. All rights reserved.
+              &copy; {new Date().getFullYear()} Givethra. All rights reserved.
             </p>
           </div>
         </section>
       </div>
-    </Layout>
+    </Layout> // ✅ یہ بند کریں
   );
 }
