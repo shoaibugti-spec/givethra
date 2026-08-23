@@ -623,6 +623,28 @@ async function handleRequest(request, env) {
     return json({ valid: true, user }, 200, origin);
   }
 
+  // Public static assets must be served before the auth-required API branch.
+  // Otherwise anonymous visitors receive JSON { error: "Authentication required" }
+  // instead of the SPA HTML/JavaScript bundle.
+  if (url.pathname.startsWith("/uploads/")) {
+    const key = url.pathname.slice(9);
+    try {
+      const object = await env.UPLOADS.get(key);
+      if (!object) return new Response("File not found", { status: 404 });
+      return new Response(object.body, {
+        headers: {
+          "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+          "Cache-Control": "public, max-age=31536000",
+        },
+      });
+    } catch {
+      return new Response("File not found", { status: 404 });
+    }
+  }
+  if (env.ASSETS && parts[0] !== "api" && request.method === "GET") {
+    return env.ASSETS.fetch(request);
+  }
+
   // ============================================================
   //  PUBLIC: Community Posts (no auth required for reading)
   // ============================================================
@@ -1008,23 +1030,6 @@ async function handleRequest(request, env) {
     }
 
     return json({ error: "API route not found" }, 404, origin);
-  }
-
-  // Serve uploaded files from R2
-  if (url.pathname.startsWith("/uploads/")) {
-    const key = url.pathname.slice(9);
-    try {
-      const object = await env.UPLOADS.get(key);
-      if (!object) return new Response("File not found", { status: 404 });
-      return new Response(object.body, {
-        headers: {
-          "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
-          "Cache-Control": "public, max-age=31536000",
-        },
-      });
-    } catch {
-      return new Response("File not found", { status: 404 });
-    }
   }
 
   return new Response("Not found", { status: 404 });
