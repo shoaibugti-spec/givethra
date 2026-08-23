@@ -3,7 +3,7 @@ import InstallButton from "@/components/InstallButton";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import FeedbackWall from "@/components/FeedbackWall";
-import Layout from "@/components/Layout"; // ✅ یہ شامل کریں
+import Layout from "@/components/Layout"; // ✅ شامل کریں
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,6 +105,7 @@ const CATEGORY_APPEAL: Record<string, string> = {
 };
 
 const URGENCIES = ["Low", "Medium", "High", "Emergency"];
+
 const TRUST_BADGES = [
   { icon: MailCheck, label: "Email Verified", color: "text-emerald-600" },
   { icon: Phone, label: "Mobile Verified", color: "text-blue-600" },
