@@ -1763,7 +1763,7 @@ function DetailRow({ label, value, mono }: { label: string; value?: string; mono
 }
 
 // ============================================================
-//  CASE CARD (FULLY COMPLETE - ALL FIELDS VISIBLE)
+//  CASE CARD (FULLY COMPLETE - با فائل کے نام)
 // ============================================================
 function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const [reason, setReason] = useState("");
@@ -1843,49 +1843,97 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     { label: "Property Ownership", value: catDetails?.property_ownership === "rented" ? "Rented" : catDetails?.property_ownership === "owned" ? "Owned" : "" },
   ].filter((d) => d.value);
 
+  // ============================================================
+  // ✅ درست شدہ فائل نام کا کوڈ
+  // ============================================================
   const fileEntries: { key: string; label: string; url: string }[] = [];
+  
+  function getFileNameFromUrl(url: string): string {
+    try {
+      // URL کو پارس کریں
+      const urlObj = new URL(url);
+      // key parameter نکالیں (اگر موجود ہے)
+      const key = urlObj.searchParams.get("key");
+      if (key) {
+        // key سے آخری حصہ نکالیں (فائل کا اصل نام)
+        const parts = key.split("/");
+        const lastPart = parts[parts.length - 1];
+        if (lastPart) {
+          // ٹائمسٹیمپ اور رینڈم ہیش ہٹائیں
+          let name = decodeURIComponent(lastPart)
+            .replace(/^[0-9]+[-_]/, "") // ٹائمسٹیمپ ہٹائیں
+            .replace(/^[a-f0-9]{8,}[-_]/, ""); // ہیش ہٹائیں
+          // اگر نام خالی نہ ہو تو واپس کریں
+          if (name && name.length > 0 && name !== "null") {
+            return name;
+          }
+        }
+      }
+      // اگر key نہیں ہے تو URL کے آخری حصے سے نام نکالیں
+      const pathParts = urlObj.pathname.split("/");
+      const last = pathParts[pathParts.length - 1];
+      if (last) {
+        let name = decodeURIComponent(last)
+          .replace(/^[0-9]+[-_]/, "")
+          .replace(/^[a-f0-9]{8,}[-_]/, "");
+        if (name && name.length > 0 && name !== "null") {
+          return name;
+        }
+      }
+      // ورنہ ڈیفالٹ نام
+      return "File";
+    } catch {
+      return "File";
+    }
+  }
+
+  function getFileLabel(key: string, url: string): string {
+    // اگر DOC_LABELS میں ہے تو وہی استعمال کریں
+    if (DOC_LABELS[key]) return DOC_LABELS[key];
+    
+    // ورنہ URL سے فائل کا نام نکالیں
+    const fileName = getFileNameFromUrl(url);
+    // اگر فائل کا نام "File" یا "photo" یا "uploads" ہے تو بہتر لیبل بنائیں
+    if (fileName === "File" || fileName === "photo" || fileName === "uploads" || fileName.match(/^[0-9a-f]{8,}$/i)) {
+      // key کو صاف کریں
+      const cleanKey = key
+        .replace(/_/g, " ")
+        .replace(/([A-Z])/g, " $1")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim();
+      if (cleanKey && cleanKey !== "Photo" && cleanKey !== "File") {
+        return cleanKey;
+      }
+      return "Uploaded File";
+    }
+    return fileName;
+  }
+
   const pushFile = (key: string, value: unknown) => {
     if (typeof value !== "string") return;
     const url = value.trim();
     if (!url.startsWith("http")) return;
     
-    let label = getDocLabel(key);
-    try {
-      const cleanUrl = url.split('?')[0];
-      const segments = cleanUrl.split('/');
-      const lastSeg = segments[segments.length - 1];
-      if (lastSeg) {
-        let decoded = decodeURIComponent(lastSeg);
-        let cleaned = decoded
-          .replace(/^[0-9]{10,}[-_]/, '')
-          .replace(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}[-_]/i, '')
-          .replace(/^[0-9]+[-_]/, '');
-        if (cleaned && !cleaned.match(/^[0-9a-f]{8,}$/i)) {
-          label = cleaned.replace(/[_]/g, ' ');
-        }
-      }
-    } catch (e) {
-      // fallback
-    }
-    if (!label || label === key || label.match(/^[0-9a-f]{8,}$/i) || label.length > 40) {
-      label = getDocLabel(key);
-    }
-
-    if (!fileEntries.some((f) => f.url === url)) {
-      fileEntries.push({ key, label, url });
-    }
+    // ڈپلیکیٹ چیک کریں
+    if (fileEntries.some((f) => f.url === url)) return;
+    
+    const label = getFileLabel(key, url);
+    fileEntries.push({ key, label, url });
   };
 
+  // Top-level evidence fields
   pushFile("selfie_url", c.selfie_url);
   pushFile("video_url", c.video_url);
   pushFile("paid_receipt_url", c.paid_receipt_url);
 
+  // photo_urls array or object
   if (Array.isArray(c.photo_urls)) {
     c.photo_urls.forEach((val, idx) => pushFile(`photo_${idx + 1}`, val));
   } else if (c.photo_urls && typeof c.photo_urls === "object") {
     for (const [k, val] of Object.entries(c.photo_urls)) pushFile(k, val);
   }
 
+  // Deep recursive walk over category_details for any document or URL field
   const walkFilesDeep = (obj: any, prefix = "") => {
     if (!obj || typeof obj !== "object") return;
     if (Array.isArray(obj)) {
@@ -1905,6 +1953,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   };
   walkFilesDeep(catDetails);
 
+  // Remove duplicates by URL
   const seen = new Set<string>();
   const uniqueFiles = fileEntries.filter((file) => {
     if (seen.has(file.url)) return false;
@@ -2009,6 +2058,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
+      {/* ✅ Uploaded Files with proper names */}
       {uniqueFiles.length > 0 ? (
         <div className="rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-3 space-y-2">
           <div className="flex items-center justify-between">
@@ -2028,7 +2078,9 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
               const isPdf = url.match(/\.pdf$/i);
               return (
                 <div key={key + url} className="space-y-1 bg-background/80 p-1.5 rounded border">
-                  <p className="text-[10px] font-medium text-foreground truncate" title={label}>📎 {label}</p>
+                  <p className="text-[10px] font-medium text-foreground truncate" title={label}>
+                    📎 {label}
+                  </p>
                   {isVideo ? (
                     <video src={url} controls className="w-full rounded border max-h-32 bg-black" />
                   ) : isPdf ? (
@@ -2178,11 +2230,34 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
 //  IMAGE COMPONENT
 // ============================================================
 function Img({ url, label }: { url: string; label: string }) {
+  // ✅ تصویر کے لیے بھی فائل کا نام دکھائیں
+  let displayLabel = label;
+  try {
+    const urlObj = new URL(url);
+    const key = urlObj.searchParams.get("key");
+    if (key) {
+      const parts = key.split("/");
+      const lastPart = parts[parts.length - 1];
+      if (lastPart) {
+        let name = decodeURIComponent(lastPart)
+          .replace(/^[0-9]+[-_]/, "")
+          .replace(/^[a-f0-9]{8,}[-_]/, "");
+        if (name && name.length > 0 && name !== "null") {
+          displayLabel = name;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
   return (
     <div className="space-y-1">
-      <p className="text-[10px] font-medium text-muted-foreground truncate">{label}</p>
+      <p className="text-[10px] font-medium text-muted-foreground truncate" title={displayLabel}>
+        📎 {displayLabel}
+      </p>
       <a href={url} target="_blank" rel="noopener noreferrer">
-        <img src={url} alt={label} className="w-full rounded border max-h-24 object-cover" />
+        <img src={url} alt={displayLabel} className="w-full rounded border max-h-24 object-cover" />
       </a>
     </div>
   );
