@@ -627,54 +627,7 @@ export default function HomePage() {
             transition={{ duration: 0.65, delay: 0.15 }}
             className="flex-1 w-full space-y-4"
           >
-            {/* Public message box above slider */}
-            <div id="public-post" className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm text-left">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <h3 className="text-sm font-semibold text-foreground">Public Post</h3>
-              </div>
-              <p className="mb-3 text-xs leading-5 text-muted-foreground">Share any message about Givethra here.</p>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                const formEl = e.currentTarget;
-                const field = formEl.elements.namedItem("feedbackText") as HTMLInputElement | HTMLTextAreaElement;
-                const txt = field?.value?.trim();
-                if (!txt) return;
-                try {
-                  const token = localStorage.getItem("auth_token");
-                  const res = await fetch("/api/public-feedback", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    },
-                    body: JSON.stringify({ message: txt, guest_name: user?.fullName || "Public Visitor" })
-                  });
-                  const result = await res.json().catch(() => null);
-                  if (!res.ok) {
-                    throw new Error(result?.error || "Failed to send message.");
-                  }
-                  toast.success("Success! Your message has been sent to Givethra.");
-                  formEl.reset();
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "We could not send your message. Please try again.");
-                }
-              }} className="space-y-2">
-                <textarea
-                  name="feedbackText"
-                  rows={3}
-                  placeholder="Write your message..."
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
-                  required
-                />
-                <div className="flex justify-end items-center text-xs">
-                  <button type="submit" className="px-3 py-1.5 font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition">
-                    Post Message
-                  </button>
-                </div>
-              </form>
-            </div>
-
+            {/* ====== PUBLIC POST BOX REMOVED ====== */}
             <div className="relative w-full rounded-2xl overflow-hidden shadow-xl">
               {renderSlideContent()}
 
