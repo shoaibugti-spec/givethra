@@ -9,6 +9,7 @@ import {
   toggleFeedbackLike,
   createComment,
   getProfile,
+  getGuestId,
 } from "@/lib/api";
 import { Heart, MessageCircle, Send, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -63,15 +64,12 @@ export default function FeedbackWall() {
   }
 
   async function handleToggleLike(feedbackId: string) {
-    if (!isAuthenticated || !user) {
-      toast.error("Please sign in to react.");
-      return;
-    }
+    const actorId = isAuthenticated && user ? user.id : getGuestId();
     const existing = likes.find(
-      (l) => l.feedback_id === feedbackId && l.user_id === user.id
+      (l) => l.feedback_id === feedbackId && l.user_id === actorId
     );
     try {
-      const result = await toggleFeedbackLike(feedbackId, user.id, existing?.id);
+      const result = await toggleFeedbackLike(feedbackId, actorId, existing?.id);
       if (result) {
         if (result.deleted) {
           setLikes((prev) => prev.filter((l) => l.id !== result.id));
@@ -109,13 +107,20 @@ export default function FeedbackWall() {
         </div>
 
         <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
-          {feedbacks.map((fb) => (
-            <FeedbackPost
+          {[...feedbacks]
+            .sort((a, b) => {
+              const score = (fb: any) =>
+                likes.filter((l) => l.feedback_id === fb.id).length * 2 +
+                comments.filter((c) => c.feedback_id === fb.id).length;
+              return score(b) - score(a);
+            })
+            .map((fb) => (
+              <FeedbackPost
               key={fb.id}
               fb={fb}
               likes={likes.filter((l) => l.feedback_id === fb.id)}
               comments={comments.filter((c) => c.feedback_id === fb.id)}
-              currentUserId={user?.id}
+              currentUserId={isAuthenticated && user ? user.id : getGuestId()}
               isAuthenticated={isAuthenticated}
               onToggleLike={() => handleToggleLike(fb.id)}
               onCommentAdded={(c: any) => setComments((prev) => [...prev, c])}
@@ -145,16 +150,13 @@ function FeedbackPost({
   const initial = firstName[0]?.toUpperCase() ?? "G";
 
   async function handlePostComment() {
-    if (!isAuthenticated || !currentUserId) {
-      toast.error("Please sign in to comment.");
-      return;
-    }
-    if (!commentText.trim()) return;
+    if (!currentUserId || !commentText.trim()) return;
     setPosting(true);
     try {
-      // Get user's first name from profile
-      const profile = await getProfile(currentUserId);
-      const cFirst = (profile?.full_name || "User").split(" ")[0] || "User";
+      const isGuest = !isAuthenticated;
+      const cFirst = isGuest
+        ? `Guest ${getGuestId().slice(-6)}`
+        : ((await getProfile(currentUserId))?.full_name || "User").split(" ")[0] || "User";
       const data = await createComment({
         feedback_id: fb.id,
         user_id: currentUserId,
@@ -251,16 +253,13 @@ function FeedbackPost({
               ))}
             </div>
           )}
-          {isAuthenticated ? (
-            <div className="flex items-center gap-2">
-              <input
+          <div className="flex items-end gap-2">
+              <textarea
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handlePostComment();
-                }}
                 placeholder="Write a kind comment..."
-                className="flex-1 h-9 px-3 rounded-full border border-border bg-background text-sm"
+                rows={3}
+                className="flex-1 min-h-10 resize-y px-3 py-2 rounded-xl border border-border bg-background text-sm"
               />
               <button
                 onClick={handlePostComment}
@@ -270,11 +269,6 @@ function FeedbackPost({
                 <Send className="h-4 w-4" />
               </button>
             </div>
-          ) : (
-            <p className="text-xs text-muted-foreground text-center">
-              Sign in to comment.
-            </p>
-          )}
         </div>
       )}
     </div>
