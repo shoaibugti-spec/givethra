@@ -52,8 +52,8 @@ export default function CommunityPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // --- پوسٹس لوڈ کریں ---
-  const fetchPosts = async () => {
-    setLoading(true);
+  const fetchPosts = async (showLoader = false) => {
+    if (showLoader) setLoading(true);
     try {
       const data = await getCommunityPosts();
       setPosts(data || []);
@@ -216,9 +216,9 @@ export default function CommunityPage() {
 
   // --- پہلی بار اور وقتاً فوقتاً لوڈ کریں ---
   useEffect(() => {
-    fetchPosts();
-    const interval = setInterval(fetchPosts, 30000);
-    const handlePostUpdate = () => fetchPosts();
+    void fetchPosts(true);
+    const interval = setInterval(() => { void fetchPosts(false); }, 600000);
+    const handlePostUpdate = () => { void fetchPosts(false); };
     window.addEventListener("post-updated", handlePostUpdate);
     return () => {
       clearInterval(interval);

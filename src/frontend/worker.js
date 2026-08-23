@@ -809,24 +809,24 @@ async function handleRequest(request, env) {
           const target = url.searchParams.get("user_id") || user.user_id;
           if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
           const rows = await env.DB.prepare(
-            "SELECT * FROM support_messages WHERE user_id = ? OR admin_id = ? ORDER BY created_at ASC"
-          ).bind(target, target).all();
+            "SELECT * FROM support_messages WHERE user_id = ? ORDER BY created_at ASC"
+          ).bind(target).all();
           return json(rows.results || [], 200, origin);
         }
         if (request.method === "POST") {
           const body = await readJson(request);
           const msgId = body?.id || id();
           await env.DB.prepare(
-            `INSERT INTO support_messages (id, user_id, admin_id, message, is_from_user, created_at)
-             VALUES (?, ?, ?, ?, ?, ?)`
-          ).bind(msgId, body.user_id, body.admin_id || null, body.message, body.is_from_user ? 1 : 0, now()).run();
+            `INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(msgId, body.user_id, body.sender || (body.is_from_user ? "user" : "admin"), body.message || null, body.attachment_url || null, body.language || "en", body.is_read ? 1 : 0, now()).run();
           return json({ id: msgId, ...body, created_at: now() }, 201, origin);
         }
       }
       if (parts[2] === "mark-read" && request.method === "PUT") {
         const body = await readJson(request);
         await env.DB.prepare(
-          "UPDATE support_messages SET is_read = 1 WHERE user_id = ? AND is_from_user = 0"
+          "UPDATE support_messages SET is_read = 1 WHERE user_id = ? AND sender = 'admin'"
         ).bind(body.user_id).run();
         return json({ updated: true }, 200, origin);
       }
@@ -886,6 +886,16 @@ async function handleRequest(request, env) {
 
     if (parts[1] === "admin") {
       if (!isAdmin(user)) return json({ error: "Admin access required" }, 403, origin);
+
+      if (parts[2] === "support" && parts[3] === "reply" && request.method === "POST") {
+        const body = await readJson(request);
+        const msgId = body?.id || id();
+        await env.DB.prepare(
+          `INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at)
+           VALUES (?, ?, 'admin', ?, ?, ?, 1, ?)`
+        ).bind(msgId, body.user_id, body.message || null, body.attachment_url || null, body.language || "en", now()).run();
+        return json({ id: msgId, ...body, sender: "admin", created_at: now() }, 201, origin);
+      }
 
       if (request.method === "GET") {
         const tableMap = {

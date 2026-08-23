@@ -36,6 +36,7 @@ const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
+const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 
 export { NavLink };
 
@@ -335,14 +336,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                   <Facebook className="h-4 w-4" />
                 </a>
-                <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white">
+                <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                   <Instagram className="h-4 w-4" />
                 </a>
-                <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white">
+                <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                   <Linkedin className="h-4 w-4" />
                 </a>
-                <a href="mailto:info@givethra.org" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white">
+                <a href="mailto:info@givethra.org" aria-label="Email" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                   <Mail className="h-4 w-4" />
+                </a>
+                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Channel" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                  <MessageCircle className="h-4 w-4" />
                 </a>
               </div>
             </div>

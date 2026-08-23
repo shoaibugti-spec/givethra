@@ -1,9 +1,9 @@
 import Layout from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { getSupportMessages, sendSupportMessage, markSupportMessagesAsRead } from "@/lib/api";
+import { getSupportMessages, sendSupportMessage, markSupportMessagesAsRead, uploadFileToStorage } from "@/lib/api";
 import { useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
-import { Send, MessageCircle, ArrowLeft, BookOpen, ExternalLink, ShieldCheck, FileText, Sparkles } from "lucide-react";
+import { Send, MessageCircle, ArrowLeft, BookOpen, ExternalLink, ShieldCheck, FileText, Sparkles, Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 
 const FAQ_ARTICLES = [
@@ -35,6 +35,8 @@ export default function SupportChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [openArticle, setOpenArticle] = useState<any>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -65,17 +67,25 @@ export default function SupportChatPage() {
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim() || !user?.id) return;
+    if ((!text.trim() && !attachmentFile) || !user?.id) return;
     const msgText = text.trim();
     setText("");
     setSending(true);
     try {
+      let attachmentUrl = "";
+      if (attachmentFile) {
+        attachmentUrl = await uploadFileToStorage(attachmentFile, `support/${user.id}/${Date.now()}-${attachmentFile.name}`);
+      }
       const res = await sendSupportMessage({
         user_id: user.id,
         sender: "user",
-        message: msgText,
+        message: msgText || null,
+        attachment_url: attachmentUrl || null,
+        filename: attachmentFile?.name || null,
       });
       if (res && (res.id || res.success !== false || res.message)) {
+        setAttachmentFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
         await loadMessages();
       } else {
         toast.error(res?.error || "Failed to send message.");
@@ -213,22 +223,34 @@ export default function SupportChatPage() {
             <div ref={bottomRef} />
           </div>
 
-          <form onSubmit={handleSend} className="p-3 border-t bg-background flex items-center gap-2">
-            <input
-              type="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 bg-muted/50 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <button
+          <form onSubmit={handleSend} className="p-3 border-t bg-background space-y-2">
+            {attachmentFile && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                <Paperclip className="h-3.5 w-3.5" /> <span className="truncate flex-1">{attachmentFile.name}</span>
+                <button type="button" onClick={() => { setAttachmentFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} aria-label="Remove attachment"><X className="h-3.5 w-3.5" /></button>
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)} />
+              <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Attach file" className="h-10 w-10 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:text-primary">
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Type your message..."
+                rows={3}
+                className="flex-1 resize-y min-h-10 bg-muted/50 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <button
               type="submit"
-              disabled={sending || !text.trim()}
+              disabled={sending || (!text.trim() && !attachmentFile)}
               className="h-10 px-5 rounded-xl bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-1.5 hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               <Send className="h-4 w-4" />
               <span>Send</span>
-            </button>
+              </button>
+            </div>
           </form>
         </div>
       </div>
