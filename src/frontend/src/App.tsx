@@ -42,6 +42,9 @@ const BecomeHeroPage = lazy(() => import("@/pages/BecomeHeroPage").catch(() => (
 const NeedHelpPage = lazy(() => import("@/pages/NeedHelpPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const OnboardingPage = lazy(() => import("@/pages/OnboardingPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
+// ✅ نیا: CommunityPage درآمد کریں
+const CommunityPage = lazy(() => import("@/pages/CommunityPage").catch(() => ({ default: () => <div>Failed to load community page</div> })));
+
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
     <LoadingSpinner size="lg" label="Loading..." />
@@ -103,6 +106,13 @@ const becomeHeroRoute = createRoute({ getParentRoute: () => rootRoute, path: "/b
 const needHelpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/need-help", component: () => <Suspense fallback={<PageLoader />}><NeedHelpPage /></Suspense> });
 const onboardingRoute = createRoute({ getParentRoute: () => rootRoute, path: "/onboarding", component: () => <Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense> });
 
+// ✅ نیا: کمیونٹی روٹ
+const communityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/community",
+  component: () => <Suspense fallback={<PageLoader />}><CommunityPage /></Suspense>,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   signUpRoute,
@@ -130,6 +140,7 @@ const routeTree = rootRoute.addChildren([
   becomeHeroRoute,
   needHelpRoute,
   onboardingRoute,
+  communityRoute, // ✅ یہاں شامل کریں
 ]);
 const router = createRouter({ routeTree });
 
