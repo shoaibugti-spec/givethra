@@ -40,6 +40,12 @@ function headers(): HeadersInit {
   };
 }
 
+async function readApiJson<T>(res: Response, fallback: T, context: string): Promise<T> {
+  const result = await res.json().catch(() => fallback as unknown);
+  if (!res.ok) throw new Error((result as any)?.error || `${context} (${res.status})`);
+  return result as T;
+}
+
 // ---------- AUTH ----------
 export async function verifyToken(): Promise<{ valid: boolean; user?: any }> {
   const token = getAuthToken();
@@ -371,7 +377,9 @@ export async function getDeposits(userId: string) {
     `${WORKER_URL}/api/deposits?user_id=${userId}`,
     { headers: headers() }
   );
-  return res.json();
+  const result = await res.json().catch(() => ([]));
+  if (!res.ok) throw new Error(result?.error || `Failed to load deposits (${res.status})`);
+  return result;
 }
 
 export async function insertDeposit(data: any) {
@@ -380,7 +388,9 @@ export async function insertDeposit(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Failed to submit deposit (${res.status})`);
+  return result;
 }
 
 // ---------- FEEDBACK ----------
@@ -507,7 +517,9 @@ export async function getSupportMessages(userId: string) {
     `${WORKER_URL}/api/support/messages?user_id=${userId}`,
     { headers: headers() }
   );
-  return res.json();
+  const result = await res.json().catch(() => ([]));
+  if (!res.ok) throw new Error(result?.error || `Failed to load support messages (${res.status})`);
+  return result;
 }
 
 export async function sendSupportMessage(data: any) {
@@ -529,7 +541,9 @@ export async function markSupportMessagesAsRead(userId: string) {
     headers: headers(),
     body: JSON.stringify({ user_id: userId }),
   });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Failed to mark support messages read (${res.status})`);
+  return result;
 }
 
 export async function getUnreadChatMessagesCount(userId: string) {
@@ -537,7 +551,8 @@ export async function getUnreadChatMessagesCount(userId: string) {
     `${WORKER_URL}/api/support/unread-count?user_id=${userId}`,
     { headers: headers() }
   );
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `Failed to load unread support count (${res.status})`);
   return data.count ?? 0;
 }
 
@@ -547,7 +562,9 @@ export async function getUserSettings(userId: string) {
     `${WORKER_URL}/api/user-settings/${userId}`,
     { headers: headers() }
   );
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Failed to load settings (${res.status})`);
+  return result;
 }
 
 export async function updateUserSettings(userId: string, data: any) {
@@ -556,7 +573,9 @@ export async function updateUserSettings(userId: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Failed to save settings (${res.status})`);
+  return result;
 }
 
 // ---------- FILE UPLOAD ----------
@@ -594,42 +613,53 @@ export async function getKycStatus(userId: string): Promise<{ status: string }> 
 // ---------- ADMIN APIs ----------
 export async function adminGetAllKyc() {
   const res = await fetch(`${WORKER_URL}/api/admin/kyc`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin KYC");
 }
 
 export async function adminGetAllCases() {
   const res = await fetch(`${WORKER_URL}/api/admin/cases`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin cases");
 }
 
 export async function adminGetAllResolutions() {
   const res = await fetch(`${WORKER_URL}/api/admin/resolutions`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin resolutions");
 }
 
 export async function adminGetAllDeposits() {
   const res = await fetch(`${WORKER_URL}/api/admin/deposits`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin deposits");
 }
 
 export async function adminGetAllProfiles() {
   const res = await fetch(`${WORKER_URL}/api/admin/profiles`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin profiles");
 }
 
 export async function adminGetAllWallets() {
   const res = await fetch(`${WORKER_URL}/api/admin/wallets`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin wallets");
 }
 
 export async function adminGetAllUnlocks() {
   const res = await fetch(`${WORKER_URL}/api/admin/unlocks`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin unlocks");
 }
 
 export async function adminGetAllSupportMessages() {
   const res = await fetch(`${WORKER_URL}/api/admin/support-messages`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin support messages");
+}
+
+export async function adminMarkSupportMessagesAsRead(userId: string) {
+  const res = await fetch(`${WORKER_URL}/api/admin/support/mark-read`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify({ user_id: userId }),
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Failed to mark support messages read (${res.status})`);
+  return result;
 }
 
 export async function adminSendSupportReply(data: Record<string, unknown>) {
@@ -645,17 +675,17 @@ export async function adminSendSupportReply(data: Record<string, unknown>) {
 
 export async function adminGetAllFeedbacks() {
   const res = await fetch(`${WORKER_URL}/api/admin/feedbacks`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin feedback");
 }
 
 export async function adminGetAllOffers() {
   const res = await fetch(`${WORKER_URL}/api/admin/offers`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin offers");
 }
 
 export async function adminGetAllSuspensions() {
   const res = await fetch(`${WORKER_URL}/api/admin/suspensions`, { headers: headers() });
-  return res.json();
+  return readApiJson(res, [], "Failed to load Admin suspensions");
 }
 
 export async function adminUpdateKyc(id: string, data: any) {
@@ -700,7 +730,9 @@ export async function adminUpdateDeposit(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Failed to update deposit (${res.status})`);
+  return result;
 }
 
 export async function adminCloseCase(id: string, data: any) {
@@ -737,11 +769,11 @@ export async function adminUpdateProfile(userId: string, data: any) {
   return res.json();
 }
 
-export async function adminGetWalletsByUser(userId: string) {
+export async function adminGetWalletsByUser(userId: string): Promise<{ user_id?: string; balance?: number; updated_at?: string } | null> {
   const res = await fetch(`${WORKER_URL}/api/admin/wallets?user_id=${userId}`, {
     headers: headers(),
   });
-  const data = await res.json();
+  const data = await readApiJson<Array<{ user_id?: string; balance?: number; updated_at?: string }>>(res, [], "Failed to load Admin wallet");
   return data[0] || null;
 }
 
@@ -751,7 +783,7 @@ export async function adminUpsertWallet(userId: string, balance: number) {
     headers: headers(),
     body: JSON.stringify({ user_id: userId, balance }),
   });
-  return res.json();
+  return readApiJson(res, {}, "Failed to update wallet");
 }
 
 export async function adminGetCategoryOffer(category: string) {

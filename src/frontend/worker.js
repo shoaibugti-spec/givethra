@@ -869,18 +869,37 @@ async function handleRequest(request, env, ctx) {
       if (request.method === "GET") {
         const target = url.searchParams.get("user_id") || user.user_id;
         if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
-        const rows = await env.DB.prepare("SELECT * FROM deposits WHERE user_id = ? ORDER BY created_at DESC").bind(target).all();
+        const rows = await env.DB.prepare("SELECT * FROM deposits WHERE user_id = ? ORDER BY submitted_at DESC").bind(target).all();
         return json(rows.results || [], 200, origin);
       }
       if (request.method === "POST") {
         const body = await readJson(request);
-        const record = pick(body, ["user_id", "amount", "currency", "payment_method", "payment_reference", "status", "deposit_date"]);
+        const target = body?.user_id || user.user_id;
+        if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+        const amount = Number(body?.amount);
+        const transactionId = String(body?.transaction_id ?? body?.payment_reference ?? "").trim();
+        const proofUrl = String(body?.proof_url ?? "").trim();
+        if (!Number.isFinite(amount) || amount <= 0) return json({ error: "A valid deposit amount is required" }, 400, origin);
+        if (!transactionId) return json({ error: "Transaction ID or reference is required" }, 400, origin);
+        if (!proofUrl) return json({ error: "Payment proof is required" }, 400, origin);
         const depositId = body?.id || id();
+        const submittedAt = body?.submitted_at || body?.deposit_date || now();
         await env.DB.prepare(
-          `INSERT INTO deposits (id, user_id, amount, currency, payment_method, payment_reference, status, deposit_date, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(depositId, record.user_id, record.amount, record.currency || "USD", record.payment_method || null, record.payment_reference || null, record.status || "pending", record.deposit_date || now(), now()).run();
-        return json({ id: depositId, ...record, created_at: now() }, 201, origin);
+          `INSERT INTO deposits (id, user_id, method, amount, currency, transaction_id, proof_url, status, credits, submitted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+        ).bind(
+          depositId,
+          target,
+          body?.method || body?.payment_method || null,
+          amount,
+          body?.currency || "USD",
+          transactionId,
+          proofUrl,
+          Number.isFinite(Number(body?.credits)) ? Number(body.credits) : amount,
+          submittedAt,
+        ).run();
+        const created = await env.DB.prepare("SELECT * FROM deposits WHERE id = ?").bind(depositId).first();
+        return json(created || { id: depositId, user_id: target, amount, currency: body?.currency || "USD", transaction_id: transactionId, proof_url: proofUrl, status: "pending", credits: amount, submitted_at: submittedAt }, 201, origin);
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }
@@ -953,25 +972,34 @@ async function handleRequest(request, env, ctx) {
         }
         if (request.method === "POST") {
           const body = await readJson(request);
+          const target = body?.user_id || user.user_id;
+          if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+          if (!String(body?.message || "").trim() && !body?.attachment_url) {
+            return json({ error: "A message or attachment is required" }, 400, origin);
+          }
           const msgId = body?.id || id();
           await env.DB.prepare(
             `INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-          ).bind(msgId, body.user_id, body.sender || (body.is_from_user ? "user" : "admin"), body.message || null, body.attachment_url || null, body.language || "en", body.is_read ? 1 : 0, now()).run();
-          return json({ id: msgId, ...body, created_at: now() }, 201, origin);
+             VALUES (?, ?, 'user', ?, ?, ?, 0, ?)`
+          ).bind(msgId, target, body.message ? String(body.message).trim() : null, body.attachment_url || null, body.language || "en", now()).run();
+          const created = await env.DB.prepare("SELECT * FROM support_messages WHERE id = ?").bind(msgId).first();
+          return json(created || { id: msgId, user_id: target, sender: "user", message: body.message || null, attachment_url: body.attachment_url || null, is_read: 0 }, 201, origin);
         }
       }
       if (parts[2] === "mark-read" && request.method === "PUT") {
         const body = await readJson(request);
-        await env.DB.prepare(
-          "UPDATE support_messages SET is_read = 1 WHERE user_id = ? AND sender = 'admin'"
-        ).bind(body.user_id).run();
-        return json({ updated: true }, 200, origin);
+        const target = body?.user_id || user.user_id;
+        if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+        const result = await env.DB.prepare(
+          "UPDATE support_messages SET is_read = 1 WHERE user_id = ? AND sender = 'admin' AND (is_read = 0 OR is_read IS NULL)"
+        ).bind(target).run();
+        return json({ updated: Number(result?.meta?.changes || 0) }, 200, origin);
       }
       if (parts[2] === "unread-count" && request.method === "GET") {
         const target = url.searchParams.get("user_id") || user.user_id;
+        if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
         const row = await env.DB.prepare(
-          "SELECT COUNT(*) AS count FROM support_messages WHERE user_id = ? AND is_from_user = 0 AND (is_read = 0 OR is_read IS NULL)"
+          "SELECT COUNT(*) AS count FROM support_messages WHERE user_id = ? AND sender = 'admin' AND (is_read = 0 OR is_read IS NULL)"
         ).bind(target).first();
         return json({ count: Number(row?.count || 0) }, 200, origin);
       }
@@ -989,14 +1017,35 @@ async function handleRequest(request, env, ctx) {
         const target = parts[2] || user.user_id;
         if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
         const body = await readJson(request);
-        const fields = ["currency", "language", "notifications_enabled", "theme"];
-        const values = pick(body, fields);
+        const fields = [
+          "language", "theme", "currency", "timezone", "email_notifications",
+          "inapp_notifications", "weekly_digest", "high_contrast", "larger_text",
+          "reduced_animations",
+        ];
+        const existing = await env.DB.prepare("SELECT * FROM user_settings WHERE user_id = ?").bind(target).first();
+        const values = { ...existing, ...pick(body, fields) };
+        const bool = (value, fallback) => value === undefined || value === null ? fallback : (value ? 1 : 0);
+        const updatedAt = now();
         await env.DB.prepare(
-          `INSERT INTO user_settings (user_id, currency, language, notifications_enabled, theme, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON CONFLICT(user_id) DO UPDATE SET currency = excluded.currency, language = excluded.language, notifications_enabled = excluded.notifications_enabled, theme = excluded.theme, updated_at = excluded.updated_at`
-        ).bind(target, values.currency || "USD", values.language || "en", values.notifications_enabled !== undefined ? (values.notifications_enabled ? 1 : 0) : 1, values.theme || "light", now()).run();
-        return json({ user_id: target, ...values, updated_at: now() }, 200, origin);
+          `INSERT INTO user_settings (user_id, language, theme, currency, timezone, email_notifications, inapp_notifications, weekly_digest, high_contrast, larger_text, reduced_animations, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET language = excluded.language, theme = excluded.theme, currency = excluded.currency, timezone = excluded.timezone, email_notifications = excluded.email_notifications, inapp_notifications = excluded.inapp_notifications, weekly_digest = excluded.weekly_digest, high_contrast = excluded.high_contrast, larger_text = excluded.larger_text, reduced_animations = excluded.reduced_animations, updated_at = excluded.updated_at`
+        ).bind(
+          target,
+          values.language || "en",
+          values.theme || "light",
+          values.currency || "USD",
+          values.timezone || "UTC",
+          bool(values.email_notifications, 1),
+          bool(values.inapp_notifications, 1),
+          bool(values.weekly_digest, 0),
+          bool(values.high_contrast, 0),
+          bool(values.larger_text, 0),
+          bool(values.reduced_animations, 0),
+          updatedAt,
+        ).run();
+        const saved = await env.DB.prepare("SELECT * FROM user_settings WHERE user_id = ?").bind(target).first();
+        return json(saved || { user_id: target, ...values, updated_at: updatedAt }, 200, origin);
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }
@@ -1025,14 +1074,51 @@ async function handleRequest(request, env, ctx) {
     if (parts[1] === "admin") {
       if (!isAdmin(user)) return json({ error: "Admin access required" }, 403, origin);
 
+      if (parts[2] === "support" && parts[3] === "mark-read" && request.method === "PUT") {
+        const body = await readJson(request);
+        if (!body?.user_id) return json({ error: "User ID is required" }, 400, origin);
+        const result = await env.DB.prepare(
+          "UPDATE support_messages SET is_read = 1 WHERE user_id = ? AND sender = 'user' AND (is_read = 0 OR is_read IS NULL)"
+        ).bind(body.user_id).run();
+        return json({ updated: Number(result?.meta?.changes || 0) }, 200, origin);
+      }
+
       if (parts[2] === "support" && parts[3] === "reply" && request.method === "POST") {
         const body = await readJson(request);
+        if (!body?.user_id || (!String(body.message || "").trim() && !body.attachment_url)) {
+          return json({ error: "A reply message or attachment is required" }, 400, origin);
+        }
         const msgId = body?.id || id();
         await env.DB.prepare(
           `INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at)
            VALUES (?, ?, 'admin', ?, ?, ?, 1, ?)`
-        ).bind(msgId, body.user_id, body.message || null, body.attachment_url || null, body.language || "en", now()).run();
-        return json({ id: msgId, ...body, sender: "admin", created_at: now() }, 201, origin);
+        ).bind(msgId, body.user_id, body.message ? String(body.message).trim() : null, body.attachment_url || null, body.language || "en", now()).run();
+        const created = await env.DB.prepare("SELECT * FROM support_messages WHERE id = ?").bind(msgId).first();
+        return json(created || { id: msgId, ...body, sender: "admin", is_read: 1 }, 201, origin);
+      }
+
+      if (parts[2] === "wallets") {
+        if (request.method === "GET") {
+          const target = url.searchParams.get("user_id");
+          const rows = target
+            ? await env.DB.prepare("SELECT * FROM wallets WHERE user_id = ?").bind(target).all()
+            : await env.DB.prepare("SELECT * FROM wallets ORDER BY updated_at DESC").all();
+          return json(rows.results || [], 200, origin);
+        }
+        if (request.method === "POST") {
+          const body = await readJson(request);
+          const target = String(body?.user_id || "").trim();
+          const balance = Number(body?.balance);
+          if (!target || !Number.isFinite(balance) || balance < 0) return json({ error: "A valid user and wallet balance are required" }, 400, origin);
+          const updatedAt = body?.updated_at || now();
+          await env.DB.prepare(
+            `INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?)
+             ON CONFLICT(user_id) DO UPDATE SET balance = excluded.balance, updated_at = excluded.updated_at`
+          ).bind(target, balance, updatedAt).run();
+          const saved = await env.DB.prepare("SELECT * FROM wallets WHERE user_id = ?").bind(target).first();
+          return json(saved || { user_id: target, balance, updated_at: updatedAt }, 200, origin);
+        }
+        return json({ error: "Method not allowed" }, 405, origin);
       }
 
       if (request.method === "GET") {
@@ -1057,23 +1143,161 @@ async function handleRequest(request, env, ctx) {
         }
       }
 
-      if (request.method === "PUT") {
-        const id = parts[3];
-        if (parts[2] === "profiles" && parts[3]) {
-          const body = await readJson(request);
-          const allowed = ["full_name", "phone_number", "country", "city", "bio", "preferred_language", "avatar_url"];
-          const values = pick(body, allowed);
-          const params = allowed.filter((field) => values[field] !== undefined).map((field) => values[field]);
-          if (params.length) {
-            await env.DB.prepare(`UPDATE profiles SET ${allowed.map((f) => `${f} = ?`).join(", ")} WHERE user_id = ?`).bind(...params, parts[3]).run();
-            const updated = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(parts[3]).first();
-            return json(updated, 200, origin);
-          }
-        }
-        // ... other admin PUT routes (kyc, cases, etc.)
+      if (parts[2] === "user-suspension" && parts[3] && request.method === "GET") {
+        const row = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ? ORDER BY suspended_at DESC LIMIT 1").bind(parts[3]).first();
+        return json(row || null, 200, origin);
       }
 
-      // ... admin POST and DELETE routes
+      if (parts[2] === "user-suspension" && request.method === "POST") {
+        const body = await readJson(request);
+        const target = String(body?.user_id || "").trim();
+        if (!target) return json({ error: "User ID is required" }, 400, origin);
+        const existing = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ? ORDER BY suspended_at DESC LIMIT 1").bind(target).first();
+        const active = body?.is_active ? 1 : 0;
+        const suspensionCount = body?.suspension_count ?? existing?.suspension_count ?? 0;
+        const suspendedAt = body?.suspended_at ?? existing?.suspended_at ?? (active ? now() : null);
+        const unlockedAt = body?.unlocked_at ?? existing?.unlocked_at ?? null;
+        await env.DB.prepare(
+          `INSERT INTO user_suspensions (user_id, suspension_count, is_active, suspended_at, unlocked_at, rejection_count_at_suspension)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET suspension_count = excluded.suspension_count, is_active = excluded.is_active, suspended_at = excluded.suspended_at, unlocked_at = excluded.unlocked_at, rejection_count_at_suspension = excluded.rejection_count_at_suspension`
+        ).bind(target, suspensionCount, active, suspendedAt, unlockedAt, body?.rejection_count_at_suspension ?? existing?.rejection_count_at_suspension ?? 0).run();
+        return json(await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(target).first(), 200, origin);
+      }
+
+      if (request.method === "PUT") {
+        const recordId = parts[3];
+        if (parts[2] === "deposits" && recordId) {
+          const body = await readJson(request);
+          const current = await env.DB.prepare("SELECT * FROM deposits WHERE id = ?").bind(recordId).first();
+          if (!current) return json({ error: "Deposit not found" }, 404, origin);
+          const requestedStatus = body?.status === undefined ? current.status : String(body.status);
+          if (!["pending", "approved", "rejected"].includes(requestedStatus)) return json({ error: "Invalid deposit status" }, 400, origin);
+          if (current.status === "approved" && requestedStatus === "rejected") return json({ error: "An approved deposit cannot be rejected" }, 409, origin);
+          const allowed = ["method", "amount", "currency", "transaction_id", "proof_url", "status", "credits", "reviewed_at", "reviewed_by", "rejection_reason"];
+          const values = pick(body, allowed);
+          values.status = requestedStatus;
+          if (requestedStatus === "approved") {
+            values.reviewed_at = values.reviewed_at ?? now();
+            values.reviewed_by = values.reviewed_by ?? user.email;
+            values.rejection_reason = null;
+          }
+          const fields = allowed.filter((field) => values[field] !== undefined);
+          const params = fields.map((field) => values[field]);
+          await env.DB.prepare(`UPDATE deposits SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...params, recordId).run();
+          if (requestedStatus === "approved" && current.status !== "approved") {
+            const credits = Number(values.credits ?? current.credits ?? current.amount ?? 0);
+            if (!Number.isFinite(credits) || credits < 0) return json({ error: "Invalid deposit credits" }, 400, origin);
+            await env.DB.prepare(
+              `INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET balance = COALESCE(wallets.balance, 0) + excluded.balance, updated_at = excluded.updated_at`
+            ).bind(current.user_id, credits, now()).run();
+          }
+          return json(await env.DB.prepare("SELECT * FROM deposits WHERE id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "profiles" && recordId) {
+          const body = await readJson(request);
+          const allowed = ["full_name", "phone_number", "country", "city", "bio", "preferred_language", "avatar_url", "cover_url", "is_suspended", "suspended_reason", "suspended_at"];
+          const values = pick(body, allowed);
+          const fields = allowed.filter((field) => values[field] !== undefined);
+          if (!fields.length) return json({ error: "No profile fields to update" }, 400, origin);
+          const existing = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(recordId).first();
+          if (existing) {
+            await env.DB.prepare(`UPDATE profiles SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE user_id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          } else {
+            const profileFields = ["user_id", ...fields, "created_at", "updated_at"];
+            await env.DB.prepare(`INSERT INTO profiles (${profileFields.join(", ")}) VALUES (${profileFields.map(() => "?").join(", ")})`).bind(recordId, ...fields.map((field) => values[field]), now(), now()).run();
+          }
+          if (values.full_name !== undefined || values.avatar_url !== undefined) {
+            await env.DB.prepare("UPDATE users SET full_name = COALESCE(?, full_name), avatar_url = COALESCE(?, avatar_url), updated_at = ? WHERE user_id = ?").bind(values.full_name ?? null, values.avatar_url ?? null, now(), recordId).run();
+          }
+          return json(await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "kyc" && recordId) {
+          const body = await readJson(request);
+          const current = await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(recordId).first();
+          if (!current) return json({ error: "KYC submission not found" }, 404, origin);
+          const allowed = ["status", "rejection_reason", "reviewed_at", "reviewed_by"];
+          const values = pick(body, allowed);
+          const fields = allowed.filter((field) => values[field] !== undefined);
+          if (!fields.length) return json({ error: "No KYC fields to update" }, 400, origin);
+          await env.DB.prepare(`UPDATE kyc_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          if (values.status !== undefined) await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?").bind(values.status, now(), current.user_id).run();
+          return json(await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "cases" && recordId) {
+          const body = await readJson(request);
+          const current = await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(recordId).first();
+          if (!current) return json({ error: "Case not found" }, 404, origin);
+          const allowed = ["status", "amount_collected", "reviewed_at", "reviewed_by", "rejection_reason"];
+          if (parts[4] === "close") allowed.push("closed_by_admin", "paid_receipt_url");
+          const values = pick(body, allowed);
+          const fields = allowed.filter((field) => values[field] !== undefined);
+          if (!fields.length) return json({ error: "No case fields to update" }, 400, origin);
+          await env.DB.prepare(`UPDATE case_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          const counts = await env.DB.prepare(
+            `SELECT COUNT(*) AS total_cases,
+                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_cases,
+                    SUM(CASE WHEN status IN ('approved', 'completed') THEN 1 ELSE 0 END) AS active_or_completed_cases,
+                    SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected_cases
+             FROM case_submissions WHERE user_id = ?`
+          ).bind(current.user_id).first();
+          await env.DB.prepare(
+            "UPDATE users SET total_cases = ?, pending_cases = ?, active_or_completed_cases = ?, rejected_cases = ?, updated_at = ? WHERE user_id = ?"
+          ).bind(Number(counts?.total_cases || 0), Number(counts?.pending_cases || 0), Number(counts?.active_or_completed_cases || 0), Number(counts?.rejected_cases || 0), now(), current.user_id).run();
+          return json(await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "feedbacks" && recordId) {
+          const body = await readJson(request);
+          const allowed = ["status", "reviewed_at", "reviewed_by", "rejection_reason"];
+          const values = pick(body, allowed);
+          const fields = allowed.filter((field) => values[field] !== undefined);
+          if (!fields.length) return json({ error: "No feedback fields to update" }, 400, origin);
+          await env.DB.prepare(`UPDATE feedbacks SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          return json(await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "resolutions" && recordId) {
+          const body = await readJson(request);
+          const allowed = ["status", "admin_confirmed", "admin_confirmed_at", "completed_at"];
+          const values = pick(body, allowed);
+          const fields = allowed.filter((field) => values[field] !== undefined);
+          if (!fields.length) return json({ error: "No resolution fields to update" }, 400, origin);
+          await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          return json(await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first(), 200, origin);
+        }
+      }
+
+      if (parts[2] === "offers" && request.method === "POST") {
+        const body = await readJson(request);
+        const category = String(body?.category || "").trim();
+        if (!category) return json({ error: "Category is required" }, 400, origin);
+        const allowed = ["is_active", "free_limit", "used_count", "label", "updated_at"];
+        const values = pick(body, allowed);
+        values.updated_at = values.updated_at ?? now();
+        const fields = ["category", ...allowed].filter((field) => field === "category" || values[field] !== undefined);
+        await env.DB.prepare(
+          `INSERT INTO category_offers (${fields.join(", ")}) VALUES (${fields.map(() => "?").join(", ")})
+           ON CONFLICT(category) DO UPDATE SET ${allowed.filter((field) => values[field] !== undefined).map((field) => `${field} = excluded.${field}`).join(", ")}`
+        ).bind(...fields.map((field) => field === "category" ? category : values[field])).run();
+        return json(await env.DB.prepare("SELECT * FROM category_offers WHERE category = ?").bind(category).first(), 200, origin);
+      }
+
+      if (parts[2] === "delete-files" && request.method === "POST") {
+        const body = await readJson(request);
+        const urls = Array.isArray(body?.urls) ? body.urls : [];
+        let deleted = 0;
+        for (const value of urls) {
+          try {
+            const parsed = new URL(String(value));
+            const marker = "/uploads/";
+            const index = parsed.pathname.indexOf(marker);
+            if (index < 0) continue;
+            const key = decodeURIComponent(parsed.pathname.slice(index + marker.length));
+            if (key) { await env.UPLOADS.delete(key); deleted += 1; }
+          } catch { /* Ignore malformed or external URLs. */ }
+        }
+        return json({ deleted }, 200, origin);
+      }
     }
 
     // Case unlocks

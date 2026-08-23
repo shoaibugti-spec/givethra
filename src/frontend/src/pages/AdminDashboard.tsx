@@ -22,6 +22,7 @@ import {
   adminGetAllWallets,
   adminGetAllUnlocks,
   adminGetAllSupportMessages,
+  adminMarkSupportMessagesAsRead,
   adminSendSupportReply,
   adminGetAllFeedbacks,
   adminGetAllOffers,
@@ -1444,9 +1445,14 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
 
   async function openChat(uid: string) {
     setActiveUser(uid);
-    await adminSendSupportReply({ user_id: uid, mark_read: true });
-    setLiveMsgs((prev) => prev.map((m) => (m.user_id === uid && m.sender === "user") ? { ...m, is_read: true } : m));
-    if (onNewMessage) onNewMessage();
+    try {
+      await adminMarkSupportMessagesAsRead(uid);
+      setLiveMsgs((prev) => prev.map((m) => (m.user_id === uid && m.sender === "user") ? { ...m, is_read: true } : m));
+      if (onNewMessage) onNewMessage();
+    } catch (error) {
+      console.error("Failed to mark support messages read:", error);
+      toast.error("Conversation opened, but unread status could not be updated.");
+    }
   }
 
   async function uploadAttachment(file: File): Promise<string> {
@@ -1975,7 +1981,13 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
           pushFile(prefix ? `${prefix}_${k}` : k, trimmed);
         }
       } else if (v && typeof v === "object") {
-        walkFilesDeep(v, prefix ? `${prefix}_${k}` : k);
+        const file = v as Record<string, unknown>;
+        const candidate = file.url || file.file_url || file.download_url || file.href || file.path;
+        if (typeof candidate === "string" && candidate.trim().startsWith("http")) {
+          pushFile(prefix ? `${prefix}_${k}` : k, file);
+        } else {
+          walkFilesDeep(v, prefix ? `${prefix}_${k}` : k);
+        }
       }
     }
   };

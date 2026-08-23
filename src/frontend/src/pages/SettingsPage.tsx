@@ -173,12 +173,12 @@ export default function SettingsPage() {
         setTheme(data.theme ?? "light");
         setCurrency(data.currency ?? "USD");
         setTimezone(data.timezone ?? "UTC");
-        setEmailNotif(data.email_notifications ?? true);
-        setInAppNotif(data.inapp_notifications ?? true);
-        setWeeklyDigest(data.weekly_digest ?? false);
-        setHighContrast(data.high_contrast ?? false);
-        setLargerText(data.larger_text ?? false);
-        setReducedAnimations(data.reduced_animations ?? false);
+        setEmailNotif(data.email_notifications === undefined ? true : Boolean(data.email_notifications));
+        setInAppNotif(data.inapp_notifications === undefined ? true : Boolean(data.inapp_notifications));
+        setWeeklyDigest(data.weekly_digest === undefined ? false : Boolean(data.weekly_digest));
+        setHighContrast(data.high_contrast === undefined ? false : Boolean(data.high_contrast));
+        setLargerText(data.larger_text === undefined ? false : Boolean(data.larger_text));
+        setReducedAnimations(data.reduced_animations === undefined ? false : Boolean(data.reduced_animations));
         applyTheme(data.theme ?? "light");
       }
     } catch (e) {
@@ -204,8 +204,19 @@ export default function SettingsPage() {
         reduced_animations: reducedAnimations,
         updated_at: new Date().toISOString(),
       };
-      await updateUserSettings(user.id, payload);
-      applyTheme(theme);
+      const saved = await updateUserSettings(user.id, payload);
+      if (!saved || saved.user_id !== user.id) throw new Error("Settings were not persisted");
+      setLanguage(saved.language ?? language);
+      setTheme(saved.theme ?? theme);
+      setCurrency(saved.currency ?? currency);
+      setTimezone(saved.timezone ?? timezone);
+      setEmailNotif(saved.email_notifications === undefined ? emailNotif : Boolean(saved.email_notifications));
+      setInAppNotif(saved.inapp_notifications === undefined ? inAppNotif : Boolean(saved.inapp_notifications));
+      setWeeklyDigest(saved.weekly_digest === undefined ? weeklyDigest : Boolean(saved.weekly_digest));
+      setHighContrast(saved.high_contrast === undefined ? highContrast : Boolean(saved.high_contrast));
+      setLargerText(saved.larger_text === undefined ? largerText : Boolean(saved.larger_text));
+      setReducedAnimations(saved.reduced_animations === undefined ? reducedAnimations : Boolean(saved.reduced_animations));
+      applyTheme(saved.theme ?? theme);
       setDirty(false);
       toast.success("Settings saved successfully!");
     } catch (err) {

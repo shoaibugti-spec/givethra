@@ -103,7 +103,7 @@ export default function ProfilePage() {
     { icon: <Bell className="h-5 w-5" />, label: "Notifications", to: "/notifications" },
     { icon: <Wallet className="h-5 w-5" />, label: "Wallet", to: "/wallet" },
     { icon: <ShieldCheck className="h-5 w-5" />, label: "Security", to: "/security" },
-    { icon: <KeyRound className="h-5 w-5" />, label: "Google Account Security", to: "/google-account-security" },
+    { icon: <KeyRound className="h-5 w-5" />, label: "Google Account Security", to: "/security" },
     { icon: <Lock className="h-5 w-5" />, label: "Privacy", to: "/account-privacy" },
     { icon: <Settings className="h-5 w-5" />, label: "Settings", to: "/settings" },
   ];

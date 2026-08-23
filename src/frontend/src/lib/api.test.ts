@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { adminSendSupportReply } from "./api";
+import { adminMarkSupportMessagesAsRead, adminSendSupportReply } from "./api";
 
 describe("adminSendSupportReply", () => {
   const fetchMock = vi.fn();
@@ -33,6 +33,7 @@ describe("adminSendSupportReply", () => {
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer verified-token",
+        "X-Guest-ID": "session-guest",
       },
       body: JSON.stringify({ user_id: "recipient-1", message: "Your request has been reviewed." }),
     });
@@ -47,16 +48,17 @@ describe("adminSendSupportReply", () => {
     );
 
     await expect(
-      adminSendSupportReply({ user_id: "recipient-1", mark_read: true }),
-    ).resolves.toMatchObject({ updated: true, user_id: "recipient-1" });
+      adminMarkSupportMessagesAsRead("recipient-1"),
+    ).resolves.toMatchObject({ updated: true });
 
-    expect(fetchMock).toHaveBeenCalledWith("https://givethra.org/api/admin/support/reply", {
-      method: "POST",
+    expect(fetchMock).toHaveBeenCalledWith("https://givethra.org/api/admin/support/mark-read", {
+      method: "PUT",
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer verified-token",
+        "X-Guest-ID": "session-guest",
       },
-      body: JSON.stringify({ user_id: "recipient-1", mark_read: true }),
+      body: JSON.stringify({ user_id: "recipient-1" }),
     });
   });
 

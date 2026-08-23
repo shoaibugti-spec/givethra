@@ -609,3 +609,19 @@
 - [x] Ensure `/verify`, Google sign-in hydration, profile reload, and Community post/comment identity all use the latest saved profile name.
 - [x] Add regression coverage for save, logout/login hydration, and Community display-name persistence.
 - [x] Run strict TypeScript, production build, and visual/flow verification without modifying unrelated repaired features or D1/R2 data.
+
+## Dashboard Operations and Admin Reliability — 2026-08-24
+- [x] Make Wallet deposit submission complete after file upload, reach Admin Deposits, and support safe Admin approve/reject actions.
+- [x] Make user Settings changes persist after save and reload, with clear success/error handling.
+- [x] Repair the Google Account Security route so it no longer shows Not Found and remains safe without exposing credentials.
+- [x] Fix Admin support reply delivery in both directions, including attachments, multiline messages, unread counts, and read-state clearing after messages are viewed/sent.
+- [x] Make Admin case detail rendering exhaustive across all payload fields and attachments, preserving original filenames and links without duplicates.
+- [x] Restore reliable Admin users/KYC/cases/deposits/notifications/offers/support/feedback/suspension visibility without changing existing records.
+- [x] Add regression coverage, run strict TypeScript and production build checks, verify requested flows, and preserve D1/R2 data.
+
+## Production Worker Schema Alignment — 2026-08-24
+- [x] Replace legacy Admin deposit mutation handling with production `method`, `transaction_id`, `proof_url`, status, credit, and review fields, including safe wallet crediting on approval.
+- [x] Persist all production `user_settings` fields and preserve existing values for omitted fields.
+- [x] Ensure support unread counts and Admin mark-read/reply flows use `sender` and never create an empty reply when marking messages read.
+- [x] Restore Admin KYC, case, feedback, resolution, profile-suspension, offer, and storage-file mutation routes against the existing schema.
+- [x] Add Worker route regression tests and verify strict TypeScript, production build, and non-destructive deployment configuration.

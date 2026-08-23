@@ -124,7 +124,8 @@ export default function WalletPage() {
     setSubmitting(true);
     try {
       // Upload proof file to Cloudflare storage (via worker)
-      const path = `deposits/${user!.id}/${Date.now()}_proof`;
+      const safeProofName = proofFile.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
+      const path = `deposits/${user!.id}/${Date.now()}-${safeProofName}`;
       const proofUrl = await uploadFileToStorage(proofFile, path);
 
       const depositData = {
