@@ -22,12 +22,15 @@ import {
   Linkedin,
   MessageCircle,
   Mail,
+  MessageSquare,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 import {
   getUnreadNotificationsCount,
   getUnreadChatMessagesCount,
+  getCommunityPosts,
+  markCommunityPostsAsRead,
 } from "@/lib/api";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
@@ -69,15 +72,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
   const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
+  const router = useRouterState();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notifCount, setNotifCount] = useState(0);
   const [chatCount, setChatCount] = useState(0);
+  const [postCount, setPostCount] = useState(0);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
 
-  // Load counts on mount and when user changes
+  // Helper to get auth token
+  const getToken = () => localStorage.getItem("auth_token") || "";
+
+  // --- Load notifications and chat counts ---
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
@@ -95,12 +103,57 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
 
     loadCounts();
-
-    // Poll every 20 seconds
     const interval = setInterval(loadCounts, 20000);
-
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
+
+  // --- Community post count ---
+  const fetchPostCount = async () => {
+    if (!isAuthenticated) {
+      setPostCount(0);
+      return;
+    }
+    try {
+      const data = await getCommunityPosts();
+      setPostCount(Array.isArray(data) ? data.length : 0);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setPostCount(0);
+      return;
+    }
+    fetchPostCount();
+    const interval = setInterval(fetchPostCount, 30000);
+    // Listen for new posts from CommunityPage
+    const handlePostUpdate = () => fetchPostCount();
+    window.addEventListener("post-updated", handlePostUpdate);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("post-updated", handlePostUpdate);
+    };
+  }, [isAuthenticated]);
+
+  // --- Mark posts as read when visiting /community ---
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const currentPath = router.location.pathname;
+    if (currentPath === "/community" || currentPath.startsWith("/community/")) {
+      const markAsRead = async () => {
+        try {
+          await markCommunityPostsAsRead();
+          // Refresh count after marking read
+          fetchPostCount();
+        } catch (e) {
+          console.error("Error marking community posts as read:", e);
+        }
+      };
+      markAsRead();
+    }
+  }, [router.location.pathname, isAuthenticated]);
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => {
@@ -143,6 +196,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-1 shrink-0">
             <LanguageSwitcher />
+
+            {/* --- Community Icon with counter --- */}
+            <Link
+              to="/community"
+              aria-label="Community"
+              className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
+            >
+              <MessageSquare className="h-5 w-5" />
+              {postCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                  {postCount > 99 ? "99+" : postCount}
+                </span>
+              )}
+            </Link>
 
             <button
               type="button"
