@@ -731,3 +731,72 @@ export async function getChatMessages(userId: string) {
 export async function sendChatMessage(data: any) {
   return sendSupportMessage(data);
 }
+
+// ============================================================
+// ========== COMMUNITY POSTS, LIKES, COMMENTS ==========
+// ============================================================
+
+// ---------- COMMUNITY POSTS ----------
+export async function getCommunityPosts(): Promise<any[]> {
+  const res = await fetch(`${WORKER_URL}/api/community-posts`, { headers: headers() });
+  return res.json();
+}
+
+export async function createCommunityPost(data: {
+  message: string;
+  display_name?: string;
+  is_guest?: boolean;
+  user_id?: string;
+}): Promise<any> {
+  const res = await fetch(`${WORKER_URL}/api/community-posts`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function markCommunityPostsAsRead(): Promise<void> {
+  await fetch(`${WORKER_URL}/api/community-posts/mark-read`, {
+    method: "POST",
+    headers: headers(),
+  });
+}
+
+// ---------- POST LIKES ----------
+export async function toggleLike(postId: string): Promise<{ liked: boolean }> {
+  const res = await fetch(`${WORKER_URL}/api/post-likes/${postId}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ post_id: postId }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to toggle like: ${res.status} - ${text}`);
+  }
+  return res.json();
+}
+
+export async function getPostLikes(postId: string): Promise<any[]> {
+  const res = await fetch(`${WORKER_URL}/api/post-likes/${postId}`, { headers: headers() });
+  return res.json();
+}
+
+// ---------- POST COMMENTS ----------
+export async function addComment(postId: string, comment: string): Promise<any> {
+  const res = await fetch(`${WORKER_URL}/api/post-comments/${postId}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ post_id: postId, comment }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to add comment: ${res.status} - ${text}`);
+  }
+  return res.json();
+}
+
+export async function getPostComments(postId: string): Promise<any[]> {
+  const res = await fetch(`${WORKER_URL}/api/post-comments/${postId}`, { headers: headers() });
+  return res.json();
+}
