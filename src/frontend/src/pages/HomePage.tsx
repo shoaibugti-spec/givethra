@@ -5,7 +5,7 @@ import InstallButton from "@/components/InstallButton";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import FeedbackWall from "@/components/FeedbackWall";
-import Layout from "@/components/Layout"; // ✅ یہ شامل کریں
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -541,7 +541,7 @@ export default function HomePage() {
   }
 
   return (
-    <Layout> {/* ✅ یہ شامل کریں */}
+    <Layout>
       <div className="bg-background pb-20 md:pb-0">
         <InstallButton />
 
@@ -1319,6 +1319,6 @@ export default function HomePage() {
           </div>
         </section>
       </div>
-    </Layout> // ✅ یہ بند کریں
+    </Layout>
   );
 }
