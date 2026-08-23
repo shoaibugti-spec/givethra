@@ -429,42 +429,43 @@ function guestIdentity(request, body = null) {
 
 async function handleCommunityPosts(request, env, user, url, parts, origin) {
   if (request.method === "GET" && parts.length === 3) {
+    const guest = user ? null : guestIdentity(request);
+    const actorId = user?.user_id || guest?.id || "";
     const posts = await env.DB.prepare(
-      `SELECT cp.*, 
+      `WITH like_counts AS (
+         SELECT post_id,
+           COUNT(*) AS likes_count,
+           MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked
+         FROM community_post_likes
+         GROUP BY post_id
+       ), comment_counts AS (
+         SELECT post_id, COUNT(*) AS comments_count
+         FROM community_post_comments
+         GROUP BY post_id
+       )
+       SELECT cp.*,
         u.full_name as user_name,
-        u.kyc_status as user_kyc_status
+        u.kyc_status as user_kyc_status,
+        COALESCE(lc.likes_count, 0) AS likes_count,
+        COALESCE(cc.comments_count, 0) AS comments_count,
+        COALESCE(lc.is_liked, 0) AS is_liked
        FROM community_posts cp
        LEFT JOIN users u ON cp.user_id = u.user_id
+       LEFT JOIN like_counts lc ON lc.post_id = cp.id
+       LEFT JOIN comment_counts cc ON cc.post_id = cp.id
        ORDER BY cp.created_at DESC
        LIMIT 500`
-    ).all();
-    
-    const results = [];
-    for (const post of (posts.results || [])) {
-      const likes = await env.DB.prepare(
-        "SELECT user_id FROM community_post_likes WHERE post_id = ?"
-      ).bind(post.id).all();
-      
-      const comments = await env.DB.prepare(
-        `SELECT cl.*,
-        CASE WHEN cl.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cl.user_id, 7) ELSE u.full_name END as user_name
-         FROM community_post_comments cl
-         LEFT JOIN users u ON cl.user_id = u.user_id
-         WHERE cl.post_id = ?
-         ORDER BY cl.created_at ASC`
-      ).bind(post.id).all();
-      
-      results.push({
-        ...post,
-        is_guest: !post.user_id,
-        display_name: post.user_name || post.display_name || "User",
-        is_verified: post.user_kyc_status === "approved",
-        likes_count: (likes.results || []).length,
-        comments_count: (comments.results || []).length,
-        comments: comments.results || [],
-      });
-    }
-    return json(results, 200, origin);
+    ).bind(actorId).all();
+
+    return json((posts.results || []).map((post) => ({
+      ...post,
+      is_guest: !post.user_id,
+      display_name: post.user_name || post.display_name || "User",
+      is_verified: post.user_kyc_status === "approved",
+      likes_count: Number(post.likes_count || 0),
+      comments_count: Number(post.comments_count || 0),
+      is_liked: Boolean(post.is_liked),
+    })), 200, origin);
   }
 
     if (request.method === "POST" && parts.length === 3) {

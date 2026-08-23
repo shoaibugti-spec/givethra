@@ -29,7 +29,7 @@ describe("support, community performance, and footer regressions", () => {
     expect(community).toContain("const fetchPosts = async (showLoader = false)");
     expect(community).toContain("setInterval(() => { void fetchPosts(false); }, 600000)");
     expect(community).toContain("void fetchPosts(true)");
-    expect(community).toContain("data?.forEach((post: Post) => { fetchLikes(post.id); });");
+    expect(community).not.toContain("data?.forEach((post: Post) => { fetchLikes(post.id); });");
     expect(community).toContain("const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({})");
     expect(community).toContain("{loading ? (");
     expect(community).toContain("Loading posts...");
@@ -45,8 +45,19 @@ describe("support, community performance, and footer regressions", () => {
     expect(layout).toContain("aria-current={isRouteActive(\"/community\") ? \"page\" : undefined}");
     expect(layout).toContain("aria-current={isRouteActive(\"/notifications\") ? \"page\" : undefined}");
     expect(layout).toContain("Reference layout: translation, Community, notifications");
+    expect(layout).toContain("max-w-2xl");
+    expect(layout).not.toContain('aria-label="Help & Support"');
+    expect(layout).not.toContain("getUnreadChatMessagesCount");
     expect(bottomNav).toContain('aria-current={isActive ? "page" : undefined}');
     expect(bottomNav).toContain('data-active={isActive ? "true" : "false"}');
+  });
+
+  it("returns Community counts in one read without per-post query fan-out", () => {
+    expect(worker).toContain("WITH like_counts AS (");
+    expect(worker).toContain("COUNT(*) AS likes_count");
+    expect(worker).toContain("COUNT(*) AS comments_count");
+    expect(worker).toContain("MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked");
+    expect(worker).not.toContain("for (const post of (posts.results || []))");
   });
 
   it("keeps the configured WhatsApp channel in the footer", () => {

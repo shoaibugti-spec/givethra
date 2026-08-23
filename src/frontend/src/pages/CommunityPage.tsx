@@ -11,7 +11,6 @@ import {
   getCommunityPosts,
   toggleLike,
   addComment,
-  getPostLikes,
   getPostComments,
   createNotification,
   createCommunityPost,
@@ -26,6 +25,9 @@ interface Post {
   is_guest: boolean;
   created_at: string;
   comments?: Comment[];
+  likes_count?: number;
+  comments_count?: number;
+  is_liked?: boolean;
 }
 
 interface Comment {
@@ -37,10 +39,35 @@ interface Comment {
   created_at: string;
 }
 
+const COMMUNITY_POSTS_CACHE_KEY = "givethra:community-posts:v1";
+
+function readCachedCommunityPosts(): Post[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(COMMUNITY_POSTS_CACHE_KEY) || "null");
+    const cached = Array.isArray(parsed) ? parsed : parsed?.posts;
+    return Array.isArray(cached)
+      ? cached.filter((post) => post && typeof post.id === "string" && typeof post.message === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedCommunityPosts(posts: Post[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const cacheablePosts = posts.map(({ comments: _comments, is_liked: _isLiked, ...post }) => post);
+    localStorage.setItem(COMMUNITY_POSTS_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), posts: cacheablePosts }));
+  } catch {
+    // A full or restricted browser cache must never block the feed.
+  }
+}
+
 export default function CommunityPage() {
   const { isAuthenticated, user } = useAuth();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<Post[]>(readCachedCommunityPosts);
+  const [loading, setLoading] = useState(() => readCachedCommunityPosts().length === 0);
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
@@ -54,32 +81,27 @@ export default function CommunityPage() {
 
   // --- پوسٹس لوڈ کریں ---
   const fetchPosts = async (showLoader = false) => {
-    if (showLoader) setLoading(true);
+    if (showLoader && posts.length === 0) setLoading(true);
     try {
       const data = await getCommunityPosts();
-      setPosts(data || []);
-      // Like counts are shown on every card; comments are fetched lazily when opened.
-      data?.forEach((post: Post) => { fetchLikes(post.id); });
+      const nextPosts = Array.isArray(data) ? data : [];
+      setPosts(nextPosts);
+      setLikeCounts((prev) => {
+        const next = { ...prev };
+        nextPosts.forEach((post: Post) => { next[post.id] = Number(post.likes_count || 0); });
+        return next;
+      });
+      setLikedPosts((prev) => {
+        const next = { ...prev };
+        nextPosts.forEach((post: Post) => { next[post.id] = Boolean(post.is_liked); });
+        return next;
+      });
+      writeCachedCommunityPosts(nextPosts);
     } catch (error) {
       console.error("Error fetching posts:", error);
       toast.error("Failed to load posts");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // --- لائکس لوڈ کریں ---
-  const fetchLikes = async (postId: string) => {
-    try {
-      const data = await getPostLikes(postId);
-      setLikeCounts((prev) => ({ ...prev, [postId]: data.length || 0 }));
-      const actorId = isAuthenticated && user?.id ? user.id : `guest:${getGuestId()}`;
-      if (actorId) {
-        const userLiked = data.some((like: any) => like.user_id === actorId);
-        setLikedPosts((prev) => ({ ...prev, [postId]: userLiked }));
-      }
-    } catch (error) {
-      console.error("Error fetching likes:", error);
     }
   };
 
@@ -89,7 +111,9 @@ export default function CommunityPage() {
       const data = await getPostComments(postId);
       setPosts((prev) =>
         prev.map((post) =>
-          post.id === postId ? { ...post, comments: data || [] } : post
+          post.id === postId
+            ? { ...post, comments: data || [], comments_count: Array.isArray(data) ? data.length : 0 }
+            : post
         )
       );
     } catch (error) {
@@ -125,8 +149,15 @@ export default function CommunityPage() {
           is_guest: !isAuthenticated,
           created_at: new Date().toISOString(),
           comments: [],
+          likes_count: 0,
+          comments_count: 0,
+          is_liked: false,
         };
-        setPosts((prev) => [newPostObj, ...prev]);
+        setPosts((prev) => {
+          const next = [newPostObj, ...prev];
+          writeCachedCommunityPosts(next);
+          return next;
+        });
         window.dispatchEvent(new CustomEvent("post-updated"));
       } else {
         toast.error("Failed to post. Please try again.");
@@ -184,7 +215,11 @@ export default function CommunityPage() {
       setPosts((prev) =>
         prev.map((post) =>
           post.id === postId
-            ? { ...post, comments: [...(post.comments || []), data] }
+            ? {
+                ...post,
+                comments: [...(post.comments || []), data],
+                comments_count: (post.comments_count ?? post.comments?.length ?? 0) + 1,
+              }
             : post
         )
       );
@@ -383,7 +418,7 @@ export default function CommunityPage() {
                         likedPosts[post.id] ? "fill-red-500" : ""
                       }`}
                     />
-                    <span className="font-medium">{likeCounts[post.id] || 0}</span>
+                    <span className="font-medium">{likeCounts[post.id] ?? post.likes_count ?? 0}</span>
                   </button>
 
                   <button
@@ -391,7 +426,7 @@ export default function CommunityPage() {
                     className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
                     <MessageCircle className="h-5 w-5" />
-                    <span className="font-medium">{post.comments?.length || 0}</span>
+                    <span className="font-medium">{post.comments_count ?? post.comments?.length ?? 0}</span>
                   </button>
 
                   <button

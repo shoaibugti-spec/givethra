@@ -26,7 +26,6 @@ import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 import {
   getUnreadNotificationsCount,
-  getUnreadChatMessagesCount,
   getCommunityPosts,
   getGuestId,
 } from "@/lib/api";
@@ -65,7 +64,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notifCount, setNotifCount] = useState(0);
-  const [chatCount, setChatCount] = useState(0);
   const [postCount, setPostCount] = useState(0);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
@@ -75,12 +73,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     if (!isAuthenticated || !user?.id) return;
     const loadCounts = async () => {
       try {
-        const [nCount, cCount] = await Promise.all([
-          getUnreadNotificationsCount(user.id),
-          getUnreadChatMessagesCount(user.id),
-        ]);
+        const nCount = await getUnreadNotificationsCount(user.id);
         setNotifCount(nCount ?? 0);
-        setChatCount(cCount ?? 0);
       } catch {}
     };
     loadCounts();
@@ -165,7 +159,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-display font-bold text-lg text-primary">Givethra</span>
           </Link>
 
-          <form onSubmit={handleSearch} className="flex-1 min-w-0 max-w-xl mx-auto">
+          <form onSubmit={handleSearch} className="flex-1 min-w-0 w-full max-w-2xl mx-auto md:mx-4">
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
               <Input
@@ -201,11 +195,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </Link>
-                {/* Desktop-only utilities stay available without crowding the mobile reference layout */}
-                <Link to="/support" aria-label="Help & Support" aria-current={isRouteActive("/support") ? "page" : undefined} className={cn("relative hidden md:flex", iconLinkClass("/support").replace("relative ", ""))}>
-                  <MessageCircle className="h-5 w-5" />
-                  {chatCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{chatCount > 9 ? "9+" : chatCount}</span>}
-                </Link>
+                {/* Support remains available from the hamburger menu, not in the compact top bar. */}
                 <button type="button" onClick={toggleTheme} aria-label="Toggle theme" className="hidden md:flex h-10 w-10 rounded-full items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                   {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>

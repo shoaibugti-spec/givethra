@@ -1,9 +1,9 @@
-# Navigation visual verification — 2026-08-24
+# Navigation and Community visual verification — 2026-08-24
 
-The correct canonical Vite preview is running on port 4174; port 4173 was owned by an older unrelated preview process and was not used for final verification.
+The correct canonical preview is running on port 4174. After client-side navigation from `/` to `/community`, the header shows the Givethra brand, usable search field, translation control, Community control, and no Support icon in the top bar. The Community page renders its title and guest composer immediately, while only the feed area shows `Loading posts...`.
 
-At `http://127.0.0.1:4174/`, the updated shared Layout header renders successfully above the homepage. The visible DOM includes the Givethra home link, `Search verified cases...` field, English translation control, Community link with unread count, and desktop sign-in/get-started controls. The screenshot confirms the page is not black and the header is present.
+This confirms the top-bar removal and non-blocking shell behavior. The first feed request still determines when cards/counts appear for a fresh browser with no local cache; the next optimization is to verify the request path/latency and use the Worker’s aggregate counts plus stale-while-revalidate cache for returning visitors. The existing guest/user post, like, comment, multiline-editor, and ten-minute-refresh code paths remain intact.
 
-The direct deep link `/community` returned `Not Found` only because standalone Vite dev mode did not provide history fallback for a direct deep-link request. Client-side navigation from the root is the appropriate local verification path; the production Wrangler asset configuration already specifies SPA fallback.
+## Focused refinement verification
 
-The reference header source is updated in `src/components/Layout.tsx`. Automated assertions cover the hamburger, brand, search, translation, Community, notifications, active route state, and Community shell/loading behavior.
+After the latest HMR refresh and client-side navigation, the Community page displayed 31 posts with like/comment counts and no `Loading posts...` spinner remaining. The top bar contained the Givethra brand, search, translation, Community, and notification controls; the Support icon was absent. The search field accepted the text `electricity` while the Community page remained rendered, confirming that the compact header search is writable.

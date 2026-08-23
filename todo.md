@@ -587,3 +587,10 @@
 - [x] Reduce Community initial blocking loading so the page shell and posts render promptly, while keeping periodic refresh and preserving guest/user posting, likes, and comments.
 - [x] Add regression coverage for active navigation state and non-blocking Community interaction/loading behavior.
 - [x] Run full tests, strict TypeScript checks, production build, and visual verification; do not modify D1/R2 data.
+
+## Header Search & Community Feed Responsiveness — 2026-08-24
+- [x] Remove the Support/Help icon from the top header while preserving Support access in the hamburger menu and existing route.
+- [x] Keep only translation, Community, and notification icons beside a centered, usable search field for both guest and signed-in states.
+- [x] Make Community posts display as quickly as possible without blocking the page on per-post metadata requests; preserve counts, likes, guest/user actions, and multiline comments.
+- [x] Add regression coverage for the reduced header controls, responsive search sizing, and fast Community feed behavior.
+- [x] Run full focused tests, strict TypeScript checks, production build, and visual verification without modifying D1/R2 data.
