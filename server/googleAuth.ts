@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { COOKIE_NAME } from "../shared/const";
-import { upsertUser } from "./db";
+import { upsertUser, getUserByOpenId } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 
@@ -67,6 +67,7 @@ function sendAuthError(res: Response, error: unknown) {
 }
 
 export function registerGoogleAuthRoutes(app: Express) {
+  // ✅ Google Sign-In
   app.post("/api/auth/google", async (req: Request, res: Response) => {
     const credential = typeof req.body?.credential === "string" ? req.body.credential : "";
     if (!credential) return res.status(400).json({ error: "Google credential is required" });
@@ -101,6 +102,41 @@ export function registerGoogleAuthRoutes(app: Express) {
       });
     } catch (error) {
       return sendAuthError(res, error);
+    }
+  });
+
+  // ✅ نیا: Verify Token Route
+  app.get("/api/auth/verify", async (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ valid: false, error: "No token provided" });
+    }
+
+    try {
+      const session = await sdk.verifySession(token);
+      if (!session) {
+        return res.status(401).json({ valid: false, error: "Invalid token" });
+      }
+
+      const user = await getUserByOpenId(session.openId);
+      if (!user) {
+        return res.status(401).json({ valid: false, error: "User not found" });
+      }
+
+      return res.status(200).json({
+        valid: true,
+        user: {
+          id: user.openId,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          picture: "", // optional
+        },
+      });
+    } catch (error) {
+      console.error("[Auth] Verify error:", error);
+      return res.status(401).json({ valid: false, error: "Verification failed" });
     }
   });
 }
