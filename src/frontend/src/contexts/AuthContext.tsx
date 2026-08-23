@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { GOOGLE_CLIENT_ID } from "../config/auth";
+import { clearLegacyBrowserState } from "@/lib/legacySessionCleanup";
 
 const WORKER_URL =
   typeof window !== "undefined" ? window.location.origin : "https://givethra.org";
@@ -89,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ✅ Worker کو verify کریں
   useEffect(() => {
+    clearLegacyBrowserState();
     const token = getTokenFromLocation();
     if (token) {
       fetch(`${WORKER_URL}/verify`, {

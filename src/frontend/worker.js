@@ -36,6 +36,46 @@ function id() {
   return crypto.randomUUID();
 }
 
+function base64UrlEncode(value) {
+  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlDecode(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+async function signSession(user, secret) {
+  if (!secret) return null;
+  const payload = base64UrlEncode(JSON.stringify({
+    user_id: user.user_id,
+    email: user.email,
+    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
+  }));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return `v2.${payload}.${base64UrlEncode(signature)}`;
+}
+
+async function verifySession(token, secret) {
+  if (!secret || !token?.startsWith("v2.")) return null;
+  try {
+    const [, payload, encodedSignature] = token.split(".");
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    const valid = await crypto.subtle.verify("HMAC", key, base64UrlDecode(encodedSignature), new TextEncoder().encode(payload));
+    if (!valid) return null;
+    const data = JSON.parse(new TextDecoder().decode(base64UrlDecode(payload)));
+    if (!data.user_id || !data.email || !Number.isFinite(data.exp) || data.exp <= Math.floor(Date.now() / 1000)) return null;
+    return { user_id: String(data.user_id), email: String(data.email).toLowerCase(), full_name: data.full_name || data.email, avatar_url: data.avatar_url || "", role: isAdmin(data) ? "admin" : null };
+  } catch {
+    return null;
+  }
+}
+
 function isAdmin(user) {
   return Boolean(user && ADMIN_EMAILS.has(String(user.email).toLowerCase()));
 }
@@ -49,33 +89,25 @@ async function verifyGoogleCredential(credential, clientId) {
   if (credential && credential.length > 100 && !credential.startsWith("eyJhbGciOi")) {
     // Custom session token fallback
   }
-  const response = await fetch(
-    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
-  );
-  if (!response.ok) {
-    try {
-      const parts = credential.split(".");
-      if (parts.length === 3) {
-        const payloadJson = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-        if (payloadJson && payloadJson.sub && payloadJson.email) {
-          return {
-            google_id: String(payloadJson.sub),
-            email: String(payloadJson.email).toLowerCase(),
-            full_name: payloadJson.name || payloadJson.email,
-            avatar_url: payloadJson.picture || "",
-          };
-        }
-      }
-    } catch (e) {}
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+      { signal: controller.signal },
+    );
+  } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
+  if (!response.ok) return null;
 
   const payload = await response.json();
   const audience = payload.aud || payload.azp;
   const verified = payload.email_verified === true || payload.email_verified === "true";
-  if (!payload.sub || !payload.email || (audience && clientId && audience !== clientId) || !verified) {
-    // fallback
-  }
+  if (!payload.sub || !payload.email || (audience && clientId && audience !== clientId) || !verified) return null;
 
   return {
     google_id: String(payload.sub),
@@ -128,6 +160,8 @@ async function findOrCreateUser(env, identity) {
 async function authenticate(request, env, clientId, createUser = false) {
   const credential = bearer(request);
   if (!credential) return null;
+  const session = await verifySession(credential, env.JWT_SECRET);
+  if (session) return session;
   const identity = await verifyGoogleCredential(credential, clientId);
   if (!identity) return null;
   if (createUser) return findOrCreateUser(env, identity);
@@ -624,8 +658,18 @@ async function handleRequest(request, env) {
     });
   }
 
-  if (parts[0] === "health" && request.method === "GET") {
+    if (parts[0] === "health" && request.method === "GET") {
     return json({ status: "ok", timestamp: now() }, 200, origin);
+  }
+
+  if (parts[0] === "auth" && parts[1] === "google" && request.method === "POST") {
+    const body = await readJson(request);
+    const identity = await verifyGoogleCredential(body?.credential, DEFAULT_GOOGLE_CLIENT_ID);
+    if (!identity) return json({ error: "Google credential could not be verified" }, 401, origin);
+    const account = await findOrCreateUser(env, identity);
+    const token = await signSession(account, env.JWT_SECRET);
+    if (!token) return json({ error: "Authentication is not configured" }, 500, origin);
+    return json({ token, user: account }, 200, origin);
   }
 
   if (parts[0] === "verify" && request.method === "GET") {
