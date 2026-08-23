@@ -1,6 +1,4 @@
-// ============================================================
-// FILE: src/frontend/src/lib/api.ts
-// ============================================================
+// src/frontend/src/lib/api.ts
 
 // Cloudflare Worker API client – all backend calls go through this file
 
@@ -33,6 +31,52 @@ export async function verifyToken(): Promise<{ valid: boolean; user?: any }> {
   if (!token) return { valid: false };
   const res = await fetch(`${WORKER_URL}/verify`, {
     headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
+}
+
+// ---------- COMMUNITY POSTS ----------
+export async function getCommunityPosts() {
+  const res = await fetch(`${WORKER_URL}/api/community/posts`, { headers: headers() });
+  return res.json();
+}
+
+export async function createCommunityPost(data: any) {
+  const res = await fetch(`${WORKER_URL}/api/community/posts`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function getPostLikes(postId: string) {
+  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/likes`, {
+    headers: headers(),
+  });
+  return res.json();
+}
+
+export async function toggleLike(postId: string) {
+  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/like`, {
+    method: "POST",
+    headers: headers(),
+  });
+  return res.json();
+}
+
+export async function getPostComments(postId: string) {
+  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/comments`, {
+    headers: headers(),
+  });
+  return res.json();
+}
+
+export async function addComment(postId: string, comment: string) {
+  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/comments`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ comment }),
   });
   return res.json();
 }
@@ -472,6 +516,17 @@ export async function uploadFileToStorage(file: File, path: string): Promise<str
   return data.url;
 }
 
+// ---------- KYC STATUS (shortcut) ----------
+export async function getKycStatus(userId: string): Promise<{ status: string }> {
+  try {
+    const submissions = await getKycSubmission(userId);
+    if (!submissions) return { status: "none" };
+    return { status: submissions.status || "pending" };
+  } catch {
+    return { status: "none" };
+  }
+}
+
 // ---------- ADMIN APIs ----------
 export async function adminGetAllKyc() {
   const res = await fetch(`${WORKER_URL}/api/admin/kyc`, { headers: headers() });
@@ -538,7 +593,6 @@ export async function adminGetAllSuspensions() {
   const res = await fetch(`${WORKER_URL}/api/admin/suspensions`, { headers: headers() });
   return res.json();
 }
-
 
 export async function adminUpdateKyc(id: string, data: any) {
   const res = await fetch(`${WORKER_URL}/api/admin/kyc/${id}`, {
@@ -690,113 +744,5 @@ export async function deleteUserAccount(userId: string) {
     headers: headers(),
     body: JSON.stringify({ user_id: userId }),
   });
-  return res.json();
-}
-
-// ========== EXTRA FUNCTIONS FOR userGuide.ts ==========
-export async function getKycStatus(userId: string): Promise<{ status: string }> {
-  try {
-    const submission = await getKycSubmission(userId);
-    return { status: submission?.status || 'none' };
-  } catch {
-    return { status: 'none' };
-  }
-}
-
-export async function getHelpCount(userId: string): Promise<number> {
-  try {
-    const unlocks = await getCaseUnlocksByHero(userId);
-    return Array.isArray(unlocks) ? unlocks.length : 0;
-  } catch {
-    return 0;
-  }
-}
-
-export async function getCaseCount(userId: string): Promise<number> {
-  try {
-    const counts = await getCaseCounts(userId);
-    return counts?.total ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-export async function getChatMessages(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/support/messages?user_id=${userId}`, {
-    headers: headers(),
-  });
-  return res.json();
-}
-
-export async function sendChatMessage(data: any) {
-  return sendSupportMessage(data);
-}
-
-// ============================================================
-// ========== COMMUNITY POSTS, LIKES, COMMENTS ==========
-// ============================================================
-
-// ---------- COMMUNITY POSTS ----------
-export async function getCommunityPosts(): Promise<any[]> {
-  const res = await fetch(`${WORKER_URL}/api/community-posts`, { headers: headers() });
-  return res.json();
-}
-
-export async function createCommunityPost(data: {
-  message: string;
-  display_name?: string;
-  is_guest?: boolean;
-  user_id?: string;
-}): Promise<any> {
-  const res = await fetch(`${WORKER_URL}/api/community-posts`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(data),
-  });
-  return res.json();
-}
-
-export async function markCommunityPostsAsRead(): Promise<void> {
-  await fetch(`${WORKER_URL}/api/community-posts/mark-read`, {
-    method: "POST",
-    headers: headers(),
-  });
-}
-
-// ---------- POST LIKES ----------
-export async function toggleLike(postId: string): Promise<{ liked: boolean }> {
-  const res = await fetch(`${WORKER_URL}/api/post-likes/${postId}`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ post_id: postId }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to toggle like: ${res.status} - ${text}`);
-  }
-  return res.json();
-}
-
-export async function getPostLikes(postId: string): Promise<any[]> {
-  const res = await fetch(`${WORKER_URL}/api/post-likes/${postId}`, { headers: headers() });
-  return res.json();
-}
-
-// ---------- POST COMMENTS ----------
-export async function addComment(postId: string, comment: string): Promise<any> {
-  const res = await fetch(`${WORKER_URL}/api/post-comments/${postId}`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ post_id: postId, comment }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to add comment: ${res.status} - ${text}`);
-  }
-  return res.json();
-}
-
-export async function getPostComments(postId: string): Promise<any[]> {
-  const res = await fetch(`${WORKER_URL}/api/post-comments/${postId}`, { headers: headers() });
   return res.json();
 }
