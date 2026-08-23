@@ -1358,7 +1358,8 @@ export default {
       }
 
       if (url.pathname === "/verify") {
-        const user = await authenticate(request, env, clientId);
+        // ✅ یہاں createUser = true کریں
+        const user = await authenticate(request, env, clientId, true);
         return user ? json({ valid: true, user }, 200, origin) : json({ valid: false }, 401, origin);
       }
 
