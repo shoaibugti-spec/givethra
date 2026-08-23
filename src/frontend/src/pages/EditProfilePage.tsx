@@ -261,17 +261,29 @@ export default function EditProfilePage() {
         const u = await uploadImage(coverFile, "covers");
         if (u) finalCover = u;
       }
-      await updateProfile(user!.id, {
-        full_name: fullName,
-        country,
-        city,
-        phone_number: phoneNumber,
-        bio,
+      const savedProfile = await updateProfile(user!.id, {
+        full_name: fullName.trim(),
+        country: country.trim(),
+        city: city.trim(),
+        phone_number: phoneNumber.trim(),
+        bio: bio.trim(),
         preferred_language: preferredLanguage,
         avatar_url: finalAvatar,
         cover_url: finalCover,
         updated_at: new Date().toISOString(),
       });
+      if (!savedProfile || savedProfile.user_id !== user!.id) {
+        throw new Error("Profile was not saved. Please try again.");
+      }
+      setFullName(savedProfile.full_name ?? fullName);
+      setCountry(savedProfile.country ?? country);
+      setCity(savedProfile.city ?? city);
+      setPhoneNumber(savedProfile.phone_number ?? phoneNumber);
+      setBio(savedProfile.bio ?? bio);
+      setAvatarUrl(savedProfile.avatar_url ?? finalAvatar);
+      setCoverUrl(savedProfile.cover_url ?? finalCover);
+      setAvatarFile(null);
+      setCoverFile(null);
       await refreshUser().catch(() => null);
       toast.success("Profile updated successfully!");
       navigate({ to: "/profile/$id", params: { id: "me" } });

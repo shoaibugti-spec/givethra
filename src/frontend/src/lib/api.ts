@@ -41,6 +41,14 @@ export async function getCommunityPosts() {
   return res.json();
 }
 
+export async function markCommunityPostsAsRead() {
+  const res = await fetch(`${WORKER_URL}/api/community/mark-read`, {
+    method: "PUT",
+    headers: headers(),
+  });
+  return res.json();
+}
+
 export async function createCommunityPost(data: any) {
   const res = await fetch(`${WORKER_URL}/api/community/posts`, {
     method: "POST",
@@ -120,6 +128,24 @@ export async function getCaseCounts(userId: string) {
     headers: headers(),
   });
   return res.json();
+}
+
+export async function getCaseCount(userId: string): Promise<number> {
+  try {
+    const counts = await getCaseCounts(userId);
+    return Number(counts?.total || 0);
+  } catch {
+    return 0;
+  }
+}
+
+export async function getHelpCount(userId: string): Promise<number> {
+  try {
+    const unlocks = await getCaseUnlocksByHero(userId);
+    return Array.isArray(unlocks) ? unlocks.length : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export async function getCategoryCounts() {
@@ -275,23 +301,33 @@ export async function updateKycSubmission(id: string, data: any) {
 }
 
 // ---------- PROFILES ----------
-export async function getProfile(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/profiles/${userId}`, { headers: headers() });
-  return res.json();
+async function readProfileResponse<T = any>(res: Response): Promise<T> {
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = typeof payload?.error === "string"
+      ? payload.error
+      : `Profile request failed (HTTP ${res.status}).`;
+    throw new Error(message);
+  }
+  return payload as T;
 }
 
-// ✅ FIXED: Added error handling and response checking
+export async function getProfile(userId: string) {
+  const res = await fetch(`${WORKER_URL}/api/profiles/${userId}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  return readProfileResponse(res);
+}
+
 export async function updateProfile(userId: string, data: any) {
   const res = await fetch(`${WORKER_URL}/api/profiles/${userId}`, {
     method: "PUT",
     headers: headers(),
+    cache: "no-store",
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to update profile (${res.status})`);
-  }
-  return res.json();
+  return readProfileResponse(res);
 }
 
 // ---------- WALLET ----------
