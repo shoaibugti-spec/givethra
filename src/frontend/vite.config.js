@@ -24,11 +24,10 @@ export default defineConfig({
       },
     },
   },
-  // ✅ لوکل ڈیولپمنٹ کے لیے PROXY شامل کریں
   server: {
     proxy: {
       "/api": {
-        target: "https://givethra.org", // ✅ اپنا اصلی Worker URL ڈالیں
+        target: "https://givethra.org",
         changeOrigin: true,
         secure: true,
       },
