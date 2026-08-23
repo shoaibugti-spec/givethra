@@ -9,9 +9,6 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { GOOGLE_CLIENT_ID } from "../config/auth";
 
-const WORKER_URL =
-  typeof window !== "undefined" ? window.location.origin : "https://givethra.org";
-
 export type UserRole = "hero" | "help_seeker" | "admin" | null;
 
 export interface UserPublic {
@@ -87,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // ✅ اب Express Backend کو verify کریں
+  // ✅ صرف Express Backend کو verify کریں
   useEffect(() => {
     const token = getTokenFromLocation();
     if (token) {
@@ -98,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then((data) => {
           if (data.valid && data.user) {
             const u: UserPublic = {
-              id: data.user.id || data.user.user_id || data.user.openId,
+              id: data.user.id || data.user.openId || data.user.user_id,
               email: data.user.email,
               fullName: data.user.name || data.user.full_name || data.user.email,
               photo: data.user.picture || data.user.avatar_url || "",
@@ -133,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       if (data.valid && data.user) {
         const u: UserPublic = {
-          id: data.user.id || data.user.user_id || data.user.openId,
+          id: data.user.id || data.user.openId || data.user.user_id,
           email: data.user.email,
           fullName: data.user.name || data.user.full_name || data.user.email,
           photo: data.user.picture || data.user.avatar_url || "",
@@ -167,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const authenticatedUser: UserPublic = {
-        id: data.user.id || data.user.openId || data.user.user_id || `google_${Date.now()}`,
+        id: data.user.id || data.user.openId || `google_${Date.now()}`,
         email: data.user.email,
         fullName: data.user.name || data.user.full_name || data.user.email,
         photo: data.user.picture || data.user.avatar_url || "",
@@ -180,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(authenticatedUser);
       setUserId(authenticatedUser.id);
       
-      window.location.href = "/dashboard";
+      window.location.href = "/";
     } catch (error) {
       console.error("Google sign-in failed:", error);
       setLoginError(error instanceof Error ? error.message : "Google sign-in failed. Please try again.");
