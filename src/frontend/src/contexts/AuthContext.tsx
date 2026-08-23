@@ -54,10 +54,8 @@ function safeLocalRemove(key: string): void {
   try { localStorage.removeItem(key); } catch { }
 }
 
-/** Accept the token formats used by the Cloudflare OAuth worker and clean the URL. */
 function getTokenFromLocation(): string | null {
   if (typeof window === "undefined") return safeLocalGet("auth_token");
-
   const url = new URL(window.location.href);
   const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
   const token =
@@ -67,13 +65,10 @@ function getTokenFromLocation(): string | null {
     hashParams.get("auth_token") ||
     hashParams.get("access_token") ||
     hashParams.get("token");
-
   if (!token) return safeLocalGet("auth_token");
-
   safeLocalSet("auth_token", token);
   const email = url.searchParams.get("email") || hashParams.get("email");
   if (email) safeLocalSet("user_email", email);
-
   ["auth_token", "access_token", "token", "email"].forEach((key) => {
     url.searchParams.delete(key);
     hashParams.delete(key);
@@ -157,30 +152,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-    const finishGoogleLogin = useCallback(async (credential: string) => {
+  // ✅ درست شدہ finishGoogleLogin - Express Backend کو کال کرتا ہے
+  const finishGoogleLogin = useCallback(async (credential: string) => {
     setLoginError(null);
     try {
-      const response = await fetch(`${WORKER_URL}/auth/google`, {
+      const response = await fetch(`/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.token || !data.user) {
+      if (!response.ok || !data.user) {
         throw new Error(data.error || `Google sign-in could not be verified (HTTP ${response.status}).`);
       }
 
-      safeLocalSet("auth_token", data.token);
-      safeLocalSet("user_email", data.user.email);
       const authenticatedUser: UserPublic = {
-        id: data.user.user_id,
+        id: data.user.id || data.user.openId || data.user.user_id,
         email: data.user.email,
-        fullName: data.user.full_name || data.user.email,
-        photo: data.user.avatar_url || "",
-        role: (safeLocalGet(ROLE_KEY) as UserRole) || null,
+        fullName: data.user.name || data.user.full_name || data.user.email,
+        photo: data.user.picture || data.user.avatar_url || "",
+        role: (safeLocalGet(ROLE_KEY) as UserRole) || data.user.role || null,
       };
+      
+      const token = data.token || credential;
+      safeLocalSet("auth_token", token);
+      safeLocalSet("user_email", data.user.email);
       setUser(authenticatedUser);
       setUserId(authenticatedUser.id);
+      
+      window.location.href = "/dashboard";
     } catch (error) {
       console.error("Google sign-in failed:", error);
       setLoginError(error instanceof Error ? error.message : "Google sign-in failed. Please try again.");
@@ -222,7 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoggingIn(false);
         setLoginError("Google sign-in could not open. Please allow Google prompts/pop-ups and try again.");
       } else {
-        // Suppress false cancellation banners entirely to ensure clean UX
         setIsLoggingIn(false);
       }
     });
