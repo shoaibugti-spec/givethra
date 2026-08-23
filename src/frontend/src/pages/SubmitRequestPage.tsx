@@ -2859,7 +2859,7 @@ export default function SubmitRequestPage() {
             {/* ============================================================
                 COUNTRY & CITY - FIXED: More spacing (gap-6)
                 ============================================================ */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-6" style={{ columnGap: "24px" }}>
               <div className="space-y-2">
                 <Label>Country *</Label>
                 <Select value={country} onValueChange={setCountry}>
