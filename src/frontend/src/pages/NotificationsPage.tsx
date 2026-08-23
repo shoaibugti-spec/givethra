@@ -24,6 +24,7 @@ import {
   deleteAllNotifications,
 } from "@/lib/api";
 
+// ✅ تمام نوٹیفکیشن ٹائپس کے لیے Config
 const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   welcome: { icon: Heart, color: "text-rose-500", bg: "bg-rose-500/10" },
   kyc_approved: { icon: ShieldCheck, color: "text-green-500", bg: "bg-green-500/10" },
@@ -37,6 +38,9 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   support_reply: { icon: MessageCircle, color: "text-primary", bg: "bg-primary/10" },
   message: { icon: MessageCircle, color: "text-primary", bg: "bg-primary/10" },
   system: { icon: Bell, color: "text-primary", bg: "bg-primary/10" },
+  // ✅ نیا: لائک اور کمنٹ کے لیے
+  like: { icon: Heart, color: "text-red-500", bg: "bg-red-500/10" },
+  comment: { icon: MessageCircle, color: "text-blue-500", bg: "bg-blue-500/10" },
 };
 
 function relativeTime(iso: string): string {
