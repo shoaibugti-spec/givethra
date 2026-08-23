@@ -25,7 +25,6 @@ async function verifyGoogleCredential(credential: string) {
   const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
   if (!clientId) throw new Error("Google sign-in is not configured");
 
-  // If credential is an OAuth access token (starts with ya29 or short string)
   if (credential.startsWith("ya29.") || credential.length < 100) {
     const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${encodeURIComponent(credential)}`);
     if (!response.ok) {
@@ -43,7 +42,6 @@ async function verifyGoogleCredential(credential: string) {
     };
   }
 
-  // Verify as JWT ID token
   const { payload } = await jwtVerify<GoogleClaims>(credential, googleJwks, {
     algorithms: ["RS256"],
     audience: clientId,
@@ -74,12 +72,14 @@ export function registerGoogleAuthRoutes(app: Express) {
     if (!credential) return res.status(400).json({ error: "Google credential is required" });
 
     try {
+      // ✅ پہلے پرانی کوکیز اور کیشے صاف کریں
+      await sdk.clearUserSession(req, res);
+
       const identity = await verifyGoogleCredential(credential);
       const ownerEmail = (process.env.GIVETHRA_ADMIN_EMAIL || "").trim().toLowerCase();
       const role = ownerEmail && identity.email === ownerEmail ? "admin" : "user";
       const openId = `google:${identity.sub}`;
 
-      // ✅ upsertUser خودکار طور پر نیا صارف بنا دے گا اگر موجود نہیں
       await upsertUser({
         openId,
         name: identity.name,
@@ -92,7 +92,6 @@ export function registerGoogleAuthRoutes(app: Express) {
       const token = await sdk.createSessionToken(openId, { name: identity.name });
       res.cookie(COOKIE_NAME, token, getSessionCookieOptions(req));
 
-      // ✅ وہی ڈیٹا واپس بھیجیں جو AuthContext کو چاہیے
       return res.status(200).json({
         token,
         user: {
