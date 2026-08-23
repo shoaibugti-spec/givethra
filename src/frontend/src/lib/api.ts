@@ -280,12 +280,17 @@ export async function getProfile(userId: string) {
   return res.json();
 }
 
+// ✅ FIXED: Added error handling and response checking
 export async function updateProfile(userId: string, data: any) {
   const res = await fetch(`${WORKER_URL}/api/profiles/${userId}`, {
     method: "PUT",
     headers: headers(),
     body: JSON.stringify(data),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to update profile (${res.status})`);
+  }
   return res.json();
 }
 
