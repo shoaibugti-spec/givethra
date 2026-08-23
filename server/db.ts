@@ -30,7 +30,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
-    // Check if a legacy user already exists by email (for seamless migration without re-registering or clearing cookies)
+    // ✅ اگر صارف email سے موجود ہے تو اپڈیٹ کریں
     if (user.email) {
       const existingByEmail = await db.select().from(users).where(eq(users.email, user.email)).limit(1);
       if (existingByEmail.length > 0) {
@@ -47,10 +47,26 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       }
     }
 
+    // ✅ اگر صارف openId سے موجود ہے تو اپڈیٹ کریں
+    const existingByOpenId = await db.select().from(users).where(eq(users.openId, user.openId)).limit(1);
+    if (existingByOpenId.length > 0) {
+      const existing = existingByOpenId[0];
+      const updateSet: Record<string, unknown> = {
+        lastSignedIn: user.lastSignedIn || new Date(),
+      };
+      if (user.name) updateSet.name = user.name;
+      if (user.email) updateSet.email = user.email;
+      if (user.loginMethod) updateSet.loginMethod = user.loginMethod;
+      if (user.role) updateSet.role = user.role;
+
+      await db.update(users).set(updateSet).where(eq(users.id, existing.id));
+      return;
+    }
+
+    // ✅ اگر صارف موجود نہیں تو نیا بنائیں (یہ وہی ہے جو آپ چاہتے ہیں)
     const values: InsertUser = {
       openId: user.openId,
     };
-    const updateSet: Record<string, unknown> = {};
 
     const textFields = ["name", "email", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
@@ -60,34 +76,24 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       if (value === undefined) return;
       const normalized = value ?? null;
       values[field] = normalized;
-      updateSet[field] = normalized;
     };
 
     textFields.forEach(assignNullable);
 
     if (user.lastSignedIn !== undefined) {
       values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
     }
     if (user.role !== undefined) {
       values.role = user.role;
-      updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
       values.role = 'admin';
-      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
       values.lastSignedIn = new Date();
     }
 
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
+    await db.insert(users).values(values);
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -102,8 +108,5 @@ export async function getUserByOpenId(openId: string) {
   }
 
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
   return result.length > 0 ? result[0] : undefined;
 }
-
-// TODO: add feature queries here as your schema grows.
