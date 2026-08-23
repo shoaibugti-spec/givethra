@@ -4,7 +4,7 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useLocation } from "@tanstack/react-router";
 import {
   Bell,
   Briefcase,
@@ -44,6 +44,7 @@ import {
 export default function ProfilePage() {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ Added for refresh detection
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [caseStats, setCaseStats] = useState({ submitted: 0, approved: 0, completed: 0 });
@@ -56,7 +57,7 @@ export default function ProfilePage() {
       return;
     }
     loadData();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, location.key]); // ✅ Added location.key as dependency
 
   async function loadData() {
     if (!user) return;
