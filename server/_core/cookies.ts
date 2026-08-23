@@ -23,26 +23,62 @@ function isSecureRequest(req: Request) {
 
 export function getSessionCookieOptions(
   req: Request
-): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  // const hostname = req.hostname;
-  // const shouldSetDomain =
-  //   hostname &&
-  //   !LOCAL_HOSTS.has(hostname) &&
-  //   !isIpAddress(hostname) &&
-  //   hostname !== "127.0.0.1" &&
-  //   hostname !== "::1";
-
-  // const domain =
-  //   shouldSetDomain && !hostname.startsWith(".")
-  //     ? `.${hostname}`
-  //     : shouldSetDomain
-  //       ? hostname
-  //       : undefined;
-
+): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure" | "maxAge"> {
   return {
     httpOnly: true,
     path: "/",
     sameSite: "none",
     secure: isSecureRequest(req),
+    maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
   };
+}
+
+// ✅ نیا: پرانی کوکیز کو صاف کرنے کا فنکشن
+export function clearSessionCookie(
+  req: Request,
+  res: Response
+): void {
+  const options = getSessionCookieOptions(req);
+  res.clearCookie("auth_token", {
+    ...options,
+    maxAge: 0,
+  });
+  res.clearCookie("user_email", {
+    ...options,
+    maxAge: 0,
+  });
+  res.clearCookie("givethra_role", {
+    ...options,
+    maxAge: 0,
+  });
+}
+
+// ✅ نیا: تمام کوکیز کو صاف کرنے کا فنکشن (Cache Delete کے لیے)
+export function clearAllCookies(
+  req: Request,
+  res: Response
+): void {
+  const options = getSessionCookieOptions(req);
+  const cookiesToClear = [
+    "auth_token",
+    "user_email", 
+    "givethra_role",
+    "session",
+    "connect.sid",
+    "token",
+    "refresh_token",
+    "access_token",
+  ];
+
+  cookiesToClear.forEach((name) => {
+    res.clearCookie(name, {
+      ...options,
+      maxAge: 0,
+    });
+  });
+
+  // ✅ Cache-Control ہیڈرز بھی بھیجیں تاکہ براؤزر کیشے صاف کرے
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
 }
