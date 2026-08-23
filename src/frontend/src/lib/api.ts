@@ -216,7 +216,7 @@ export async function upsertUserSuspension(data: Record<string, unknown>) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiJson(res, {}, "Failed to update user suspension");
 }
 
 export async function getCategoryOffer(category: string) {
@@ -483,7 +483,9 @@ export async function markAllNotificationsAsRead(userId: string) {
     headers: headers(),
     body: JSON.stringify({ user_id: userId }),
   });
-  return res.json();
+  const result = await res.json();
+  if (res.ok && typeof window !== "undefined") window.dispatchEvent(new Event("notification-updated"));
+  return result;
 }
 
 export async function deleteAllNotifications(userId: string) {
@@ -503,12 +505,22 @@ export async function createNotification(data: any) {
   });
   const result = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(result?.error || `Failed to create notification (${res.status})`);
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("notification-updated"));
   return result;
 }
 
 export async function checkNotificationExists(userId: string, type: string) {
   const result = await getNotifications(userId);
   return Array.isArray(result) && result.some((n: any) => n.type === type);
+}
+
+export async function adminBroadcastNotification(data: { user_ids: string[]; type: string; title: string; message: string; link?: string }) {
+  const res = await fetch(`${WORKER_URL}/api/admin/notifications/broadcast`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  return readApiJson(res, { sent: 0, failed: 0 }, "Failed to send notification broadcast");
 }
 
 // ---------- SUPPORT CHAT ----------
@@ -694,7 +706,7 @@ export async function adminUpdateKyc(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiJson(res, {}, "Failed to update Admin KYC");
 }
 
 export async function adminUpdateCase(id: string, data: any) {
@@ -703,7 +715,7 @@ export async function adminUpdateCase(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiJson(res, {}, "Failed to update Admin case");
 }
 
 export async function adminUpdateFeedback(id: string, data: any) {
@@ -712,7 +724,7 @@ export async function adminUpdateFeedback(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiJson(res, {}, "Failed to update Admin feedback");
 }
 
 export async function adminUpdateResolution(id: string, data: any) {
@@ -721,7 +733,7 @@ export async function adminUpdateResolution(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiJson(res, {}, "Failed to update Admin resolution");
 }
 
 export async function adminUpdateDeposit(id: string, data: any) {
@@ -741,14 +753,14 @@ export async function adminCloseCase(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiJson(res, {}, "Failed to close Admin case");
 }
 
-export async function adminGetUserSuspension(userId: string) {
+export async function adminGetUserSuspension(userId: string): Promise<{ user_id?: string; suspension_count?: number; is_active?: boolean | number; suspended_at?: string | null; unlocked_at?: string | null } | null> {
   const res = await fetch(`${WORKER_URL}/api/admin/user-suspension/${userId}`, {
     headers: headers(),
   });
-  return res.json();
+  return readApiJson<{ user_id?: string; suspension_count?: number; is_active?: boolean | number; suspended_at?: string | null; unlocked_at?: string | null } | null>(res, null, "Failed to load user suspension");
 }
 
 export async function adminUpsertUserSuspension(data: any) {
@@ -757,7 +769,7 @@ export async function adminUpsertUserSuspension(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiJson(res, {}, "Failed to update user suspension");
 }
 
 export async function adminUpdateProfile(userId: string, data: any) {

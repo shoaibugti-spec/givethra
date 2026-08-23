@@ -28,6 +28,30 @@ describe("dashboard operations repair", () => {
     expect(adminSource).toContain("adminUpdateDeposit(id");
   });
 
+  it("uses a batch Admin broadcast route and does not swallow send failures", () => {
+    expect(workerSource).toContain('parts[2] === "notifications" && parts[3] === "broadcast"');
+    expect(workerSource).toContain("await env.DB.batch(batch)");
+    expect(apiSource).toContain("/api/admin/notifications/broadcast");
+    expect(fs.readFileSync(path.join(root, "src/lib/notify.ts"), "utf8")).toContain("throw lastError");
+    expect(adminSource).toContain("adminBroadcastNotification");
+    expect(adminSource).not.toContain("for (const uid of users)");
+  });
+
+  it("refreshes the bell after notification changes and keeps user copy branded as Givethra", () => {
+    const layoutSource = fs.readFileSync(path.join(root, "src/components/Layout.tsx"), "utf8");
+    const notificationsSource = fs.readFileSync(path.join(root, "src/pages/NotificationsPage.tsx"), "utf8");
+    const walletSourceText = fs.readFileSync(path.join(root, "src/pages/WalletPage.tsx"), "utf8");
+    expect(layoutSource).toContain('window.addEventListener("notification-updated"');
+    expect(apiSource).toContain('window.dispatchEvent(new Event("notification-updated"))');
+    expect(notificationsSource).toContain("admin_broadcast");
+    expect(walletSourceText).not.toContain("admin approval");
+  });
+
+  it("creates a user bell alert when an Admin reply is persisted", () => {
+    expect(workerSource).toContain("'support_reply', 'New message from Givethra'");
+    expect(workerSource).toContain("A support attachment was sent.");
+  });
+
   it("restores the remaining Admin mutation routes without legacy placeholders", () => {
     expect(workerSource).toContain('parts[2] === "kyc" && recordId');
     expect(workerSource).toContain('parts[2] === "cases" && recordId');

@@ -41,6 +41,7 @@ import {
   adminGetCategoryOffer,
   adminUpsertCategoryOffer,
   adminDeleteFiles,
+  adminBroadcastNotification,
   uploadFileToStorage,
 } from "@/lib/api";
 
@@ -450,7 +451,7 @@ export default function AdminPage() {
     try {
       await adminUpsertUserSuspension({ user_id: userId, is_active: false, unlocked_at: new Date().toISOString() });
       await adminUpdateProfile(userId, { is_suspended: false, suspended_reason: null });
-      await sendNotification(userId, "system", "🔓 Account Unlocked (Admin)", "Your account has been manually unlocked by the admin. Please submit cases carefully.", "/dashboard");
+      await sendNotification(userId, "system", "Account Unlocked by Givethra", "Givethra has unlocked your account. Please submit cases carefully.", "/dashboard");
       toast.success("User unlocked successfully!");
       loadData();
     } catch (err) {
@@ -508,9 +509,6 @@ export default function AdminPage() {
   async function approveDeposit(dep: any, finalCredits: number) {
     const credits = (finalCredits ?? (dep.credits ?? dep.amount)) || 0;
     try {
-      const wallet = await adminGetWalletsByUser(dep.user_id);
-      const newBalance = (wallet?.balance ?? 0) + credits;
-      await adminUpsertWallet(dep.user_id, newBalance);
       await adminUpdateDeposit(dep.id, { status: "approved", credits, reviewed_at: new Date().toISOString(), reviewed_by: user?.email });
       if (dep.user_id) {
         await sendNotification(dep.user_id, "credits_added", "Credits Added 💰", `${credits} credit(s) have been added to your wallet.`, "/wallet");
@@ -1251,21 +1249,28 @@ function NotifyPanel({ profiles, kycList, caseList }: any) {
     if (!confirm(`Send this notification to ${users.length} user(s)?`)) return;
     setSending(true);
     try {
-      let ok = 0;
-      for (const uid of users) {
-        try { await sendNotification(uid, "admin_broadcast", title.trim(), message.trim(), link || "/"); ok++; } catch {}
-      }
-      toast.success(`Sent to ${ok} user(s)!`);
-      setTitle(""); setMessage("");
-    } catch { toast.error("Something went wrong."); }
-    finally { setSending(false); }
+      const result = await adminBroadcastNotification({
+        user_ids: users,
+        type: "admin_broadcast",
+        title: title.trim(),
+        message: message.trim(),
+        link: link || "/",
+      });
+      const sent = Number(result?.sent || 0);
+      const failed = Number(result?.failed || 0);
+      if (failed > 0) toast.error(`Sent to ${sent} user(s); ${failed} could not be reached.`);
+      else toast.success(`Sent to ${sent} user(s).`);
+      if (sent > 0) { setTitle(""); setMessage(""); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Notification could not be sent.");
+    } finally { setSending(false); }
   }
 
   return (
     <div className="space-y-4">
       <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
         <Megaphone className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-        <p>Send a notification to a group of users. It appears in their bell 🔔 and takes them to the page you choose.</p>
+        <p>Send a Givethra notification to a group of users. It appears in their notification bell and opens the page you choose.</p>
       </div>
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase text-muted-foreground">Quick fill (optional)</p>

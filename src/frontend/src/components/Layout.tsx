@@ -76,7 +76,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
     loadCounts();
     const interval = setInterval(loadCounts, 20000);
-    return () => clearInterval(interval);
+    const handleNotificationUpdate = () => loadCounts();
+    window.addEventListener("notification-updated", handleNotificationUpdate);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("notification-updated", handleNotificationUpdate);
+    };
   }, [isAuthenticated, user]);
 
     const fetchPostCount = async () => {

@@ -21,18 +21,24 @@ export async function sendNotification(
   message?: string,
   link?: string
 ) {
-  try {
-    await createNotification({
-      user_id: userId,
-      type,
-      title,
-      message: message || null,
-      link: link || null,
-      is_read: false,
-    });
-  } catch (e) {
-    console.error("notify error", e);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await createNotification({
+        user_id: userId,
+        type,
+        title,
+        message: message || null,
+        link: link || null,
+        is_read: false,
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    }
   }
+  console.error("notify error", lastError);
+  throw lastError instanceof Error ? lastError : new Error("Notification could not be sent");
 }
 
 /**

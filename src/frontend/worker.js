@@ -691,6 +691,13 @@ async function handleNotifications(request, env, user, url, parts, origin) {
     return json({ error: "Unauthorized" }, 403, origin);
   }
 
+  if (parts[2] === "unread-count" && request.method === "GET") {
+    const row = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND (is_read = 0 OR is_read IS NULL)"
+    ).bind(requested).first();
+    return json({ count: Number(row?.count || 0) }, 200, origin);
+  }
+
   if (request.method === "GET") {
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 100), 1), 500);
     const rows = await env.DB.prepare(
@@ -725,13 +732,6 @@ async function handleNotifications(request, env, user, url, parts, origin) {
       "DELETE FROM notifications WHERE user_id = ?"
     ).bind(requested).run();
     return json({ deleted: true, user_id: requested }, 200, origin);
-  }
-
-  if (parts[2] === "unread-count" && request.method === "GET") {
-    const row = await env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND (is_read = 0 OR is_read IS NULL)"
-    ).bind(requested).first();
-    return json({ count: Number(row?.count || 0) }, 200, origin);
   }
 
   return json({ error: "Method not allowed" }, 405, origin);
@@ -1094,7 +1094,31 @@ async function handleRequest(request, env, ctx) {
            VALUES (?, ?, 'admin', ?, ?, ?, 1, ?)`
         ).bind(msgId, body.user_id, body.message ? String(body.message).trim() : null, body.attachment_url || null, body.language || "en", now()).run();
         const created = await env.DB.prepare("SELECT * FROM support_messages WHERE id = ?").bind(msgId).first();
+        queueCommunityNotification(ctx, env.DB.prepare(
+          `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+           VALUES (?, ?, 'support_reply', 'New message from Givethra', ?, '/support', 0, ?)`
+        ).bind(id(), body.user_id, body.message ? String(body.message).trim() : "A support attachment was sent.", now()).run());
         return json(created || { id: msgId, ...body, sender: "admin", is_read: 1 }, 201, origin);
+      }
+
+      if (parts[2] === "notifications" && parts[3] === "broadcast" && request.method === "POST") {
+        const body = await readJson(request);
+        const userIds = [...new Set((Array.isArray(body?.user_ids) ? body.user_ids : []).map((value) => String(value).trim()).filter(Boolean))].slice(0, 1000);
+        const title = String(body?.title || "").trim();
+        const message = String(body?.message || "").trim();
+        if (!userIds.length || !title || !message) return json({ error: "Recipients, title, and message are required" }, 400, origin);
+        const type = String(body?.type || "admin_broadcast").slice(0, 80);
+        const link = String(body?.link || "/").slice(0, 500);
+        let sent = 0;
+        for (let start = 0; start < userIds.length; start += 50) {
+          const batch = userIds.slice(start, start + 50).map((target) => env.DB.prepare(
+            `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
+          ).bind(id(), target, type, title, message, link, now()));
+          await env.DB.batch(batch);
+          sent += batch.length;
+        }
+        return json({ sent, failed: userIds.length - sent }, 201, origin);
       }
 
       if (parts[2] === "wallets") {

@@ -141,7 +141,7 @@ export default function WalletPage() {
       };
 
       await insertDeposit(depositData);
-      toast.success("Deposit submitted! Credits added after admin approval.");
+      toast.success("Deposit submitted! Credits will be added after Givethra reviews it.");
       // Reset form
       setAmount("");
       setTxId("");

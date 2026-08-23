@@ -625,3 +625,11 @@
 - [x] Ensure support unread counts and Admin mark-read/reply flows use `sender` and never create an empty reply when marking messages read.
 - [x] Restore Admin KYC, case, feedback, resolution, profile-suspension, offer, and storage-file mutation routes against the existing schema.
 - [x] Add Worker route regression tests and verify strict TypeScript, production build, and non-destructive deployment configuration.
+
+## Admin Notifications, Support Replies, and Case Completeness — 2026-08-24
+- [x] Make Admin broadcast notifications send reliably to all eligible users with bounded retries and clear success/error feedback.
+- [x] Remove internal Admin wording from user-facing notification and deposit copy; use Givethra branding and neutral language.
+- [x] Ensure Admin support replies persist and are delivered to the target user with attachment and multiline-message support.
+- [x] Make bell unread counts include Admin notifications and Community likes/comments, clear after viewing, and reappear for new events.
+- [x] Verify all case submission fields and original attachment filenames are visible in Admin review without silent omissions.
+- [x] Add regression tests, run strict checks/build, and preserve existing D1/R2 data.
