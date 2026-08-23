@@ -7,3 +7,7 @@ This confirms the top-bar removal and non-blocking shell behavior. The first fee
 ## Focused refinement verification
 
 After the latest HMR refresh and client-side navigation, the Community page displayed 31 posts with like/comment counts and no `Loading posts...` spinner remaining. The top bar contained the Givethra brand, search, translation, Community, and notification controls; the Support icon was absent. The search field accepted the text `electricity` while the Community page remained rendered, confirming that the compact header search is writable.
+
+## Likes, privacy, header, and legacy-state repair verification
+
+The updated local homepage now has no top-header search input. The homepage case-search input remains present below the hero and filters. Navigating to Community keeps the compact header and shows 31 loaded posts with visible like/comment counts and the guest composer. The Community page did not remain behind a feed loading spinner during this check.

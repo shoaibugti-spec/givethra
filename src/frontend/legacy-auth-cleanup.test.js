@@ -6,6 +6,7 @@ const root = process.cwd();
 const cleanup = fs.readFileSync(path.join(root, "src/lib/legacySessionCleanup.ts"), "utf8");
 const auth = fs.readFileSync(path.join(root, "src/contexts/AuthContext.tsx"), "utf8");
 const worker = fs.readFileSync(path.join(root, "worker.js"), "utf8");
+const serviceWorker = fs.readFileSync(path.join(root, "public/sw.js"), "utf8");
 
 describe("legacy authentication recovery", () => {
   it("clears only legacy browser state and preserves the current session", () => {
@@ -13,6 +14,10 @@ describe("legacy authentication recovery", () => {
     expect(cleanup).toContain("return false");
     expect(cleanup).toContain("supabase");
     expect(cleanup).toContain("Max-Age=0");
+    expect(cleanup).toContain("caches.keys()");
+    expect(cleanup).toContain("getRegistrations()");
+    expect(cleanup).toContain("CURRENT_SERVICE_WORKER_CACHE");
+    expect(serviceWorker).toContain('const CACHE_NAME = "givethra-v2"');
     expect(auth).toContain("clearLegacyBrowserState();");
   });
 
@@ -22,6 +27,7 @@ describe("legacy authentication recovery", () => {
     expect(worker).toContain("verifySession(credential, env.JWT_SECRET)");
     expect(worker).toContain("if (!payload.sub || !payload.email");
     expect(worker).toContain("return null;");
+    expect(auth).toContain('fullName: data.user.full_name || "User"');
   });
 });
 

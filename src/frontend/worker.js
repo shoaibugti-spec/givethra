@@ -427,6 +427,26 @@ function guestIdentity(request, body = null) {
   return { id: `guest:${normalized}`, name: `Guest ${suffix}` };
 }
 
+function publicDisplayName(value, fallback = "User") {
+  const name = String(value || "").trim();
+  if (!name || name.includes("@")) return fallback;
+  return name.slice(0, 120);
+}
+
+function queueCommunityNotification(ctx, task) {
+  const safeTask = Promise.resolve(task).catch((error) => console.error("Community notification failed:", error));
+  if (ctx?.waitUntil) ctx.waitUntil(safeTask);
+  else void safeTask;
+}
+
+async function insertCommunityNotification(env, ctx, recipientId, actorId, actorName, type, title, message) {
+  if (!recipientId || recipientId === actorId) return;
+  queueCommunityNotification(ctx, env.DB.prepare(
+    `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
+  ).bind(id(), recipientId, type, title, `${publicDisplayName(actorName, "A Givethra member")}: ${message}`, "/community", now()).run());
+}
+
 async function handleCommunityPosts(request, env, user, url, parts, origin) {
   if (request.method === "GET" && parts.length === 3) {
     const guest = user ? null : guestIdentity(request);
@@ -460,7 +480,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
     return json((posts.results || []).map((post) => ({
       ...post,
       is_guest: !post.user_id,
-      display_name: post.user_name || post.display_name || "User",
+      display_name: publicDisplayName(post.user_name, publicDisplayName(post.display_name, "User")),
       is_verified: post.user_kyc_status === "approved",
       likes_count: Number(post.likes_count || 0),
       comments_count: Number(post.comments_count || 0),
@@ -476,7 +496,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
     if (!user && !guest) return json({ error: "Guest identity is required" }, 400, origin);
     const postId = id();
     const displayName = user
-      ? (user.full_name || user.email?.split("@")[0] || "User")
+      ? publicDisplayName(user.full_name, "User")
       : guest.name;
     await env.DB.prepare(
       `INSERT INTO community_posts (id, user_id, display_name, message, created_at)
@@ -507,7 +527,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
 // ============================================================
 //  COMMUNITY LIKES HANDLER
 // ============================================================
-async function handleCommunityLikes(request, env, user, url, parts, origin) {
+async function handleCommunityLikes(request, env, user, url, parts, origin, ctx) {
   const postId = parts[3];
   if (!postId) return json({ error: "Post ID required" }, 400, origin);
 
@@ -522,6 +542,8 @@ async function handleCommunityLikes(request, env, user, url, parts, origin) {
     const guest = user ? null : guestIdentity(request);
     const actorId = user?.user_id || guest?.id;
     if (!actorId) return json({ error: "Guest identity is required" }, 400, origin);
+    const post = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(postId).first();
+    const actorName = user ? publicDisplayName(user.full_name, "User") : guest.name;
     const existing = await env.DB.prepare(
       "SELECT id FROM community_post_likes WHERE post_id = ? AND user_id = ?"
     ).bind(postId, actorId).first();
@@ -536,6 +558,16 @@ async function handleCommunityLikes(request, env, user, url, parts, origin) {
       await env.DB.prepare(
         "INSERT INTO community_post_likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)"
       ).bind(likeId, postId, actorId, now()).run();
+      await insertCommunityNotification(
+        env,
+        ctx,
+        post?.user_id,
+        actorId,
+        actorName,
+        "like",
+        "New Community Like",
+        "liked your post"
+      );
       return json({ liked: true, post_id: postId, id: likeId }, 201, origin);
     }
   }
@@ -546,7 +578,7 @@ async function handleCommunityLikes(request, env, user, url, parts, origin) {
 // ============================================================
 //  COMMUNITY COMMENTS HANDLER
 // ============================================================
-async function handleCommunityComments(request, env, user, url, parts, origin) {
+async function handleCommunityComments(request, env, user, url, parts, origin, ctx) {
   const postId = parts[3];
   if (!postId) return json({ error: "Post ID required" }, 400, origin);
 
@@ -559,7 +591,10 @@ async function handleCommunityComments(request, env, user, url, parts, origin) {
        WHERE cc.post_id = ?
        ORDER BY cc.created_at ASC`
     ).bind(postId).all();
-    return json(comments.results || [], 200, origin);
+    return json((comments.results || []).map((comment) => ({
+      ...comment,
+      user_name: publicDisplayName(comment.user_name, String(comment.user_id || "").startsWith("guest:") ? `Guest ${String(comment.user_id).slice(-6)}` : "User"),
+    })), 200, origin);
   }
 
   if (request.method === "POST") {
@@ -569,6 +604,8 @@ async function handleCommunityComments(request, env, user, url, parts, origin) {
     if (!actorId) return json({ error: "Guest identity is required" }, 400, origin);
     const commentText = String(body?.comment || "").trim();
     if (!commentText) return json({ error: "Comment is required" }, 400, origin);
+    const post = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(postId).first();
+    const actorName = user ? publicDisplayName(user.full_name, "User") : guest.name;
 
     const commentId = id();
     await env.DB.prepare(
@@ -583,7 +620,20 @@ async function handleCommunityComments(request, env, user, url, parts, origin) {
        WHERE cc.id = ?`
     ).bind(commentId).first();
 
-    return json(newComment, 201, origin);
+    await insertCommunityNotification(
+      env,
+      ctx,
+      post?.user_id,
+      actorId,
+      actorName,
+      "comment",
+      "New Community Comment",
+      `commented: "${commentText.slice(0, 80)}${commentText.length > 80 ? "..." : ""}"`
+    );
+    return json(newComment ? {
+      ...newComment,
+      user_name: publicDisplayName(newComment.user_name, guest ? guest.name : "User"),
+    } : { id: commentId, post_id: postId, user_id: actorId, user_name: actorName, comment: commentText, created_at: now() }, 201, origin);
   }
 
   return json({ error: "Method not allowed" }, 405, origin);
@@ -647,7 +697,7 @@ async function handleNotifications(request, env, user, url, parts, origin) {
 // ============================================================
 //  MAIN HANDLER
 // ============================================================
-async function handleRequest(request, env) {
+async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const origin = url.origin;
   const parts = pathParts(url);
@@ -721,10 +771,10 @@ async function handleRequest(request, env) {
       return handleCommunityPosts(request, env, user, url, parts, origin);
     }
     if (parts[2] === "posts" && parts[4] === "likes") {
-      return handleCommunityLikes(request, env, user, url, parts, origin);
+      return handleCommunityLikes(request, env, user, url, parts, origin, ctx);
     }
     if (parts[2] === "posts" && parts[4] === "comments") {
-      return handleCommunityComments(request, env, user, url, parts, origin);
+      return handleCommunityComments(request, env, user, url, parts, origin, ctx);
     }
   }
 
@@ -1122,7 +1172,7 @@ async function handleRequest(request, env) {
 export default {
   async fetch(request, env, ctx) {
     try {
-      return await handleRequest(request, env);
+      return await handleRequest(request, env, ctx);
     } catch (err) {
       console.error(err);
       return new Response("Internal Server Error: " + err.message, {

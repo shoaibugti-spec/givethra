@@ -12,7 +12,6 @@ import {
   toggleLike,
   addComment,
   getPostComments,
-  createNotification,
   createCommunityPost,
   getGuestId,
 } from "@/lib/api";
@@ -41,13 +40,44 @@ interface Comment {
 
 const COMMUNITY_POSTS_CACHE_KEY = "givethra:community-posts:v1";
 
+function safeDisplayName(value: unknown, fallback: string): string {
+  const name = String(value || "").trim();
+  return name && !name.includes("@") ? name.slice(0, 120) : fallback;
+}
+
+function guestDisplayName(userId: unknown): string {
+  const raw = String(userId || "").replace(/^guest:/, "");
+  const suffix = raw.replace(/[^0-9]/g, "").slice(-6) || raw.slice(-6) || "Guest";
+  return `Guest ${suffix}`;
+}
+
+function normalizeCachedPost(post: any): Post {
+  const isGuest = Boolean(post?.is_guest) || String(post?.user_id || "").startsWith("guest:");
+  return {
+    ...post,
+    is_guest: isGuest,
+    display_name: safeDisplayName(post?.display_name, isGuest ? guestDisplayName(post?.user_id) : "User"),
+    comments: undefined,
+  };
+}
+
+function normalizeComment(comment: any): Comment {
+  const isGuest = String(comment?.user_id || "").startsWith("guest:");
+  return {
+    ...comment,
+    user_name: safeDisplayName(comment?.user_name, isGuest ? guestDisplayName(comment?.user_id) : "User"),
+  };
+}
+
 function readCachedCommunityPosts(): Post[] {
   if (typeof window === "undefined") return [];
   try {
     const parsed = JSON.parse(localStorage.getItem(COMMUNITY_POSTS_CACHE_KEY) || "null");
     const cached = Array.isArray(parsed) ? parsed : parsed?.posts;
     return Array.isArray(cached)
-      ? cached.filter((post) => post && typeof post.id === "string" && typeof post.message === "string")
+      ? cached
+          .filter((post) => post && typeof post.id === "string" && typeof post.message === "string")
+          .map(normalizeCachedPost)
       : [];
   } catch {
     return [];
@@ -84,7 +114,7 @@ export default function CommunityPage() {
     if (showLoader && posts.length === 0) setLoading(true);
     try {
       const data = await getCommunityPosts();
-      const nextPosts = Array.isArray(data) ? data : [];
+      const nextPosts = Array.isArray(data) ? data.map(normalizeCachedPost) : [];
       setPosts(nextPosts);
       setLikeCounts((prev) => {
         const next = { ...prev };
@@ -112,7 +142,7 @@ export default function CommunityPage() {
       setPosts((prev) =>
         prev.map((post) =>
           post.id === postId
-            ? { ...post, comments: data || [], comments_count: Array.isArray(data) ? data.length : 0 }
+            ? { ...post, comments: Array.isArray(data) ? data.map(normalizeComment) : [], comments_count: Array.isArray(data) ? data.length : 0 }
             : post
         )
       );
@@ -132,7 +162,7 @@ export default function CommunityPage() {
     try {
       const payload = {
         message,
-        display_name: isAuthenticated ? (user?.fullName || user?.email?.split("@")[0] || "User") : undefined,
+        display_name: isAuthenticated ? (user?.fullName || "User") : undefined,
         is_guest: !isAuthenticated,
         user_id: isAuthenticated ? (user?.id || null) : null,
         guest_id: isAuthenticated ? undefined : getGuestId(),
@@ -144,7 +174,7 @@ export default function CommunityPage() {
         const newPostObj: Post = {
           id: result.id,
           user_id: user?.id || null,
-          display_name: result.display_name || payload.display_name || `Guest ${getGuestId().slice(-6)}`,
+          display_name: safeDisplayName(result.display_name || payload.display_name, isAuthenticated ? (user?.fullName || "User") : `Guest ${getGuestId().slice(-6)}`),
           message,
           is_guest: !isAuthenticated,
           created_at: new Date().toISOString(),
@@ -176,25 +206,17 @@ export default function CommunityPage() {
     setLiking(postId);
     try {
       const result = await toggleLike(postId);
-      if (result.liked) {
-        setLikedPosts((prev) => ({ ...prev, [postId]: true }));
-        setLikeCounts((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-        const postOwner = posts.find((p) => p.id === postId)?.user_id;
-        if (postOwner && postOwner !== user?.id) {
-          try {
-            await createNotification({
-              user_id: postOwner,
-              type: "like",
-              title: "New Like ❤️",
-              message: `${user?.fullName || "Someone"} liked your post.`,
-              link: "/community",
-            });
-          } catch (e) {}
-        }
-      } else {
-        setLikedPosts((prev) => ({ ...prev, [postId]: false }));
-        setLikeCounts((prev) => ({ ...prev, [postId]: Math.max((prev[postId] || 0) - 1, 0) }));
-      }
+      const postSnapshot = posts.find((post) => post.id === postId);
+      const currentCount = likeCounts[postId] ?? postSnapshot?.likes_count ?? 0;
+      const nextLiked = Boolean(result.liked);
+      const nextCount = Math.max(currentCount + (nextLiked ? 1 : -1), 0);
+      setLikedPosts((prev) => ({ ...prev, [postId]: nextLiked }));
+      setLikeCounts((prev) => ({ ...prev, [postId]: nextCount }));
+      setPosts((prev) => {
+        const next = prev.map((post) => post.id === postId ? { ...post, is_liked: nextLiked, likes_count: nextCount } : post);
+        writeCachedCommunityPosts(next);
+        return next;
+      });
     } catch (error: any) {
       console.error("Error toggling like:", error);
       toast.error(error?.message || "Failed to like.");
@@ -217,25 +239,13 @@ export default function CommunityPage() {
           post.id === postId
             ? {
                 ...post,
-                comments: [...(post.comments || []), data],
+                comments: [...(post.comments || []), normalizeComment(data)],
                 comments_count: (post.comments_count ?? post.comments?.length ?? 0) + 1,
               }
             : post
         )
       );
       setNewComment((prev) => ({ ...prev, [postId]: "" }));
-      const postOwner = posts.find((p) => p.id === postId)?.user_id;
-      if (postOwner && postOwner !== user?.id) {
-        try {
-          await createNotification({
-            user_id: postOwner,
-            type: "comment",
-            title: "New Comment 💬",
-            message: `${user?.fullName || "Someone"} commented: "${comment.slice(0, 50)}${comment.length > 50 ? "..." : ""}"`,
-            link: "/community",
-          });
-        } catch (e) {}
-      }
       toast.success("Comment added!");
       setTimeout(() => {
         const commentEl = document.getElementById(`comment-${data.id}`);

@@ -72,29 +72,30 @@ export async function createCommunityPost(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
-}
-
-export async function getPostLikes(postId: string) {
-  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/likes`, {
-    headers: headers(),
-  });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Failed to create post (${res.status})`);
+  return result;
 }
 
 export async function toggleLike(postId: string) {
-  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/like`, {
+  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/likes`, {
     method: "POST",
     headers: headers(),
   });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok || typeof result?.liked !== "boolean") {
+    throw new Error(result?.error || `Failed to update like (${res.status})`);
+  }
+  return result;
 }
 
 export async function getPostComments(postId: string) {
   const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/comments`, {
     headers: headers(),
   });
-  return res.json();
+  const result = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(result?.error || `Failed to load comments (${res.status})`);
+  return Array.isArray(result) ? result : [];
 }
 
 export async function addComment(postId: string, comment: string) {
@@ -103,7 +104,9 @@ export async function addComment(postId: string, comment: string) {
     headers: headers(),
     body: JSON.stringify({ comment }),
   });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok || !result?.id) throw new Error(result?.error || `Failed to add comment (${res.status})`);
+  return result;
 }
 
 // ---------- CASES ----------
@@ -459,7 +462,8 @@ export async function getUnreadNotificationsCount(userId: string) {
     `${WORKER_URL}/api/notifications/unread-count?user_id=${userId}`,
     { headers: headers() }
   );
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `Failed to load notification count (${res.status})`);
   return data.count ?? 0;
 }
 
@@ -487,7 +491,9 @@ export async function createNotification(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Failed to create notification (${res.status})`);
+  return result;
 }
 
 export async function checkNotificationExists(userId: string, type: string) {

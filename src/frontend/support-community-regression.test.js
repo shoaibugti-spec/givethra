@@ -39,13 +39,14 @@ describe("support, community performance, and footer regressions", () => {
   it("matches the requested reference header and marks active icon routes", () => {
     expect(layout).toContain("aria-label=\"Toggle menu\"");
     expect(layout).toContain("aria-label=\"Givethra home\"");
-    expect(layout).toContain("aria-label=\"Search verified cases\"");
+    expect(layout).not.toContain("aria-label=\"Search verified cases\"");
+    expect(layout).not.toContain("max-w-2xl");
     expect(layout).toContain("aria-label=\"Community\"");
     expect(layout).toContain("aria-label=\"Notifications\"");
     expect(layout).toContain("aria-current={isRouteActive(\"/community\") ? \"page\" : undefined}");
     expect(layout).toContain("aria-current={isRouteActive(\"/notifications\") ? \"page\" : undefined}");
     expect(layout).toContain("Reference layout: translation, Community, notifications");
-    expect(layout).toContain("max-w-2xl");
+    expect(layout).not.toContain("max-w-2xl");
     expect(layout).not.toContain('aria-label="Help & Support"');
     expect(layout).not.toContain("getUnreadChatMessagesCount");
     expect(bottomNav).toContain('aria-current={isActive ? "page" : undefined}');

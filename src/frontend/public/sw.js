@@ -1,4 +1,4 @@
-const CACHE_NAME = "givethra-v1";
+const CACHE_NAME = "givethra-v2";
 const urlsToCache = ["/", "/index.html", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

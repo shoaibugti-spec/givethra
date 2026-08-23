@@ -594,3 +594,11 @@
 - [x] Make Community posts display as quickly as possible without blocking the page on per-post metadata requests; preserve counts, likes, guest/user actions, and multiline comments.
 - [x] Add regression coverage for the reduced header controls, responsive search sizing, and fast Community feed behavior.
 - [x] Run full focused tests, strict TypeScript checks, production build, and visual verification without modifying D1/R2 data.
+
+## Community Likes, Identity Privacy & Legacy Browser Cleanup — 2026-08-24
+- [x] Diagnose and repair guest and signed-in Community like toggles against the existing D1 likes table without changing stored records.
+- [x] Ensure Community posts and comments show the user’s saved profile name or a safe guest name, never an email address.
+- [x] Remove the top-header search control while preserving the homepage case search and all other header navigation.
+- [x] Ensure valid like/comment activity creates the recipient’s notification and appears through the bell unread count without blocking Community actions.
+- [x] Strengthen origin-scoped automatic cleanup of stale legacy cache, local/session storage, cookies, and service-worker state while preserving current Givethra auth/session data.
+- [x] Add regression coverage, run strict TypeScript and production build checks, and visually verify the focused changes without modifying D1/R2 data.

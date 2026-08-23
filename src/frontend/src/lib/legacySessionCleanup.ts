@@ -1,4 +1,5 @@
-const CURRENT_KEYS = new Set(["auth_token", "user_email", "givethra_role", "givethra_guest_id"]);
+const CURRENT_KEYS = new Set(["auth_token", "user_email", "givethra_role", "givethra_guest_id", "givethra:community-posts:v1"]);
+const CURRENT_SERVICE_WORKER_CACHE = "givethra-v2";
 
 function isLegacyKey(key: string): boolean {
   const normalized = key.toLowerCase();
@@ -29,5 +30,48 @@ export function clearLegacyBrowserState(): void {
     }
   } catch {
     // HttpOnly or blocked cookies cannot be cleared by frontend JavaScript.
+  }
+
+  void clearLegacyCaches();
+}
+
+async function clearLegacyCaches(): Promise<void> {
+  try {
+    if ("caches" in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter((name) => {
+            const normalized = name.toLowerCase();
+            return name !== CURRENT_SERVICE_WORKER_CACHE &&
+              (normalized.includes("supabase") || normalized.includes("old_givethra") || normalized.startsWith("givethra-") || normalized.includes("workbox"));
+          })
+          .map((name) => caches.delete(name))
+      );
+    }
+  } catch {
+    // Cache Storage may be unavailable in private browsing; continue normally.
+  }
+
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(
+        registrations
+          .filter((registration) => {
+            const scriptUrl = registration.active?.scriptURL || registration.waiting?.scriptURL || registration.installing?.scriptURL;
+            if (!scriptUrl) return false;
+            try {
+              const parsed = new URL(scriptUrl);
+              return parsed.origin === window.location.origin && parsed.pathname !== "/sw.js";
+            } catch {
+              return false;
+            }
+          })
+          .map((registration) => registration.unregister())
+      );
+    }
+  } catch {
+    // A service worker can be controlled by the browser and may not be unregisterable here.
   }
 }

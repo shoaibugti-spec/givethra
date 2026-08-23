@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const u: UserPublic = {
               id: data.user.user_id,
               email: data.user.email,
-              fullName: data.user.full_name || data.user.email,
+              fullName: data.user.full_name || "User",
               photo: data.user.avatar_url || "",
               role: (safeLocalGet(ROLE_KEY) as UserRole) || null,
             };
@@ -137,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u: UserPublic = {
           id: data.user.user_id,
           email: data.user.email,
-          fullName: data.user.full_name || data.user.email,
+          fullName: data.user.full_name || "User",
           photo: data.user.avatar_url || "",
           role: (safeLocalGet(ROLE_KEY) as UserRole) || null,
         };
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const authenticatedUser: UserPublic = {
         id: data.user.user_id,
         email: data.user.email,
-        fullName: data.user.full_name || data.user.email,
+        fullName: data.user.full_name || "User",
         photo: data.user.avatar_url || "",
         role: (safeLocalGet(ROLE_KEY) as UserRole) || null,
       };

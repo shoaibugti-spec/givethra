@@ -1,6 +1,5 @@
 // src/frontend/src/components/Layout.tsx
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -10,7 +9,6 @@ import {
   Heart,
   Menu,
   Moon,
-  Search,
   Shield,
   Sun,
   User,
@@ -62,7 +60,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const router = useRouterState();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [notifCount, setNotifCount] = useState(0);
   const [postCount, setPostCount] = useState(0);
 
@@ -122,11 +119,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     navigate({ to: "/" });
   };
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) navigate({ to: "/cases" });
-  };
-
   const isRouteActive = (to: string) =>
     router.location.pathname === to || router.location.pathname.startsWith(`${to}/`);
 
@@ -159,19 +151,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-display font-bold text-lg text-primary">Givethra</span>
           </Link>
 
-          <form onSubmit={handleSearch} className="flex-1 min-w-0 w-full max-w-2xl mx-auto md:mx-4">
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
-              <Input
-                type="search"
-                placeholder="Search verified cases..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search verified cases"
-                className="pl-11 h-10 bg-muted/60 border-transparent focus:border-input focus:bg-background text-sm rounded-full"
-              />
-            </div>
-          </form>
+          <div className="flex-1" aria-hidden="true" />
 
           {/* Reference layout: translation, Community, notifications */}
           <div className="flex items-center gap-1 shrink-0">

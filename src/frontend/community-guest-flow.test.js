@@ -14,6 +14,16 @@ describe("public Community Posts flow", () => {
     expect(workerSource).toContain("function guestIdentity(request, body = null)");
     expect(workerSource).toContain("const actorId = user?.user_id || guest?.id;");
     expect(workerSource).toContain("user?.user_id || null, displayName");
+    expect(apiSource).toContain("/api/community/posts/${postId}/likes");
+    expect(pageSource).not.toContain("user?.email?.split(\"@\")[0]");
+  });
+
+  it("creates server-side notifications for like and comment activity without exposing email names", () => {
+    expect(workerSource).toContain("insertCommunityNotification");
+    expect(workerSource).toContain('"like"');
+    expect(workerSource).toContain('"comment"');
+    expect(workerSource).toContain("publicDisplayName");
+    expect(workerSource).toContain("ctx.waitUntil");
   });
 
   it("keeps the guest composer and public interactions enabled in the UI", () => {
