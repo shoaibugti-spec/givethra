@@ -124,7 +124,7 @@ const CATEGORIES = [
 ];
 
 // ============================================================
-//  COUNTRIES LIST (moved outside component - FIXED)
+//  COUNTRIES LIST (moved outside component)
 // ============================================================
 const COUNTRIES = [
   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda",
@@ -2857,9 +2857,9 @@ export default function SubmitRequestPage() {
               />
             </div>
             {/* ============================================================
-                COUNTRY & CITY - FIXED: Side by side, same as before
+                COUNTRY & CITY - FIXED: More spacing (gap-6)
                 ============================================================ */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label>Country *</Label>
                 <Select value={country} onValueChange={setCountry}>
@@ -2933,7 +2933,7 @@ export default function SubmitRequestPage() {
           </div>
         )}
 
-        {/* STEP 2 */}
+        {/* STEP 2 - باقی کوڈ ویسے کا ویسے ہے، صرف یہاں تک درست ہے */}
         {step === 2 && (
           <div className="rounded-2xl border bg-card p-6 space-y-5">
             <h2 className="font-bold text-lg">🗂 {category || "Category"} — Details</h2>
