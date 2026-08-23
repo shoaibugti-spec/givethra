@@ -82,10 +82,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
 
-  // Helper to get auth token
-  const getToken = () => localStorage.getItem("auth_token") || "";
-
-  // --- Load notifications and chat counts ---
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
@@ -97,9 +93,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         ]);
         setNotifCount(nCount ?? 0);
         setChatCount(cCount ?? 0);
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     };
 
     loadCounts();
@@ -107,7 +101,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
 
-  // --- Community post count ---
   const fetchPostCount = async () => {
     if (!isAuthenticated) {
       setPostCount(0);
@@ -116,9 +109,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     try {
       const data = await getCommunityPosts();
       setPostCount(Array.isArray(data) ? data.length : 0);
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -128,7 +119,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
     fetchPostCount();
     const interval = setInterval(fetchPostCount, 30000);
-    // Listen for new posts from CommunityPage
     const handlePostUpdate = () => fetchPostCount();
     window.addEventListener("post-updated", handlePostUpdate);
     return () => {
@@ -137,7 +127,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated]);
 
-  // --- Mark posts as read when visiting /community ---
   useEffect(() => {
     if (!isAuthenticated) return;
     const currentPath = router.location.pathname;
@@ -145,7 +134,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       const markAsRead = async () => {
         try {
           await markCommunityPostsAsRead();
-          // Refresh count after marking read
           fetchPostCount();
         } catch (e) {
           console.error("Error marking community posts as read:", e);
@@ -201,7 +189,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1 shrink-0">
             <LanguageSwitcher />
 
-            {/* --- Community Icon with counter --- */}
             <Link
               to="/community"
               aria-label="Community"
@@ -221,11 +208,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               aria-label="Toggle theme"
               className="hidden md:flex h-9 w-9 rounded-lg items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth"
             >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
             {isAuthenticated ? (
@@ -277,14 +260,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             ) : (
               <>
                 <Link to="/sign-in" className="hidden md:block">
-                  <Button variant="ghost" size="sm">
-                    Sign in
-                  </Button>
+                  <Button variant="ghost" size="sm">Sign in</Button>
                 </Link>
                 <Link to="/sign-up" className="hidden md:block">
-                  <Button size="sm" className="font-semibold">
-                    Get Started
-                  </Button>
+                  <Button size="sm" className="font-semibold">Get Started</Button>
                 </Link>
               </>
             )}
@@ -300,6 +279,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
+        {/* ===== Desktop Navigation Links ===== */}
         <div className="hidden md:block border-t border-border/50">
           <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
             <NavLink to="/cases">Browse Cases</NavLink>
@@ -312,103 +292,41 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
+        {/* ===== Mobile Menu ===== */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
-            <NavLink to="/cases" onClick={closeMenu}>
-              Browse Cases
-            </NavLink>
+            <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
             {isAuthenticated && (
-              <div className="py-1">
-                <NavLink to="/my-cases" onClick={closeMenu}>
-                  My Cases
-                </NavLink>
-              </div>
+              <>
+                <div className="py-1"><NavLink to="/my-cases" onClick={closeMenu}>My Cases</NavLink></div>
+                <div className="py-1"><NavLink to="/submit-request" onClick={closeMenu}>Submit a Case</NavLink></div>
+                <div className="py-1"><NavLink to="/support" onClick={closeMenu}>Help & Support</NavLink></div>
+              </>
             )}
-            {isAuthenticated && (
-              <div className="py-1">
-                <NavLink to="/submit-request" onClick={closeMenu}>
-                  Submit a Case
-                </NavLink>
-              </div>
-            )}
-            {isAuthenticated && (
-              <div className="py-1">
-                <NavLink to="/support" onClick={closeMenu}>
-                  Help & Support
-                </NavLink>
-              </div>
-            )}
-            {isAdmin && (
-              <div className="py-1">
-                <NavLink to="/admin" onClick={closeMenu}>
-                  Admin Panel
-                </NavLink>
-              </div>
-            )}
-            <div className="py-1">
-              <NavLink to="/about" onClick={closeMenu}>
-                About
-              </NavLink>
-            </div>
-            <div className="py-1">
-              <NavLink to="/faq" onClick={closeMenu}>
-                FAQ
-              </NavLink>
-            </div>
+            {isAdmin && <div className="py-1"><NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink></div>}
+            <div className="py-1"><NavLink to="/about" onClick={closeMenu}>About</NavLink></div>
+            <div className="py-1"><NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink></div>
             <div className="pt-1">
               <button
                 type="button"
-                onClick={() => {
-                  toggleTheme();
-                  closeMenu();
-                }}
+                onClick={() => { toggleTheme(); closeMenu(); }}
                 className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors"
               >
-                {theme === "dark" ? (
-                  <>
-                    <Sun className="h-4 w-4" /> Light Mode
-                  </>
-                ) : (
-                  <>
-                    <Moon className="h-4 w-4" /> Dark Mode
-                  </>
-                )}
+                {theme === "dark" ? <><Sun className="h-4 w-4" /> Light Mode</> : <><Moon className="h-4 w-4" /> Dark Mode</>}
               </button>
             </div>
             <div className="pt-3 border-t border-border mt-2 space-y-2">
               {isAuthenticated ? (
                 <>
-                  <Link
-                    to="/profile/$id"
-                    params={{ id: "me" }}
-                    onClick={closeMenu}
-                  >
-                    <Button variant="outline" size="sm" className="w-full">
-                      <Shield className="h-4 w-4 mr-2" />
-                      Profile
-                    </Button>
+                  <Link to="/profile/$id" params={{ id: "me" }} onClick={closeMenu}>
+                    <Button variant="outline" size="sm" className="w-full"><Shield className="h-4 w-4 mr-2" /> Profile</Button>
                   </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleLogout}
-                  >
-                    Logout
-                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full" onClick={handleLogout}>Logout</Button>
                 </>
               ) : (
                 <>
-                  <Link to="/sign-in" onClick={closeMenu}>
-                    <Button variant="outline" size="sm" className="w-full">
-                      Sign in
-                    </Button>
-                  </Link>
-                  <Link to="/sign-up" onClick={closeMenu}>
-                    <Button size="sm" className="w-full font-semibold">
-                      Get Started
-                    </Button>
-                  </Link>
+                  <Link to="/sign-in" onClick={closeMenu}><Button variant="outline" size="sm" className="w-full">Sign in</Button></Link>
+                  <Link to="/sign-up" onClick={closeMenu}><Button size="sm" className="w-full font-semibold">Get Started</Button></Link>
                 </>
               )}
             </div>
@@ -418,6 +336,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 has-bottom-nav">{children}</main>
 
+      {/* ===== Footer ===== */}
       <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
@@ -426,46 +345,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
                   <Heart className="h-3.5 w-3.5 text-primary-foreground" />
                 </div>
-                <span className="font-display font-bold text-foreground">
-                  Givethra
-                </span>
+                <span className="font-display font-bold text-foreground">Givethra</span>
               </div>
-              <p className="text-xs text-muted-foreground max-w-xs">
-                Verified Help. Real Impact.
-              </p>
+              <p className="text-xs text-muted-foreground max-w-xs">Verified Help. Real Impact.</p>
               <div className="flex items-center gap-3 pt-1">
-                <a
-                  href={FACEBOOK_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Facebook"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
+                <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
                   <Facebook className="h-4 w-4" />
                 </a>
-                <a
-                  href={INSTAGRAM_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Instagram"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
+                <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white">
                   <Instagram className="h-4 w-4" />
                 </a>
-                <a
-                  href={LINKEDIN_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="LinkedIn"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
+                <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white">
                   <Linkedin className="h-4 w-4" />
                 </a>
-                <a
-                  href="mailto:info@givethra.org"
-                  aria-label="Email"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
+                <a href="mailto:info@givethra.org" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white">
                   <Mail className="h-4 w-4" />
                 </a>
               </div>
@@ -479,22 +372,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 { to: "/community-guidelines", label: "Community Guidelines" },
                 { to: "/contact", label: "Contact Us" },
               ].map(({ to, label }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {label}
-                </Link>
+                <Link key={to} to={to} className="text-sm text-muted-foreground hover:text-foreground transition-colors">{label}</Link>
               ))}
             </nav>
           </div>
           <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-1">
             <p>&copy; {new Date().getFullYear()} Givethra. All rights reserved.</p>
-            <p>
-              Givethra™ is a humanitarian platform connecting verified people
-              with verified help.
-            </p>
+            <p>Givethra™ is a humanitarian platform connecting verified people with verified help.</p>
           </div>
         </div>
       </footer>
