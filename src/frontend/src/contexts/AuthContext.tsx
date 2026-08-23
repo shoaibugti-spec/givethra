@@ -167,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const authenticatedUser: UserPublic = {
-        id: data.user.id || data.user.openId || data.user.user_id,
+        id: data.user.id || data.user.openId || data.user.user_id || `google_${Date.now()}`,
         email: data.user.email,
         fullName: data.user.name || data.user.full_name || data.user.email,
         photo: data.user.picture || data.user.avatar_url || "",
