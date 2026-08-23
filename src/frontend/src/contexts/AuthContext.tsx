@@ -87,22 +87,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Initial verification on load
+  // ✅ اب Express Backend کو verify کریں
   useEffect(() => {
     const token = getTokenFromLocation();
     if (token) {
-      fetch(`${WORKER_URL}/verify`, {
+      fetch(`/api/auth/verify`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
         .then((data) => {
           if (data.valid && data.user) {
             const u: UserPublic = {
-              id: data.user.user_id,
+              id: data.user.id || data.user.user_id || data.user.openId,
               email: data.user.email,
-              fullName: data.user.full_name || data.user.email,
-              photo: data.user.avatar_url || "",
-              role: (safeLocalGet(ROLE_KEY) as UserRole) || null,
+              fullName: data.user.name || data.user.full_name || data.user.email,
+              photo: data.user.picture || data.user.avatar_url || "",
+              role: (safeLocalGet(ROLE_KEY) as UserRole) || data.user.role || null,
             };
             setUser(u);
             setUserId(u.id);
@@ -127,17 +127,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const res = await fetch(`${WORKER_URL}/verify`, {
+      const res = await fetch(`/api/auth/verify`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.valid && data.user) {
         const u: UserPublic = {
-          id: data.user.user_id,
+          id: data.user.id || data.user.user_id || data.user.openId,
           email: data.user.email,
-          fullName: data.user.full_name || data.user.email,
-          photo: data.user.avatar_url || "",
-          role: (safeLocalGet(ROLE_KEY) as UserRole) || null,
+          fullName: data.user.name || data.user.full_name || data.user.email,
+          photo: data.user.picture || data.user.avatar_url || "",
+          role: (safeLocalGet(ROLE_KEY) as UserRole) || data.user.role || null,
         };
         setUser(u);
         setUserId(u.id);
