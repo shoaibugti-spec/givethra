@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Heart, MessageCircle, Send, User, Plus, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, Send, User, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -117,7 +118,6 @@ export default function CommunityPage() {
       if (result?.id) {
         toast.success("Post shared!");
         setNewPost("");
-        // Add new post to the top
         const newPostObj: Post = {
           id: result.id,
           user_id: user?.id || null,
@@ -128,7 +128,6 @@ export default function CommunityPage() {
           comments: [],
         };
         setPosts((prev) => [newPostObj, ...prev]);
-        // Trigger post-updated event to update count in Layout
         window.dispatchEvent(new CustomEvent("post-updated"));
       } else {
         toast.error("Failed to post. Please try again.");
@@ -152,7 +151,6 @@ export default function CommunityPage() {
       if (result.liked) {
         setLikedPosts((prev) => ({ ...prev, [postId]: true }));
         setLikeCounts((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-        // Send notification to post owner (if not self)
         const postOwner = posts.find((p) => p.id === postId)?.user_id;
         if (postOwner && postOwner !== user?.id) {
           try {
@@ -163,15 +161,11 @@ export default function CommunityPage() {
               message: `${user?.fullName || "Someone"} liked your post.`,
               link: "/community",
             });
-          } catch (e) {
-            // silent fail for notification
-          }
+          } catch (e) {}
         }
-        // toast.success("Liked!");
       } else {
         setLikedPosts((prev) => ({ ...prev, [postId]: false }));
         setLikeCounts((prev) => ({ ...prev, [postId]: Math.max((prev[postId] || 0) - 1, 0) }));
-        // toast.info("Unliked");
       }
     } catch (error: any) {
       console.error("Error toggling like:", error);
@@ -200,7 +194,6 @@ export default function CommunityPage() {
         )
       );
       setNewComment((prev) => ({ ...prev, [postId]: "" }));
-      // Send notification to post owner
       const postOwner = posts.find((p) => p.id === postId)?.user_id;
       if (postOwner && postOwner !== user?.id) {
         try {
@@ -214,7 +207,6 @@ export default function CommunityPage() {
         } catch (e) {}
       }
       toast.success("Comment added!");
-      // Scroll to the new comment after a moment
       setTimeout(() => {
         const commentEl = document.getElementById(`comment-${data.id}`);
         if (commentEl) commentEl.scrollIntoView({ behavior: "smooth" });
@@ -244,221 +236,225 @@ export default function CommunityPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-          <p className="mt-4 text-muted-foreground">Loading community...</p>
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+            <p className="mt-4 text-muted-foreground">Loading community...</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Community</h1>
-          <p className="text-sm text-muted-foreground">Share and connect with the Givethra family</p>
-        </div>
-        <span className="text-sm font-medium bg-primary/10 text-primary px-3 py-1 rounded-full">
-          {posts.length} posts
-        </span>
-      </div>
-
-      {/* New Post Box (only for authenticated users) */}
-      {isAuthenticated ? (
-        <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <User className="h-5 w-5 text-primary" />
-            </div>
-            <span className="font-medium text-sm">{user?.full_name || "User"}</span>
+    <Layout>
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Community</h1>
+            <p className="text-sm text-muted-foreground">Share and connect with the Givethra family</p>
           </div>
-          <Textarea
-            placeholder="What's on your mind? Share your thoughts..."
-            value={newPost}
-            onChange={(e) => setNewPost(e.target.value)}
-            rows={3}
-            className="resize-none border-border focus:border-primary"
-          />
-          <div className="flex justify-end">
+          <span className="text-sm font-medium bg-primary/10 text-primary px-3 py-1 rounded-full">
+            {posts.length} posts
+          </span>
+        </div>
+
+        {/* New Post Box (only for authenticated users) */}
+        {isAuthenticated ? (
+          <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+              <span className="font-medium text-sm">{user?.full_name || "User"}</span>
+            </div>
+            <Textarea
+              placeholder="What's on your mind? Share your thoughts..."
+              value={newPost}
+              onChange={(e) => setNewPost(e.target.value)}
+              rows={3}
+              className="resize-none border-border focus:border-primary"
+            />
+            <div className="flex justify-end">
+              <Button
+                onClick={handleCreatePost}
+                disabled={submitting || !newPost.trim()}
+                className="px-6 rounded-full"
+              >
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Post
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-6 text-center">
+            <p className="text-muted-foreground">Sign in to share your thoughts with the community.</p>
             <Button
-              onClick={handleCreatePost}
-              disabled={submitting || !newPost.trim()}
-              className="px-6 rounded-full"
+              variant="outline"
+              className="mt-3 rounded-full"
+              onClick={() => window.location.href = "/sign-in"}
             >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Send className="h-4 w-4 mr-2" />
-              )}
-              Post
+              Sign In
             </Button>
           </div>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-6 text-center">
-          <p className="text-muted-foreground">Sign in to share your thoughts with the community.</p>
-          <Button
-            variant="outline"
-            className="mt-3 rounded-full"
-            onClick={() => window.location.href = "/sign-in"}
-          >
-            Sign In
-          </Button>
-        </div>
-      )}
+        )}
 
-      {/* Posts List */}
-      {posts.length === 0 ? (
-        <div className="text-center py-16 border rounded-2xl bg-muted/10">
-          <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {posts.map((post) => (
-            <div
-              key={post.id}
-              className="rounded-2xl border border-border bg-card p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow"
-            >
-              {/* Post Header */}
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <User className="h-5 w-5 text-primary" />
+        {/* Posts List */}
+        {posts.length === 0 ? (
+          <div className="text-center py-16 border rounded-2xl bg-muted/10">
+            <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {posts.map((post) => (
+              <div
+                key={post.id}
+                className="rounded-2xl border border-border bg-card p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow"
+              >
+                {/* Post Header */}
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <User className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-foreground">
+                        {post.display_name || "User"}
+                      </span>
+                      {post.is_guest ? (
+                        <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Guest</span>
+                      ) : (
+                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">Verified</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-foreground">
-                      {post.display_name || "User"}
-                    </span>
-                    {post.is_guest ? (
-                      <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Guest</span>
+
+                {/* Post Content */}
+                <p className="text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                  {post.message}
+                </p>
+
+                {/* Actions */}
+                <div className="flex items-center gap-6 pt-2 border-t border-border">
+                  <button
+                    onClick={() => handleLike(post.id)}
+                    className={`flex items-center gap-1.5 text-sm transition-colors ${
+                      likedPosts[post.id]
+                        ? "text-red-500"
+                        : "text-muted-foreground hover:text-red-500"
+                    }`}
+                    disabled={!isAuthenticated}
+                  >
+                    <Heart
+                      className={`h-5 w-5 transition-all ${
+                        likedPosts[post.id] ? "fill-red-500" : ""
+                      }`}
+                    />
+                    <span className="font-medium">{likeCounts[post.id] || 0}</span>
+                  </button>
+
+                  <button
+                    onClick={() => toggleComments(post.id)}
+                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    <span className="font-medium">{post.comments?.length || 0}</span>
+                  </button>
+                </div>
+
+                {/* Comments Section */}
+                {showComments[post.id] && (
+                  <div className="space-y-4 pt-2 border-t border-border">
+                    {post.comments && post.comments.length > 0 ? (
+                      <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                        {post.comments.map((comment) => (
+                          <div
+                            key={comment.id}
+                            id={`comment-${comment.id}`}
+                            className="flex gap-3"
+                          >
+                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-foreground">
+                                  {comment.user_name || "User"}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {formatDistanceToNow(new Date(comment.created_at), {
+                                    addSuffix: true,
+                                  })}
+                                </span>
+                              </div>
+                              <p className="text-sm text-foreground break-words">
+                                {comment.comment}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     ) : (
-                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">Verified</span>
+                      <p className="text-sm text-muted-foreground text-center py-2">
+                        No comments yet.
+                      </p>
+                    )}
+
+                    {/* Comment Input */}
+                    {isAuthenticated ? (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Input
+                          placeholder="Write a comment..."
+                          value={newComment[post.id] || ""}
+                          onChange={(e) =>
+                            setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleComment(post.id);
+                            }
+                          }}
+                          className="flex-1 rounded-full border-border focus:border-primary"
+                        />
+                        <Button
+                          size="icon"
+                          onClick={() => handleComment(post.id)}
+                          disabled={!newComment[post.id]?.trim()}
+                          className="rounded-full shrink-0 h-10 w-10"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center">
+                        <button
+                          onClick={() => window.location.href = "/sign-in"}
+                          className="text-primary hover:underline"
+                        >
+                          Sign in
+                        </button>{" "}
+                        to comment.
+                      </p>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                  </p>
-                </div>
+                )}
               </div>
-
-              {/* Post Content */}
-              <p className="text-foreground whitespace-pre-wrap break-words leading-relaxed">
-                {post.message}
-              </p>
-
-              {/* Actions */}
-              <div className="flex items-center gap-6 pt-2 border-t border-border">
-                <button
-                  onClick={() => handleLike(post.id)}
-                  className={`flex items-center gap-1.5 text-sm transition-colors ${
-                    likedPosts[post.id]
-                      ? "text-red-500"
-                      : "text-muted-foreground hover:text-red-500"
-                  }`}
-                  disabled={!isAuthenticated}
-                >
-                  <Heart
-                    className={`h-5 w-5 transition-all ${
-                      likedPosts[post.id] ? "fill-red-500" : ""
-                    }`}
-                  />
-                  <span className="font-medium">{likeCounts[post.id] || 0}</span>
-                </button>
-
-                <button
-                  onClick={() => toggleComments(post.id)}
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  <span className="font-medium">{post.comments?.length || 0}</span>
-                </button>
-              </div>
-
-              {/* Comments Section */}
-              {showComments[post.id] && (
-                <div className="space-y-4 pt-2 border-t border-border">
-                  {post.comments && post.comments.length > 0 ? (
-                    <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                      {post.comments.map((comment) => (
-                        <div
-                          key={comment.id}
-                          id={`comment-${comment.id}`}
-                          className="flex gap-3"
-                        >
-                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-foreground">
-                                {comment.user_name || "User"}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {formatDistanceToNow(new Date(comment.created_at), {
-                                  addSuffix: true,
-                                })}
-                              </span>
-                            </div>
-                            <p className="text-sm text-foreground break-words">
-                              {comment.comment}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-2">
-                      No comments yet.
-                    </p>
-                  )}
-
-                  {/* Comment Input */}
-                  {isAuthenticated ? (
-                    <div className="flex items-center gap-2 mt-2">
-                      <Input
-                        placeholder="Write a comment..."
-                        value={newComment[post.id] || ""}
-                        onChange={(e) =>
-                          setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleComment(post.id);
-                          }
-                        }}
-                        className="flex-1 rounded-full border-border focus:border-primary"
-                      />
-                      <Button
-                        size="icon"
-                        onClick={() => handleComment(post.id)}
-                        disabled={!newComment[post.id]?.trim()}
-                        className="rounded-full shrink-0 h-10 w-10"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center">
-                      <button
-                        onClick={() => window.location.href = "/sign-in"}
-                        className="text-primary hover:underline"
-                      >
-                        Sign in
-                      </button>{" "}
-                      to comment.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Layout>
   );
 }
