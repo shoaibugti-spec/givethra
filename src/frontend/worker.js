@@ -408,13 +408,13 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
     const results = [];
     for (const post of (posts.results || [])) {
       const likes = await env.DB.prepare(
-        "SELECT user_id FROM community_likes WHERE post_id = ?"
+        "SELECT user_id FROM community_post_likes WHERE post_id = ?"
       ).bind(post.id).all();
       
       const comments = await env.DB.prepare(
         `SELECT cl.*,
         CASE WHEN cl.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cl.user_id, 7) ELSE u.full_name END as user_name
-         FROM community_comments cl
+         FROM community_post_comments cl
          LEFT JOIN users u ON cl.user_id = u.user_id
          WHERE cl.post_id = ?
          ORDER BY cl.created_at ASC`
@@ -478,7 +478,7 @@ async function handleCommunityLikes(request, env, user, url, parts, origin) {
 
   if (request.method === "GET") {
     const likes = await env.DB.prepare(
-      "SELECT * FROM community_likes WHERE post_id = ?"
+      "SELECT * FROM community_post_likes WHERE post_id = ?"
     ).bind(postId).all();
     return json(likes.results || [], 200, origin);
   }
@@ -488,18 +488,18 @@ async function handleCommunityLikes(request, env, user, url, parts, origin) {
     const actorId = user?.user_id || guest?.id;
     if (!actorId) return json({ error: "Guest identity is required" }, 400, origin);
     const existing = await env.DB.prepare(
-      "SELECT id FROM community_likes WHERE post_id = ? AND user_id = ?"
+      "SELECT id FROM community_post_likes WHERE post_id = ? AND user_id = ?"
     ).bind(postId, actorId).first();
 
     if (existing) {
       await env.DB.prepare(
-        "DELETE FROM community_likes WHERE post_id = ? AND user_id = ?"
+        "DELETE FROM community_post_likes WHERE post_id = ? AND user_id = ?"
       ).bind(postId, actorId).run();
       return json({ liked: false, post_id: postId }, 200, origin);
     } else {
       const likeId = id();
       await env.DB.prepare(
-        "INSERT INTO community_likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)"
+        "INSERT INTO community_post_likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)"
       ).bind(likeId, postId, actorId, now()).run();
       return json({ liked: true, post_id: postId, id: likeId }, 201, origin);
     }
@@ -519,7 +519,7 @@ async function handleCommunityComments(request, env, user, url, parts, origin) {
     const comments = await env.DB.prepare(
       `SELECT cc.*,
         CASE WHEN cc.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cc.user_id, 7) ELSE u.full_name END as user_name
-       FROM community_comments cc
+       FROM community_post_comments cc
        LEFT JOIN users u ON cc.user_id = u.user_id
        WHERE cc.post_id = ?
        ORDER BY cc.created_at ASC`
@@ -537,12 +537,13 @@ async function handleCommunityComments(request, env, user, url, parts, origin) {
 
     const commentId = id();
     await env.DB.prepare(
-      "INSERT INTO community_comments (id, post_id, user_id, comment, created_at) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO community_post_comments (id, post_id, user_id, comment, created_at) VALUES (?, ?, ?, ?, ?)"
     ).bind(commentId, postId, actorId, commentText, now()).run();
 
     const newComment = await env.DB.prepare(
-      `SELECT cc.*, u.full_name as user_name
-       FROM community_comments cc
+      `SELECT cc.*,
+        CASE WHEN cc.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cc.user_id, 7) ELSE u.full_name END as user_name
+       FROM community_post_comments cc
        LEFT JOIN users u ON cc.user_id = u.user_id
        WHERE cc.id = ?`
     ).bind(commentId).first();
