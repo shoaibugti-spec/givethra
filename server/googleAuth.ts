@@ -18,7 +18,7 @@ type GoogleClaims = {
 };
 
 function isVerifiedEmail(value: GoogleClaims["email_verified"]) {
-  return value === true || value === "true" || value === undefined; // Google userinfo or token response
+  return value === true || value === "true" || value === undefined;
 }
 
 async function verifyGoogleCredential(credential: string) {
@@ -79,7 +79,8 @@ export function registerGoogleAuthRoutes(app: Express) {
       const role = ownerEmail && identity.email === ownerEmail ? "admin" : "user";
       const openId = `google:${identity.sub}`;
 
-      await upsertUser({
+      // ✅ upsertUser خودکار طور پر نیا صارف بنا دے گا اگر موجود نہیں
+      const user = await upsertUser({
         openId,
         name: identity.name,
         email: identity.email,
@@ -91,8 +92,16 @@ export function registerGoogleAuthRoutes(app: Express) {
       const token = await sdk.createSessionToken(openId, { name: identity.name });
       res.cookie(COOKIE_NAME, token, getSessionCookieOptions(req));
 
+      // ✅ وہی ڈیٹا واپس بھیجیں جو AuthContext کو چاہیے
       return res.status(200).json({
-        user: { name: identity.name, email: identity.email, role, picture: identity.picture },
+        token,
+        user: {
+          id: user.id || user.user_id || openId,
+          email: identity.email,
+          name: identity.name,
+          role,
+          picture: identity.picture,
+        },
       });
     } catch (error) {
       return sendAuthError(res, error);
