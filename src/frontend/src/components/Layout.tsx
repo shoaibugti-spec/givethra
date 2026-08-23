@@ -7,7 +7,23 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, Heart, Menu, Moon, Search, Shield, Sun, User, X, Facebook, Instagram, Linkedin, MessageCircle, Mail, Users } from "lucide-react";
+import {
+  Bell,
+  Heart,
+  Menu,
+  Moon,
+  Search,
+  Shield,
+  Sun,
+  User,
+  X,
+  Facebook,
+  Instagram,
+  Linkedin,
+  MessageCircle,
+  Mail,
+  MessageSquare,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 import {
@@ -156,39 +172,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col bg-background">
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-14 md:h-16 flex items-center gap-2 md:gap-4">
-          <div className="flex items-center gap-1 shrink-0">
-            {isAuthenticated && (
-              <button onClick={() => navigate({ to: "/notifications" })} aria-label="Notifications"
-                className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth">
-                <Bell className="h-5 w-5" />
-                {notifCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                    {notifCount > 9 ? "9+" : notifCount}
-                  </span>
-                )}
-              </button>
-            )}
-            <Link to="/community" aria-label="Community"
-              className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth">
-              <Users className="h-5 w-5" />
-            </Link>
-            <LanguageSwitcher />
-          </div>
-
-          <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input type="search" placeholder="Search verified cases..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 bg-muted/60 border-transparent focus:border-input focus:bg-background text-sm rounded-full" />
-            </div>
-          </form>
-
+          
+          {/* ===== LEFT: Logo ===== */}
           <Link to="/" className="flex items-center gap-1.5 shrink-0">
             <div className="h-7 w-7 md:h-8 md:w-8 rounded-lg bg-primary flex items-center justify-center">
               <Heart className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-base md:text-lg text-foreground hidden sm:block">Givethra</span>
+            <span className="font-display font-bold text-base md:text-lg text-foreground hidden sm:block">
+              Givethra
+            </span>
           </Link>
+
+          {/* ===== CENTER: Search ===== */}
+          <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto md:mx-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="search"
+                placeholder="Search verified cases..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 bg-muted/60 border-transparent focus:border-input focus:bg-background text-sm rounded-full"
+              />
+            </div>
+          </form>
+
+          {/* ===== RIGHT: Icons ===== */}
+          <div className="flex items-center gap-1 shrink-0">
+            <LanguageSwitcher />
 
             {/* --- Community Icon with counter --- */}
             <Link
