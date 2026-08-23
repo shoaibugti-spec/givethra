@@ -1,10 +1,11 @@
+// src/frontend/src/pages/CommunityPage.tsx
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Heart, MessageCircle, Send, User, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, Send, User, Loader2, CheckCircle2, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -158,7 +159,7 @@ export default function CommunityPage() {
               user_id: postOwner,
               type: "like",
               title: "New Like ❤️",
-              message: `${user?.fullName || "Someone"} liked your post.`,
+              message: `${user?.full_name || "Someone"} liked your post.`,
               link: "/community",
             });
           } catch (e) {}
@@ -201,7 +202,7 @@ export default function CommunityPage() {
             user_id: postOwner,
             type: "comment",
             title: "New Comment 💬",
-            message: `${user?.fullName || "Someone"} commented: "${comment.slice(0, 50)}${comment.length > 50 ? "..." : ""}"`,
+            message: `${user?.full_name || "Someone"} commented: "${comment.slice(0, 50)}${comment.length > 50 ? "..." : ""}"`,
             link: "/community",
           });
         } catch (e) {}
@@ -234,10 +235,28 @@ export default function CommunityPage() {
     };
   }, [isAuthenticated]);
 
+  // --- شیئر کرنا ---
+  const handleShare = (postId: string) => {
+    const url = `${window.location.origin}/community?post=${postId}`;
+    if (navigator.share) {
+      navigator.share({
+        title: "Check out this post on Givethra Community",
+        text: "Join the conversation on Givethra Community!",
+        url: url,
+      }).catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(url).then(() => {
+        toast.success("Link copied to clipboard!");
+      }).catch(() => {
+        toast.info(`Share this link: ${url}`);
+      });
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
             <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
             <p className="mt-4 text-muted-foreground">Loading community...</p>
@@ -269,6 +288,9 @@ export default function CommunityPage() {
                 <User className="h-5 w-5 text-primary" />
               </div>
               <span className="font-medium text-sm">{user?.full_name || "User"}</span>
+              <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" /> Verified
+              </span>
             </div>
             <Textarea
               placeholder="What's on your mind? Share your thoughts..."
@@ -331,7 +353,9 @@ export default function CommunityPage() {
                       {post.is_guest ? (
                         <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Guest</span>
                       ) : (
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">Verified</span>
+                        <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Verified
+                        </span>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -370,6 +394,13 @@ export default function CommunityPage() {
                   >
                     <MessageCircle className="h-5 w-5" />
                     <span className="font-medium">{post.comments?.length || 0}</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleShare(post.id)}
+                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <Share2 className="h-5 w-5" />
                   </button>
                 </div>
 
