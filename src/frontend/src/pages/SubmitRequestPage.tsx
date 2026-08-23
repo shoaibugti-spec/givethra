@@ -177,7 +177,7 @@ const FEE_SUB_OPTIONS = [
   { value: "university", label: "🏛️ University Fee" },
 ];
 
-// ===== EDUCATION FIELDS (unchanged) =====
+// ===== EDUCATION FIELDS =====
 const EDUCATION_ADMISSION_FIELDS = {
   School: [
     { key: "institute_name", label: "School Name", required: true, placeholder: "e.g. Beaconhouse School System" },
@@ -306,7 +306,7 @@ const PAYMENT_RECEIVER_CATS = new Set([
   "Other",
 ]);
 
-// ===== LIST_CATS (unchanged) =====
+// ===== LIST_CATS =====
 const LIST_CATS: Record<
   string,
   {
@@ -729,14 +729,16 @@ export default function SubmitRequestPage() {
       const cases = await getCasesByUser(user.id);
       const totalCases = cases?.length || 0;
       const rejectedCases = cases?.filter((c: any) => c.status === "rejected").length || 0;
-      // Only count approved/active cases as truly consumed free cases. Rejected cases do not consume free quota.
-      const freeCasesUsed = cases?.filter((c: any) => c.was_free === true && c.status !== "rejected").length || 0;
+      
+      // ✅ FIX: Count all free cases regardless of status (including rejected)
+      const freeCasesUsed = cases?.filter((c: any) => c.was_free === true).length || 0;
 
       setUserTotalCases(totalCases);
       setUserRejectionCount(rejectedCases);
       setUserFreeCasesUsed(freeCasesUsed);
 
-      const freeDisabled = rejectedCases >= 3 || freeCasesUsed >= MAX_FREE_CASES;
+      // Free disabled if free cases used >= 2 OR rejections >= 3
+      const freeDisabled = freeCasesUsed >= MAX_FREE_CASES || rejectedCases >= 3;
       setIsFreeDisabled(freeDisabled);
 
       const suspensionData = await getUserSuspension(user.id);
@@ -776,16 +778,19 @@ export default function SubmitRequestPage() {
       setIsSuspended(false);
       setSuspensionCount(suspensionCount + 1);
       setUserRejectionCount(0);
+      // Reset free cases used when unlocked
+      setUserFreeCasesUsed(0);
+      setIsFreeDisabled(false);
 
       await sendNotification(
         user.id,
         "system",
         "🔓 Account Unlocked",
-        `Your account has been unlocked using ${UNLOCK_CREDITS_REQUIRED} credits.`,
+        `Your account has been unlocked using ${UNLOCK_CREDITS_REQUIRED} credits. Your free case quota has been reset.`,
         "/dashboard"
       );
 
-      toast.success(`✅ Account unlocked! ${UNLOCK_CREDITS_REQUIRED} credits deducted.`);
+      toast.success(`✅ Account unlocked! ${UNLOCK_CREDITS_REQUIRED} credits deducted. Free cases reset.`);
       await loadUserStats();
     } catch (err) {
       toast.error(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
@@ -795,7 +800,7 @@ export default function SubmitRequestPage() {
   }
 
   // ============================================================
-  //  ✅ COMPLETE extraConditionalDocs() - FIXED (unchanged)
+  //  EXTRA CONDITIONAL DOCS
   // ============================================================
   function extraConditionalDocs(): { key: string; label: string; hint?: string }[] {
     const list: { key: string; label: string; hint?: string }[] = [];
@@ -842,9 +847,7 @@ export default function SubmitRequestPage() {
       list.push({ key: "livestock_proof", label: "Proof of Livestock / Farming", hint: "Photo or document showing your livestock/farming" });
     }
 
-    // ============================================================
-    //  ✅ GENDER-BASED DOCUMENTS - ONE "Widow" FOR BOTH
-    // ============================================================
+    // Gender-based documents
     if (gender === "Male") {
       if (maritalStatus === "Single") {
         list.push({ key: "frc", label: "Family Registration Certificate (FRC)", hint: "Required for single male" });
@@ -1132,12 +1135,6 @@ export default function SubmitRequestPage() {
       const completedCases = cases?.filter((c: any) => c.status === "completed") || [];
 
       if (completedCases.length > 0) {
-        // We need to check feedbacks for these cases
-        // For now, we'll assume no blocking; in real implementation, we'd call a feedback API
-        // Since feedbacks are also migrated, we'll use a placeholder
-        // Actually we can fetch feedbacks from the worker if needed
-        // For simplicity, we'll set blockedByFeedback to null
-        // In a production environment, you'd have a `getFeedbackByCase` API
         setBlockedByFeedback(null);
       } else {
         setBlockedByFeedback(null);
@@ -1165,7 +1162,6 @@ export default function SubmitRequestPage() {
       const settings = await getUserSettings(user.id);
       if (settings?.currency && settings.currency !== "USD") setCurrency(settings.currency);
       const counts = await getCaseCounts(user.id);
-      // Count active cases (pending, approved, completed)
       const activeCount = (counts?.pending || 0) + (counts?.approved || 0) + (counts?.completed || 0);
       setActiveCaseCount(activeCount);
     } catch (err) {
@@ -1186,7 +1182,6 @@ export default function SubmitRequestPage() {
       throw new Error(`File size (${fileSizeMB.toFixed(1)}MB) exceeds 50MB limit. Please record a shorter video.`);
     }
 
-    // Use the new upload function from api.ts
     try {
       const url = await uploadFileToStorage(file, path);
       return url;
@@ -1286,7 +1281,7 @@ export default function SubmitRequestPage() {
   }
 
   // ============================================================
-  //  VIDEO RECORDING - FIXED (60 seconds max, low quality, live preview)
+  //  VIDEO RECORDING - FIXED (60 seconds max, with audio improvements)
   // ============================================================
   async function startVideoRecording() {
     try {
@@ -1310,6 +1305,7 @@ export default function SubmitRequestPage() {
           noiseSuppression: true,
           autoGainControl: true,
           channelCount: 1,
+          sampleRate: 48000,
         },
       });
 
@@ -1327,8 +1323,9 @@ export default function SubmitRequestPage() {
       }, 50);
 
       const recorder = new MediaRecorder(s, {
-        mimeType: "video/webm;codecs=vp8",
+        mimeType: "video/webm;codecs=vp8,opus",
         videoBitsPerSecond: 1500000,
+        audioBitsPerSecond: 128000, // ✅ Better audio quality
       });
 
       mediaRecorderRef.current = recorder;
@@ -1696,9 +1693,10 @@ export default function SubmitRequestPage() {
       // Fetch fresh case data
       const freshCases = await getCasesByUser(uid);
       const freshRejections = freshCases?.filter((c: any) => c.status === "rejected").length || 0;
+      // Count all free cases regardless of status
       const freshFreeUsed = freshCases?.filter((c: any) => c.was_free === true).length || 0;
 
-      const freeDisabled = freshRejections >= 3 || freshFreeUsed >= MAX_FREE_CASES;
+      const freeDisabled = freshFreeUsed >= MAX_FREE_CASES || freshRejections >= 3;
       const userSuspended = freshRejections >= MAX_REJECTIONS_BEFORE_SUSPENSION;
 
       if (userSuspended) {
@@ -1715,6 +1713,7 @@ export default function SubmitRequestPage() {
         return;
       }
 
+      // First case free if no cases submitted yet
       const firstFree = (freshCases?.length || 0) === 0 && !freeDisabled;
 
       let offerFree = false;
@@ -1877,7 +1876,6 @@ export default function SubmitRequestPage() {
         finalAmount = parseFloat(amount) || 0;
       }
 
-      // Build the case object
       const caseData = {
         user_id: uid,
         category,
@@ -2083,7 +2081,6 @@ export default function SubmitRequestPage() {
     );
   }
 
-  // ===== FIXED: Removed extra } at line 2090 =====
   function renderPaymentReceiverDetails() {
     if (!needsPaymentReceiver) return null;
 
@@ -2608,6 +2605,7 @@ export default function SubmitRequestPage() {
               <p>⚠️ Important:</p>
               <ul className="list-disc list-inside space-y-1 mt-1">
                 <li>After unlocking, your rejection count will reset to 0</li>
+                <li>Your free case quota will be reset (you get 2 free cases again)</li>
                 <li>
                   If you get {MAX_REJECTIONS_BEFORE_SUSPENSION} rejections again, your account will be suspended again
                 </li>
@@ -2633,7 +2631,7 @@ export default function SubmitRequestPage() {
         <h1 className="text-3xl font-bold mb-2">Submit a Help Request</h1>
         <p className="text-muted-foreground mb-3">Your first case is FREE. After that, a 1 credit listing fee applies.</p>
 
-        {/* User Stats Banner */}
+        {/* User Stats Banner - Updated with Free Cases Used X/2 and Rejections X/5 */}
         {!loadingUserStats && user && (
           <div className="mb-4 rounded-xl border bg-card p-4 text-sm">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
@@ -2643,7 +2641,12 @@ export default function SubmitRequestPage() {
               </div>
               <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-2">
                 <p className="text-xs text-muted-foreground">Rejected</p>
-                <p className="font-bold text-lg text-red-600">{userRejectionCount}</p>
+                <p className="font-bold text-lg text-red-600">
+                  {userRejectionCount}/{MAX_REJECTIONS_BEFORE_SUSPENSION}
+                </p>
+                {userRejectionCount >= 3 && userRejectionCount < MAX_REJECTIONS_BEFORE_SUSPENSION && (
+                  <p className="text-[10px] text-amber-600">⚠️ Near suspension</p>
+                )}
               </div>
               <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2">
                 <p className="text-xs text-muted-foreground">Free Cases Used</p>
@@ -2660,7 +2663,7 @@ export default function SubmitRequestPage() {
             </div>
             {isFreeDisabled && !isSuspended && (
               <div className="mt-2 text-xs text-center text-red-600 bg-red-50 dark:bg-red-950/20 rounded-lg p-2">
-                ⚠️ Your free case access has been disabled. You can still submit cases using credits.
+                ⚠️ Your free case access has been disabled (used {userFreeCasesUsed}/{MAX_FREE_CASES} free cases or rejections ≥3). You can still submit cases using credits.
               </div>
             )}
             {userRejectionCount >= 3 && userRejectionCount < MAX_REJECTIONS_BEFORE_SUSPENSION && (
