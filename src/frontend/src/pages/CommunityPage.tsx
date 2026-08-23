@@ -46,6 +46,7 @@ export default function CommunityPage() {
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [liking, setLiking] = useState<string | null>(null);
 
   // New post state
   const [newPost, setNewPost] = useState("");
@@ -142,6 +143,8 @@ export default function CommunityPage() {
 
   // --- لائک ٹوگل کریں ---
   const handleLike = async (postId: string) => {
+    if (liking === postId) return;
+    setLiking(postId);
     try {
       const result = await toggleLike(postId);
       if (result.liked) {
@@ -166,6 +169,8 @@ export default function CommunityPage() {
     } catch (error: any) {
       console.error("Error toggling like:", error);
       toast.error(error?.message || "Failed to like.");
+    } finally {
+      setLiking(null);
     }
   };
 
@@ -368,7 +373,8 @@ export default function CommunityPage() {
                 <div className="flex items-center gap-6 pt-2 border-t border-border">
                   <button
                     onClick={() => handleLike(post.id)}
-                    className={`flex items-center gap-1.5 text-sm transition-colors ${
+                    disabled={liking === post.id}
+                    className={`flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50 ${
                       likedPosts[post.id]
                         ? "text-red-500"
                         : "text-muted-foreground hover:text-red-500"
@@ -399,7 +405,7 @@ export default function CommunityPage() {
                 </div>
 
                 {/* Comments Section */}
-                {showComments[post.id] && (
+                    {showComments[post.id] && (
                   <div className="space-y-4 pt-2 border-t border-border">
                     {post.comments && post.comments.length > 0 ? (
                       <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
@@ -438,8 +444,8 @@ export default function CommunityPage() {
 
                     {/* Public Comment Input */}
                     {true ? (
-                      <div className="flex items-center gap-2 mt-2">
-                        <Input
+                      <div className="flex items-end gap-2 mt-2">
+                        <textarea
                           placeholder="Write a comment..."
                           value={newComment[post.id] || ""}
                           onChange={(e) =>
@@ -451,7 +457,8 @@ export default function CommunityPage() {
                               handleComment(post.id);
                             }
                           }}
-                          className="flex-1 rounded-full border-border focus:border-primary"
+                          rows={3}
+                          className="flex-1 min-h-12 resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
                         />
                         <Button
                           size="icon"

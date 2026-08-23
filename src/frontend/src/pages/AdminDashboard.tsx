@@ -1786,8 +1786,15 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const s = sym(cur);
   const seeker = profileMap[c.user_id];
   const hasPayment = c.institute_name || c.account_number || c.account_title || c.account_iban;
-  const catDetails = c.category_details && typeof c.category_details === "object" ? c.category_details : null;
-  const catDocs = catDetails?._documents && typeof catDetails._documents === "object" ? catDetails._documents : {};
+  const parseObject = (value: unknown): any => {
+    if (value && typeof value === "object") return value;
+    if (typeof value === "string") {
+      try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" ? parsed : null; } catch { return null; }
+    }
+    return null;
+  };
+  const catDetails = parseObject(c.category_details);
+  const catDocs = parseObject(catDetails?._documents) || {};
 
   const allFields: { label: string; value: any }[] = [];
   if (catDetails) {
@@ -1902,7 +1909,8 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     }
   }
 
-  function getFileLabel(key: string, url: string): string {
+  function getFileLabel(key: string, url: string, explicitLabel?: string): string {
+    if (explicitLabel?.trim()) return explicitLabel.trim();
     // اگر DOC_LABELS میں ہے تو وہی استعمال کریں
     if (DOC_LABELS[key]) return DOC_LABELS[key];
     
@@ -1924,16 +1932,21 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     return fileName;
   }
 
-  const pushFile = (key: string, value: unknown) => {
-    if (typeof value !== "string") return;
-    const url = value.trim();
+  const pushFile = (key: string, value: unknown, explicitLabel?: string) => {
+    let url = "";
+    let label = explicitLabel;
+    if (typeof value === "string") {
+      url = value.trim();
+    } else if (value && typeof value === "object") {
+      const file = value as Record<string, unknown>;
+      const candidate = file.url || file.file_url || file.download_url || file.href || file.path;
+      if (typeof candidate === "string") url = candidate.trim();
+      const name = file.original_name || file.filename || file.file_name || file.name;
+      if (!label && typeof name === "string") label = name;
+    }
     if (!url.startsWith("http")) return;
-    
-    // ڈپلیکیٹ چیک کریں
     if (fileEntries.some((f) => f.url === url)) return;
-    
-    const label = getFileLabel(key, url);
-    fileEntries.push({ key, label, url });
+    fileEntries.push({ key, label: getFileLabel(key, url, label), url });
   };
 
   // Top-level evidence fields
@@ -1948,7 +1961,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     for (const [k, val] of Object.entries(c.photo_urls)) pushFile(k, val);
   }
 
-  // Deep recursive walk over category_details for any document or URL field
+  // Deep recursive walk over every case payload branch for any document or URL field
   const walkFilesDeep = (obj: any, prefix = "") => {
     if (!obj || typeof obj !== "object") return;
     if (Array.isArray(obj)) {
@@ -1966,7 +1979,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
       }
     }
   };
-  walkFilesDeep(catDetails);
+  walkFilesDeep(c);
 
   // Remove duplicates by URL
   const seen = new Set<string>();
