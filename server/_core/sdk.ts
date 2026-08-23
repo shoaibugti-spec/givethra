@@ -2,11 +2,12 @@ import { COOKIE_NAME, ONE_YEAR_MS, decodeOAuthState } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { clearAllCookies, clearSessionCookie } from "./cookies";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -147,7 +148,6 @@ class SDKServer {
     return new TextEncoder().encode(secret);
   }
 
-  // ✅ درست شدہ createSessionToken
   async createSessionToken(
     openId: string,
     options: { expiresInMs?: number; name?: string } = {}
@@ -216,6 +216,18 @@ class SDKServer {
     }
   }
 
+  // ✅ نیا: لاگ ان سے پہلے صارف کی تمام پرانی کوکیز اور کیشے صاف کرنا
+  async clearUserSession(req: Request, res: Response): Promise<void> {
+    clearAllCookies(req, res);
+    console.log("[Auth] All cookies cleared for new login");
+  }
+
+  // ✅ نیا: صرف سیشن کوکی صاف کرنا (لاگ آؤٹ کے لیے)
+  async clearSessionOnly(req: Request, res: Response): Promise<void> {
+    clearSessionCookie(req, res);
+    console.log("[Auth] Session cookie cleared");
+  }
+
   async getUserInfoWithJwt(
     jwtToken: string
   ): Promise<GetUserInfoWithJwtResponse> {
@@ -261,7 +273,6 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // ✅ اگر صارف ڈیٹابیس میں نہیں تو OAuth سے Sync کریں اور نیا بنائیں
     if (!user) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
