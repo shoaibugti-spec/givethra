@@ -198,7 +198,7 @@ function FeedbackPost({
           <p className="text-xs text-muted-foreground">{timeAgo(fb.created_at)}</p>
           {fb.case_title && <p className="text-xs text-primary truncate">Feedback for: {fb.case_title}</p>}
         </div>
-        <span className="ml-auto text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold shrink-0">
+        <span className="ml-auto text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-semibold shrink-0">
           Givethra Verified
         </span>
       </div>

@@ -157,7 +157,7 @@ export default function WalletPage() {
 
   const statusConfig: any = {
     pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Pending Review", color: "bg-orange-100 text-orange-700" },
-    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Approved", color: "bg-green-100 text-green-700" },
+    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Approved", color: "bg-teal-100 text-teal-700" },
     rejected: { icon: <XCircle className="h-3.5 w-3.5" />, label: "Rejected", color: "bg-red-100 text-red-700" },
   };
 
@@ -359,7 +359,7 @@ export default function WalletPage() {
                 }}
               />
               {proofName && (
-                <p className="text-xs text-green-600 flex items-center gap-1">
+                <p className="text-xs text-teal-600 flex items-center gap-1">
                   <CheckCircle2 className="h-3.5 w-3.5" /> {proofName} (will
                   upload when you submit)
                 </p>

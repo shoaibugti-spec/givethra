@@ -25,10 +25,10 @@ const roles = [
     subtitle: "I need assistance",
     description:
       "Submit a verified help request, upload supporting documents, and connect with Heroes who can assist you directly.",
-    accent: "text-emerald-600 dark:text-emerald-400",
-    bg: "bg-emerald-50 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 dark:bg-emerald-950 dark:border-emerald-800",
+    accent: "text-teal-600 dark:text-teal-400",
+    bg: "bg-teal-50 border-teal-200 hover:bg-teal-100 hover:border-teal-300 dark:bg-teal-950 dark:border-teal-800",
     selected:
-      "bg-emerald-100 border-emerald-500 ring-2 ring-emerald-300 dark:bg-emerald-900 dark:border-emerald-500",
+      "bg-teal-100 border-teal-500 ring-2 ring-teal-300 dark:bg-teal-900 dark:border-teal-500",
   },
 ];
 

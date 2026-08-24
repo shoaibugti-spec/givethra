@@ -157,7 +157,7 @@ export default function SupportChatPage() {
         <div className="rounded-2xl border bg-card flex flex-col h-[500px] shadow-sm overflow-hidden">
           <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="h-2.5 w-2.5 rounded-full bg-teal-500 animate-pulse" />
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Support Conversation
               </span>

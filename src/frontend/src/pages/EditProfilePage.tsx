@@ -564,7 +564,7 @@ export default function EditProfilePage() {
                         variant="outline"
                         className={`text-xs ${
                           kycStatus === "approved"
-                            ? "border-green-500 text-green-600 bg-green-50 dark:bg-green-950"
+                            ? "border-teal-500 text-teal-600 bg-teal-50 dark:bg-teal-950"
                             : "border-border text-muted-foreground"
                         }`}
                       >

@@ -407,7 +407,7 @@ export default function CasesPage() {
                     {needed > 0 && (
                       <div className="space-y-1 pt-1">
                         <div className="flex justify-between text-[11px] font-medium">
-                          <span className="text-green-600">
+                          <span className="text-teal-600">
                             {s} {collected} raised
                           </span>
                           <span className="text-muted-foreground">{pct}%</span>
@@ -445,7 +445,7 @@ export default function CasesPage() {
                           </div>
                         );
                       })()}
-                    <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                    <div className="flex items-center gap-1 text-xs text-teal-600 font-medium">
                       <CheckCircle2 className="h-3 w-3" /> Verified
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t">

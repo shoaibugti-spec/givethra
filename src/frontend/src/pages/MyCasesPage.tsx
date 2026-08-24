@@ -75,7 +75,7 @@ export default function MyCasesPage() {
 
   const statusConfig: any = {
     pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Under Review", color: "bg-orange-100 text-orange-700" },
-    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Published", color: "bg-green-100 text-green-700" },
+    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Published", color: "bg-teal-100 text-teal-700" },
     rejected: { icon: <XCircle className="h-3.5 w-3.5" />, label: "Rejected", color: "bg-red-100 text-red-700" },
     completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Completed", color: "bg-blue-100 text-blue-700" },
     expired: { icon: <CalendarClock className="h-3.5 w-3.5" />, label: "Expired", color: "bg-amber-100 text-amber-700" },
@@ -110,7 +110,7 @@ export default function MyCasesPage() {
         {needed > 0 && !isRejected && !isExpired && (
           <div className="space-y-1">
             <div className="flex justify-between text-[11px] font-medium">
-              <span className="text-green-600">{s} {collected} raised</span>
+              <span className="text-teal-600">{s} {collected} raised</span>
               <span className="text-muted-foreground">{pct}% · {s} {Math.max(needed - collected, 0)} left</span>
             </div>
             <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
@@ -152,20 +152,20 @@ export default function MyCasesPage() {
               </div>
 
               {/* Refund/Free Status */}
-              <div className={`rounded-lg border p-3 ${isFree ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
+              <div className={`rounded-lg border p-3 ${isFree ? "bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:border-teal-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
                 <div className="flex items-start gap-2">
                   {isFree ? (
-                    <RefreshCw className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                    <RefreshCw className="h-5 w-5 text-teal-600 dark:text-teal-400 mt-0.5 shrink-0" />
                   ) : (
                     <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                   )}
                   <div>
-                    <p className={`text-sm font-semibold ${isFree ? "text-green-800 dark:text-green-300" : "text-blue-800 dark:text-blue-300"}`}>
+                    <p className={`text-sm font-semibold ${isFree ? "text-teal-800 dark:text-teal-300" : "text-blue-800 dark:text-blue-300"}`}>
                       {isFree 
                         ? "🎁 Your free submission has been returned!" 
                         : "💳 1 credit has been refunded to your account!"}
                     </p>
-                    <p className={`text-xs mt-0.5 ${isFree ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
+                    <p className={`text-xs mt-0.5 ${isFree ? "text-teal-700 dark:text-teal-400" : "text-blue-700 dark:text-blue-400"}`}>
                       {isFree 
                         ? "You can submit a new case for FREE again. Your free case allowance is restored." 
                         : "You can re-submit this case using your refunded credit. No extra cost."}
@@ -237,20 +237,20 @@ export default function MyCasesPage() {
                 )}
               </div>
 
-              <div className={`rounded-lg border p-3 ${isFree ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
+              <div className={`rounded-lg border p-3 ${isFree ? "bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:border-teal-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
                 <div className="flex items-start gap-2">
                   {isFree ? (
-                    <RefreshCw className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                    <RefreshCw className="h-5 w-5 text-teal-600 dark:text-teal-400 mt-0.5 shrink-0" />
                   ) : (
                     <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                   )}
                   <div>
-                    <p className={`text-sm font-semibold ${isFree ? "text-green-800 dark:text-green-300" : "text-blue-800 dark:text-blue-300"}`}>
+                    <p className={`text-sm font-semibold ${isFree ? "text-teal-800 dark:text-teal-300" : "text-blue-800 dark:text-blue-300"}`}>
                       {isFree 
                         ? "🎁 Your free submission is still available!" 
                         : "💳 1 credit has been refunded to your account!"}
                     </p>
-                    <p className={`text-xs mt-0.5 ${isFree ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
+                    <p className={`text-xs mt-0.5 ${isFree ? "text-teal-700 dark:text-teal-400" : "text-blue-700 dark:text-blue-400"}`}>
                       {isFree 
                         ? "You can submit a brand new case for FREE." 
                         : "You can submit a new case using your refunded credit."}

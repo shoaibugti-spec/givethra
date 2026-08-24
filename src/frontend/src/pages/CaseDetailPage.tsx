@@ -566,16 +566,16 @@ export default function CaseDetailPage() {
             </div>
 
             {/* Refund/Free Status */}
-            <div className={`rounded-xl border p-4 ${caseData.was_free ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
+            <div className={`rounded-xl border p-4 ${caseData.was_free ? "bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:border-teal-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
               <div className="flex items-start gap-3">
-                <RefreshCw className={`h-5 w-5 mt-0.5 shrink-0 ${caseData.was_free ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`} />
+                <RefreshCw className={`h-5 w-5 mt-0.5 shrink-0 ${caseData.was_free ? "text-teal-600 dark:text-teal-400" : "text-blue-600 dark:text-blue-400"}`} />
                 <div>
-                  <p className={`text-sm font-semibold ${caseData.was_free ? "text-green-800 dark:text-green-300" : "text-blue-800 dark:text-blue-300"}`}>
+                  <p className={`text-sm font-semibold ${caseData.was_free ? "text-teal-800 dark:text-teal-300" : "text-blue-800 dark:text-blue-300"}`}>
                     {caseData.was_free 
                       ? "🎁 Your free submission has been returned!" 
                       : "💳 1 credit has been refunded to your account!"}
                   </p>
-                  <p className={`text-xs mt-0.5 ${caseData.was_free ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
+                  <p className={`text-xs mt-0.5 ${caseData.was_free ? "text-teal-700 dark:text-teal-400" : "text-blue-700 dark:text-blue-400"}`}>
                     {caseData.was_free 
                       ? "You can submit a new case for FREE again. Your free case allowance is restored." 
                       : "You can re-submit this case using your refunded credit. No extra cost."}
@@ -708,7 +708,7 @@ export default function CaseDetailPage() {
         </button>
 
         {/* === FREE UNLOCK ANNOUNCEMENT - TOP OF PAGE === */}
-        <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border-2 border-green-400 p-4 text-sm text-green-700 dark:text-green-300 text-center font-medium">
+        <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border-2 border-teal-400 p-4 text-sm text-teal-700 dark:text-teal-300 text-center font-medium">
           🎉 Your first <strong>3 helps are FREE</strong>! After that, 1 credit per help.
         </div>
 
@@ -716,7 +716,7 @@ export default function CaseDetailPage() {
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${caseData.status === "approved" ? "bg-green-100 text-green-700" : caseData.status === "completed" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>{caseData.status?.toUpperCase()}</span>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${caseData.status === "approved" ? "bg-teal-100 text-teal-700" : caseData.status === "completed" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>{caseData.status?.toUpperCase()}</span>
                 <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">{caseData.category}</span>
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${caseData.urgency === "Emergency" ? "bg-red-100 text-red-700" : caseData.urgency === "High" ? "bg-orange-100 text-orange-700" : "bg-muted text-muted-foreground"}`}>{caseData.urgency}</span>
               </div>
@@ -743,7 +743,7 @@ export default function CaseDetailPage() {
           {amountNeeded > 0 && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs font-medium">
-                <span className="text-green-600">{sym} {amountCollected} collected</span>
+                <span className="text-teal-600">{sym} {amountCollected} collected</span>
                 <span className="text-muted-foreground">{percentDone}% · {sym} {remaining} left</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
@@ -753,9 +753,9 @@ export default function CaseDetailPage() {
           )}
 
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Identity Verified</span>
-            <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> KYC Approved</span>
-            <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Givethra Verified</span>
+            <span className="inline-flex items-center gap-1 text-xs text-teal-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Identity Verified</span>
+            <span className="inline-flex items-center gap-1 text-xs text-teal-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> KYC Approved</span>
+            <span className="inline-flex items-center gap-1 text-xs text-teal-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Givethra Verified</span>
           </div>
         </div>
 
@@ -768,16 +768,16 @@ export default function CaseDetailPage() {
             </div>
 
             {isOwner && isCompleted && (
-              <div className="rounded-2xl bg-green-50 dark:bg-green-950/20 border-2 border-green-200 p-5 space-y-4">
+              <div className="rounded-2xl bg-teal-50 dark:bg-teal-950/20 border-2 border-teal-200 p-5 space-y-4">
                 <div className="text-center space-y-2">
                   <div className="text-4xl">🎉🤲</div>
-                  <h2 className="font-bold text-lg text-green-700">Your case is complete!</h2>
-                  <p className="text-sm text-green-700">
+                  <h2 className="font-bold text-lg text-teal-700">Your case is complete!</h2>
+                  <p className="text-sm text-teal-700">
                     {caseData.closed_by_admin ? "Many kind people came together and Givethra paid your bill. May Allah bless everyone who helped." : "A kind Hero helped you directly. May Allah bless them."}
                   </p>
                 </div>
                 {caseData.paid_receipt_url && (
-                  <a href={caseData.paid_receipt_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg bg-card border border-green-300 p-3 text-sm text-green-700 font-medium">
+                  <a href={caseData.paid_receipt_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg bg-card border border-teal-300 p-3 text-sm text-teal-700 font-medium">
                     <FileText className="h-4 w-4" /> View Payment Receipt
                   </a>
                 )}
@@ -810,7 +810,7 @@ export default function CaseDetailPage() {
                           <div className="w-full bg-muted rounded-full h-2"><div className="bg-red-500 h-2 rounded-full transition-all" style={{ width: `${(recTimer / 60) * 100}%` }} /></div>
                           <div className="flex gap-2">
                             {!paused ? <Button type="button" variant="outline" className="flex-1" onClick={pauseRecording}>⏸ Pause</Button> : <Button type="button" variant="outline" className="flex-1" onClick={resumeRecording}>▶ Resume</Button>}
-                            <Button type="button" className="flex-1 bg-green-600 hover:bg-green-700" onClick={stopRecording}>✓ Done</Button>
+                            <Button type="button" className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={stopRecording}>✓ Done</Button>
                           </div>
                         </div>
                       ) : (
@@ -818,7 +818,7 @@ export default function CaseDetailPage() {
                           <Button type="button" variant="outline" className="w-full gap-2" onClick={startRecording}><Video className="h-4 w-4" /> Record a Video (up to 60s)</Button>
                           <p className="text-[11px] text-muted-foreground text-center">Or upload a video file</p>
                           <Input type="file" accept="video/*" onChange={e => { const f = e.target.files?.[0] ?? null; setFbVideoFile(f); setFbVideoName(f?.name ?? ""); setFbVideoBlob(f ? URL.createObjectURL(f) : null); }} />
-                          {fbVideoName && !fbVideoBlob && <p className="text-xs text-green-600">✓ {fbVideoName}</p>}
+                          {fbVideoName && !fbVideoBlob && <p className="text-xs text-teal-600">✓ {fbVideoName}</p>}
                         </div>
                       )}
                     </div>
@@ -908,22 +908,22 @@ export default function CaseDetailPage() {
                   const cur2 = caseData.currency || "USD";
                   const sym2 = CURRENCY_SYMBOLS[cur2] ?? cur2;
                   return (
-                    <div className="rounded-2xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-5 space-y-3">
+                    <div className="rounded-2xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-5 space-y-3">
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        <h2 className="font-semibold text-green-700">Givethra Verification Summary</h2>
+                        <CheckCircle2 className="h-5 w-5 text-teal-600" />
+                        <h2 className="font-semibold text-teal-700">Givethra Verification Summary</h2>
                       </div>
-                      <p className="text-sm text-green-700 leading-relaxed">
+                      <p className="text-sm text-teal-700 leading-relaxed">
                         This case was submitted by a KYC-verified user for <strong>{caseData.category}</strong> ({sym2} {caseData.amount_needed} {cur2} needed{caseData.institute_name ? `, via ${caseData.institute_name}` : ""}). Givethra reviewed the bill/reference, income proof, live selfie, and video statement before approving this case for Heroes.
                       </p>
                       {docNames.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
                           {docNames.map(n => (
-                            <span key={n} className="text-xs font-medium bg-white dark:bg-green-900/30 text-green-700 border border-green-300 rounded-full px-2.5 py-1">✅ {n}</span>
+                            <span key={n} className="text-xs font-medium bg-white dark:bg-teal-900/30 text-teal-700 border border-teal-300 rounded-full px-2.5 py-1">✅ {n}</span>
                           ))}
                         </div>
                       )}
-                      <p className="text-xs text-green-600">
+                      <p className="text-xs text-teal-600">
                         For the beneficiary's privacy, the content of these documents is not shown publicly — only reviewed and verified by Givethra's team.
                       </p>
                     </div>
@@ -946,13 +946,13 @@ export default function CaseDetailPage() {
                     {myResolutions.map((r: any) => (
                       <div key={r.id} className="rounded-xl border border-border p-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === "completed" ? "bg-green-100 text-green-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === "completed" ? "bg-teal-100 text-teal-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>
                             {r.status === "completed" ? "VERIFIED ✓" : r.status === "seeker_confirmed" ? "UNDER VERIFICATION" : r.status === "disputed" ? "DISPUTED" : "PENDING"}
                           </span>
                           <span className="text-sm font-bold text-primary">{sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</span>
                         </div>
                         {r.status === "completed" ? (
-                          <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, heroName)}><FileText className="h-3.5 w-3.5" /> Download Affidavit</Button>
+                          <Button size="sm" variant="outline" className="w-full gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, heroName)}><FileText className="h-3.5 w-3.5" /> Download Affidavit</Button>
                         ) : (
                           <p className="text-xs text-muted-foreground">{r.status === "seeker_confirmed" ? "Givethra is verifying this contribution." : r.status === "disputed" ? "This was disputed — Givethra will investigate." : "Waiting for confirmation."}</p>
                         )}
@@ -982,7 +982,7 @@ export default function CaseDetailPage() {
                         <div className="space-y-2">
                           <Label>Upload Receipt</Label>
                           <input type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0] ?? null; setReceiptFile(f); setReceiptName(f?.name ?? ""); }} className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white file:text-sm" />
-                          {receiptName && <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {receiptName} (will upload when you submit)</p>}
+                          {receiptName && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {receiptName} (will upload when you submit)</p>}
                         </div>
                         <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Any details..." /></div>
                         <div className="flex gap-2">
@@ -995,10 +995,10 @@ export default function CaseDetailPage() {
                 )}
 
                 {!isOwner && isCompleted && myResolutions.length > 0 && (
-                  <div className="rounded-2xl bg-green-50 dark:bg-green-950/20 border border-green-200 p-5 text-center space-y-2">
+                  <div className="rounded-2xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 p-5 text-center space-y-2">
                     <div className="text-3xl">🤲</div>
-                    <h2 className="font-bold text-green-700">This case is complete!</h2>
-                    <p className="text-sm text-green-700">Thank you for your help. May Allah reward you. Your affidavits are above.</p>
+                    <h2 className="font-bold text-teal-700">This case is complete!</h2>
+                    <p className="text-sm text-teal-700">Thank you for your help. May Allah reward you. Your affidavits are above.</p>
                   </div>
                 )}
 
@@ -1018,7 +1018,7 @@ export default function CaseDetailPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="font-medium capitalize">{caseData.status}</span></div>
                 {caseData.deadline && <div className="flex justify-between"><span className="text-muted-foreground">Deadline</span><span className="font-medium">{new Date(caseData.deadline).toLocaleDateString()}</span></div>}
                 {amountNeeded > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Amount</span><span className="font-bold text-primary">{sym} {amountNeeded} {cur}</span></div>}
-                {amountNeeded > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Collected</span><span className="font-bold text-green-600">{sym} {amountCollected} ({percentDone}%)</span></div>}
+                {amountNeeded > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Collected</span><span className="font-bold text-teal-600">{sym} {amountCollected} ({percentDone}%)</span></div>}
               </div>
             </div>
           </div>
@@ -1069,13 +1069,13 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
                     <p className="text-[11px] text-muted-foreground">Enter the amount you truly received. Givethra will verify this.</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { const amt = parseFloat(confirmAmount); if (!amt || amt <= 0) { toast.error("Please enter the amount you received."); return; } onConfirm(amt, res); }}><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm this amount</Button>
+                    <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={() => { const amt = parseFloat(confirmAmount); if (!amt || amt <= 0) { toast.error("Please enter the amount you received."); return; } onConfirm(amt, res); }}><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm this amount</Button>
                     <Button variant="outline" onClick={() => setConfirmingId(null)}>Cancel</Button>
                   </div>
                 </div>
               ) : (
                 <div className="flex gap-3">
-                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setConfirmingId(res.id); setConfirmAmount(String(res.amount_paid ?? "")); }}><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm Help</Button>
+                  <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={() => { setConfirmingId(res.id); setConfirmAmount(String(res.amount_paid ?? "")); }}><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm Help</Button>
                   <Button variant="outline" className="flex-1 text-red-600 border-red-300" onClick={() => onDispute(res)}>Dispute</Button>
                 </div>
               )}
@@ -1087,7 +1087,7 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
             </div>
           ) : res.status === "completed" ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-green-700"><CheckCircle2 className="h-5 w-5" /><h2 className="font-bold">Help Confirmed</h2></div>
+              <div className="flex items-center gap-2 text-teal-700"><CheckCircle2 className="h-5 w-5" /><h2 className="font-bold">Help Confirmed</h2></div>
               <p className="text-sm text-muted-foreground">{sym} {res.seeker_confirmed_amount ?? res.amount_paid} {cur} — {res.resolution_type}</p>
             </div>
           ) : res.status === "disputed" ? (

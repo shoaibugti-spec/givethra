@@ -696,3 +696,9 @@
 - [x] Ensure Google verified-email matching reuses the pre-created current D1 user ID and creates a fresh account only for an unknown email.
 - [x] Ensure auth, D1, and frontend errors always terminate loading with a clear JSON/UI error.
 - [x] Add or update regression coverage and validate syntax, strict TypeScript, production build, and deployment readiness.
+
+## Logo Teal Brand Color Update — 2026-08-24
+- [x] Audit existing green/teal theme tokens and hard-coded brand-color usage across the canonical frontend.
+- [x] Replace old brand green with the logo-derived teal/turquoise palette while preserving semantic contrast variants.
+- [x] Verify buttons, text, navigation, forms, cards, notifications, Community, Wallet, Cases, Support, and Admin surfaces remain readable and functional.
+- [x] Run responsive visual checks, regression tests, strict TypeScript, and production build without modifying D1/R2 data.

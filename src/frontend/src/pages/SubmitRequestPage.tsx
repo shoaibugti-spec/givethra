@@ -2307,8 +2307,8 @@ export default function SubmitRequestPage() {
           )}
 
           {instituteName && !isOtherInstitute && (
-            <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-3 flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-green-700">
+            <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-3 flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-teal-700">
                 ✓ {instituteName} <span className="text-[10px]">(1Bill listed)</span>
               </p>
               <button
@@ -2510,7 +2510,7 @@ export default function SubmitRequestPage() {
       />
       {uploadingDoc === key && <p className="text-xs text-amber-600">⏳ Uploading... please wait</p>}
       {catDocUrls[key] && uploadingDoc !== key && (
-        <p className="text-xs text-green-600 flex items-center gap-1">
+        <p className="text-xs text-teal-600 flex items-center gap-1">
           <CheckCircle2 className="h-3.5 w-3.5" /> {catDocNames[key] || "Document"} — Uploaded ✓
         </p>
       )}
@@ -2613,13 +2613,13 @@ export default function SubmitRequestPage() {
               </p>
               <div className="flex justify-between items-center bg-primary/5 rounded-lg p-3">
                 <span className="text-sm">Your Balance:</span>
-                <span className={`font-bold text-lg ${canUnlock ? "text-green-600" : "text-red-600"}`}>
+                <span className={`font-bold text-lg ${canUnlock ? "text-teal-600" : "text-red-600"}`}>
                   {balance} credits
                 </span>
               </div>
               {canUnlock ? (
                 <Button
-                  className="w-full h-12 font-semibold bg-green-600 hover:bg-green-700"
+                  className="w-full h-12 font-semibold bg-teal-600 hover:bg-teal-700"
                   onClick={handleUnlockAccount}
                   disabled={unlocking}
                 >
@@ -2684,15 +2684,15 @@ export default function SubmitRequestPage() {
                   <p className="text-[10px] text-amber-600">⚠️ Near suspension</p>
                 )}
               </div>
-              <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2">
+              <div className="bg-teal-50 dark:bg-teal-950/20 rounded-lg p-2">
                 <p className="text-xs text-muted-foreground">Free Cases Used</p>
-                <p className="font-bold text-lg text-green-600">
+                <p className="font-bold text-lg text-teal-600">
                   {userFreeCasesUsed}/{MAX_FREE_CASES}
                 </p>
               </div>
               <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2">
                 <p className="text-xs text-muted-foreground">Status</p>
-                <p className={`font-bold text-lg ${isFreeDisabled ? "text-red-600" : "text-green-600"}`}>
+                <p className={`font-bold text-lg ${isFreeDisabled ? "text-red-600" : "text-teal-600"}`}>
                   {isFreeDisabled ? "🔒 Free Disabled" : "✅ Free Active"}
                 </p>
               </div>
@@ -2724,11 +2724,11 @@ export default function SubmitRequestPage() {
         </div>
 
         {willBeFree && !isFreeDisabled && (
-          <div className="mb-6 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-4 flex items-start gap-2">
-            <Gift className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+          <div className="mb-6 rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-4 flex items-start gap-2">
+            <Gift className="h-5 w-5 text-teal-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-green-700">🎉 This Case is FREE!</p>
-              <p className="text-sm text-green-700">
+              <p className="font-bold text-teal-700">🎉 This Case is FREE!</p>
+              <p className="text-sm text-teal-700">
                 {isFirstCaseFree ? "Your first case is FREE!" : "This category has a FREE offer!"}
                 {userFreeCasesUsed > 0 && ` (You've used ${userFreeCasesUsed}/${MAX_FREE_CASES} free cases)`}
               </p>
@@ -2812,7 +2812,7 @@ export default function SubmitRequestPage() {
                 </SelectContent>
               </Select>
               {willBeFree && !isFreeDisabled && (
-                <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                <p className="text-xs text-teal-600 font-medium flex items-center gap-1">
                   <Gift className="h-3 w-3" /> {isFirstCaseFree ? "Your first case is FREE!" : "This category has a FREE offer!"}
                 </p>
               )}
@@ -2823,7 +2823,7 @@ export default function SubmitRequestPage() {
                     📋 {CATEGORY_LIMITS[category]?.label || "Verified Need"}
                   </p>
                   {isFixedAmount(category) && (
-                    <p className="text-green-600 font-bold">
+                    <p className="text-teal-600 font-bold">
                       💰 Fixed Amount: Rs {getFixedAmountValue(category)?.toLocaleString()}
                     </p>
                   )}
@@ -2956,8 +2956,8 @@ export default function SubmitRequestPage() {
               </div>
               {jobStatus === "Yes" && (
                 <div className="pt-2 space-y-2">
-                  <div className="rounded-xl border border-green-300 bg-green-50 dark:bg-green-950/20 p-3 space-y-2">
-                    <p className="text-xs font-medium text-green-700">📎 Required Documents (Job)</p>
+                  <div className="rounded-xl border border-teal-300 bg-teal-50 dark:bg-teal-950/20 p-3 space-y-2">
+                    <p className="text-xs font-medium text-teal-700">📎 Required Documents (Job)</p>
                     {docBox("salary_slip", "Last 6 Months Salary Slip", true)}
                     {docBox("statement", "Last 6 Months Bank Statement", true, "Bank, EasyPaisa or JazzCash", ".pdf,image/*")}
                   </div>
@@ -3192,8 +3192,8 @@ export default function SubmitRequestPage() {
                   </div>
                 )}
                 {instituteName && !isOtherInstitute && (
-                  <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-3 flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-green-700">
+                  <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-3 flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-teal-700">
                       ✓ {instituteName} <span className="text-[10px]">(1Bill listed)</span>
                     </p>
                     <button
@@ -3376,7 +3376,7 @@ export default function SubmitRequestPage() {
 
                 {disabilityMode === "product" && (
                   <div className="space-y-3 rounded-xl border border-border p-3 bg-card">
-                    <p className="text-sm font-semibold text-green-700">🛒 Product — Shop Details</p>
+                    <p className="text-sm font-semibold text-teal-700">🛒 Product — Shop Details</p>
                     <p className="text-xs text-muted-foreground">Enter the shop where you'll buy the equipment.</p>
                     <div className="space-y-2">
                       <Label>Shop Name *</Label>
@@ -3400,7 +3400,7 @@ export default function SubmitRequestPage() {
 
                 {disabilityMode === "treatment" && (
                   <div className="space-y-3 rounded-xl border border-border p-3 bg-card">
-                    <p className="text-sm font-semibold text-green-700">🏥 Treatment — Select Hospital</p>
+                    <p className="text-sm font-semibold text-teal-700">🏥 Treatment — Select Hospital</p>
                     {!disabilityHospitalOther && !disabilityHospital && (
                       <div className="space-y-2">
                         <Label>Search & Select Hospital *</Label>
@@ -3444,8 +3444,8 @@ export default function SubmitRequestPage() {
                       </div>
                     )}
                     {disabilityHospital && !disabilityHospitalOther && (
-                      <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-3 flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-green-700">✓ {disabilityHospital}</p>
+                      <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-3 flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-teal-700">✓ {disabilityHospital}</p>
                         <button
                           type="button"
                           onClick={() => setDisabilityHospital("")}
@@ -3502,7 +3502,7 @@ export default function SubmitRequestPage() {
                                 ? "text-red-600"
                                 : treatmentAutoUrgency === "Medium"
                                 ? "text-orange-600"
-                                : "text-green-600"
+                                : "text-teal-600"
                             }
                           >
                             {treatmentAutoUrgency}
@@ -3523,7 +3523,7 @@ export default function SubmitRequestPage() {
 
                 {disabilityMode === "stipend" && (
                   <div className="space-y-3 rounded-xl border border-border p-3 bg-card">
-                    <p className="text-sm font-semibold text-green-700">💰 Monthly Stipend — Rs {DISABILITY_STIPEND_AMOUNT}</p>
+                    <p className="text-sm font-semibold text-teal-700">💰 Monthly Stipend — Rs {DISABILITY_STIPEND_AMOUNT}</p>
                     <p className="text-xs text-muted-foreground">This amount will be sent directly to your own account.</p>
                     <div className="space-y-2">
                       <Label>Account Title *</Label>
@@ -3640,9 +3640,9 @@ export default function SubmitRequestPage() {
 
               {/* ===== AMOUNT FIELD - Conditional ===== */}
               {isFixedAmount(category) ? (
-                <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-4">
-                  <p className="text-sm font-semibold text-green-700">💰 Fixed Amount</p>
-                  <p className="text-lg font-bold text-green-700">
+                <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-4">
+                  <p className="text-sm font-semibold text-teal-700">💰 Fixed Amount</p>
+                  <p className="text-lg font-bold text-teal-700">
                     Rs {getFixedAmountValue(category)?.toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">This amount is fixed for this category. You cannot change it.</p>
@@ -3775,7 +3775,7 @@ export default function SubmitRequestPage() {
                           ? "text-red-600"
                           : autoUrgency === "Medium"
                           ? "text-orange-600"
-                          : "text-green-600"
+                          : "text-teal-600"
                       }
                     >
                       {autoUrgency}
@@ -3885,7 +3885,7 @@ export default function SubmitRequestPage() {
                   <img src={selfiePreview} alt="Selfie" className="w-full rounded-xl border max-h-48 object-cover" />
                   {uploadingSelfie && <p className="text-xs text-amber-600">⏳ Uploading selfie...</p>}
                   {selfieUrl && !uploadingSelfie && (
-                    <p className="text-xs text-green-600 flex items-center gap-1">
+                    <p className="text-xs text-teal-600 flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Selfie ready ✓
                     </p>
                   )}
@@ -3958,7 +3958,7 @@ export default function SubmitRequestPage() {
                   <video src={videoPreview} controls className="w-full rounded-xl border max-h-48" />
                   {uploadingVideo && <p className="text-xs text-amber-600">⏳ Uploading video...</p>}
                   {videoUrl && !uploadingVideo && (
-                    <p className="text-xs text-green-600 flex items-center gap-1">
+                    <p className="text-xs text-teal-600 flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Video ready ✓
                     </p>
                   )}
@@ -4058,7 +4058,7 @@ export default function SubmitRequestPage() {
               {isFixedAmount(category) ? (
                 <div className="flex justify-between border-b pb-2">
                   <span className="text-muted-foreground">Amount (Fixed)</span>
-                  <span className="font-medium text-green-600">
+                  <span className="font-medium text-teal-600">
                     Rs {getFixedAmountValue(category)?.toLocaleString()}
                   </span>
                 </div>
@@ -4340,11 +4340,11 @@ export default function SubmitRequestPage() {
                 <>
                   <div className="flex justify-between border-b pb-2">
                     <span className="text-muted-foreground">Rental Agreement</span>
-                    <span className="font-medium text-green-600">{catDocUrls["rental_agreement"] ? "✓" : "✗"}</span>
+                    <span className="font-medium text-teal-600">{catDocUrls["rental_agreement"] ? "✓" : "✗"}</span>
                   </div>
                   <div className="flex justify-between border-b pb-2">
                     <span className="text-muted-foreground">Landlord's CNIC</span>
-                    <span className="font-medium text-green-600">{catDocUrls["landlord_cnic"] ? "✓" : "✗"}</span>
+                    <span className="font-medium text-teal-600">{catDocUrls["landlord_cnic"] ? "✓" : "✗"}</span>
                   </div>
                 </>
               )}
@@ -4354,16 +4354,16 @@ export default function SubmitRequestPage() {
               </div>
               <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Selfie</span>
-                <span className="font-medium text-green-600">{selfieUrl ? "✓ Done" : "—"}</span>
+                <span className="font-medium text-teal-600">{selfieUrl ? "✓ Done" : "—"}</span>
               </div>
               <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Video</span>
-                <span className="font-medium text-green-600">{videoUrl ? "✓ Done" : "—"}</span>
+                <span className="font-medium text-teal-600">{videoUrl ? "✓ Done" : "—"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Listing Fee</span>
                 {willBeFree ? (
-                  <span className="font-bold text-green-600">
+                  <span className="font-bold text-teal-600">
                     FREE 🎉 {isFirstCaseFree ? "(First Case)" : `(${offer?.label || "Offer"})`}
                   </span>
                 ) : (

@@ -165,7 +165,7 @@ export default function ProfilePage() {
                   <Calendar className="h-3 w-3" /> Member since 2026
                 </span>
                 {kycApproved && (
-                  <span className="flex items-center gap-1 text-green-600 font-medium">
+                  <span className="flex items-center gap-1 text-teal-600 font-medium">
                     <CheckCircle2 className="h-3 w-3" /> KYC Verified
                   </span>
                 )}
@@ -181,7 +181,7 @@ export default function ProfilePage() {
                   key={badge.label}
                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
                     badge.active
-                      ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800"
+                      ? "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800"
                       : "bg-muted text-muted-foreground border-border"
                   }`}
                 >
@@ -243,7 +243,7 @@ export default function ProfilePage() {
               <p className="text-xs text-muted-foreground">Email Address</p>
               <p className="text-sm font-semibold text-foreground">{user?.email ?? "Not set"}</p>
             </div>
-            <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />
+            <CheckCircle2 className="h-5 w-5 text-teal-500 ml-auto" />
           </div>
           {profile?.phone_number && (
             <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">

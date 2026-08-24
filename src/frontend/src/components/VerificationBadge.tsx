@@ -22,7 +22,7 @@ const config: Record<
     label: "Verified",
     icon: ShieldCheck,
     className:
-      "text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950 dark:border-emerald-800",
+      "text-teal-700 bg-teal-50 border-teal-200 dark:text-teal-400 dark:bg-teal-950 dark:border-teal-800",
   },
   documents_submitted: {
     label: "Docs Submitted",

@@ -149,7 +149,7 @@ const CATEGORY_APPEAL: Record<string, string> = {
 const URGENCIES = ["Low", "Medium", "High", "Emergency"];
 
 const TRUST_BADGES = [
-  { icon: MailCheck, label: "Email Verified", color: "text-emerald-600" },
+  { icon: MailCheck, label: "Email Verified", color: "text-teal-600" },
   { icon: Phone, label: "Mobile Verified", color: "text-blue-600" },
   { icon: BadgeCheck, label: "Identity Verified", color: "text-violet-600" },
   { icon: Building2, label: "Institution Verified", color: "text-orange-600" },
@@ -306,8 +306,8 @@ export default function HomePage() {
           desc: "Become a Hero and unlock your first 3 cases for free. After that, 1 credit per help.",
           cta: "Become a Hero — Free",
           to: "/sign-in",
-          color: "text-green-600",
-          bg: "bg-green-500/10",
+          color: "text-teal-600",
+          bg: "bg-teal-500/10",
         },
         {
           key: "free_case",
@@ -374,8 +374,8 @@ export default function HomePage() {
             title: "🎉 Your first 3 helps are FREE!",
             desc: `Your first ${3 - unlockCount} unlocks are free. Start helping now!`,
             to: "/cases",
-            color: "text-green-600",
-            bg: "bg-green-500/10",
+            color: "text-teal-600",
+            bg: "bg-teal-500/10",
           });
         }
       }
@@ -1065,7 +1065,7 @@ export default function HomePage() {
                           {needed > 0 && (
                             <div className="space-y-1.5">
                               <div className="flex items-center justify-between text-xs">
-                                <span className="font-bold text-green-600">
+                                <span className="font-bold text-teal-600">
                                   {currencySymbol} {collected} raised
                                 </span>
                                 <span className="text-muted-foreground">
@@ -1078,7 +1078,7 @@ export default function HomePage() {
                               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                                 <div
                                   className={`h-2 rounded-full transition-all ${
-                                    isDone ? "bg-green-500" : "bg-primary"
+                                    isDone ? "bg-teal-500" : "bg-primary"
                                   }`}
                                   style={{ width: `${percent}%` }}
                                 />
@@ -1166,7 +1166,7 @@ export default function HomePage() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1">
-                      <BadgeCheck className="h-3 w-3 text-emerald-500" />
+                      <BadgeCheck className="h-3 w-3 text-teal-500" />
                       <span className="text-xs font-semibold">{label}</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
@@ -1321,7 +1321,7 @@ export default function HomePage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="WhatsApp"
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-green-600 hover:text-white"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-teal-600 hover:text-white"
               >
                 <MessageCircle className="h-5 w-5" />
               </a>
@@ -1338,7 +1338,7 @@ export default function HomePage() {
               href={WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline"
+              className="inline-flex items-center gap-2 text-sm font-medium text-teal-600 hover:underline"
             >
               <MessageCircle className="h-4 w-4" />
               Follow our WhatsApp Channel

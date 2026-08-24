@@ -352,7 +352,7 @@ export default function CommunityPage() {
                 {isAuthenticated ? (user?.fullName || "User") : `Guest ${getGuestId().slice(-6)}`}
               </span>
               {isAuthenticated && (
-                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full flex items-center gap-1">
                   <CheckCircle2 className="h-3 w-3" /> Verified
                 </span>
               )}
@@ -423,7 +423,7 @@ export default function CommunityPage() {
                       {post.is_guest ? (
                         <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Guest</span>
                       ) : (
-                        <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full flex items-center gap-1">
                           <CheckCircle2 className="h-3 w-3" /> Verified
                         </span>
                       )}

@@ -59,7 +59,7 @@ export default function BecomeHeroPage() {
           </div>
 
           {/* ====== FREE HELP ANNOUNCEMENT - TOP OF PAGE ====== */}
-          <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border-2 border-green-400 p-4 text-sm text-green-700 dark:text-green-300 text-center max-w-xl mx-auto font-medium">
+          <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border-2 border-teal-400 p-4 text-sm text-teal-700 dark:text-teal-300 text-center max-w-xl mx-auto font-medium">
             🎉 Your first <strong>3 helps are FREE</strong>! After that, 1 credit per help.
           </div>
         </div>
@@ -94,7 +94,7 @@ export default function BecomeHeroPage() {
           <p className="text-center text-muted-foreground mb-2">One Credit unlocks one verified case. 1 Credit = $1.</p>
 
           {/* ====== FREE HELP REMINDER - ABOVE CREDIT PACKAGES ====== */}
-          <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-3 text-sm text-green-700 dark:text-green-300 text-center max-w-2xl mx-auto mb-6">
+          <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-3 text-sm text-teal-700 dark:text-teal-300 text-center max-w-2xl mx-auto mb-6">
             💚 Remember: Your first <strong>3 unlocks are FREE</strong> — you don't need credits for them!
           </div>
 

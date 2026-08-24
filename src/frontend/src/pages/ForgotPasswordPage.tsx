@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
               data-ocid="forgot_password.success_state"
               className="text-center space-y-4"
             >
-              <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+              <CheckCircle2 className="mx-auto h-12 w-12 text-teal-500" />
               <h2 className="font-display font-semibold text-foreground">
                 Check your inbox
               </h2>

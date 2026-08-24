@@ -57,12 +57,12 @@ function ProofStatusBadge({ status }: { status: ReviewStatus }) {
     },
     Approved: {
       className:
-        "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+        "bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-800",
       icon: <CheckCircle2 className="h-3 w-3" />,
     },
     Completed: {
       className:
-        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-700",
+        "bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-950 dark:text-teal-200 dark:border-teal-700",
       icon: <ShieldCheck className="h-3 w-3" />,
     },
     Rejected: {
@@ -85,7 +85,7 @@ function ProofStatusBadge({ status }: { status: ReviewStatus }) {
 function VerifStatusBadge({ status }: { status: string }) {
   if (status === "InstitutionVerified") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+      <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300">
         <ShieldCheck className="h-3 w-3" />
         Verified
       </span>

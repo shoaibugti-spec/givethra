@@ -286,7 +286,7 @@ export default function NeedHelpPage() {
   ];
 
   const badgeStyle: Record<CategoryGuide["amountBadge"], string> = {
-    fixed: "bg-green-100 text-green-700",
+    fixed: "bg-teal-100 text-teal-700",
     verified: "bg-blue-100 text-blue-700",
     max: "bg-amber-100 text-amber-700",
     percent: "bg-purple-100 text-purple-700",
@@ -303,7 +303,7 @@ export default function NeedHelpPage() {
       {/* HERO */}
       <section className="bg-gradient-to-b from-primary/5 to-background">
         <div className="max-w-5xl mx-auto px-4 py-16 text-center space-y-6">
-          <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-sm font-bold">
+          <div className="inline-flex items-center gap-2 bg-teal-100 text-teal-700 px-4 py-1.5 rounded-full text-sm font-bold">
             <Gift className="h-4 w-4" /> Your First Case is 100% FREE
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
@@ -324,7 +324,7 @@ export default function NeedHelpPage() {
 
       {/* FIRST CASE FREE HIGHLIGHT */}
       <section className="max-w-4xl mx-auto px-4 py-10">
-        <div className="rounded-3xl bg-gradient-to-br from-green-500 to-green-600 text-white p-8 text-center space-y-3 shadow-lg">
+        <div className="rounded-3xl bg-gradient-to-br from-teal-500 to-teal-600 text-white p-8 text-center space-y-3 shadow-lg">
           <Sparkles className="h-10 w-10 mx-auto" />
           <h2 className="text-2xl md:text-3xl font-bold">🎉 Your First Case is Completely FREE</h2>
           <p className="text-white/90 max-w-xl mx-auto">
@@ -385,7 +385,7 @@ export default function NeedHelpPage() {
                       <ul className="space-y-1.5">
                         {c.documents.map((d, i) => (
                           <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" />
+                            <CheckCircle2 className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" />
                             <span>{d}</span>
                           </li>
                         ))}
@@ -414,12 +414,12 @@ export default function NeedHelpPage() {
             Along with each category, the following documents are also required based on your gender and marital status:
           </p>
           <ul className="grid sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
-            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" /> Single (Male/Female): Family Registration Certificate (FRC)</li>
-            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" /> Married: Nikah Nama + FRC</li>
-            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" /> Widow: Deceased spouse's Death Certificate + Nikah Nama + FRC</li>
-            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" /> Divorced: Court Divorce Certificate + Nikah Nama + FRC</li>
-            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" /> Orphan (Female/Child): Parent's Death Certificate</li>
-            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" /> Child: B-Form + FRC</li>
+            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" /> Single (Male/Female): Family Registration Certificate (FRC)</li>
+            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" /> Married: Nikah Nama + FRC</li>
+            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" /> Widow: Deceased spouse's Death Certificate + Nikah Nama + FRC</li>
+            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" /> Divorced: Court Divorce Certificate + Nikah Nama + FRC</li>
+            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" /> Orphan (Female/Child): Parent's Death Certificate</li>
+            <li className="flex items-start gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" /> Child: B-Form + FRC</li>
           </ul>
           <div className="pt-2 border-t border-border grid sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
             <p className="flex items-start gap-2"><Briefcase className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" /> Employed: Last 6 months' Salary Slip + Bank Statement</p>
@@ -456,10 +456,10 @@ export default function NeedHelpPage() {
         <div className="max-w-4xl mx-auto px-4 py-14">
           <h2 className="text-2xl md:text-3xl font-bold text-center mb-10">What Does It Cost?</h2>
           <div className="grid sm:grid-cols-2 gap-5">
-            <div className="rounded-2xl border-2 border-green-400 bg-card p-6 shadow-sm space-y-3 text-center">
-              <Gift className="h-8 w-8 text-green-600 mx-auto" />
+            <div className="rounded-2xl border-2 border-teal-400 bg-card p-6 shadow-sm space-y-3 text-center">
+              <Gift className="h-8 w-8 text-teal-600 mx-auto" />
               <h3 className="font-bold text-lg">First Case</h3>
-              <p className="text-3xl font-bold text-green-600">FREE</p>
+              <p className="text-3xl font-bold text-teal-600">FREE</p>
               <p className="text-sm text-muted-foreground">Every new user's very first case is completely free — no credits, no charge.</p>
             </div>
             <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-3 text-center">

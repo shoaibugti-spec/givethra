@@ -26,13 +26,13 @@ import {
 
 const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   welcome: { icon: Heart, color: "text-rose-500", bg: "bg-rose-500/10" },
-  kyc_approved: { icon: ShieldCheck, color: "text-green-500", bg: "bg-green-500/10" },
+  kyc_approved: { icon: ShieldCheck, color: "text-teal-500", bg: "bg-teal-500/10" },
   kyc_rejected: { icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10" },
   kyc_pending: { icon: ShieldCheck, color: "text-amber-500", bg: "bg-amber-500/10" },
-  case_approved: { icon: CheckCheck, color: "text-green-500", bg: "bg-green-500/10" },
+  case_approved: { icon: CheckCheck, color: "text-teal-500", bg: "bg-teal-500/10" },
   case_rejected: { icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10" },
   case_completed: { icon: CheckCheck, color: "text-blue-500", bg: "bg-blue-500/10" },
-  credits_added: { icon: CreditCard, color: "text-green-500", bg: "bg-green-500/10" },
+  credits_added: { icon: CreditCard, color: "text-teal-500", bg: "bg-teal-500/10" },
   deposit_rejected: { icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10" },
   support_reply: { icon: MessageCircle, color: "text-primary", bg: "bg-primary/10" },
   admin_broadcast: { icon: Bell, color: "text-primary", bg: "bg-primary/10" },

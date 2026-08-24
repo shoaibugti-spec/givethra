@@ -110,7 +110,7 @@ export default function VerifyEmailPage() {
           {error && <ErrorBanner message={error} />}
 
           {resendMessage && (
-            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+            <div className="rounded-lg bg-teal-500/10 border border-teal-500/30 p-3 text-sm text-teal-700 dark:text-teal-400 flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 shrink-0" />
               {resendMessage}
             </div>

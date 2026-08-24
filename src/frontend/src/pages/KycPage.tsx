@@ -401,7 +401,7 @@ export default function KycPage() {
 
   const statusConfig: any = {
     pending: { icon: <Clock className="h-4 w-4" />, label: "Under Review", color: "bg-orange-100 text-orange-700" },
-    approved: { icon: <CheckCircle2 className="h-4 w-4" />, label: "Approved", color: "bg-green-100 text-green-700" },
+    approved: { icon: <CheckCircle2 className="h-4 w-4" />, label: "Approved", color: "bg-teal-100 text-teal-700" },
     rejected: { icon: <AlertTriangle className="h-4 w-4" />, label: "Rejected", color: "bg-red-100 text-red-700" },
   };
 
@@ -488,7 +488,7 @@ export default function KycPage() {
           </h2>
 
           {isFront && (
-            <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-800 dark:text-green-300">
+            <div className="rounded-xl bg-teal-500/10 border border-teal-500/20 p-3 text-sm text-teal-800 dark:text-teal-300">
               ✅ Tasveer capture ho gayi hai. "Verify & Confirm" dabayein — OCR number parh kar auto-fill kar dega. Agar koi ghalti ho to baad mein khud durust kar sakte hain.
             </div>
           )}
@@ -623,7 +623,7 @@ export default function KycPage() {
             )}
 
             {submission.status === "approved" && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-sm text-teal-700">
                 ✓ Your identity is verified. You can now submit and unlock cases.
               </div>
             )}
@@ -695,7 +695,7 @@ export default function KycPage() {
                     placeholder="00000-0000000-0"
                   />
                   {form.cnic_number && cnicFrontPreview ? (
-                    <p className="text-xs text-green-600 flex items-center gap-1">
+                    <p className="text-xs text-teal-600 flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" /> OCR se number auto-fill ho gaya hai. Agar koi ghalti hai to khud durust kar lein.
                     </p>
                   ) : (
@@ -747,7 +747,7 @@ export default function KycPage() {
               <div className="space-y-2">
                 <Label>Passport (PDF) *</Label>
                 <Input type="file" accept=".pdf,image/*" onChange={e => setPassportFile(e.target.files?.[0] ?? null)} />
-                {passportFile && <p className="text-xs text-green-600">✓ {passportFile.name}</p>}
+                {passportFile && <p className="text-xs text-teal-600">✓ {passportFile.name}</p>}
               </div>
             )}
 

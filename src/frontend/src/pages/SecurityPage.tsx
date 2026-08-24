@@ -52,7 +52,7 @@ export default function SecurityPage() {
     action?: React.ReactNode;
   }) {
     const config = {
-      verified: { icon: <CheckCircle2 className="h-4 w-4" />, text: "Verified", cls: "text-green-600" },
+      verified: { icon: <CheckCircle2 className="h-4 w-4" />, text: "Verified", cls: "text-teal-600" },
       pending: { icon: <Clock className="h-4 w-4" />, text: "Pending", cls: "text-orange-500" },
       failed: { icon: <XCircle className="h-4 w-4" />, text: "Rejected", cls: "text-red-500" },
       unknown: { icon: <Clock className="h-4 w-4" />, text: "Not Set", cls: "text-muted-foreground" },

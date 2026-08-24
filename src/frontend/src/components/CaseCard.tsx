@@ -35,7 +35,7 @@ async function copyText(text?: string) {
 }
 
 function StatusBadge({ status }: { status?: string }) {
-  const colors: Record<string, string> = { pending: "bg-orange-100 text-orange-700", approved: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", completed: "bg-blue-100 text-blue-700" };
+  const colors: Record<string, string> = { pending: "bg-orange-100 text-orange-700", approved: "bg-teal-100 text-teal-700", rejected: "bg-red-100 text-red-700", completed: "bg-blue-100 text-blue-700" };
   return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${colors[status || ""] ?? "bg-gray-100 text-gray-600"}`}>{status === "none" ? "NO KYC" : (status || "unknown").toUpperCase()}</span>;
 }
 
@@ -235,7 +235,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
         <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{c.urgency}</span>
         {c.was_free
-          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">FREE</span>
+          ? <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-semibold">FREE</span>
           : <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">PAID</span>}
         {c.closed_by_admin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">FUNDRAISED & PAID</span>}
       </div>
@@ -262,7 +262,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
             ⏰ Bill / Case Due (Expiry) Date: {new Date(c.deadline).toLocaleDateString()}
           </p>
         )}
-        {c.amount_needed > 0 && <p className="text-xs text-green-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>}
+        {c.amount_needed > 0 && <p className="text-xs text-teal-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>}
 
         {!isRejected && (
           <div className="mt-2 rounded-lg bg-primary/5 border border-primary/10 p-3">
@@ -425,7 +425,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
           {resolutions.map((r: any) => (
             <div key={r.id} className="text-xs space-y-0.5 border-b border-border/50 last:border-0 pb-2">
               <p>
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.status === "completed" ? "bg-green-100 text-green-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>{r.status?.toUpperCase()}</span>
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.status === "completed" ? "bg-teal-100 text-teal-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>{r.status?.toUpperCase()}</span>
                 {" "}
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.paid_to === "givethra" ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"}`}>{r.paid_to === "givethra" ? "FUNDRAISING" : "DIRECT"}</span>
               </p>
@@ -448,7 +448,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         <div className="space-y-2">
           <Textarea placeholder="Rejection reason (e.g. 'video missing', 'bill not clear', 'account seems personal')" value={reason} onChange={e => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(c.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Publish</Button>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(c.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Publish</Button>
             <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(c.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
           </div>
         </div>

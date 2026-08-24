@@ -34,15 +34,15 @@
     --popover: 0.99 0.005 0;
     --popover-foreground: 0.21 0.02 260;
 
-    --primary: 0.54 0.18 165;
+    --primary: 0.55 0.16 190;
     --primary-foreground: 0.99 0.005 0;
 
-    --secondary: 0.32 0.12 190;
+    --secondary: 0.34 0.12 195;
     --secondary-foreground: 0.99 0.005 0;
     --muted: 0.92 0.008 260;
     --muted-foreground: 0.55 0.01 260;
 
-    --accent: 0.96 0.01 150;
+    --accent: 0.96 0.02 190;
     --accent-foreground: 0.21 0.02 260;
 
     --destructive: 0.55 0.22 25;
@@ -50,29 +50,29 @@
 
     --border: 0.88 0.008 260;
     --input: 0.88 0.008 260;
-    --ring: 0.54 0.18 165;
+    --ring: 0.55 0.16 190;
 
-    --chart-1: 0.54 0.18 165;
-    --chart-2: 0.32 0.12 190;
-    --chart-3: 0.96 0.01 150;
+    --chart-1: 0.55 0.16 190;
+    --chart-2: 0.34 0.12 195;
+    --chart-3: 0.96 0.02 190;
     --chart-4: 0.55 0.22 25;
-    --chart-5: 0.62 0.18 150;
+    --chart-5: 0.65 0.14 190;
 
     --sidebar: 0.99 0.005 0;
     --sidebar-foreground: 0.21 0.02 260;
-    --sidebar-primary: 0.54 0.18 165;
+    --sidebar-primary: 0.55 0.16 190;
     --sidebar-primary-foreground: 0.99 0.005 0;
     --sidebar-accent: 0.92 0.008 260;
     --sidebar-accent-foreground: 0.32 0.12 190;
     --sidebar-border: 0.88 0.008 260;
-    --sidebar-ring: 0.54 0.18 165;
+    --sidebar-ring: 0.55 0.16 190;
 
-    --primary-brand-color: #00a896;
-    --secondary-brand-color: #028090;
-    --light-background: #f4f9f9;
+    --primary-brand-color: #0b8795;
+    --secondary-brand-color: #056f80;
+    --light-background: #effbfc;
     --dark-background: #0f172a;
     --text-main: #1e293b;
-    --accent-color: #f0fdf4;
+    --accent-color: #e8f8fa;
   }
 
   .dark {
@@ -83,15 +83,15 @@
     --popover: 0.15 0.01 260;
     --popover-foreground: 0.96 0.008 260;
 
-    --primary: 0.62 0.18 165;
+    --primary: 0.65 0.15 190;
     --primary-foreground: 0.08 0.02 0;
 
-    --secondary: 0.48 0.12 190;
+    --secondary: 0.5 0.12 195;
     --secondary-foreground: 0.99 0.005 0;
     --muted: 0.25 0.01 260;
     --muted-foreground: 0.65 0.008 260;
 
-    --accent: 0.8 0.01 150;
+    --accent: 0.82 0.02 190;
     --accent-foreground: 0.08 0.02 0;
 
     --destructive: 0.65 0.19 22;
@@ -99,22 +99,22 @@
 
     --border: 0.22 0.01 260;
     --input: 0.22 0.01 260;
-    --ring: 0.62 0.18 165;
+    --ring: 0.65 0.15 190;
 
-    --chart-1: 0.62 0.18 165;
-    --chart-2: 0.48 0.12 190;
+    --chart-1: 0.65 0.15 190;
+    --chart-2: 0.5 0.12 195;
     --chart-3: 0.8 0.01 150;
     --chart-4: 0.68 0.22 23;
-    --chart-5: 0.72 0.15 195;
+    --chart-5: 0.74 0.14 190;
 
     --sidebar: 0.12 0.01 260;
     --sidebar-foreground: 0.96 0.008 260;
-    --sidebar-primary: 0.62 0.18 165;
+    --sidebar-primary: 0.65 0.15 190;
     --sidebar-primary-foreground: 0.08 0.02 0;
     --sidebar-accent: 0.25 0.01 260;
     --sidebar-accent-foreground: 0.85 0.008 260;
     --sidebar-border: 0.22 0.01 260;
-    --sidebar-ring: 0.62 0.18 165;
+    --sidebar-ring: 0.65 0.15 190;
   }
 
   * {

@@ -673,10 +673,10 @@ export default function AdminPage() {
               <TabsTrigger value="kyc">KYC {pendingKyc.length > 0 && <span className="ml-1 bg-primary text-white text-[10px] rounded-full px-1.5">{pendingKyc.length}</span>}</TabsTrigger>
               <TabsTrigger value="cases">Cases {pendingCases.length > 0 && <span className="ml-1 bg-primary text-white text-[10px] rounded-full px-1.5">{pendingCases.length}</span>}</TabsTrigger>
               <TabsTrigger value="verify">Verify Help {pendingResolutions.length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{pendingResolutions.length}</span>}</TabsTrigger>
-              <TabsTrigger value="pay">Pay & Close {readyToClose.length > 0 && <span className="ml-1 bg-green-500 text-white text-[10px] rounded-full px-1.5">{readyToClose.length}</span>}</TabsTrigger>
+              <TabsTrigger value="pay">Pay & Close {readyToClose.length > 0 && <span className="ml-1 bg-teal-500 text-white text-[10px] rounded-full px-1.5">{readyToClose.length}</span>}</TabsTrigger>
               <TabsTrigger value="deposits">Deposits {pendingDeposits.length > 0 && <span className="ml-1 bg-primary text-white text-[10px] rounded-full px-1.5">{pendingDeposits.length}</span>}</TabsTrigger>
               <TabsTrigger value="notify">Notify</TabsTrigger>
-              <TabsTrigger value="offers">Offers {activeOffers > 0 && <span className="ml-1 bg-green-500 text-white text-[10px] rounded-full px-1.5">{activeOffers}</span>}</TabsTrigger>
+              <TabsTrigger value="offers">Offers {activeOffers > 0 && <span className="ml-1 bg-teal-500 text-white text-[10px] rounded-full px-1.5">{activeOffers}</span>}</TabsTrigger>
               <TabsTrigger value="support">Support {unreadSupport > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{unreadSupport}</span>}</TabsTrigger>
               <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => f.status === "pending_review" && f.case_id).length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => f.status === "pending_review" && f.case_id).length}</span>}</TabsTrigger>
               <TabsTrigger value="suspensions">Suspensions {activeSuspensions > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{activeSuspensions}</span>}</TabsTrigger>
@@ -707,7 +707,7 @@ export default function AdminPage() {
                 <div className="rounded-xl border bg-card p-3">
                   <p className="text-xs text-muted-foreground">KYC</p>
                   <div className="flex gap-2 text-xs">
-                    <span className="text-green-600">✅ {approvedKycCount}</span>
+                    <span className="text-teal-600">✅ {approvedKycCount}</span>
                     <span className="text-red-600">❌ {rejectedKycCount}</span>
                     <span className="text-orange-500">⏳ {pendingKyc.length}</span>
                   </div>
@@ -715,7 +715,7 @@ export default function AdminPage() {
                 <div className="rounded-xl border bg-card p-3">
                   <p className="text-xs text-muted-foreground">Cases</p>
                   <div className="flex gap-2 text-xs">
-                    <span className="text-green-600">✅ {approvedCasesCount}</span>
+                    <span className="text-teal-600">✅ {approvedCasesCount}</span>
                     <span className="text-red-600">❌ {rejectedCasesCount}</span>
                     <span className="text-blue-600">✅ {completedCasesCount}</span>
                     <span className="text-orange-500">⏳ {pendingCases.length}</span>
@@ -724,7 +724,7 @@ export default function AdminPage() {
                 <div className="rounded-xl border bg-card p-3">
                   <p className="text-xs text-muted-foreground">Deposits</p>
                   <div className="flex gap-2 text-xs">
-                    <span className="text-green-600">✅ {approvedDepositsCount}</span>
+                    <span className="text-teal-600">✅ {approvedDepositsCount}</span>
                     <span className="text-red-600">❌ {rejectedDepositsCount}</span>
                     <span className="text-orange-500">⏳ {pendingDeposits.length}</span>
                   </div>
@@ -763,7 +763,7 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="pay" className="space-y-4 mt-4">
-              <div className="rounded-xl border bg-green-50 dark:bg-green-950/20 p-4 text-sm text-green-700 flex items-start gap-2">
+              <div className="rounded-xl border bg-teal-50 dark:bg-teal-950/20 p-4 text-sm text-teal-700 flex items-start gap-2">
                 <HandCoins className="h-4 w-4 shrink-0 mt-0.5" />
                 <p>These fundraising cases have reached their goal! Pay the institute's bill yourself, upload the receipt, and close the case. The seeker will be notified that everyone helped together.</p>
               </div>
@@ -839,7 +839,7 @@ function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
                 <div><p className="text-xs text-muted-foreground">Suspended At</p><p className="text-sm">{new Date(s.suspended_at).toLocaleDateString()}</p></div>
               </div>
               <div className="flex gap-2 pt-2 border-t border-red-200">
-                <Button size="sm" variant="outline" className="text-green-600 border-green-300" onClick={() => onUnlock(s.user_id)}>
+                <Button size="sm" variant="outline" className="text-teal-600 border-teal-300" onClick={() => onUnlock(s.user_id)}>
                   <CheckCircle className="h-3.5 w-3.5 mr-1" /> Manually Unlock
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(s.user_id); toast.success("User ID copied!"); }}>
@@ -1041,7 +1041,7 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
 
           <div className="flex gap-2">
             {u.isSuspended && (
-              <Button size="sm" variant="outline" className="text-green-600 border-green-300 flex-1" onClick={() => onManualUnlock(u.user_id)}>
+              <Button size="sm" variant="outline" className="text-teal-600 border-teal-300 flex-1" onClick={() => onManualUnlock(u.user_id)}>
                 <CheckCircle className="h-3.5 w-3.5 mr-1" /> Unlock Manually
               </Button>
             )}
@@ -1094,13 +1094,13 @@ function PayCloseCard({ c, profileMap, onClose }: any) {
   }
 
   return (
-    <div className="rounded-xl border-2 border-green-300 bg-card p-4 space-y-3">
+    <div className="rounded-xl border-2 border-teal-300 bg-card p-4 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">GOAL REACHED 🎉</span>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">GOAL REACHED 🎉</span>
         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
       </div>
       <p className="font-semibold text-sm">{c.title}</p>
-      <p className="text-xs text-green-600 font-medium">Raised: {s} {c.amount_collected} of {s} {c.amount_needed} ✅</p>
+      <p className="text-xs text-teal-600 font-medium">Raised: {s} {c.amount_collected} of {s} {c.amount_needed} ✅</p>
 
       <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs space-y-0.5">
         <p className="font-semibold flex items-center gap-1"><Users className="h-3 w-3" /> Seeker</p>
@@ -1117,8 +1117,8 @@ function PayCloseCard({ c, profileMap, onClose }: any) {
         <label className="text-xs font-medium">Upload your payment receipt (after you pay the bill):</label>
         <Input type="file" accept="image/*,.pdf" onChange={(e) => uploadReceipt(e.target.files?.[0] ?? null)} className="text-sm" />
         {uploading && <p className="text-xs text-amber-600">⏳ Uploading...</p>}
-        {receiptUrl && <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Receipt uploaded</p>}
-        <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={closing || uploading}
+        {receiptUrl && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Receipt uploaded</p>}
+        <Button size="sm" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={closing || uploading}
           onClick={async () => { setClosing(true); await onClose(c, receiptUrl); setClosing(false); }}>
           <CheckCircle className="h-3.5 w-3.5 mr-1" /> Mark as Paid & Close Case
         </Button>
@@ -1184,7 +1184,7 @@ function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
       )}
 
       <div className="flex gap-2 pt-1">
-        <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => onConfirm(r)}>
+        <Button size="sm" className="flex-1 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onConfirm(r)}>
           <CheckCircle className="h-3.5 w-3.5 mr-1" /> Verify & Add {s} {confirmedAmt}
         </Button>
         <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onReject(r)}>
@@ -1376,13 +1376,13 @@ function OfferRow({ category, offer, onReload }: any) {
   }
 
   return (
-    <div className={`rounded-xl border p-4 space-y-3 ${active ? "border-green-300 bg-green-50/50 dark:bg-green-950/10" : "bg-card"}`}>
+    <div className={`rounded-xl border p-4 space-y-3 ${active ? "border-teal-300 bg-teal-50/50 dark:bg-teal-950/10" : "bg-card"}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold text-sm">{category}</p>
           {offer && <p className="text-xs text-muted-foreground">{used} / {offer.free_limit} free used</p>}
         </div>
-        <Button size="sm" disabled={saving} className={active ? "bg-green-600 hover:bg-green-700 text-white" : ""} variant={active ? "default" : "outline"} onClick={() => save(!active)}>
+        <Button size="sm" disabled={saving} className={active ? "bg-teal-600 hover:bg-teal-700 text-white" : ""} variant={active ? "default" : "outline"} onClick={() => save(!active)}>
           {active ? "Offer ON" : "Offer OFF"}
         </Button>
       </div>
@@ -1594,7 +1594,7 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
           </div>
           <div className="flex justify-between text-[10px] text-muted-foreground px-1">
             <span>Supported: Images, PDF, DOC, TXT (max 10MB)</span>
-            {attachmentFile && <span className="text-green-600">📎 {attachmentFile.name}</span>}
+            {attachmentFile && <span className="text-teal-600">📎 {attachmentFile.name}</span>}
           </div>
         </div>
       </div>
@@ -1635,7 +1635,7 @@ function Empty({ text }: { text: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const c: any = { pending: "bg-orange-100 text-orange-700", approved: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700", completed: "bg-blue-100 text-blue-700", none: "bg-gray-100 text-gray-600" };
+  const c: any = { pending: "bg-orange-100 text-orange-700", approved: "bg-teal-100 text-teal-700", rejected: "bg-red-100 text-red-700", completed: "bg-blue-100 text-blue-700", none: "bg-gray-100 text-gray-600" };
   return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c[status] ?? "bg-gray-100"}`}>{status === "none" ? "NO KYC" : status?.toUpperCase()}</span>;
 }
 
@@ -1694,7 +1694,7 @@ function KycCard({ kyc, onUpdate, dupCount }: any) {
         <div className="space-y-2">
           <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(kyc.id, "approved", "", "approve")}>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(kyc.id, "approved", "", "approve")}>
               <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
             </Button>
             <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(kyc.id, "rejected", reason, "reject")}>
@@ -2015,7 +2015,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
         <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{c.urgency}</span>
         {c.was_free
-          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">FREE</span>
+          ? <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-semibold">FREE</span>
           : <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">PAID</span>}
         {c.closed_by_admin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">FUNDRAISED & PAID</span>}
       </div>
@@ -2042,7 +2042,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
             ⏰ Bill / Case Due (Expiry) Date: {new Date(c.deadline).toLocaleDateString()}
           </p>
         )}
-        {c.amount_needed > 0 && <p className="text-xs text-green-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>}
+        {c.amount_needed > 0 && <p className="text-xs text-teal-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>}
 
         {!isRejected && (
           <div className="mt-2 rounded-lg bg-primary/5 border border-primary/10 p-3">
@@ -2171,7 +2171,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
           {resolutions.map((r: any) => (
             <div key={r.id} className="text-xs space-y-0.5 border-b border-border/50 last:border-0 pb-2">
               <p>
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.status === "completed" ? "bg-green-100 text-green-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>{r.status?.toUpperCase()}</span>
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.status === "completed" ? "bg-teal-100 text-teal-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>{r.status?.toUpperCase()}</span>
                 {" "}
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.paid_to === "givethra" ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"}`}>{r.paid_to === "givethra" ? "FUNDRAISING" : "DIRECT"}</span>
               </p>
@@ -2186,7 +2186,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         <div className="space-y-2">
           <Textarea placeholder="Rejection reason (e.g. 'video missing', 'bill not clear', 'account seems personal')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(c.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Publish</Button>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(c.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Publish</Button>
             <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(c.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
           </div>
         </div>
@@ -2222,7 +2222,7 @@ function DepositCard({ d, onApprove, onReject }: any) {
           </div>
           <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex gap-2">
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onApprove(d, parseFloat(credits) || 0)}>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onApprove(d, parseFloat(credits) || 0)}>
               <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Add {credits || 0} Credits
             </Button>
             <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onReject(d.id, reason)}>
@@ -2249,7 +2249,7 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
   return (
     <div className="rounded-xl border bg-card p-4 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status === "approved" ? "bg-green-100 text-green-700" : status === "rejected" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>{status.replace("_", " ").toUpperCase()}</span>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status === "approved" ? "bg-teal-100 text-teal-700" : status === "rejected" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>{status.replace("_", " ").toUpperCase()}</span>
         {c && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>}
       </div>
       <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs">
@@ -2262,7 +2262,7 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
         <div className="space-y-2 pt-1 border-t border-border">
           <Textarea placeholder="Rejection reason (e.g. 'video too short', 'unrelated content')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex gap-2">
-              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve — Post to Wall</Button>
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve — Post to Wall</Button>
             <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(fb.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
           </div>
         </div>
