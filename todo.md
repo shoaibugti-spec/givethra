@@ -639,3 +639,9 @@
 - [x] Expand Admin case attachment collection to include `_documents`, `edu_documents`, every nested URL, required documents, original metadata names, and duplicate-by-URL filtering.
 - [x] Repair Admin-to-user support reply persistence/delivery, including recipient identity, attachment URL, multiline message, and reload verification.
 - [x] Add regression tests and run Worker syntax, strict TypeScript, and production build checks without changing D1/R2 data.
+
+## Case and Help Status Tabs, Durable Support Readback — 2026-08-24
+- [x] Add status tabs beneath Cases for All, Pending, Rejected, and Completed cases.
+- [x] Add status tabs beneath Help/Support for All, Open/Pending, Replied, and Closed conversations.
+- [x] Ensure Admin support replies are returned by the same conversation query after send and browser refresh.
+- [x] Add regression tests and run Worker syntax, strict TypeScript, and production build checks without changing D1/R2 data.

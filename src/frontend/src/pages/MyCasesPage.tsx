@@ -32,6 +32,8 @@ export default function MyCasesPage() {
   const [myCases, setMyCases] = useState<any[]>([]);
   const [unlockedCases, setUnlockedCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [caseFilter, setCaseFilter] = useState<"all" | "pending" | "rejected" | "completed">("all");
+  const [helpFilter, setHelpFilter] = useState<"all" | "active" | "completed">("all");
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -305,6 +307,12 @@ export default function MyCasesPage() {
   const myCompleted = myCases.filter(c => c.status === "completed");
   const myRejected = myCases.filter(c => c.status === "rejected");
   const myExpired = myCases.filter(c => c.status === "expired");
+  const showCaseStatus = (status: string) => caseFilter === "all" || caseFilter === status;
+  const visibleHelping = unlockedCases.filter((c) => {
+    if (helpFilter === "all") return true;
+    if (helpFilter === "completed") return c.status === "completed";
+    return !["completed", "rejected", "expired"].includes(String(c.status));
+  });
 
   return (
     <Layout>
@@ -327,6 +335,18 @@ export default function MyCasesPage() {
             </TabsList>
 
             <TabsContent value="requests" className="space-y-5 mt-4">
+              <div className="grid grid-cols-4 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="My case status filters">
+                {([
+                  ["all", "All"],
+                  ["pending", "Pending"],
+                  ["rejected", "Rejected"],
+                  ["completed", "Completed"],
+                ] as const).map(([value, label]) => (
+                  <button key={value} type="button" role="tab" aria-selected={caseFilter === value} onClick={() => setCaseFilter(value)} className={`rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${caseFilter === value ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                    {label} ({value === "all" ? myCases.length : value === "pending" ? myPending.length : value === "rejected" ? myRejected.length : myCompleted.length})
+                  </button>
+                ))}
+              </div>
               {myCases.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FileText className="h-10 w-10 mx-auto opacity-30 mb-2" />
@@ -335,7 +355,7 @@ export default function MyCasesPage() {
                 </div>
               ) : (
                 <>
-                  {myExpired.length > 0 && (
+                  {showCaseStatus("expired") && myExpired.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-amber-600 flex items-center gap-1.5">
                         <CalendarClock className="h-4 w-4" /> Expired ({myExpired.length})
@@ -343,7 +363,7 @@ export default function MyCasesPage() {
                       {myExpired.map(c => <CaseRow key={c.id} c={c} />)}
                     </div>
                   )}
-                  {myRejected.length > 0 && (
+                  {showCaseStatus("rejected") && myRejected.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
                         <XCircle className="h-4 w-4" /> Rejected ({myRejected.length})
@@ -351,19 +371,19 @@ export default function MyCasesPage() {
                       {myRejected.map(c => <CaseRow key={c.id} c={c} />)}
                     </div>
                   )}
-                  {myPending.length > 0 && (
+                  {showCaseStatus("pending") && myPending.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-muted-foreground">⏳ Under Review ({myPending.length})</h3>
                       {myPending.map(c => <CaseRow key={c.id} c={c} />)}
                     </div>
                   )}
-                  {myActive.length > 0 && (
+                  {showCaseStatus("approved") && myActive.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-muted-foreground">✅ Published ({myActive.length})</h3>
                       {myActive.map(c => <CaseRow key={c.id} c={c} />)}
                     </div>
                   )}
-                  {myCompleted.length > 0 && (
+                  {showCaseStatus("completed") && myCompleted.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-muted-foreground">🎉 Completed ({myCompleted.length})</h3>
                       {myCompleted.map(c => <CaseRow key={c.id} c={c} />)}
@@ -374,14 +394,25 @@ export default function MyCasesPage() {
             </TabsContent>
 
             <TabsContent value="helping" className="space-y-3 mt-4">
-              {unlockedCases.length === 0 ? (
+              <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Help status filters">
+                {([
+                  ["all", "All Help"],
+                  ["active", "Active"],
+                  ["completed", "Completed"],
+                ] as const).map(([value, label]) => (
+                  <button key={value} type="button" role="tab" aria-selected={helpFilter === value} onClick={() => setHelpFilter(value)} className={`rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${helpFilter === value ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                    {label} ({value === "all" ? unlockedCases.length : value === "active" ? unlockedCases.filter((c) => !["completed", "rejected", "expired"].includes(String(c.status))).length : unlockedCases.filter((c) => c.status === "completed").length})
+                  </button>
+                ))}
+              </div>
+              {visibleHelping.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Heart className="h-10 w-10 mx-auto opacity-30 mb-2" />
                   <p>You haven't unlocked any cases yet.</p>
                   <Button size="sm" className="mt-3" onClick={() => navigate({ to: "/cases" })}>Browse Cases</Button>
                 </div>
               ) : (
-                unlockedCases.map(c => <CaseRow key={c.id} c={c} isHelping />)
+                visibleHelping.map(c => <CaseRow key={c.id} c={c} isHelping />)
               )}
             </TabsContent>
           </Tabs>

@@ -9,6 +9,7 @@ const walletSource = fs.readFileSync(path.join(root, "src/pages/WalletPage.tsx")
 const settingsSource = fs.readFileSync(path.join(root, "src/pages/SettingsPage.tsx"), "utf8");
 const adminSource = fs.readFileSync(path.join(root, "src/pages/AdminDashboard.tsx"), "utf8");
 const profileSource = fs.readFileSync(path.join(root, "src/pages/ProfilePage.tsx"), "utf8");
+const myCasesSource = fs.readFileSync(path.join(root, "src/pages/MyCasesPage.tsx"), "utf8");
 
 describe("dashboard operations repair", () => {
   it("submits deposits using the production D1 columns and keeps the proof filename", () => {
@@ -98,11 +99,25 @@ describe("dashboard operations repair", () => {
     expect(profileSource).not.toContain('to: "/google-account-security"');
   });
 
+  it("adds nested Cases and Help status filters", () => {
+    expect(myCasesSource).toContain('aria-label="My case status filters"');
+    expect(myCasesSource).toContain('aria-label="Help status filters"');
+    expect(myCasesSource).toContain('["pending", "Pending"]');
+    expect(myCasesSource).toContain('["rejected", "Rejected"]');
+    expect(myCasesSource).toContain('["completed", "Completed"]');
+    expect(myCasesSource).toContain('["active", "Active"]');
+    expect(myCasesSource).toContain("visibleHelping");
+  });
+
   it("keeps exhaustive case attachment traversal and original-name metadata", () => {
     expect(adminSource).toContain("const walkFilesDeep =");
     expect(adminSource).toContain("original_name || file.filename || file.file_name || file.name");
     expect(adminSource).toContain("const candidate = file.url || file.file_url || file.download_url || file.href || file.path");
     expect(adminSource).toContain("const seen = new Set<string>()");
     expect(adminSource).toContain("const uniqueFiles = fileEntries.filter");
+    expect(adminSource).toContain("parseObject(c.photo_urls)");
+    expect(adminSource).toContain('walkFilesDeep(catDocs, "documents")');
+    expect(adminSource).toContain('walkFilesDeep(parseObject(catDetails?.edu_documents) || {}, "education_documents")');
+    expect(workerSource).toContain("await env.DB.batch([");
   });
 });
