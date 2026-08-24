@@ -17,8 +17,10 @@ import { runUserGuide } from "@/lib/userGuide";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   BadgeCheck,
+  Battery,
   Building2,
   ChevronRight,
+  WalletCards,
   Facebook,
   FileText,
   Gift,
@@ -40,6 +42,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getApprovedCases,
   getCategoryCounts,
+  getCasesByUser,
   getKycStatus,
   getWallet,
   getUnlockCount,
@@ -146,6 +149,52 @@ const CATEGORY_APPEAL: Record<string, string> = {
   Other: "Be someone's hope today 🤲",
 };
 
+const CATEGORY_SLIDE_ICONS: Record<string, React.ElementType> = {
+  "Electricity Bill": Battery,
+  "Gas Bill": FileText,
+  "Water Bill": FileText,
+  "House Rent": Building2,
+  "School Fees": FileText,
+  "Education & Books": FileText,
+  "Medical & Treatment": FileText,
+  Medicines: FileText,
+  "Food & Groceries": FileText,
+  "Child Support": FileText,
+  "Widow & Elderly Support": Heart,
+  "Disability Support": FileText,
+  "Marriage Support": Heart,
+  "Business / Work Help": Building2,
+  "Home Repair": Building2,
+  "Funeral Expenses": FileText,
+  "Livestock / Farming": FileText,
+  "Debt Relief": WalletCards,
+  "Emergency Help": FileText,
+  Other: FileText,
+};
+
+const CATEGORY_SLIDE_COPY: Record<string, { title: string; desc: string }> = {
+  "Electricity Bill": { title: "Need Electricity Bill Help?", desc: "Need help paying this month’s electricity bill?" },
+  "Gas Bill": { title: "Need Gas Bill Help?", desc: "Need help paying this month’s gas bill?" },
+  "Water Bill": { title: "Need Water Bill Help?", desc: "Need help paying this month’s water bill?" },
+  "House Rent": { title: "Need Rent Help?", desc: "Need help paying this month’s rent?" },
+  "School Fees": { title: "Need School Fee Help?", desc: "Need help paying your school fees?" },
+  "Education & Books": { title: "Need Education Help?", desc: "Need help with books or study costs?" },
+  "Medical & Treatment": { title: "Need Medical Help?", desc: "Need help with treatment costs?" },
+  Medicines: { title: "Need Medicine Help?", desc: "Need help paying for essential medicines?" },
+  "Food & Groceries": { title: "Need Food Help?", desc: "Need help with essential groceries?" },
+  "Child Support": { title: "Need Child Support?", desc: "Need help with essential needs for your child?" },
+  "Widow & Elderly Support": { title: "Need Elderly Support?", desc: "Need help with essential needs?" },
+  "Disability Support": { title: "Need Disability Support?", desc: "Need help with an essential need?" },
+  "Marriage Support": { title: "Need Wedding Help?", desc: "Need help with an essential wedding expense?" },
+  "Business / Work Help": { title: "Need Work Support?", desc: "Need help starting work or a small business?" },
+  "Home Repair": { title: "Need Home Repair Help?", desc: "Need help with an essential home repair?" },
+  "Funeral Expenses": { title: "Need Funeral Help?", desc: "Need help with essential funeral expenses?" },
+  "Livestock / Farming": { title: "Need Farming Help?", desc: "Need help with livestock or farming costs?" },
+  "Debt Relief": { title: "Need Debt Relief?", desc: "Need help with an urgent debt?" },
+  "Emergency Help": { title: "Need Emergency Help?", desc: "Facing an urgent essential need?" },
+  Other: { title: "Need Help?", desc: "Facing an urgent essential need?" },
+};
+
 const URGENCIES = ["Low", "Medium", "High", "Emergency"];
 
 const TRUST_BADGES = [
@@ -168,6 +217,7 @@ type GuideSlide =
       to: string;
       color: string;
       bg: string;
+      eyebrow?: string;
     };
 
 export default function HomePage() {
@@ -181,6 +231,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [kycStatus, setKycStatus] = useState("none");
   const [unlockCount, setUnlockCount] = useState(0);
+  const [freeCasesUsed, setFreeCasesUsed] = useState(0);
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterCountry, setFilterCountry] = useState("all");
@@ -193,6 +244,7 @@ export default function HomePage() {
   const [slideIndex, setSlideIndex] = useState(0);
 
   const resultsRef = useRef<HTMLDivElement>(null);
+  const sliderTouchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     void loadCases();
@@ -242,7 +294,7 @@ export default function HomePage() {
 
   useEffect(() => {
     setSlideIndex(0);
-  }, [isAuthenticated, kycStatus, unlockCount]);
+  }, [freeCasesUsed, isAuthenticated, kycStatus, unlockCount]);
 
   async function loadCases() {
     setLoading(true);
@@ -268,10 +320,18 @@ export default function HomePage() {
   async function loadGuideStatus() {
     if (!user?.id) return;
     try {
-      const kyc = await getKycStatus(user.id);
+      const [kyc, userCases] = await Promise.all([
+        getKycStatus(user.id),
+        getCasesByUser(user.id),
+      ]);
       setKycStatus(kyc?.status ?? "none");
-      await getWallet(user.id);
-      await getUnreadNotificationsCount(user.id);
+      setFreeCasesUsed(
+        (userCases ?? []).filter((item: any) => item.was_free === true).length,
+      );
+      await Promise.all([
+        getWallet(user.id),
+        getUnreadNotificationsCount(user.id),
+      ]);
     } catch {
       // Optional dashboard data.
     }
@@ -295,6 +355,7 @@ export default function HomePage() {
         image: "/assets/generated/hero-givethra.dim_1200x500.jpg",
       },
     ];
+    const freeCaseComplete = freeCasesUsed >= 2;
 
     if (!isAuthenticated) {
       slides.push(
@@ -306,7 +367,7 @@ export default function HomePage() {
           desc: "Become a Hero and unlock your first 3 cases for free. After that, 1 credit per help.",
           cta: "Become a Hero — Free",
           to: "/sign-in",
-          color: "text-teal-600",
+          color: "text-teal-700",
           bg: "bg-teal-500/10",
         },
         {
@@ -335,36 +396,52 @@ export default function HomePage() {
             icon: ShieldCheck,
             title: "Step 1: Verify your identity",
             desc: "Complete your KYC by adding your CNIC front, back, and selfie photos.",
+            cta: "Complete your KYC now",
             to: "/kyc",
-            color: "text-violet-600",
+            color: "text-violet-700",
             bg: "bg-violet-500/10",
           },
         );
       }
 
       if (kycStatus === "approved") {
-        slides.push(
-          {
+        if (!freeCaseComplete) {
+          slides.push({
             key: "submit",
             type: "guide",
             icon: FileText,
             title: "Submit your FIRST case — FREE! 🎉",
             desc: "Your identity is verified. Submit your first case completely free.",
+            cta: "Submit your free case",
             to: "/submit-request",
             color: "text-primary",
             bg: "bg-primary/10",
-          },
-          {
-            key: "help",
+          });
+        } else {
+          slides.push({
+            key: "credits",
             type: "guide",
-            icon: Heart,
-            title: "Help someone — become a Hero",
-            desc: "Browse verified cases and support a real person directly.",
-            to: "/cases",
-            color: "text-rose-600",
-            bg: "bg-rose-500/10",
-          },
-        );
+            icon: WalletCards,
+            title: "Need more help after your free cases?",
+            desc: "Add credits securely to submit another eligible case when you are ready.",
+            cta: "View credits",
+            to: "/become-hero",
+            color: "text-amber-700",
+            bg: "bg-amber-500/10",
+          });
+        }
+
+        slides.push({
+          key: "help",
+          type: "guide",
+          icon: Heart,
+          title: "Help someone — become a Hero",
+          desc: "Browse verified cases and support a real person directly.",
+          cta: "Browse verified cases",
+          to: "/cases",
+          color: "text-rose-700",
+          bg: "bg-rose-500/10",
+        });
 
         if (unlockCount < 3) {
           slides.push({
@@ -373,16 +450,32 @@ export default function HomePage() {
             icon: Gift,
             title: "🎉 Your first 3 helps are FREE!",
             desc: `Your first ${3 - unlockCount} unlocks are free. Start helping now!`,
+            cta: "Start helping now",
             to: "/cases",
-            color: "text-teal-600",
+            color: "text-teal-700",
             bg: "bg-teal-500/10",
           });
         }
       }
     }
 
+    slides.push(
+      ...FILTER_CATEGORIES.map((category) => ({
+        key: `category_${category}`,
+        type: "guide" as const,
+        icon: CATEGORY_SLIDE_ICONS[category] ?? FileText,
+        eyebrow: "Explore a help category",
+        title: CATEGORY_SLIDE_COPY[category]?.title ?? category,
+        desc: CATEGORY_SLIDE_COPY[category]?.desc ?? "Explore verified help requests in this category.",
+        cta: "Explore categories",
+        to: "/need-help",
+        color: "text-primary",
+        bg: "bg-primary/10",
+      })),
+    );
+
     return slides;
-  }, [isAuthenticated, kycStatus, unlockCount]);
+  }, [freeCasesUsed, isAuthenticated, kycStatus, unlockCount]);
 
   useEffect(() => {
     if (guideSlides.length <= 1) return;
@@ -509,6 +602,31 @@ export default function HomePage() {
     }, 100);
   }
 
+  const visibleSlideIndexes = useMemo(() => {
+    const last = guideSlides.length - 1;
+    return guideSlides
+      .map((_, index) => index)
+      .filter((index) => index === 0 || index === last || Math.abs(index - slideIndex) <= 2);
+  }, [guideSlides, slideIndex]);
+
+  function goToSlide(index: number) {
+    setSlideIndex((index + guideSlides.length) % guideSlides.length);
+  }
+
+  function handleSliderTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    sliderTouchStartX.current = event.touches[0]?.clientX ?? null;
+  }
+
+  function handleSliderTouchEnd(event: React.TouchEvent<HTMLDivElement>) {
+    const start = sliderTouchStartX.current;
+    sliderTouchStartX.current = null;
+    if (start === null || guideSlides.length < 2) return;
+    const end = event.changedTouches[0]?.clientX ?? start;
+    const distance = end - start;
+    if (Math.abs(distance) < 42) return;
+    goToSlide(slideIndex + (distance < 0 ? 1 : -1));
+  }
+
   function renderSlideContent() {
     const slide = guideSlides[slideIndex] ?? guideSlides[0];
     if (!slide) return null;
@@ -528,16 +646,16 @@ export default function HomePage() {
         <button
           type="button"
           onClick={() => navigate({ to: slide.to })}
-          className="flex h-52 w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary to-primary/80 px-6 text-center text-white md:h-72"
+          className="flex min-h-52 w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary via-primary to-teal-600 px-6 py-5 text-center text-white transition-transform hover:scale-[1.01] md:min-h-72"
         >
-          <span className="text-4xl">🎉</span>
-          <div className="text-2xl font-black tracking-wide md:text-3xl">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-4xl shadow-inner">🎉</span>
+          <div className="max-w-xs text-2xl font-black leading-tight tracking-tight md:text-3xl">
             First Case FREE! 🎉
           </div>
-          <p className="text-sm font-semibold opacity-90">
+          <p className="max-w-sm text-sm font-medium leading-relaxed text-white/85">
             Complete your KYC and submit your first request with zero fees.
           </p>
-          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-4 py-1.5 text-sm font-bold">
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-primary shadow-sm">
             Complete your KYC now
             <ChevronRight className="h-4 w-4" />
           </span>
@@ -550,20 +668,23 @@ export default function HomePage() {
       <button
         type="button"
         onClick={() => navigate({ to: slide.to })}
-        className="flex h-52 w-full cursor-pointer flex-col items-center justify-center gap-3 bg-gradient-to-br from-card to-muted/40 px-6 text-center transition-colors hover:from-muted/30 md:h-72"
+        className="group flex min-h-52 w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gradient-to-br from-card via-card to-primary/5 px-6 py-5 text-center transition-transform hover:scale-[1.01] md:min-h-72"
       >
-        <div
-          className={`flex h-16 w-16 items-center justify-center rounded-2xl ${slide.bg}`}
-        >
-          <Icon className={`h-8 w-8 ${slide.color}`} />
+        <div className={`flex h-14 w-14 items-center justify-center rounded-[18px] shadow-sm ${slide.bg}`}>
+          <Icon className={`h-7 w-7 ${slide.color}`} />
         </div>
-        <h3 className="font-display text-xl font-bold text-foreground">
+        {slide.eyebrow && (
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary/75">
+            {slide.eyebrow}
+          </span>
+        )}
+        <h3 className="max-w-md font-display text-lg font-bold leading-tight tracking-tight text-foreground md:text-2xl">
           {slide.title}
         </h3>
-        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+        <p className="max-w-md text-xs leading-relaxed text-muted-foreground md:text-[15px]">
           {slide.desc}
         </p>
-        <span className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+        <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-transform group-hover:translate-x-0.5 md:px-4 md:py-2 md:text-sm">
           {slide.cta ?? "Tap to continue"}
           <ChevronRight className="h-4 w-4" />
         </span>
@@ -641,23 +762,35 @@ export default function HomePage() {
               transition={{ duration: 0.65, delay: 0.15 }}
               className="w-full flex-1 space-y-4"
             >
-              <div className="relative w-full overflow-hidden rounded-2xl shadow-xl">
+              <div
+                className="relative w-full overflow-hidden rounded-2xl border border-primary/10 bg-card shadow-xl"
+                onTouchStart={handleSliderTouchStart}
+                onTouchEnd={handleSliderTouchEnd}
+              >
                 {renderSlideContent()}
                 {guideSlides.length > 1 && (
-                  <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5">
-                    {guideSlides.map((slide, index) => (
-                      <button
-                        key={slide.key}
-                        type="button"
-                        onClick={() => setSlideIndex(index)}
-                        aria-label={`Go to slide ${index + 1}`}
-                        className={`h-2 rounded-full transition-all ${
-                          index === slideIndex
-                            ? "w-6 bg-primary"
-                            : "w-2 border border-border bg-white/70"
-                        }`}
-                      />
-                    ))}
+                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/40 to-transparent px-4 pb-3 pt-8">
+                    <span className="rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-semibold text-white/90">
+                      {slideIndex + 1} / {guideSlides.length}
+                    </span>
+                    <div className="flex items-center gap-1.5" aria-label="Slider navigation">
+                      {visibleSlideIndexes.map((index) => {
+                        const slide = guideSlides[index];
+                        return (
+                          <button
+                            key={slide.key}
+                            type="button"
+                            onClick={() => goToSlide(index)}
+                            aria-label={`Go to slide ${index + 1}: ${slide.key.replaceAll("_", " ")}`}
+                            className={`h-2 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
+                              index === slideIndex
+                                ? "w-7 bg-white"
+                                : "w-2 bg-white/55 hover:bg-white/80"
+                            }`}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

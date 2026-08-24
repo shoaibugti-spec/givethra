@@ -27,3 +27,31 @@ describe("public Community composer placement", () => {
     expect(communityPageSource).not.toContain("Visible only in Givethra");
   });
 });
+
+
+describe("homepage help slider", () => {
+  it("keeps the hand hero as the first slide and includes every supported category", () => {
+    expect(homePageSource).toContain('key: "hero"');
+    expect(homePageSource).toContain('image: "/assets/generated/hero-givethra.dim_1200x500.jpg"');
+    expect(homePageSource).toContain("...FILTER_CATEGORIES.map");
+    expect(homePageSource).toContain('key: `category_${category}`');
+    expect(homePageSource).toContain('to: "/need-help"');
+  });
+
+  it("hides completed free-case prompts and shows credits after the allowance is used", () => {
+    expect(homePageSource).toContain("const freeCaseComplete = freeCasesUsed >= 2");
+    expect(homePageSource).toContain("if (!freeCaseComplete)");
+    expect(homePageSource).toContain('key: "credits"');
+    expect(homePageSource).toContain('to: "/become-hero"');
+    expect(homePageSource).toContain("getCasesByUser(user.id)");
+  });
+
+  it("keeps slide text readable and supports touch navigation without an oversized dot row", () => {
+    expect(homePageSource).toContain("handleSliderTouchStart");
+    expect(homePageSource).toContain("handleSliderTouchEnd");
+    expect(homePageSource).toContain("visibleSlideIndexes");
+    expect(homePageSource).toContain("slideIndex + 1");
+    expect(homePageSource).toContain("min-h-52");
+    expect(homePageSource).toContain("text-primary-foreground");
+  });
+});
