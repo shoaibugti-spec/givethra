@@ -1417,7 +1417,6 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [liveMsgs, setLiveMsgs] = useState<any[]>(allMsgs);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1429,10 +1428,6 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
       textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
     }
   }, [reply]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [liveMsgs, activeUser]);
 
   const byUser: Record<string, any[]> = {};
   for (const m of liveMsgs) {
@@ -1502,6 +1497,7 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
       });
 
       setLiveMsgs((prev) => [...prev, newMsg]);
+      await Promise.resolve(onNewMessage?.());
       setReply("");
       setAttachmentFile(null);
       setAttachmentPreview(null);
@@ -1558,7 +1554,7 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
               </div>
             );
           })}
-          <div ref={bottomRef} />
+
         </div>
 
         <div className="flex flex-col gap-2 p-3 border-t border-border bg-card">

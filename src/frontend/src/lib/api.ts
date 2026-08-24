@@ -659,7 +659,7 @@ export async function adminGetAllUnlocks() {
 }
 
 export async function adminGetAllSupportMessages() {
-  const res = await fetch(`${WORKER_URL}/api/admin/support-messages`, { headers: headers() });
+  const res = await fetch(`${WORKER_URL}/api/admin/support-messages`, { headers: { ...headers(), "Cache-Control": "no-store" }, cache: "no-store" });
   return readApiJson(res, [], "Failed to load Admin support messages");
 }
 

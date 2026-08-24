@@ -659,3 +659,9 @@
 - [x] Render feedback text and feedback videos with the completed case context and original media URLs.
 - [x] Preserve existing case eligibility/completion rules and do not delete or migrate D1/R2 data.
 - [x] Add regression coverage and run Worker syntax, strict TypeScript, and production build checks.
+
+## End-to-End Support Messaging Repair — 2026-08-24
+- [x] Audit user-to-support and Admin-to-user Support route payloads, identity fields, and conversation readback.
+- [x] Ensure both directions persist in the existing `support_messages` schema and remain visible after refresh.
+- [x] Ensure replies and attachments are returned in the same conversation without false success.
+- [x] Add end-to-end contract regression coverage and run syntax, strict TypeScript, and production build checks.

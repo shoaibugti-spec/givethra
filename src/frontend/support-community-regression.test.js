@@ -4,10 +4,12 @@ import path from "node:path";
 
 const root = process.cwd();
 const worker = fs.readFileSync(path.join(root, "worker.js"), "utf8");
+const apiSource = fs.readFileSync(path.join(root, "src/lib/api.ts"), "utf8");
 const support = fs.readFileSync(path.join(root, "src/pages/SupportChatPage.tsx"), "utf8");
 const community = fs.readFileSync(path.join(root, "src/pages/CommunityPage.tsx"), "utf8");
 const layout = fs.readFileSync(path.join(root, "src/components/Layout.tsx"), "utf8");
 const bottomNav = fs.readFileSync(path.join(root, "src/components/BottomNav.tsx"), "utf8");
+const admin = fs.readFileSync(path.join(root, "src/pages/AdminDashboard.tsx"), "utf8");
 
 describe("support, community performance, and footer regressions", () => {
   it("uses production support_messages columns for user and admin messages", () => {
@@ -15,6 +17,13 @@ describe("support, community performance, and footer regressions", () => {
     expect(worker).toContain("sender = 'admin'");
     expect(worker).toContain("parts[2] === \"support\" && parts[3] === \"reply\"");
     expect(worker).not.toContain("admin_id, message, is_from_user");
+  });
+
+  it("refreshes persisted Admin replies into the same conversation without page auto-scroll", () => {
+    expect(apiSource).toContain('cache: "no-store"');
+    expect(admin).toContain("await Promise.resolve(onNewMessage?.())");
+    expect(admin).not.toContain("bottomRef.current?.scrollIntoView");
+    expect(worker).toContain("SELECT * FROM support_messages WHERE user_id = ? ORDER BY created_at ASC");
   });
 
   it("keeps support attachments and a multiline composer", () => {
