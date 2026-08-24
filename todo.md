@@ -665,3 +665,28 @@
 - [x] Ensure both directions persist in the existing `support_messages` schema and remain visible after refresh.
 - [x] Ensure replies and attachments are returned in the same conversation without false success.
 - [x] Add end-to-end contract regression coverage and run syntax, strict TypeScript, and production build checks.
+
+## Legacy Data Integration Assessment — 2026-08-24
+- [ ] Receive and inspect the legacy export format without executing it or writing it to production.
+- [ ] Map legacy users to current identities using verified email/Google identity and preserve current IDs where possible.
+- [ ] Map profiles, cases, feedback/posts, wallets, notifications, and attachment references without duplicating or overwriting current records.
+- [ ] Produce a dry-run conflict report and import plan before requesting execution approval.
+- [ ] Execute no live import until the user explicitly approves the reviewed dry-run and a non-destructive backup/rollback strategy is available.
+
+## Supplied Legacy Email/ID CSV — 2026-08-24
+- [x] Inspect the supplied CSV headers, row count, email validity, duplicate emails, and ID formats without writing to production.
+- [x] Compare legacy emails/IDs with current D1 users and determine safe existing-account matches versus new pre-registration rows.
+- [x] Produce a dry-run report; do not create accounts or alter D1/R2 until the user reviews and explicitly approves it.
+
+## Approved Unmatched Email Pre-Registration Import — 2026-08-24
+- [x] Preserve all 287 legacy emails already matched to current D1 users without changing their rows.
+- [x] Insert only the 7,340 unmatched distinct emails as fresh current-format users with generated unique IDs and zero/default counters.
+- [x] Keep legacy KYC, cases, wallets, profiles, posts, support messages, attachments, and legacy IDs out of the fresh-account import.
+- [x] Verify post-import counts, uniqueness, defaults, and email-based Google account matching without deleting or migrating existing data.
+
+## Email-First Google OAuth Authentication Repair — 2026-08-24
+- [x] Audit the current Google credential verification, D1 users schema, and session issuance path.
+- [x] Match verified Google sign-ins by normalized email before Google subject, link legacy rows, and preserve current D1 user IDs.
+- [x] Insert unknown verified emails with a new current-format user ID and fresh defaults.
+- [x] Add bounded try/catch JSON error responses for credential, D1, and session failures so the frontend cannot remain in an infinite loading state.
+- [x] Add regression coverage and run Worker syntax, strict TypeScript, and production build checks without modifying existing D1/R2 data.

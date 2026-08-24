@@ -120,14 +120,17 @@ async function verifyGoogleCredential(credential, clientId) {
 async function findOrCreateUser(env, identity) {
   if (!env.DB) return { ...identity, user_id: identity.google_id };
 
+  // Email is the durable legacy identity. The current production users table
+  // intentionally does not require a google_id column: the verified Google
+  // credential is exchanged for a signed session whose user_id is this D1 row.
   const existing = await env.DB.prepare(
-    `SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases, 
-            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit 
-     FROM users WHERE user_id = ? OR lower(email) = lower(?) LIMIT 1`
-  ).bind(identity.google_id, identity.email).first();
+    `SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases,
+            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit
+     FROM users WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1`
+  ).bind(identity.email).first();
 
   const timestamp = now();
-  const userId = existing?.user_id || identity.google_id;
+  const userId = String(existing?.user_id || identity.google_id);
   const existingProfile = await env.DB.prepare(
     "SELECT full_name, avatar_url FROM profiles WHERE user_id = ?"
   ).bind(userId).first();
@@ -138,19 +141,18 @@ async function findOrCreateUser(env, identity) {
 
   if (existing) {
     await env.DB.prepare(
-      `UPDATE users SET email = ?, full_name = ?, avatar_url = ?, updated_at = ? 
-       WHERE user_id = ?`
-    ).bind(identity.email, canonicalName, canonicalAvatar, timestamp, userId).run();
+      `UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?`
+    ).bind(canonicalName, canonicalAvatar, timestamp, userId).run();
   } else {
     await env.DB.prepare(
-      `INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at) 
+      `INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(userId, identity.email, canonicalName, canonicalAvatar, timestamp, timestamp, timestamp).run();
   }
 
   await env.DB.prepare(
-    `INSERT INTO profiles (user_id, full_name, avatar_url, created_at, updated_at) 
-     VALUES (?, ?, ?, ?, ?) 
+    `INSERT INTO profiles (user_id, full_name, avatar_url, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET full_name = excluded.full_name, avatar_url = excluded.avatar_url, updated_at = excluded.updated_at`
   ).bind(userId, canonicalName, canonicalAvatar, timestamp, timestamp).run();
 
@@ -211,10 +213,10 @@ async function authenticate(request, env, clientId, createUser = false) {
 
   if (!env.DB) return { ...identity, user_id: identity.google_id };
   const existing = await env.DB.prepare(
-    `SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases, 
-            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit 
-     FROM users WHERE user_id = ? OR lower(email) = lower(?) LIMIT 1`
-  ).bind(identity.google_id, identity.email).first();
+    `SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases,
+            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit
+     FROM users WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1`
+  ).bind(identity.email).first();
   return hydrateAuthenticatedUser(env, {
     user_id: existing?.user_id || identity.google_id,
     email: identity.email,
@@ -1483,10 +1485,7 @@ export default {
       return await handleRequest(request, env, ctx);
     } catch (err) {
       console.error(err);
-      return new Response("Internal Server Error: " + err.message, {
-        status: 500,
-        headers: corsHeaders("https://givethra.org"),
-      });
+      return json({ error: "Authentication or database request failed", code: "INTERNAL_ERROR" }, 500, "https://givethra.org");
     }
   },
 };
