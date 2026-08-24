@@ -157,7 +157,8 @@ function FeedbackPost({
   const [posting, setPosting] = useState(false);
 
   const iLiked = likes.some((l: any) => l.user_id === currentUserId);
-  const firstName = fb.first_name || "A grateful person";
+  const firstName = fb.user_name || fb.full_name || fb.first_name || "A grateful person";
+  const feedbackText = fb.comment || fb.text_message;
   const initial = firstName[0]?.toUpperCase() ?? "G";
 
   async function handlePostComment() {
@@ -195,6 +196,7 @@ function FeedbackPost({
         <div className="min-w-0">
           <p className="font-semibold text-sm text-foreground">{firstName}</p>
           <p className="text-xs text-muted-foreground">{timeAgo(fb.created_at)}</p>
+          {fb.case_title && <p className="text-xs text-primary truncate">Feedback for: {fb.case_title}</p>}
         </div>
         <span className="ml-auto text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold shrink-0">
           Givethra Verified
@@ -202,9 +204,9 @@ function FeedbackPost({
       </div>
 
       {/* Body */}
-      {fb.text_message && (
+      {feedbackText && (
         <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
-          {fb.text_message}
+          {feedbackText}
         </p>
       )}
       {fb.video_url && (

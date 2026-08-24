@@ -652,3 +652,10 @@
 - [x] Make Admin support replies remain visible after send and refresh by verifying the conversation readback contract.
 - [x] Prevent Support from jumping to the bottom when opening or reading a message; preserve intentional composer scrolling.
 - [x] Add regression tests and run Worker syntax, strict TypeScript, and production build checks without changing D1/R2 data.
+
+## Completed Case Feedback Community Wall — 2026-08-24
+- [x] Audit the completed-case feedback submission, text/video fields, and Community Wall data source.
+- [x] Change Community Wall to show only feedback attached to completed cases; exclude ordinary Public Posts.
+- [x] Render feedback text and feedback videos with the completed case context and original media URLs.
+- [x] Preserve existing case eligibility/completion rules and do not delete or migrate D1/R2 data.
+- [x] Add regression coverage and run Worker syntax, strict TypeScript, and production build checks.

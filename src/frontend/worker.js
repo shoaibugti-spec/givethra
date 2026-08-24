@@ -907,19 +907,34 @@ async function handleRequest(request, env, ctx) {
     if (parts[1] === "feedbacks") {
       if (request.method === "GET") {
         const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 50), 1), 500);
+        const caseId = url.searchParams.get("case_id");
+        const feedbackUserId = url.searchParams.get("user_id");
+        if (caseId && feedbackUserId) {
+          const row = await env.DB.prepare(
+            "SELECT f.*, c.title as case_title, c.status as case_status FROM feedbacks f LEFT JOIN case_submissions c ON c.id = f.case_id WHERE f.case_id = ? AND f.user_id = ? ORDER BY f.created_at DESC LIMIT 1"
+          ).bind(caseId, feedbackUserId).first();
+          return json(row ? [row] : [], 200, origin);
+        }
         const rows = await env.DB.prepare(
-          "SELECT f.*, u.full_name as user_name FROM feedbacks f LEFT JOIN users u ON f.user_id = u.user_id ORDER BY f.created_at DESC LIMIT ?"
+          "SELECT f.*, u.full_name as user_name, c.title as case_title, c.status as case_status FROM feedbacks f LEFT JOIN users u ON f.user_id = u.user_id LEFT JOIN case_submissions c ON c.id = f.case_id WHERE lower(COALESCE(c.status, '')) = 'completed' ORDER BY f.created_at DESC LIMIT ?"
         ).bind(limit).all();
         return json(rows.results || [], 200, origin);
       }
       if (request.method === "POST") {
         const body = await readJson(request);
+        const caseRow = await env.DB.prepare(
+          "SELECT id, user_id, status FROM case_submissions WHERE id = ?"
+        ).bind(body?.case_id).first();
+        if (!caseRow || caseRow.user_id !== body?.user_id || String(caseRow.status).toLowerCase() !== "completed") {
+          return json({ error: "Feedback is available only for your completed case" }, 400, origin);
+        }
         const fbId = body?.id || id();
         await env.DB.prepare(
-          `INSERT INTO feedbacks (id, case_id, user_id, rating, comment, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        ).bind(fbId, body.case_id, body.user_id, body.rating || null, body.comment || null, now()).run();
-        return json({ id: fbId, ...body, created_at: now() }, 201, origin);
+          `INSERT INTO feedbacks (id, case_id, user_id, rating, comment, video_url, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(fbId, body.case_id, body.user_id, body.rating || null, body.comment || null, body.video_url || null, now()).run();
+        const created = await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(fbId).first();
+        return json(created || { id: fbId, ...body, created_at: now() }, 201, origin);
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }
