@@ -7,6 +7,10 @@ const DEFAULT_GOOGLE_CLIENT_ID =
 const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
 
+function googleClientId(env) {
+  return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID).trim();
+}
+
 function corsHeaders(origin) {
   const allowOrigin = origin === PUBLIC_ORIGIN ? origin : PUBLIC_ORIGIN;
   return {
@@ -105,9 +109,9 @@ async function verifyGoogleCredential(credential, clientId) {
   if (!response.ok) return null;
 
   const payload = await response.json();
-  const audience = payload.aud || payload.azp;
+  const audience = String(payload.aud || "").trim();
   const verified = payload.email_verified === true || payload.email_verified === "true";
-  if (!payload.sub || !payload.email || (audience && clientId && audience !== clientId) || !verified) return null;
+  if (!clientId || !payload.sub || !payload.email || audience !== clientId || !verified) return null;
 
   return {
     google_id: String(payload.sub),
@@ -760,8 +764,8 @@ async function handleRequest(request, env, ctx) {
 
   if (parts[0] === "auth" && parts[1] === "google" && request.method === "POST") {
     const body = await readJson(request);
-    const identity = await verifyGoogleCredential(body?.credential, DEFAULT_GOOGLE_CLIENT_ID);
-    if (!identity) return json({ error: "Google credential could not be verified" }, 401, origin);
+    const identity = await verifyGoogleCredential(body?.credential || body?.id_token, googleClientId(env));
+    if (!identity) return json({ error: "Google credential could not be verified for this website", code: "GOOGLE_CREDENTIAL_INVALID" }, 401, origin);
     const account = await findOrCreateUser(env, identity);
     const token = await signSession(account, env.JWT_SECRET);
     if (!token) return json({ error: "Authentication is not configured" }, 500, origin);
@@ -769,7 +773,7 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "verify" && request.method === "GET") {
-    const user = await authenticate(request, env, DEFAULT_GOOGLE_CLIENT_ID);
+    const user = await authenticate(request, env, googleClientId(env));
     if (!user) return json({ valid: false }, 401, origin);
     return json({ valid: true, user }, 200, origin);
   }
@@ -800,7 +804,7 @@ async function handleRequest(request, env, ctx) {
   //  PUBLIC: Community Posts (no auth required for reading)
   // ============================================================
   if (parts[0] === "api" && parts[1] === "community") {
-    const user = await authenticate(request, env, DEFAULT_GOOGLE_CLIENT_ID);
+    const user = await authenticate(request, env, googleClientId(env));
     if (parts[2] === "mark-read" && request.method === "PUT") {
       if (!user) return json({ error: "Authentication required" }, 401, origin);
       await env.DB.prepare(

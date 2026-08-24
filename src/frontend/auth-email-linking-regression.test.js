@@ -18,6 +18,13 @@ describe("email-first Google authentication", () => {
     expect(worker).toContain('json({ error: "Authentication or database request failed", code: "INTERNAL_ERROR" }, 500');
     expect(worker).toContain("const controller = new AbortController();");
   });
+
+  it("uses the deployed OAuth client configuration and rejects mismatched audiences clearly", () => {
+    expect(worker).toContain("function googleClientId(env)");
+    expect(worker).toContain("env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID");
+    expect(worker).toContain("audience !== clientId");
+    expect(worker).toContain('code: "GOOGLE_CREDENTIAL_INVALID"');
+  });
 });
 
 const authContext = fs.readFileSync(new URL("./src/contexts/AuthContext.tsx", import.meta.url), "utf8");

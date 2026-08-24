@@ -702,3 +702,9 @@
 - [x] Replace old brand green with the logo-derived teal/turquoise palette while preserving semantic contrast variants.
 - [x] Verify buttons, text, navigation, forms, cards, notifications, Community, Wallet, Cases, Support, and Admin surfaces remain readable and functional.
 - [x] Run responsive visual checks, regression tests, strict TypeScript, and production build without modifying D1/R2 data.
+
+## Google Login Issue 15 Repair — 2026-08-24
+- [x] Trace the reported Issue 15 wording to the actual Google credential, Worker auth, D1 email-link, and frontend error paths.
+- [x] Ensure valid legacy email-linked users are accepted into their current D1 account and receive a fresh-user session without importing old KYC status.
+- [x] Ensure invalid, expired, unverified, audience-mismatched, and unknown credentials return actionable errors and never leave the login spinner active.
+- [x] Add regression coverage for Issue 15 and run Worker syntax, strict TypeScript, and production build checks.

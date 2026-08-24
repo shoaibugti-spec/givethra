@@ -25,7 +25,7 @@ describe("legacy authentication recovery", () => {
     expect(worker).toContain("parts[0] === \"auth\" && parts[1] === \"google\"");
     expect(worker).toContain("signSession(account, env.JWT_SECRET)");
     expect(worker).toContain("verifySession(credential, env.JWT_SECRET)");
-    expect(worker).toContain("if (!payload.sub || !payload.email");
+    expect(worker).toContain("!payload.sub || !payload.email || audience !== clientId");
     expect(worker).toContain("return null;");
     expect(worker).toContain("const existingProfile = await env.DB.prepare");
     expect(worker).toContain("const canonicalName = savedName && !savedName.includes(\"@\") ? savedName : identity.full_name;");
