@@ -19,3 +19,18 @@ describe("email-first Google authentication", () => {
     expect(worker).toContain("const controller = new AbortController();");
   });
 });
+
+const authContext = fs.readFileSync(new URL("./src/contexts/AuthContext.tsx", import.meta.url), "utf8");
+describe("frontend authentication recovery", () => {
+  it("bounds verify and Google login requests", () => {
+    expect(authContext).toContain("async function fetchWithTimeout");
+    expect(authContext).toContain("/auth/google");
+    expect(authContext).toContain("Google sign-in timed out. Please try again.");
+  });
+
+  it("clears login loading when Google returns no credential or cannot open", () => {
+    expect(authContext).toContain("Google did not return a sign-in credential. Please try again.");
+    expect(authContext).toContain("Google sign-in could not open. Please allow Google prompts/pop-ups and try again.");
+    expect(authContext).toContain("setIsLoggingIn(false)");
+  });
+});

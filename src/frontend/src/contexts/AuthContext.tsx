@@ -55,6 +55,16 @@ function safeLocalRemove(key: string): void {
   try { localStorage.removeItem(key); } catch { }
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 function getTokenFromLocation(): string | null {
   if (typeof window === "undefined") return safeLocalGet("auth_token");
   const url = new URL(window.location.href);
@@ -93,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearLegacyBrowserState();
     const token = getTokenFromLocation();
     if (token) {
-      fetch(`${WORKER_URL}/verify`, {
+      fetchWithTimeout(`${WORKER_URL}/verify`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
@@ -129,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const res = await fetch(`${WORKER_URL}/verify`, {
+      const res = await fetchWithTimeout(`${WORKER_URL}/verify`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -157,11 +167,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const finishGoogleLogin = useCallback(async (credential: string) => {
     setLoginError(null);
     try {
-      const response = await fetch(`${WORKER_URL}/auth/google`, {
+      const response = await fetchWithTimeout(`${WORKER_URL}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential }),
-      });
+      }, 15000);
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token || !data.user) {
         throw new Error(data.error || `Google sign-in could not be verified (HTTP ${response.status}).`);
@@ -180,7 +190,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserId(authenticatedUser.id);
     } catch (error) {
       console.error("Google sign-in failed:", error);
-      setLoginError(error instanceof Error ? error.message : "Google sign-in failed. Please try again.");
+      setLoginError(error instanceof DOMException && error.name === "AbortError"
+        ? "Google sign-in timed out. Please try again."
+        : error instanceof Error ? error.message : "Google sign-in failed. Please try again.");
       safeLocalRemove("auth_token");
       safeLocalRemove("user_email");
     } finally {
@@ -217,10 +229,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (notification?.isNotDisplayed?.()) {
         setIsLoggingIn(false);
         setLoginError("Google sign-in could not open. Please allow Google prompts/pop-ups and try again.");
-      } else {
-        setIsLoggingIn(false);
       }
     });
+    window.setTimeout(() => {
+      setIsLoggingIn((active) => {
+        if (active) setLoginError("Google sign-in timed out. Please try again.");
+        return false;
+      });
+    }, 30000);
   }, [finishGoogleLogin]);
 
   const handleLogout = useCallback(async () => {

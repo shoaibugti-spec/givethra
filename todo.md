@@ -690,3 +690,9 @@
 - [x] Insert unknown verified emails with a new current-format user ID and fresh defaults.
 - [x] Add bounded try/catch JSON error responses for credential, D1, and session failures so the frontend cannot remain in an infinite loading state.
 - [x] Add regression coverage and run Worker syntax, strict TypeScript, and production build checks without modifying existing D1/R2 data.
+
+## Final Legacy Login Completion Pass — 2026-08-24
+- [x] Re-verify all 7,340 imported email-linked D1 accounts and the 287 preserved existing accounts.
+- [x] Ensure Google verified-email matching reuses the pre-created current D1 user ID and creates a fresh account only for an unknown email.
+- [x] Ensure auth, D1, and frontend errors always terminate loading with a clear JSON/UI error.
+- [x] Add or update regression coverage and validate syntax, strict TypeScript, production build, and deployment readiness.
