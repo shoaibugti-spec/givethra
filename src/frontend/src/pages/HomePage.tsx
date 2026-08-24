@@ -16,15 +16,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { runUserGuide } from "@/lib/userGuide";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Accessibility,
+  Baby,
   BadgeCheck,
   Battery,
+  BookOpen,
+  Briefcase,
   Building2,
   ChevronRight,
-  WalletCards,
+  Droplets,
+  Feather,
   Facebook,
   FileText,
+  Flame,
   Gift,
+  GraduationCap,
+  Hammer,
   Heart,
+  HeartHandshake,
+  Home,
   Instagram,
   Linkedin,
   Mail,
@@ -34,7 +44,13 @@ import {
   Phone,
   Search,
   ShieldCheck,
+  ShoppingCart,
+  Siren,
   SlidersHorizontal,
+  Stethoscope,
+  Pill,
+  WalletCards,
+  Wheat,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -149,27 +165,27 @@ const CATEGORY_APPEAL: Record<string, string> = {
   Other: "Be someone's hope today 🤲",
 };
 
-const CATEGORY_SLIDE_ICONS: Record<string, React.ElementType> = {
-  "Electricity Bill": Battery,
-  "Gas Bill": FileText,
-  "Water Bill": FileText,
-  "House Rent": Building2,
-  "School Fees": FileText,
-  "Education & Books": FileText,
-  "Medical & Treatment": FileText,
-  Medicines: FileText,
-  "Food & Groceries": FileText,
-  "Child Support": FileText,
-  "Widow & Elderly Support": Heart,
-  "Disability Support": FileText,
-  "Marriage Support": Heart,
-  "Business / Work Help": Building2,
-  "Home Repair": Building2,
-  "Funeral Expenses": FileText,
-  "Livestock / Farming": FileText,
-  "Debt Relief": WalletCards,
-  "Emergency Help": FileText,
-  Other: FileText,
+const CATEGORY_SLIDE_STYLE: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
+  "Electricity Bill": { icon: Battery, color: "text-amber-600", bg: "bg-amber-500/15" },
+  "Gas Bill": { icon: Flame, color: "text-orange-600", bg: "bg-orange-500/15" },
+  "Water Bill": { icon: Droplets, color: "text-sky-600", bg: "bg-sky-500/15" },
+  "House Rent": { icon: Home, color: "text-emerald-600", bg: "bg-emerald-500/15" },
+  "School Fees": { icon: GraduationCap, color: "text-indigo-600", bg: "bg-indigo-500/15" },
+  "Education & Books": { icon: BookOpen, color: "text-blue-600", bg: "bg-blue-500/15" },
+  "Medical & Treatment": { icon: Stethoscope, color: "text-rose-600", bg: "bg-rose-500/15" },
+  Medicines: { icon: Pill, color: "text-violet-600", bg: "bg-violet-500/15" },
+  "Food & Groceries": { icon: ShoppingCart, color: "text-lime-700", bg: "bg-lime-500/15" },
+  "Child Support": { icon: Baby, color: "text-pink-600", bg: "bg-pink-500/15" },
+  "Widow & Elderly Support": { icon: HeartHandshake, color: "text-fuchsia-600", bg: "bg-fuchsia-500/15" },
+  "Disability Support": { icon: Accessibility, color: "text-cyan-700", bg: "bg-cyan-500/15" },
+  "Marriage Support": { icon: Heart, color: "text-red-600", bg: "bg-red-500/15" },
+  "Business / Work Help": { icon: Briefcase, color: "text-slate-700", bg: "bg-slate-500/15" },
+  "Home Repair": { icon: Hammer, color: "text-yellow-700", bg: "bg-yellow-500/15" },
+  "Funeral Expenses": { icon: Feather, color: "text-slate-600", bg: "bg-slate-500/15" },
+  "Livestock / Farming": { icon: Wheat, color: "text-green-700", bg: "bg-green-500/15" },
+  "Debt Relief": { icon: WalletCards, color: "text-teal-700", bg: "bg-teal-500/15" },
+  "Emergency Help": { icon: Siren, color: "text-red-700", bg: "bg-red-500/15" },
+  Other: { icon: FileText, color: "text-primary", bg: "bg-primary/10" },
 };
 
 const CATEGORY_SLIDE_COPY: Record<string, { title: string; desc: string }> = {
@@ -215,6 +231,7 @@ type GuideSlide =
       desc: string;
       cta?: string;
       to: string;
+      category?: string;
       color: string;
       bg: string;
       eyebrow?: string;
@@ -463,14 +480,15 @@ export default function HomePage() {
       ...FILTER_CATEGORIES.map((category) => ({
         key: `category_${category}`,
         type: "guide" as const,
-        icon: CATEGORY_SLIDE_ICONS[category] ?? FileText,
+        icon: CATEGORY_SLIDE_STYLE[category]?.icon ?? FileText,
         eyebrow: "Explore a help category",
         title: CATEGORY_SLIDE_COPY[category]?.title ?? category,
         desc: CATEGORY_SLIDE_COPY[category]?.desc ?? "Explore verified help requests in this category.",
-        cta: "Explore categories",
-        to: "/need-help",
-        color: "text-primary",
-        bg: "bg-primary/10",
+        cta: "Explore this category",
+        to: "/",
+        category,
+        color: CATEGORY_SLIDE_STYLE[category]?.color ?? "text-primary",
+        bg: CATEGORY_SLIDE_STYLE[category]?.bg ?? "bg-primary/10",
       })),
     );
 
@@ -481,7 +499,7 @@ export default function HomePage() {
     if (guideSlides.length <= 1) return;
     const interval = window.setInterval(() => {
       setSlideIndex((current) => (current + 1) % guideSlides.length);
-    }, 7000);
+    }, 6000);
     return () => window.clearInterval(interval);
   }, [guideSlides.length]);
 
@@ -627,6 +645,15 @@ export default function HomePage() {
     goToSlide(slideIndex + (distance < 0 ? 1 : -1));
   }
 
+  function handleSlideClick(slide: GuideSlide) {
+    if (slide.type === "image") return;
+    if ("category" in slide && slide.category) {
+      selectCategory(slide.category);
+      return;
+    }
+    navigate({ to: slide.to });
+  }
+
   function renderSlideContent() {
     const slide = guideSlides[slideIndex] ?? guideSlides[0];
     if (!slide) return null;
@@ -645,7 +672,7 @@ export default function HomePage() {
       return (
         <button
           type="button"
-          onClick={() => navigate({ to: slide.to })}
+          onClick={() => handleSlideClick(slide)}
           className="flex min-h-52 w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary via-primary to-teal-600 px-6 py-5 text-center text-white transition-transform hover:scale-[1.01] md:min-h-72"
         >
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-4xl shadow-inner">🎉</span>
@@ -770,9 +797,6 @@ export default function HomePage() {
                 {renderSlideContent()}
                 {guideSlides.length > 1 && (
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/40 to-transparent px-4 pb-3 pt-8">
-                    <span className="rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-semibold text-white/90">
-                      {slideIndex + 1} / {guideSlides.length}
-                    </span>
                     <div className="flex items-center gap-1.5" aria-label="Slider navigation">
                       {visibleSlideIndexes.map((index) => {
                         const slide = guideSlides[index];

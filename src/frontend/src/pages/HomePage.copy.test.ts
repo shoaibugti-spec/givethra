@@ -50,8 +50,28 @@ describe("homepage help slider", () => {
     expect(homePageSource).toContain("handleSliderTouchStart");
     expect(homePageSource).toContain("handleSliderTouchEnd");
     expect(homePageSource).toContain("visibleSlideIndexes");
-    expect(homePageSource).toContain("slideIndex + 1");
+    expect(homePageSource).not.toContain("slideIndex + 1");
     expect(homePageSource).toContain("min-h-52");
     expect(homePageSource).toContain("text-primary-foreground");
+  });
+});
+
+
+describe("homepage slider refinement", () => {
+  it("uses distinct visual treatments for supported categories and direct category selection", () => {
+    expect(homePageSource).toContain("CATEGORY_SLIDE_STYLE");
+    expect(homePageSource).toContain("Battery");
+    expect(homePageSource).toContain("Flame");
+    expect(homePageSource).toContain("Droplets");
+    expect(homePageSource).toContain("GraduationCap");
+    expect(homePageSource).toContain("Stethoscope");
+    expect(homePageSource).toContain("ShoppingCart");
+    expect(homePageSource).toContain("selectCategory(slide.category)");
+  });
+
+  it("speeds the automatic rotation moderately and removes the visible counter", () => {
+    expect(homePageSource).toContain("}, 6000);");
+    expect(homePageSource).not.toContain("slideIndex + 1");
+    expect(homePageSource).toContain('aria-label="Slider navigation"');
   });
 });
