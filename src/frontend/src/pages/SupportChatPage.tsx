@@ -38,8 +38,6 @@ export default function SupportChatPage() {
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [openArticle, setOpenArticle] = useState<any>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!isAuthenticated) {
       navigate({ to: "/sign-in" });
@@ -50,9 +48,6 @@ export default function SupportChatPage() {
     return () => clearInterval(interval);
   }, [isAuthenticated, user?.id]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   async function loadMessages() {
     if (!user?.id) return;
@@ -220,7 +215,6 @@ export default function SupportChatPage() {
                 );
               })
             )}
-            <div ref={bottomRef} />
           </div>
 
           <form onSubmit={handleSend} className="p-3 border-t bg-background space-y-2">

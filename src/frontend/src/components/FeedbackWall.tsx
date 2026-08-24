@@ -40,13 +40,16 @@ export default function FeedbackWall() {
   const [likes, setLikes] = useState<any[]>([]);
   const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [popularIndex, setPopularIndex] = useState(0);
 
   useEffect(() => {
-    loadWall();
+    void loadWall(false);
+    const refresh = window.setInterval(() => { void loadWall(true); }, 60 * 60 * 1000);
+    return () => window.clearInterval(refresh);
   }, [user]);
 
-  async function loadWall() {
-    setLoading(true);
+  async function loadWall(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const [fbs, lks, cms] = await Promise.all([
         getFeedbacks(),
@@ -94,6 +97,13 @@ export default function FeedbackWall() {
 
   if (feedbacks.length === 0) return null;
 
+  const score = (fb: any) =>
+    likes.filter((l) => l.feedback_id === fb.id).length * 2 +
+    comments.filter((c) => c.feedback_id === fb.id).length;
+  const popularFeedbacks = [...feedbacks].sort((a, b) => score(b) - score(a)).slice(0, 10);
+  const activePopularIndex = Math.min(popularIndex, Math.max(popularFeedbacks.length - 1, 0));
+  const activePopularPost = popularFeedbacks[activePopularIndex];
+
   return (
     <section className="py-8 px-4 bg-muted/20 border-y border-border">
       <div className="max-w-2xl mx-auto space-y-5">
@@ -106,26 +116,27 @@ export default function FeedbackWall() {
           </p>
         </div>
 
-        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
-          {[...feedbacks]
-            .sort((a, b) => {
-              const score = (fb: any) =>
-                likes.filter((l) => l.feedback_id === fb.id).length * 2 +
-                comments.filter((c) => c.feedback_id === fb.id).length;
-              return score(b) - score(a);
-            })
-            .map((fb) => (
-              <FeedbackPost
-              key={fb.id}
-              fb={fb}
-              likes={likes.filter((l) => l.feedback_id === fb.id)}
-              comments={comments.filter((c) => c.feedback_id === fb.id)}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Popular posts</p>
+            <div className="flex items-center gap-2">
+              <button type="button" aria-label="Previous popular post" onClick={() => setPopularIndex((current) => (current - 1 + popularFeedbacks.length) % popularFeedbacks.length)} disabled={popularFeedbacks.length < 2} className="h-8 w-8 rounded-full border border-border bg-card text-foreground disabled:opacity-40">‹</button>
+              <span className="text-xs text-muted-foreground">{activePopularIndex + 1} / {popularFeedbacks.length}</span>
+              <button type="button" aria-label="Next popular post" onClick={() => setPopularIndex((current) => (current + 1) % popularFeedbacks.length)} disabled={popularFeedbacks.length < 2} className="h-8 w-8 rounded-full border border-border bg-card text-foreground disabled:opacity-40">›</button>
+            </div>
+          </div>
+          {activePopularPost && (
+            <FeedbackPost
+              key={activePopularPost.id}
+              fb={activePopularPost}
+              likes={likes.filter((l) => l.feedback_id === activePopularPost.id)}
+              comments={comments.filter((c) => c.feedback_id === activePopularPost.id)}
               currentUserId={isAuthenticated && user ? user.id : getGuestId()}
               isAuthenticated={isAuthenticated}
-              onToggleLike={() => handleToggleLike(fb.id)}
+              onToggleLike={() => handleToggleLike(activePopularPost.id)}
               onCommentAdded={(c: any) => setComments((prev) => [...prev, c])}
             />
-          ))}
+          )}
         </div>
       </div>
     </section>

@@ -645,3 +645,10 @@
 - [x] Add status tabs beneath Help/Support for All, Open/Pending, Replied, and Closed conversations.
 - [x] Ensure Admin support replies are returned by the same conversation query after send and browser refresh.
 - [x] Add regression tests and run Worker syntax, strict TypeScript, and production build checks without changing D1/R2 data.
+
+## Popular Community Wall and Support Scroll Stability — 2026-08-24
+- [x] Rank the homepage Community wall by likes and comments and show a 5–10 post slider.
+- [x] Refresh the popular wall hourly without blocking the homepage or changing public post behavior.
+- [x] Make Admin support replies remain visible after send and refresh by verifying the conversation readback contract.
+- [x] Prevent Support from jumping to the bottom when opening or reading a message; preserve intentional composer scrolling.
+- [x] Add regression tests and run Worker syntax, strict TypeScript, and production build checks without changing D1/R2 data.

@@ -527,7 +527,7 @@ export async function adminBroadcastNotification(data: { user_ids: string[]; typ
 export async function getSupportMessages(userId: string) {
   const res = await fetch(
     `${WORKER_URL}/api/support/messages?user_id=${userId}`,
-    { headers: headers() }
+    { headers: { ...headers(), "Cache-Control": "no-store" }, cache: "no-store" }
   );
   const result = await res.json().catch(() => ([]));
   if (!res.ok) throw new Error(result?.error || `Failed to load support messages (${res.status})`);
