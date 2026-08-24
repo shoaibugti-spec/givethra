@@ -708,3 +708,9 @@
 - [x] Ensure valid legacy email-linked users are accepted into their current D1 account and receive a fresh-user session without importing old KYC status.
 - [x] Ensure invalid, expired, unverified, audience-mismatched, and unknown credentials return actionable errors and never leave the login spinner active.
 - [x] Add regression coverage for Issue 15 and run Worker syntax, strict TypeScript, and production build checks.
+
+## Automatic Legacy Browser Cleanup — 2026-08-24
+- [x] Audit current legacy cookie, localStorage, sessionStorage, service-worker, and Cache Storage cleanup behavior.
+- [x] Automatically remove stale first-party legacy Givethra state while preserving active current sessions and new visitors.
+- [x] Keep cleanup origin-scoped and avoid attempting to clear third-party cookies or unrelated browser data.
+- [x] Add regression coverage for stale cleanup versus current `auth_token`, then run strict checks and production build.

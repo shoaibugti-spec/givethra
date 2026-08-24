@@ -3,6 +3,10 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { clearLegacyBrowserState } from "./lib/legacySessionCleanup";
+
+// Clean only stale first-party Givethra/Supabase state before auth initializes.
+clearLegacyBrowserState();
 
 BigInt.prototype.toJSON = function () {
   return this.toString();

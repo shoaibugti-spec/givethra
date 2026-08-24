@@ -7,6 +7,7 @@ const cleanup = fs.readFileSync(path.join(root, "src/lib/legacySessionCleanup.ts
 const auth = fs.readFileSync(path.join(root, "src/contexts/AuthContext.tsx"), "utf8");
 const worker = fs.readFileSync(path.join(root, "worker.js"), "utf8");
 const serviceWorker = fs.readFileSync(path.join(root, "public/sw.js"), "utf8");
+const bootstrap = fs.readFileSync(path.join(root, "src/main.tsx"), "utf8");
 
 describe("legacy authentication recovery", () => {
   it("clears only legacy browser state and preserves the current session", () => {
@@ -19,6 +20,8 @@ describe("legacy authentication recovery", () => {
     expect(cleanup).toContain("CURRENT_SERVICE_WORKER_CACHE");
     expect(serviceWorker).toContain('const CACHE_NAME = "givethra-v2"');
     expect(auth).toContain("clearLegacyBrowserState();");
+    expect(bootstrap).toContain('import { clearLegacyBrowserState } from "./lib/legacySessionCleanup";');
+    expect(bootstrap).toContain("clearLegacyBrowserState();");
   });
 
   it("exchanges verified Google credentials for a signed persistent session", () => {
