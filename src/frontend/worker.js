@@ -830,7 +830,7 @@ async function handleRequest(request, env, ctx) {
   // ============================================================
   //  AUTH REQUIRED: All other APIs
   // ============================================================
-  const user = await authenticate(request, env, DEFAULT_GOOGLE_CLIENT_ID);
+  const user = await authenticate(request, env, googleClientId(env));
   if (!user && parts[0] !== "api") {
     return json({ error: "Authentication required" }, 401, origin);
   }

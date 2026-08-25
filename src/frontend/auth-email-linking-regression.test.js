@@ -25,6 +25,10 @@ describe("email-first Google authentication", () => {
     expect(worker).toContain("audience !== clientId");
     expect(worker).toContain('code: "GOOGLE_CREDENTIAL_INVALID"');
   });
+
+  it("uses the same deployed client configuration for authenticated API verification", () => {
+    expect(worker).toContain("authenticate(request, env, googleClientId(env))");
+  });
 });
 
 const authContext = fs.readFileSync(new URL("./src/contexts/AuthContext.tsx", import.meta.url), "utf8");

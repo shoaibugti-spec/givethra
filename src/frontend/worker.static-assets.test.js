@@ -8,7 +8,7 @@ describe("public Worker routing", () => {
   it("serves uploads and static assets before the authentication-required API branch", () => {
     const uploadsIndex = workerSource.indexOf('if (url.pathname.startsWith("/uploads/"))');
     const assetsIndex = workerSource.indexOf('if (env.ASSETS && parts[0] !== "api" && request.method === "GET")');
-    const authIndex = workerSource.indexOf('const user = await authenticate(request, env, DEFAULT_GOOGLE_CLIENT_ID);', assetsIndex);
+    const authIndex = workerSource.indexOf('const user = await authenticate(request, env, googleClientId(env));', assetsIndex);
 
     expect(uploadsIndex).toBeGreaterThan(-1);
     expect(assetsIndex).toBeGreaterThan(uploadsIndex);
