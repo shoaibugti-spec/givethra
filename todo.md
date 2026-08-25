@@ -897,3 +897,9 @@
 - [x] Keep the separate Case Verification Documents section below them for approved case-specific files.
 - [x] Add/update regression coverage so both platform badges and case documents are present together.
 - [x] Re-run tests, strict TypeScript, and production build; keep deployment user-controlled.
+
+## User-Reported Missing Case Verification Documents Section
+- [x] Ensure the Case Verification Documents section is visibly rendered for published, approved, or active cases, including legacy payloads without extractable document metadata.
+- [x] Preserve Identity Verified, KYC Approved, and Givethra Verified unchanged.
+- [x] Add regression coverage for document-section visibility with the existing case payload shape.
+- [x] Re-run tests, strict TypeScript, and production build; keep deployment user-controlled.

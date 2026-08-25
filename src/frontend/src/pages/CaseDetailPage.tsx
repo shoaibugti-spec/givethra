@@ -930,7 +930,8 @@ export default function CaseDetailPage() {
                 {(() => {
                   const approvedItems = getApprovedCaseItems(caseData);
                   const documentItems = approvedItems.filter((item) => item.source === "document");
-                  if (approvedItems.length === 0) return null;
+                  const isPublishedCase = ["approved", "published", "active"].includes(String(caseData.status || "").toLowerCase());
+                  if (!isPublishedCase && approvedItems.length === 0) return null;
                   const cur2 = caseData.currency || "USD";
                   const sym2 = CURRENCY_SYMBOLS[cur2] ?? cur2;
                   return (
@@ -942,16 +943,18 @@ export default function CaseDetailPage() {
                       <p className="text-sm text-teal-700 leading-relaxed">
                         This case was submitted by a KYC-verified user for <strong>{caseData.category}</strong> ({sym2} {caseData.amount_needed} {cur2} needed{caseData.institute_name ? `, via ${caseData.institute_name}` : ""}).                         Givethra reviewed the submitted verification materials before approving this case for Heroes.
                       </p>
-                      {documentItems.length > 0 && (
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-teal-700">Case Verification Documents</h3>
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-teal-700">Case Verification Documents</h3>
+                        {documentItems.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
                             {documentItems.map(({ label }) => (
                               <span key={label} className="text-xs font-medium bg-white dark:bg-teal-900/30 text-teal-700 border border-teal-300 rounded-full px-2.5 py-1">✅ {label}</span>
                             ))}
                           </div>
-                        </div>
-                      )}
+                        ) : (
+                          <p className="text-xs text-teal-600">No additional case-specific documents are recorded in this case.</p>
+                        )}
+                      </div>
                       <p className="text-xs text-teal-600">
                         For the beneficiary's privacy, the content of these documents is not shown publicly — only reviewed and verified by Givethra's team.
                       </p>

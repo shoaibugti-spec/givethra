@@ -12,6 +12,8 @@ describe("public case verification presentation", () => {
 
   it("keeps the case-document section and document-specific labels", () => {
     expect(caseDetailSource).toContain("Case Verification Documents");
+    expect(caseDetailSource).toContain("const isPublishedCase");
+    expect(caseDetailSource).toContain("No additional case-specific documents are recorded in this case.");
     expect(caseDetailSource).toContain("documentItems");
     expect(caseDetailSource).toContain("item.source === \"document\"");
   });
