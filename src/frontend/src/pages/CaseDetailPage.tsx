@@ -24,10 +24,11 @@ import {
   uploadFileToStorage,
 } from "@/lib/api";
 import { sendNotification } from "@/lib/notify";
+import { shareCase } from "@/lib/caseSharing";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   ChevronLeft, Lock, Unlock, MapPin, CheckCircle2,
-  Heart, FileText, ExternalLink, Copy, Building2, Clock, HandCoins, Star, Video, AlertCircle, XCircle, RefreshCw, Eye, CalendarClock,
+  Heart, FileText, ExternalLink, Copy, Share2, Building2, Clock, HandCoins, Star, Video, AlertCircle, XCircle, RefreshCw, Eye, CalendarClock,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -264,6 +265,13 @@ export default function CaseDetailPage() {
     } catch (err) {
       console.error("Error checking feedback:", err);
     }
+  }
+
+  async function handleCaseShare() {
+    if (!caseData) return;
+    const result = await shareCase(caseData);
+    if (result === "shared") toast.success("Case shared!");
+    else if (result === "copied") toast.success("Case message and link copied!");
   }
 
   async function loadCase() {
@@ -735,6 +743,9 @@ export default function CaseDetailPage() {
               <h1 className="text-2xl font-bold text-foreground">{caseData.title}</h1>
               <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" /> {caseData.city}, {caseData.country}</div>
             </div>
+            <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5 border-primary/25 text-primary hover:bg-primary/10" onClick={handleCaseShare} aria-label={`Share ${caseData.title}`}>
+              <Share2 className="h-4 w-4" /> Share
+            </Button>
             {caseData.deadline && (() => {
             const daysLeft = Math.ceil((new Date(caseData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             if (daysLeft < 0) return null;

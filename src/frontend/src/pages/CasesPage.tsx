@@ -13,9 +13,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useNavigate } from "@tanstack/react-router";
-import { Search, MapPin, CheckCircle2, SlidersHorizontal, X } from "lucide-react";
+import { Search, MapPin, CheckCircle2, SlidersHorizontal, X, Share2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getApprovedCases } from "@/lib/api";
+import { shareCase } from "@/lib/caseSharing";
+import { toast } from "sonner";
 
 const CATEGORIES = [
   "Education",
@@ -448,15 +450,26 @@ export default function CasesPage() {
                     <div className="flex items-center gap-1 text-xs text-teal-600 font-medium">
                       <CheckCircle2 className="h-3 w-3" /> Verified
                     </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" /> {c.city}, {c.country}
+                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground pt-1 border-t">
+                      <span className="flex items-center gap-1 min-w-0 truncate">
+                        <MapPin className="h-3 w-3 shrink-0" /> {c.city}, {c.country}
                       </span>
-                      {needed > 0 && (
-                        <span className="font-bold text-primary">
-                          {s} {needed} {cur}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {needed > 0 && <span className="font-bold text-primary">{s} {needed} {cur}</span>}
+                        <button
+                          type="button"
+                          aria-label={`Share ${c.title}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 text-primary transition-colors hover:bg-primary/10"
+                          onClick={async (event) => {
+                            event.stopPropagation();
+                            const result = await shareCase(c);
+                            if (result === "shared") toast.success("Case shared!");
+                            else if (result === "copied") toast.success("Case message and link copied!");
+                          }}
+                        >
+                          <Share2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
