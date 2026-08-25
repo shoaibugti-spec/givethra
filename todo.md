@@ -936,3 +936,20 @@
 - [x] Present the 14-day deadline as a compact complete line/card without broken word wrapping.
 - [x] Make Case Verification Documents visibly appear directly beneath the three platform badges for the case payload.
 - [x] Preserve all other pages and functional flows; add focused regression coverage and verify mobile/desktop builds.
+
+## Final Legacy Login Confirmation Request
+- [x] Verify the committed Google auth reconciliation, cache cleanup, session handling, and controlled error recovery in the canonical branch.
+- [x] Re-run auth regressions, full tests, strict TypeScript, and production build.
+- [x] Confirm the announcement gate: a successful production deploy and real legacy-user canary are still required before claiming all users can log in.
+
+## Final Authentication-Only Readiness Audit
+- [x] Verify canonical Google Client ID usage and Google claim validation in the Worker path; obsolete hard-coded Client ID fallback removed.
+- [x] Verify existing-email read-only reconciliation, original user_id preservation, duplicate-race handling, new-user UUID creation, and structured errors.
+- [x] Verify legacy browser cleanup, bounded token exchange, stale-auth recovery, and reload-loop prevention.
+- [x] Re-run authentication regressions, strict TypeScript, and production build; no D1/R2 data modified.
+- [x] Gate public announcement until Cloudflare deployment and a real imported legacy-user canary succeed.
+
+## Final Auth Audit Finding: Obsolete OAuth Fallback
+- [x] Remove the deleted/obsolete hard-coded Google Client ID fallback from frontend and Worker auth paths.
+- [x] Fail clearly when the deployed Client ID is not configured, while continuing to accept the configured current Client ID.
+- [x] Update regression coverage and re-run all authentication and build checks.

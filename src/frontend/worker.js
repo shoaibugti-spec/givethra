@@ -2,13 +2,11 @@
 // FILE: worker.js (COMPLETE - ALL FEATURES + COMMUNITY POSTS, LIKES, COMMENTS, MARK-READ + PROFILE FIXED)
 // ============================================================
 
-const DEFAULT_GOOGLE_CLIENT_ID =
-  "588032676735-6aa3hj5b990sa5hcn6qltvj10581od9p.apps.googleusercontent.com";
 const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
 
 function googleClientId(env) {
-  return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID).trim();
+  return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || "").trim();
 }
 
 function corsHeaders(origin) {
@@ -110,8 +108,10 @@ async function verifyGoogleCredential(credential, clientId) {
 
   const payload = await response.json();
   const audience = String(payload.aud || "").trim();
+  const issuer = String(payload.iss || "").trim();
   const verified = payload.email_verified === true || payload.email_verified === "true";
-  if (!clientId || !payload.sub || !payload.email || audience !== clientId || !verified) return null;
+  const trustedIssuer = issuer === "accounts.google.com" || issuer === "https://accounts.google.com";
+  if (!clientId || !payload.sub || !payload.email || audience !== clientId || !trustedIssuer || !verified) return null;
 
   return {
     google_id: String(payload.sub),
@@ -782,7 +782,9 @@ async function handleRequest(request, env, ctx) {
   if (parts[0] === "auth" && parts[1] === "google" && request.method === "POST") {
     try {
       const body = await readJson(request);
-      const identity = await verifyGoogleCredential(body?.credential || body?.id_token, googleClientId(env));
+      const configuredClientId = googleClientId(env);
+      if (!configuredClientId) return json({ error: "Google authentication is not configured", code: "AUTH_NOT_CONFIGURED" }, 500, origin);
+      const identity = await verifyGoogleCredential(body?.credential || body?.id_token, configuredClientId);
       if (!identity) return json({ error: "Google credential could not be verified for this website", code: "GOOGLE_CREDENTIAL_INVALID" }, 401, origin);
       const account = await findOrCreateUser(env, identity);
       const token = await signSession(account, env.JWT_SECRET);

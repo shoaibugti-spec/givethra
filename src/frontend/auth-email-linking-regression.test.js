@@ -27,8 +27,9 @@ describe("email-first Google authentication", () => {
 
   it("uses the deployed OAuth client configuration and rejects mismatched audiences clearly", () => {
     expect(worker).toContain("function googleClientId(env)");
-    expect(worker).toContain("env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID");
+    expect(worker).toContain("env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || \"\"");
     expect(worker).toContain("audience !== clientId");
+    expect(worker).toContain("trustedIssuer");
     expect(worker).toContain('code: "GOOGLE_CREDENTIAL_INVALID"');
   });
 
