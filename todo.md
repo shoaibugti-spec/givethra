@@ -903,3 +903,10 @@
 - [x] Preserve Identity Verified, KYC Approved, and Givethra Verified unchanged.
 - [x] Add regression coverage for document-section visibility with the existing case payload shape.
 - [x] Re-run tests, strict TypeScript, and production build; keep deployment user-controlled.
+
+## User-Reported Fast One-Click Interactions and Case Presentation
+- [x] Audit route transitions, loading guards, and Help actions for avoidable delays across Home, Cases, Submit Case, Wallet, Profile, Community, Settings, and Case Detail.
+- [x] Reduce avoidable Case Detail perceived loading by parallelizing independent data requests while preserving required authentication and data-fetch states.
+- [x] Combine the public Case Story and What You Need Help With headings into one heading and deduplicate repeated story text.
+- [x] Ensure the three platform verification badges and the visible Case Verification Documents section render together on public case detail.
+- [x] Add/update regression coverage and run tests, strict TypeScript, and production build; keep deployment user-controlled.

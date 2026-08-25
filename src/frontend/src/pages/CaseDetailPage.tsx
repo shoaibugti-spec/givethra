@@ -283,21 +283,18 @@ export default function CaseDetailPage() {
 
       if (user && data) {
         const owner = data.user_id === user.id;
-        const unlock = await getCaseUnlock(id, user.id);
+        const [unlock, count, res, kyc, prof] = await Promise.all([
+          getCaseUnlock(id, user.id),
+          getUserUnlockCount(user.id),
+          getCaseResolutions(id, user.id),
+          getKycSubmission(data.user_id),
+          getProfile(user.id),
+        ]);
         setMyUnlock(unlock);
         setUnlocked(!!unlock || owner);
-
-        // Get total unlocks count for this user (across all cases)
-        const count = await getUserUnlockCount(user.id);
         setUserUnlockCount(count ?? 0);
-
-        const res = await getCaseResolutions(id, user.id);
         setMyResolutions((res ?? []).slice().reverse());
-
-        const kyc = await getKycSubmission(data.user_id);
         setSeekerKyc(kyc);
-
-        const prof = await getProfile(user.id);
         const nm = (prof?.full_name || "").split(" ")[0];
         if (nm) setHeroName(nm);
 
@@ -784,8 +781,11 @@ export default function CaseDetailPage() {
           <div className="lg:col-span-2 space-y-5">
             <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
               <h2 className="font-semibold text-foreground">Case Story (What You Need Help With)</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{caseData.description}</p>
-              {caseData.why_help && <p className="text-sm text-muted-foreground whitespace-pre-line">{caseData.why_help}</p>}
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                {[caseData.description, caseData.why_help]
+                  .filter((text, index, values) => Boolean(text?.trim()) && values.findIndex((value) => value?.trim() === text.trim()) === index)
+                  .join("\n\n")}
+              </p>
             </div>
 
             {isOwner && isCompleted && (
