@@ -440,7 +440,7 @@ export default function HomePage() {
             type: "guide",
             icon: WalletCards,
             title: "Need more help after your free cases?",
-            desc: "Add credits securely to submit another eligible case when you are ready.",
+            desc: "Use one credit to help one person as a Hero or submit one additional eligible help case when you are ready.",
             cta: "View credits",
             to: "/become-hero",
             color: "text-amber-700",
@@ -620,13 +620,6 @@ export default function HomePage() {
     }, 100);
   }
 
-  const visibleSlideIndexes = useMemo(() => {
-    const last = guideSlides.length - 1;
-    return guideSlides
-      .map((_, index) => index)
-      .filter((index) => index === 0 || index === last || Math.abs(index - slideIndex) <= 2);
-  }, [guideSlides, slideIndex]);
-
   function goToSlide(index: number) {
     setSlideIndex((index + guideSlides.length) % guideSlides.length);
   }
@@ -648,7 +641,7 @@ export default function HomePage() {
   function handleSlideClick(slide: GuideSlide) {
     if (slide.type === "image") return;
     if ("category" in slide && slide.category) {
-      selectCategory(slide.category);
+      navigate({ to: "/submit-request" });
       return;
     }
     navigate({ to: slide.to });
@@ -663,7 +656,7 @@ export default function HomePage() {
         <img
           src={slide.image}
           alt="Givethra community support"
-          className="h-52 w-full object-cover md:h-72"
+          className="h-full w-full object-cover"
         />
       );
     }
@@ -673,7 +666,7 @@ export default function HomePage() {
         <button
           type="button"
           onClick={() => handleSlideClick(slide)}
-          className="flex min-h-52 w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary via-primary to-teal-600 px-6 py-5 text-center text-white transition-transform hover:scale-[1.01] md:min-h-72"
+          className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary via-primary to-teal-600 px-6 py-5 text-center text-white transition-transform hover:scale-[1.01]"
         >
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-4xl shadow-inner">🎉</span>
           <div className="max-w-xs text-2xl font-black leading-tight tracking-tight md:text-3xl">
@@ -694,8 +687,8 @@ export default function HomePage() {
     return (
       <button
         type="button"
-        onClick={() => navigate({ to: slide.to })}
-        className="group flex min-h-52 w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gradient-to-br from-card via-card to-primary/5 px-6 py-5 text-center transition-transform hover:scale-[1.01] md:min-h-72"
+        onClick={() => handleSlideClick(slide)}
+        className="group flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gradient-to-br from-card via-card to-primary/5 px-6 py-5 text-center transition-transform hover:scale-[1.01]"
       >
         <div className={`flex h-14 w-14 items-center justify-center rounded-[18px] shadow-sm ${slide.bg}`}>
           <Icon className={`h-7 w-7 ${slide.color}`} />
@@ -790,33 +783,12 @@ export default function HomePage() {
               className="w-full flex-1 space-y-4"
             >
               <div
-                className="relative w-full overflow-hidden rounded-2xl border border-primary/10 bg-card shadow-xl"
+                className="relative h-52 w-full overflow-hidden rounded-2xl border border-primary/10 bg-card shadow-xl md:h-72"
                 onTouchStart={handleSliderTouchStart}
                 onTouchEnd={handleSliderTouchEnd}
               >
                 {renderSlideContent()}
-                {guideSlides.length > 1 && (
-                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/40 to-transparent px-4 pb-3 pt-8">
-                    <div className="flex items-center gap-1.5" aria-label="Slider navigation">
-                      {visibleSlideIndexes.map((index) => {
-                        const slide = guideSlides[index];
-                        return (
-                          <button
-                            key={slide.key}
-                            type="button"
-                            onClick={() => goToSlide(index)}
-                            aria-label={`Go to slide ${index + 1}: ${slide.key.replaceAll("_", " ")}`}
-                            className={`h-2 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
-                              index === slideIndex
-                                ? "w-7 bg-white"
-                                : "w-2 bg-white/55 hover:bg-white/80"
-                            }`}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+
               </div>
             </motion.div>
           </div>
