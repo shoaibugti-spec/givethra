@@ -1154,12 +1154,12 @@ export default function HomePage() {
                               {item.category}
                             </span>
                             <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
                                 item.urgency === "Emergency"
-                                  ? "bg-red-100 text-red-700"
+                                  ? "border-red-300 bg-red-100 text-red-700"
                                   : item.urgency === "High"
-                                    ? "bg-orange-100 text-orange-700"
-                                    : "bg-muted text-muted-foreground"
+                                    ? "border-orange-300 bg-orange-100 text-orange-700"
+                                    : "border-border bg-muted text-muted-foreground"
                               }`}
                             >
                               {item.urgency}
@@ -1260,8 +1260,9 @@ export default function HomePage() {
                               <MapPin className="h-3 w-3" />
                               {item.city}, {item.country}
                             </span>
-                            <span className="inline-flex items-center gap-1 font-semibold text-primary">
-                              Help now
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-600 px-3 py-1.5 font-bold text-white shadow-sm transition-colors group-hover:bg-teal-700">
+                              <Heart className="h-3.5 w-3.5" fill="currentColor" />
+                              Help Now
                               <ChevronRight className="h-3.5 w-3.5" />
                             </span>
                           </div>

@@ -58,6 +58,14 @@ describe("homepage help slider", () => {
 
 
 describe("homepage slider refinement", () => {
+  it("keeps the verified case help action prominent and urgency visible", () => {
+    expect(homePageSource).toContain("Help Now");
+    expect(homePageSource).toContain("bg-teal-600");
+    expect(homePageSource).toContain("uppercase tracking-wide");
+    expect(homePageSource).toContain("border-orange-300");
+    expect(homePageSource).toContain("border-red-300");
+  });
+
   it("uses distinct visual treatments for supported categories and direct category selection", () => {
     expect(homePageSource).toContain("CATEGORY_SLIDE_STYLE");
     expect(homePageSource).toContain("Battery");
