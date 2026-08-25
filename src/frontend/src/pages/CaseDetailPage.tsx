@@ -316,7 +316,13 @@ export default function CaseDetailPage() {
           height: { ideal: 720 },
           frameRate: { ideal: 30 },
         },
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: { ideal: 1 },
+          sampleRate: { ideal: 48000 },
+        },
       });
       setStream(s);
       setRecording(true);
@@ -327,16 +333,22 @@ export default function CaseDetailPage() {
       setFbVideoName("");
       setTimeout(() => { if (liveVideoRef.current) liveVideoRef.current.srcObject = s; }, 100);
 
+      const preferredMimeType = "video/webm;codecs=vp8,opus";
+      const mimeType = typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(preferredMimeType)
+        ? preferredMimeType
+        : "video/webm";
       const recorder = new MediaRecorder(s, {
-        mimeType: "video/webm;codecs=vp8",
+        mimeType,
         videoBitsPerSecond: 1500000,
+        audioBitsPerSecond: 128000,
       });
       mediaRecorderRef.current = recorder;
       videoChunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) videoChunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        const blob = new Blob(videoChunksRef.current, { type: "video/webm" });
-        setFbVideoFile(new File([blob], "feedback.webm", { type: "video/webm" }));
+        const recordedType = recorder.mimeType || mimeType;
+        const blob = new Blob(videoChunksRef.current, { type: recordedType });
+        setFbVideoFile(new File([blob], "feedback.webm", { type: recordedType }));
         setFbVideoBlob(URL.createObjectURL(blob));
         setFbVideoName("feedback.webm");
         s.getTracks().forEach(t => t.stop());

@@ -266,19 +266,34 @@ export default function KycPage() {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: { ideal: 1 },
+          sampleRate: { ideal: 48000 },
+        },
       });
       setStream(s);
       setVideoRecording(true);
       setVideoTimer(0);
       setTimeout(() => { if (liveVideoRef.current) liveVideoRef.current.srcObject = s; }, 100);
-      const recorder = new MediaRecorder(s);
+      const preferredMimeType = "video/webm;codecs=vp8,opus";
+      const mimeType = typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(preferredMimeType)
+        ? preferredMimeType
+        : "video/webm";
+      const recorder = new MediaRecorder(s, {
+        mimeType,
+        videoBitsPerSecond: 1500000,
+        audioBitsPerSecond: 128000,
+      });
       mediaRecorderRef.current = recorder;
       videoChunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) videoChunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        const blob = new Blob(videoChunksRef.current, { type: "video/webm" });
-        setVideoFile(new File([blob], "face.webm", { type: "video/webm" }));
+        const recordedType = recorder.mimeType || mimeType;
+        const blob = new Blob(videoChunksRef.current, { type: recordedType });
+        setVideoFile(new File([blob], "face.webm", { type: recordedType }));
         setVideoBlob(URL.createObjectURL(blob));
         s.getTracks().forEach(t => t.stop());
         setVideoRecording(false);
