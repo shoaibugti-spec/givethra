@@ -35,6 +35,9 @@ describe("legacy authentication recovery", () => {
     expect(worker).toContain("async function hydrateAuthenticatedUser(env, session)");
     expect(worker).toContain("p.full_name AS profile_full_name");
     expect(auth).toContain('fullName: data.user.full_name || "User"');
+    expect(auth).toContain("const googleInitializedRef = useRef(false);");
+    expect(auth).toContain("if (!googleInitializedRef.current)");
+    expect(auth).toContain("googleInitializedRef.current = true;");
   });
 });
 

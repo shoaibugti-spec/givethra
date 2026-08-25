@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -97,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const googleInitializedRef = useRef(false);
 
   // ✅ Worker کو verify کریں
   useEffect(() => {
@@ -212,19 +214,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setLoginError(null);
     setIsLoggingIn(true);
-    googleIdentity.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: (response: { credential?: string }) => {
-        if (response?.credential) {
-          void finishGoogleLogin(response.credential);
-        } else {
-          setLoginError("Google did not return a sign-in credential. Please try again.");
-          setIsLoggingIn(false);
-        }
-      },
-      auto_select: false,
-      cancel_on_tap_outside: true,
-    });
+    if (!googleInitializedRef.current) {
+      googleIdentity.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (response: { credential?: string }) => {
+          if (response?.credential) {
+            void finishGoogleLogin(response.credential);
+          } else {
+            setLoginError("Google did not return a sign-in credential. Please try again.");
+            setIsLoggingIn(false);
+          }
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      googleInitializedRef.current = true;
+    }
     googleIdentity.accounts.id.prompt((notification: any) => {
       if (notification?.isNotDisplayed?.()) {
         setIsLoggingIn(false);
