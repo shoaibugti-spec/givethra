@@ -773,11 +773,7 @@ export default function CaseDetailPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1 text-xs text-teal-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Identity Verified</span>
-            <span className="inline-flex items-center gap-1 text-xs text-teal-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> KYC Approved</span>
-            <span className="inline-flex items-center gap-1 text-xs text-teal-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Givethra Verified</span>
-          </div>
+
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">

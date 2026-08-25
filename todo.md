@@ -886,3 +886,8 @@
 
 ### Deployment note
 - [ ] Deploy the latest canonical source to the Cloudflare Worker before announcing the updated public verification summary to users.
+
+## User-Reported Duplicate Verification Badges
+- [x] Remove the duplicate Identity Verification, KYC Approved, and Givethra Verified labels from the public case header while preserving the separate case-document summary.
+- [x] Add regression coverage proving the public summary renders case-specific document approvals separately from identity-level badges.
+- [x] Re-run tests, strict TypeScript, and production build; keep deployment as a separate user-controlled step.
