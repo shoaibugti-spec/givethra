@@ -930,3 +930,9 @@
 - [x] Clean only legacy Supabase/Givethra auth storage and cookies, preserving current auth session storage; cleanup also runs at Google-login click time.
 - [x] Add bounded timeout/error handling so failed login attempts cannot leave an infinite spinner or stale auth state; reconciliation failures receive a controlled one-time reload.
 - [x] Add regression tests and run the complete test suite, strict TypeScript check, and production build; deployment remains user-controlled.
+
+## User-Reported Mobile Case Detail Layout Issue
+- [x] Keep Identity Verified, KYC Approved, and Givethra Verified visible together in one orderly responsive verification block.
+- [x] Present the 14-day deadline as a compact complete line/card without broken word wrapping.
+- [x] Make Case Verification Documents visibly appear directly beneath the three platform badges for the case payload.
+- [x] Preserve all other pages and functional flows; add focused regression coverage and verify mobile/desktop builds.

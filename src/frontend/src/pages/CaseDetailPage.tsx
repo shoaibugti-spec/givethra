@@ -731,31 +731,33 @@ export default function CaseDetailPage() {
         </div>
 
         <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-2">
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="min-w-0 flex-1 space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${caseData.status === "approved" ? "bg-teal-100 text-teal-700" : caseData.status === "completed" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>{caseData.status?.toUpperCase()}</span>
                 <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">{caseData.category}</span>
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${caseData.urgency === "Emergency" ? "bg-red-100 text-red-700" : caseData.urgency === "High" ? "bg-orange-100 text-orange-700" : "bg-muted text-muted-foreground"}`}>{caseData.urgency}</span>
               </div>
-              <h1 className="text-2xl font-bold text-foreground">{caseData.title}</h1>
-              <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" /> {caseData.city}, {caseData.country}</div>
+              <h1 className="text-2xl font-bold text-foreground break-words">{caseData.title}</h1>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4 shrink-0" /> <span className="break-words">{caseData.city}, {caseData.country}</span></div>
             </div>
-            <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5 border-primary/25 text-primary hover:bg-primary/10" onClick={handleCaseShare} aria-label={`Share ${caseData.title}`}>
-              <Share2 className="h-4 w-4" /> Share
-            </Button>
-            {caseData.deadline && (() => {
-            const daysLeft = Math.ceil((new Date(caseData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            if (daysLeft < 0) return null;
-            return (
-              <div className={`rounded-lg px-3 py-2 flex items-center gap-2 ${daysLeft <= 3 ? "bg-red-50 dark:bg-red-950/20 border border-red-300" : "bg-amber-50 dark:bg-amber-950/20 border border-amber-300"}`}>
-                <span className="text-lg">⏳</span>
-                <p className={`text-xs font-bold ${daysLeft <= 3 ? "text-red-700" : "text-amber-700"}`}>
-                  {daysLeft === 0 ? "Expires TODAY — Help Now" : daysLeft === 1 ? "Only 1 day left — Help Now" : `Only ${daysLeft} days left to help`}
-                </p>
-              </div>
-            );
-          })()}
+            <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+              <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5 border-primary/25 text-primary hover:bg-primary/10" onClick={handleCaseShare} aria-label={`Share ${caseData.title}`}>
+                <Share2 className="h-4 w-4" /> Share
+              </Button>
+              {caseData.deadline && (() => {
+              const daysLeft = Math.ceil((new Date(caseData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              if (daysLeft < 0) return null;
+              return (
+                <div className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 sm:flex-none ${daysLeft <= 3 ? "bg-red-50 dark:bg-red-950/20 border border-red-300" : "bg-amber-50 dark:bg-amber-950/20 border border-amber-300"}`}>
+                  <span className="shrink-0 text-lg">⏳</span>
+                  <p className={`whitespace-nowrap text-xs font-bold ${daysLeft <= 3 ? "text-red-700" : "text-amber-700"}`}>
+                    {daysLeft === 0 ? "Expires TODAY — Help Now" : daysLeft === 1 ? "Only 1 day left — Help Now" : `Only ${daysLeft} days left to help`}
+                  </p>
+                </div>
+              );
+            })()}
+            </div>
           </div>
 
           {amountNeeded > 0 && (
@@ -770,11 +772,38 @@ export default function CaseDetailPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1 text-xs text-teal-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Identity Verified</span>
-            <span className="inline-flex items-center gap-1 text-xs text-teal-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> KYC Approved</span>
-            <span className="inline-flex items-center gap-1 text-xs text-teal-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Givethra Verified</span>
+          <div className="flex items-center gap-2 flex-wrap rounded-xl bg-teal-50/70 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 px-3 py-2.5">
+            <span className="inline-flex items-center gap-1 text-xs text-teal-700 dark:text-teal-300 font-medium"><CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Identity Verified</span>
+            <span className="inline-flex items-center gap-1 text-xs text-teal-700 dark:text-teal-300 font-medium"><CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> KYC Approved</span>
+            <span className="inline-flex items-center gap-1 text-xs text-teal-700 dark:text-teal-300 font-medium"><CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Givethra Verified</span>
           </div>
+
+          {(() => {
+            const approvedItems = getApprovedCaseItems(caseData);
+            const documentItems = approvedItems.filter((item) => item.source === "document");
+            const isPublishedCase = ["approved", "published", "active"].includes(String(caseData.status || "").toLowerCase());
+            if (!isPublishedCase && approvedItems.length === 0) return null;
+            const cur2 = caseData.currency || "USD";
+            const sym2 = CURRENCY_SYMBOLS[cur2] ?? cur2;
+            return (
+              <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-teal-600 shrink-0" />
+                  <h2 className="text-sm font-semibold text-teal-700">Case Verification Documents</h2>
+                </div>
+                {documentItems.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {documentItems.map(({ label }) => (
+                      <span key={label} className="text-xs font-medium bg-white dark:bg-teal-900/30 text-teal-700 border border-teal-300 rounded-full px-2.5 py-1">✅ {label}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-teal-600">No additional case-specific documents are recorded in this case.</p>
+                )}
+                <p className="text-[11px] leading-relaxed text-teal-600">Only the reviewed document names are shown publicly; document contents remain private.</p>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -927,40 +956,7 @@ export default function CaseDetailPage() {
                   </div>
                 )}
 
-                {(() => {
-                  const approvedItems = getApprovedCaseItems(caseData);
-                  const documentItems = approvedItems.filter((item) => item.source === "document");
-                  const isPublishedCase = ["approved", "published", "active"].includes(String(caseData.status || "").toLowerCase());
-                  if (!isPublishedCase && approvedItems.length === 0) return null;
-                  const cur2 = caseData.currency || "USD";
-                  const sym2 = CURRENCY_SYMBOLS[cur2] ?? cur2;
-                  return (
-                    <div className="rounded-2xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-5 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-teal-600" />
-                        <h2 className="font-semibold text-teal-700">Givethra Verification Summary</h2>
-                      </div>
-                      <p className="text-sm text-teal-700 leading-relaxed">
-                        This case was submitted by a KYC-verified user for <strong>{caseData.category}</strong> ({sym2} {caseData.amount_needed} {cur2} needed{caseData.institute_name ? `, via ${caseData.institute_name}` : ""}).                         Givethra reviewed the submitted verification materials before approving this case for Heroes.
-                      </p>
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-teal-700">Case Verification Documents</h3>
-                        {documentItems.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {documentItems.map(({ label }) => (
-                              <span key={label} className="text-xs font-medium bg-white dark:bg-teal-900/30 text-teal-700 border border-teal-300 rounded-full px-2.5 py-1">✅ {label}</span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-teal-600">No additional case-specific documents are recorded in this case.</p>
-                        )}
-                      </div>
-                      <p className="text-xs text-teal-600">
-                        For the beneficiary's privacy, the content of these documents is not shown publicly — only reviewed and verified by Givethra's team.
-                      </p>
-                    </div>
-                  );
-                })()}
+
 
                 <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
                   <h2 className="font-semibold">🎥 Verification Media</h2>

@@ -26,4 +26,10 @@ describe("public case verification presentation", () => {
   it("loads independent Case Detail data requests in parallel", () => {
     expect(caseDetailSource).toContain("const [unlock, count, res, kyc, prof] = await Promise.all([");
   });
+
+  it("keeps the three badges before the visible case-document block and prevents deadline wrapping", () => {
+    expect(caseDetailSource.indexOf("Identity Verified")).toBeLessThan(caseDetailSource.indexOf("Case Verification Documents"));
+    expect(caseDetailSource).toContain("whitespace-nowrap text-xs font-bold");
+    expect(caseDetailSource).toContain("flex min-w-0 flex-1 items-center justify-center gap-2");
+  });
 });
