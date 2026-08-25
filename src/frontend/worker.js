@@ -786,12 +786,18 @@ async function handleRequest(request, env, ctx) {
     try {
       const object = await env.UPLOADS.get(key);
       if (!object) return new Response("File not found", { status: 404 });
-      return new Response(object.body, {
-        headers: {
-          "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
-          "Cache-Control": "public, max-age=31536000",
-        },
+      const headers = new Headers({
+        "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+        "Cache-Control": "public, max-age=31536000",
+        "X-Content-Type-Options": "nosniff",
       });
+      if (url.searchParams.get("download") === "1") {
+        const fileName = decodeURIComponent(key.split("/").pop() || "download")
+          .replace(/[\\r\\n\\\"]+/g, "_")
+          .slice(0, 180) || "download";
+        headers.set("Content-Disposition", `attachment; filename="${fileName}"`);
+      }
+      return new Response(object.body, { headers });
     } catch {
       return new Response("File not found", { status: 404 });
     }

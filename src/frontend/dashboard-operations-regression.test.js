@@ -119,5 +119,20 @@ describe("dashboard operations repair", () => {
     expect(adminSource).toContain('walkFilesDeep(catDocs, "documents")');
     expect(adminSource).toContain('walkFilesDeep(parseObject(catDetails?.edu_documents) || {}, "education_documents")');
     expect(workerSource).toContain("await env.DB.batch([");
+    expect(adminSource).toContain("const isImage =");
+    expect(adminSource).toContain('download={label}');
+    expect(adminSource).toContain('parsed.searchParams.set("download", "1")');
+    expect(workerSource).toContain('url.searchParams.get("download") === "1"');
+    expect(workerSource).toContain("Content-Disposition");
+  });
+});
+
+
+describe("case attachment filename persistence", () => {
+  it("includes original names in the submitted document metadata", () => {
+    const submitSource = fs.readFileSync(path.join(root, "src/pages/SubmitRequestPage.tsx"), "utf8");
+    expect(submitSource).toContain("const docMeta: Record<string, { url: string; original_name: string }> = {};");
+    expect(submitSource).toContain("original_name: catDocNames[k] || k");
+    expect(submitSource).toContain("_documents: docMeta");
   });
 });

@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { sendNotification } from "@/lib/notify";
 import {
-  Shield as ShieldIcon, CheckCircle, XCircle, ClipboardCheck, FileText, ExternalLink, Heart, Coins, Users,
+  Shield as ShieldIcon, CheckCircle, XCircle, ClipboardCheck, FileText, Download, ExternalLink, Heart, Coins, Users,
   ChevronDown, Wallet, Mail, Calendar, Send, ArrowLeft, Gift, AlertTriangle, Building2, Copy,
   Megaphone, HandCoins, Eye, User, Search, Paperclip, Loader2, X, RotateCw, Ban, MessageCircle,
 } from "lucide-react";
@@ -2119,8 +2119,19 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {uniqueFiles.map(({ key, label, url }) => {
-              const isVideo = url.match(/\.(mp4|webm|mov|avi)$/i) || url.includes("video");
-              const isPdf = url.match(/\.pdf$/i);
+              const lowerFileName = `${url} ${label}`.toLowerCase();
+              const isVideo = lowerFileName.match(/\.(mp4|webm|mov|avi)(?:$|\?)/i) || lowerFileName.includes("video");
+              const isPdf = lowerFileName.match(/\.pdf(?:$|\?)/i);
+              const isImage = lowerFileName.match(/\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)(?:$|\?)/i) || lowerFileName.includes("image") || lowerFileName.includes("photo") || lowerFileName.includes("selfie");
+              const downloadUrl = (() => {
+                try {
+                  const parsed = new URL(url, window.location.origin);
+                  parsed.searchParams.set("download", "1");
+                  return parsed.toString();
+                } catch {
+                  return url;
+                }
+              })();
               return (
                 <div key={key + url} className="space-y-1 bg-background/80 p-1.5 rounded border">
                   <p className="text-[10px] font-medium text-foreground truncate" title={label}>
@@ -2132,19 +2143,29 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
                     <a href={url} target="_blank" rel="noopener noreferrer" className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
                       📄 View PDF
                     </a>
-                  ) : (
+                  ) : isImage ? (
                     <a href={url} target="_blank" rel="noopener noreferrer">
                       <img src={url} alt={label} className="w-full rounded border max-h-28 object-cover hover:opacity-95" />
                     </a>
+                  ) : (
+                    <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded border bg-muted/60 p-3 text-center">
+                      <FileText className="h-8 w-8 text-primary" />
+                      <span className="text-[10px] text-muted-foreground">Document file</span>
+                    </div>
                   )}
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="block text-[9px] text-primary hover:underline text-center">
-                    Open in Full Size ↗
-                  </a>
+                  <div className="flex items-center justify-center gap-2 text-[9px]">
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {isImage || isPdf || isVideo ? "Open in Full Size ↗" : "Open File ↗"}
+                    </a>
+                    <a href={downloadUrl} download={label} className="inline-flex items-center gap-0.5 text-primary hover:underline">
+                      <Download className="h-3 w-3" /> Download
+                    </a>
+                  </div>
                 </div>
               );
             })}
           </div>
-          <p className="text-[10px] text-muted-foreground">📌 Click any image to enlarge.</p>
+          <p className="text-[10px] text-muted-foreground">📌 Images, videos, PDFs and document files can be opened or downloaded from their controls.</p>
         </div>
       ) : (
         <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 p-3 text-xs text-yellow-700">
