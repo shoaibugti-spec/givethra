@@ -750,14 +750,11 @@ export default function CaseDetailPage() {
             const daysLeft = Math.ceil((new Date(caseData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             if (daysLeft < 0) return null;
             return (
-              <div className={`rounded-xl p-3 flex items-center gap-2 ${daysLeft <= 3 ? "bg-red-50 dark:bg-red-950/20 border border-red-300" : "bg-amber-50 dark:bg-amber-950/20 border border-amber-300"}`}>
-                <span className="text-2xl">⏳</span>
-                <div>
-                  <p className={`text-sm font-bold ${daysLeft <= 3 ? "text-red-700" : "text-amber-700"}`}>
-                    {daysLeft === 0 ? "Expires TODAY!" : daysLeft === 1 ? "Only 1 day left to help!" : `Only ${daysLeft} days left to help!`}
-                  </p>
-                  <p className="text-xs text-muted-foreground">If no one helps in time, this case will expire and this person will have to wait again. Be their Hero today.</p>
-                </div>
+              <div className={`rounded-lg px-3 py-2 flex items-center gap-2 ${daysLeft <= 3 ? "bg-red-50 dark:bg-red-950/20 border border-red-300" : "bg-amber-50 dark:bg-amber-950/20 border border-amber-300"}`}>
+                <span className="text-lg">⏳</span>
+                <p className={`text-xs font-bold ${daysLeft <= 3 ? "text-red-700" : "text-amber-700"}`}>
+                  {daysLeft === 0 ? "Expires TODAY — Help Now" : daysLeft === 1 ? "Only 1 day left — Help Now" : `Only ${daysLeft} days left to help`}
+                </p>
               </div>
             );
           })()}
@@ -785,9 +782,9 @@ export default function CaseDetailPage() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-5">
             <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
-              <h2 className="font-semibold text-foreground">Case Story</h2>
+              <h2 className="font-semibold text-foreground">Case Story (What You Need Help With)</h2>
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{caseData.description}</p>
-              {caseData.why_help && <div className="mt-3 pt-3 border-t border-border"><p className="text-xs font-medium text-foreground mb-1">Why they need help:</p><p className="text-sm text-muted-foreground whitespace-pre-line">{caseData.why_help}</p></div>}
+              {caseData.why_help && <p className="text-sm text-muted-foreground whitespace-pre-line">{caseData.why_help}</p>}
             </div>
 
             {isOwner && isCompleted && (
@@ -866,13 +863,17 @@ export default function CaseDetailPage() {
                   <Button onClick={() => navigate({ to: "/sign-in" })} className="px-8">Sign in to help</Button>
                 ) : (
                   <div className="w-full space-y-3">
-                    {/* DIRECT HELP - always visible */}
-                    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+                    <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2"><Heart className="h-5 w-5 text-primary" /><h4 className="font-bold text-sm">Help Now</h4></div>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">Choose one</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">You can help this case directly or contribute any amount.</p>
                       <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h4 className="font-bold text-sm">Pay the full bill directly</h4></div>
                       <p className="text-xs text-muted-foreground">You'll get the institute's payment details and pay the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} directly. Best if you can cover it all at once.</p>
-                      <Button onClick={() => handleUnlock("full")} disabled={unlocking} className="w-full gap-2 mt-1">
+                      <Button onClick={() => handleUnlock("full")} disabled={unlocking} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
                         <Unlock className="h-4 w-4" />
-                        {isFirstThreeUnlocks ? `FREE (${3 - userUnlockCount} left)` : "Pay Full — Unlock"}
+                        {isFirstThreeUnlocks ? `Help Now — FREE (${3 - userUnlockCount} left)` : "Help Now — Pay Full"}
                       </Button>
                     </div>
 
@@ -889,9 +890,9 @@ export default function CaseDetailPage() {
                           </div>
                         </div>
                       )}
-                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking} className="w-full gap-2 mt-1">
+                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
                         <Unlock className="h-4 w-4" />
-                        {isFirstThreeUnlocks ? `FREE (${3 - userUnlockCount} left)` : "Contribute — Unlock"}
+                        {isFirstThreeUnlocks ? `Help Now — FREE (${3 - userUnlockCount} left)` : "Help Now — Contribute"}
                       </Button>
                     </div>
                   </div>

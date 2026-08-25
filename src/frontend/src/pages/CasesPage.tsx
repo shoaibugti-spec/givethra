@@ -459,7 +459,7 @@ export default function CasesPage() {
                         <button
                           type="button"
                           aria-label={`Share ${c.title}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 text-primary transition-colors hover:bg-primary/10"
+                          className="inline-flex h-8 items-center justify-center gap-1 rounded-full border border-primary/20 px-2 text-primary transition-colors hover:bg-primary/10"
                           onClick={async (event) => {
                             event.stopPropagation();
                             const result = await shareCase(c);
@@ -468,6 +468,7 @@ export default function CasesPage() {
                           }}
                         >
                           <Share2 className="h-3.5 w-3.5" />
+                          <span className="text-[10px] font-semibold">Share</span>
                         </button>
                       </div>
                     </div>
