@@ -25,6 +25,7 @@ import {
 } from "@/lib/api";
 import { sendNotification } from "@/lib/notify";
 import { shareCase } from "@/lib/caseSharing";
+import { getApprovedCaseItems } from "@/lib/caseVerification";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   ChevronLeft, Lock, Unlock, MapPin, CheckCircle2,
@@ -926,9 +927,9 @@ export default function CaseDetailPage() {
                   </div>
                 )}
 
-                {(caseData.photo_urls?.length > 0) && (() => {
-                  const catDocs = caseData.category_details?._documents && typeof caseData.category_details._documents === "object" ? caseData.category_details._documents : {};
-                  const docNames = Object.keys(catDocs).map(k => k.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "));
+                {(() => {
+                  const approvedItems = getApprovedCaseItems(caseData);
+                  if (approvedItems.length === 0) return null;
                   const cur2 = caseData.currency || "USD";
                   const sym2 = CURRENCY_SYMBOLS[cur2] ?? cur2;
                   return (
@@ -940,13 +941,11 @@ export default function CaseDetailPage() {
                       <p className="text-sm text-teal-700 leading-relaxed">
                         This case was submitted by a KYC-verified user for <strong>{caseData.category}</strong> ({sym2} {caseData.amount_needed} {cur2} needed{caseData.institute_name ? `, via ${caseData.institute_name}` : ""}). Givethra reviewed the bill/reference, income proof, live selfie, and video statement before approving this case for Heroes.
                       </p>
-                      {docNames.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {docNames.map(n => (
-                            <span key={n} className="text-xs font-medium bg-white dark:bg-teal-900/30 text-teal-700 border border-teal-300 rounded-full px-2.5 py-1">✅ {n}</span>
-                          ))}
-                        </div>
-                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {approvedItems.map(({ label, source }) => (
+                          <span key={`${source}-${label}`} className="text-xs font-medium bg-white dark:bg-teal-900/30 text-teal-700 border border-teal-300 rounded-full px-2.5 py-1">✅ {label}</span>
+                        ))}
+                      </div>
                       <p className="text-xs text-teal-600">
                         For the beneficiary's privacy, the content of these documents is not shown publicly — only reviewed and verified by Givethra's team.
                       </p>
