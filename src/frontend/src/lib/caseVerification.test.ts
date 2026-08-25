@@ -63,4 +63,19 @@ describe("approved case verification items", () => {
       { label: "Family Tree Verification", source: "document" },
     ]);
   });
+
+  it("accepts camelCase, top-level, and array document payloads", () => {
+    expect(getApprovedCaseItems({ categoryDetails: { b_form: "https://cdn.test/b-form.pdf" } })).toContainEqual({
+      label: "B-Form Verification",
+      source: "document",
+    });
+    expect(getApprovedCaseItems({ documents: [{ key: "family_tree", url: "https://cdn.test/tree.pdf" }] })).toContainEqual({
+      label: "Family Tree Verification",
+      source: "document",
+    });
+    expect(getApprovedCaseItems({ category_details: [{ key: "fee_challan", url: "https://cdn.test/fee.pdf" }] })).toContainEqual({
+      label: "Fee Challan Verification",
+      source: "document",
+    });
+  });
 });

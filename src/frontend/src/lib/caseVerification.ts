@@ -74,7 +74,8 @@ function collectDocumentContainer(value: unknown, key: string, items: ApprovedCa
       const fileName = record.original_name || record.filename || record.name;
       const fileKey = typeof fileName === "string" ? fileName.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() : "";
       if (fileKey && seen.has(fileKey)) return;
-      addUnique(items, seen, documentLabel(key), "document");
+      const recordKey = typeof record.key === "string" ? record.key : typeof record.field === "string" ? record.field : key;
+      addUnique(items, seen, documentLabel(recordKey), "document");
       if (fileKey) seen.add(fileKey);
       return;
     }
@@ -94,18 +95,24 @@ export function getApprovedCaseItems(caseData: Record<string, any>): ApprovedCas
   if (caseData.selfie_url) addUnique(items, seen, "Live Selfie", "media");
   if (caseData.video_url) addUnique(items, seen, "Video Statement", "media");
 
+  const rawDetails = caseData.category_details ?? caseData.categoryDetails ?? caseData.documents ?? caseData.verification_documents;
   let details: Record<string, unknown> = {};
-  if (caseData.category_details && typeof caseData.category_details === "object") {
-    details = caseData.category_details as Record<string, unknown>;
-  } else if (typeof caseData.category_details === "string") {
+  let detailList: unknown[] | null = null;
+  if (Array.isArray(rawDetails)) {
+    detailList = rawDetails;
+  } else if (rawDetails && typeof rawDetails === "object") {
+    details = rawDetails as Record<string, unknown>;
+  } else if (typeof rawDetails === "string") {
     try {
-      const parsed = JSON.parse(caseData.category_details);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) details = parsed as Record<string, unknown>;
+      const parsed = JSON.parse(rawDetails);
+      if (Array.isArray(parsed)) detailList = parsed;
+      else if (parsed && typeof parsed === "object") details = parsed as Record<string, unknown>;
     } catch {
       // Preserve compatibility with legacy plain-string payloads.
     }
   }
 
+  if (detailList) collectDocumentContainer(detailList, "document", items, seen);
   const containerKeys = new Set(["_documents", "edu_documents", "documents", "uploaded_documents", "verification_documents"]);
   for (const [key, value] of Object.entries(details)) {
     if (containerKeys.has(key)) continue;
@@ -116,6 +123,10 @@ export function getApprovedCaseItems(caseData: Record<string, any>): ApprovedCas
     if (details[containerKey] != null) {
       collectDocumentContainer(details[containerKey], containerKey === "_documents" ? "document" : containerKey, items, seen);
     }
+  }
+
+  for (const key of Object.keys(DOCUMENT_LABELS)) {
+    if (caseData[key] != null) collectDocumentContainer(caseData[key], key, items, seen);
   }
 
   return items;

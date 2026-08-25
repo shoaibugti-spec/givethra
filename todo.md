@@ -916,3 +916,9 @@
 - [x] Preserve all existing case, navigation, Help, wallet, profile, community, settings, and verification behavior.
 - [x] Reduce only avoidable loading without bypassing required authentication, database, payment, or upload states.
 - [x] Add/update regression coverage and run tests, strict TypeScript, and production build; keep deployment user-controlled.
+
+## User-Reported Live Missing Document Labels
+- [x] Trace the public case payload and identify the legacy/direct/array document shapes that could leave approved case-specific verification labels absent.
+- [x] Apply only the minimal document-extraction and rendering fix; preserve the three platform badges and all other features.
+- [x] Add regression coverage for the real payload shapes, then run tests, strict TypeScript, and production build.
+- [x] Push the focused fix; deployment remains user-controlled.
