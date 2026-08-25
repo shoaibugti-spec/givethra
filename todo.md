@@ -910,3 +910,9 @@
 - [x] Combine the public Case Story and What You Need Help With headings into one heading and deduplicate repeated story text.
 - [x] Ensure the three platform verification badges and the visible Case Verification Documents section render together on public case detail.
 - [x] Add/update regression coverage and run tests, strict TypeScript, and production build; keep deployment user-controlled.
+
+## User Reconfirmation: Only Add Case Documents and Reduce Avoidable Loading
+- [x] Make Case Verification Documents visibly render beneath the existing three platform verification badges for approved cases, including legacy JSON-string and direct category document payloads.
+- [x] Preserve all existing case, navigation, Help, wallet, profile, community, settings, and verification behavior.
+- [x] Reduce only avoidable loading without bypassing required authentication, database, payment, or upload states.
+- [x] Add/update regression coverage and run tests, strict TypeScript, and production build; keep deployment user-controlled.

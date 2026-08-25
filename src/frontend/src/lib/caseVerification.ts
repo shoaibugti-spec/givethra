@@ -94,15 +94,28 @@ export function getApprovedCaseItems(caseData: Record<string, any>): ApprovedCas
   if (caseData.selfie_url) addUnique(items, seen, "Live Selfie", "media");
   if (caseData.video_url) addUnique(items, seen, "Video Statement", "media");
 
-  const details = caseData.category_details;
-  const documentContainers = details && typeof details === "object"
-    ? ["_documents", "edu_documents", "documents", "uploaded_documents", "verification_documents"]
-        .filter((key) => details[key] != null)
-        .map((key) => [key, details[key]] as const)
-    : [];
+  let details: Record<string, unknown> = {};
+  if (caseData.category_details && typeof caseData.category_details === "object") {
+    details = caseData.category_details as Record<string, unknown>;
+  } else if (typeof caseData.category_details === "string") {
+    try {
+      const parsed = JSON.parse(caseData.category_details);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) details = parsed as Record<string, unknown>;
+    } catch {
+      // Preserve compatibility with legacy plain-string payloads.
+    }
+  }
 
-  for (const [containerKey, containerValue] of documentContainers) {
-    collectDocumentContainer(containerValue, containerKey === "_documents" ? "document" : containerKey, items, seen);
+  const containerKeys = new Set(["_documents", "edu_documents", "documents", "uploaded_documents", "verification_documents"]);
+  for (const [key, value] of Object.entries(details)) {
+    if (containerKeys.has(key)) continue;
+    collectDocumentContainer(value, key, items, seen);
+  }
+
+  for (const containerKey of containerKeys) {
+    if (details[containerKey] != null) {
+      collectDocumentContainer(details[containerKey], containerKey === "_documents" ? "document" : containerKey, items, seen);
+    }
   }
 
   return items;

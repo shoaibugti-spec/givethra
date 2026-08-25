@@ -49,4 +49,18 @@ describe("approved case verification items", () => {
       "Fee Challan Verification",
     ]);
   });
+
+  it("accepts JSON-string and direct category document payloads", () => {
+    const items = getApprovedCaseItems({
+      category_details: JSON.stringify({
+        birth_certificate: "https://cdn.test/birth.pdf",
+        documents: { family_tree: "https://cdn.test/tree.pdf" },
+      }),
+    });
+
+    expect(items.filter((item) => item.source === "document")).toEqual([
+      { label: "Birth Certificate Verification", source: "document" },
+      { label: "Family Tree Verification", source: "document" },
+    ]);
+  });
 });
