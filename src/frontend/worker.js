@@ -122,52 +122,65 @@ async function verifyGoogleCredential(credential, clientId) {
 }
 
 async function findOrCreateUser(env, identity) {
-  if (!env.DB) return { ...identity, user_id: identity.google_id };
-
-  // Email is the durable legacy identity. The current production users table
-  // intentionally does not require a google_id column: the verified Google
-  // credential is exchanged for a signed session whose user_id is this D1 row.
-  const existing = await env.DB.prepare(
+  if (!env.DB) return { ...identity, user_id: id() };
+  // The verified email is the durable legacy identity. Never use the Google
+  // sub/provider ID to decide whether an imported D1 account already exists.
+  const selectExisting = () => env.DB.prepare(
     `SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases,
             pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit
      FROM users WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1`
   ).bind(identity.email).first();
+  const existing = await selectExisting();
+
+  // Existing imported users are read-only during login. This preserves their
+  // original user_id and avoids every duplicate INSERT/UPSERT path.
+  if (existing) {
+    return {
+      user_id: String(existing.user_id),
+      email: String(existing.email || identity.email).toLowerCase(),
+      full_name: existing.full_name || identity.full_name,
+      avatar_url: existing.avatar_url || identity.avatar_url,
+      kyc_status: existing.kyc_status || "none",
+      role: isAdmin(existing) || isAdmin(identity) ? "admin" : null,
+      last_community_visit: existing.last_community_visit || null,
+    };
+  }
 
   const timestamp = now();
-  const userId = String(existing?.user_id || identity.google_id);
-  const existingProfile = await env.DB.prepare(
-    "SELECT full_name, avatar_url FROM profiles WHERE user_id = ?"
-  ).bind(userId).first();
-  const savedName = String(existingProfile?.full_name || existing?.full_name || "").trim();
-  const savedAvatar = String(existingProfile?.avatar_url || existing?.avatar_url || "").trim();
-  const canonicalName = savedName && !savedName.includes("@") ? savedName : identity.full_name;
-  const canonicalAvatar = savedAvatar || identity.avatar_url;
-
-  if (existing) {
-    await env.DB.prepare(
-      `UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?`
-    ).bind(canonicalName, canonicalAvatar, timestamp, userId).run();
-  } else {
+  const userId = id();
+  try {
     await env.DB.prepare(
       `INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(userId, identity.email, canonicalName, canonicalAvatar, timestamp, timestamp, timestamp).run();
+    ).bind(userId, identity.email, identity.full_name, identity.avatar_url, timestamp, timestamp, timestamp).run();
+    await env.DB.prepare(
+      `INSERT INTO profiles (user_id, full_name, avatar_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(userId, identity.full_name, identity.avatar_url, timestamp, timestamp).run();
+  } catch (error) {
+    // Another login may have inserted this email between SELECT and INSERT.
+    // Reconcile that race by returning the now-existing row, never creating a
+    // second account or exposing a raw D1 constraint error to the frontend.
+    const raced = await selectExisting();
+    if (!raced) throw error;
+    return {
+      user_id: String(raced.user_id),
+      email: String(raced.email || identity.email).toLowerCase(),
+      full_name: raced.full_name || identity.full_name,
+      avatar_url: raced.avatar_url || identity.avatar_url,
+      kyc_status: raced.kyc_status || "none",
+      role: isAdmin(raced) || isAdmin(identity) ? "admin" : null,
+      last_community_visit: raced.last_community_visit || null,
+    };
   }
-
-  await env.DB.prepare(
-    `INSERT INTO profiles (user_id, full_name, avatar_url, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET full_name = excluded.full_name, avatar_url = excluded.avatar_url, updated_at = excluded.updated_at`
-  ).bind(userId, canonicalName, canonicalAvatar, timestamp, timestamp).run();
-
   return {
     user_id: userId,
     email: identity.email,
-    full_name: canonicalName,
-    avatar_url: canonicalAvatar,
-    kyc_status: existing?.kyc_status || "none",
+    full_name: identity.full_name,
+    avatar_url: identity.avatar_url,
+    kyc_status: "none",
     role: isAdmin(identity) ? "admin" : null,
-    last_community_visit: existing?.last_community_visit || timestamp,
+    last_community_visit: timestamp,
   };
 }
 
@@ -438,7 +451,11 @@ async function handleCases(request, env, user, url, parts, origin) {
       return json(decodeCaseRow(row), 200, origin);
     }
     if (parts[2] === "counts") {
-      const row = await env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending, SUM(CASE WHEN status IN ('approved','published','active') THEN 1 ELSE 0 END) AS active_or_completed, SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected FROM case_submissions WHERE user_id = ?").bind(target || user.user_id).first();
+      const countUserId = target || user?.user_id;
+      if (!countUserId) {
+        return json({ total: 0, pending: 0, active_or_completed: 0, rejected: 0 }, 200, origin);
+      }
+      const row = await env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending, SUM(CASE WHEN status IN ('approved','published','active') THEN 1 ELSE 0 END) AS active_or_completed, SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected FROM case_submissions WHERE user_id = ?").bind(countUserId).first();
       return json(row || {}, 200, origin);
     }
     if (parts[2] === "category-counts") {
@@ -763,13 +780,18 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "auth" && parts[1] === "google" && request.method === "POST") {
-    const body = await readJson(request);
-    const identity = await verifyGoogleCredential(body?.credential || body?.id_token, googleClientId(env));
-    if (!identity) return json({ error: "Google credential could not be verified for this website", code: "GOOGLE_CREDENTIAL_INVALID" }, 401, origin);
-    const account = await findOrCreateUser(env, identity);
-    const token = await signSession(account, env.JWT_SECRET);
-    if (!token) return json({ error: "Authentication is not configured" }, 500, origin);
-    return json({ token, user: account }, 200, origin);
+    try {
+      const body = await readJson(request);
+      const identity = await verifyGoogleCredential(body?.credential || body?.id_token, googleClientId(env));
+      if (!identity) return json({ error: "Google credential could not be verified for this website", code: "GOOGLE_CREDENTIAL_INVALID" }, 401, origin);
+      const account = await findOrCreateUser(env, identity);
+      const token = await signSession(account, env.JWT_SECRET);
+      if (!token) return json({ error: "Authentication is not configured", code: "AUTH_NOT_CONFIGURED" }, 500, origin);
+      return json({ token, user: account }, 200, origin);
+    } catch (error) {
+      console.error("Google authentication reconciliation failed", error);
+      return json({ error: "Authentication or database request failed", code: "AUTH_RECONCILIATION_FAILED" }, 500, origin);
+    }
   }
 
   if (parts[0] === "verify" && request.method === "GET") {

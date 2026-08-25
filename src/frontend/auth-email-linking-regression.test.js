@@ -6,16 +6,22 @@ const worker = fs.readFileSync(new URL("./worker.js", import.meta.url), "utf8");
 describe("email-first Google authentication", () => {
   it("looks up the durable user account by normalized email", () => {
     expect(worker).toContain("WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1");
-    expect(worker).toContain("const userId = String(existing?.user_id || identity.google_id);");
+    expect(worker).toContain("const existing = await selectExisting();");
+    expect(worker).toContain("user_id: String(existing.user_id)");
   });
 
-  it("keeps legacy D1 IDs and only creates a new ID for an unknown email", () => {
-    expect(worker).toContain("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?");
+  it("keeps legacy D1 IDs read-only and creates a UUID only for an unknown email", () => {
+    expect(worker).toContain("// Existing imported users are read-only during login.");
+    expect(worker).toContain("const userId = id();");
     expect(worker).toContain("INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at)");
+    expect(worker).toContain("const raced = await selectExisting();");
+    const reconciliation = worker.slice(worker.indexOf("async function findOrCreateUser"), worker.indexOf("async function hydrateAuthenticatedUser"));
+    expect(reconciliation).not.toContain("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?");
   });
 
-  it("returns a JSON error instead of exposing a raw server error or hanging", () => {
-    expect(worker).toContain('json({ error: "Authentication or database request failed", code: "INTERNAL_ERROR" }, 500');
+  it("returns a structured JSON error instead of exposing a raw server error or hanging", () => {
+    expect(worker).toContain('json({ error: "Authentication or database request failed", code: "AUTH_RECONCILIATION_FAILED" }, 500');
+    expect(worker).toContain("try {\n      const body = await readJson(request);");
     expect(worker).toContain("const controller = new AbortController();");
   });
 
@@ -43,5 +49,12 @@ describe("frontend authentication recovery", () => {
     expect(authContext).toContain("Google did not return a sign-in credential. Please try again.");
     expect(authContext).toContain("Google sign-in could not open. Please allow Google prompts/pop-ups and try again.");
     expect(authContext).toContain("setIsLoggingIn(false)");
+  });
+
+  it("cleans legacy browser state at click time and recovers once from reconciliation errors", () => {
+    expect(authContext).toContain("clearLegacyBrowserState();\n    const googleIdentity");
+    expect(authContext).toContain('message.includes("Authentication or database request failed")');
+    expect(authContext).toContain('sessionStorage.getItem("givethra_auth_recovery_reload")');
+    expect(authContext).toContain("window.location.reload()");
   });
 });

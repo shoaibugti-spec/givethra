@@ -181,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       safeLocalSet("auth_token", data.token);
       safeLocalSet("user_email", data.user.email);
+      try { sessionStorage.removeItem("givethra_auth_recovery_reload"); } catch { }
       const authenticatedUser: UserPublic = {
         id: data.user.user_id,
         email: data.user.email,
@@ -192,17 +193,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserId(authenticatedUser.id);
     } catch (error) {
       console.error("Google sign-in failed:", error);
-      setLoginError(error instanceof DOMException && error.name === "AbortError"
+      const message = error instanceof DOMException && error.name === "AbortError"
         ? "Google sign-in timed out. Please try again."
-        : error instanceof Error ? error.message : "Google sign-in failed. Please try again.");
+        : error instanceof Error ? error.message : "Google sign-in failed. Please try again.";
+      setLoginError(message);
       safeLocalRemove("auth_token");
       safeLocalRemove("user_email");
+      setUser(null);
+      setUserId(null);
+      if (message.includes("Authentication or database request failed")) {
+        let canRecover = false;
+        try {
+          canRecover = sessionStorage.getItem("givethra_auth_recovery_reload") !== "1";
+          if (canRecover) sessionStorage.setItem("givethra_auth_recovery_reload", "1");
+        } catch { }
+        if (canRecover) window.setTimeout(() => window.location.reload(), 50);
+      }
     } finally {
       setIsLoggingIn(false);
     }
   }, []);
 
   const loginWithGoogle = useCallback(() => {
+    clearLegacyBrowserState();
     const googleIdentity = (window as any).google;
     if (!GOOGLE_CLIENT_ID || !googleIdentity?.accounts?.id) {
       const message = "Google sign-in is not ready yet. Please wait a moment and try again.";

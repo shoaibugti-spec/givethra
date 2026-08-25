@@ -922,3 +922,11 @@
 - [x] Apply only the minimal document-extraction and rendering fix; preserve the three platform badges and all other features.
 - [x] Add regression coverage for the real payload shapes, then run tests, strict TypeScript, and production build.
 - [x] Push the focused fix; deployment remains user-controlled.
+
+## User-Reported Legacy Google Login Reconciliation
+- [x] Audit the current Worker Google token validation, D1 identity lookup, session issuance, and frontend login cleanup paths.
+- [x] Preserve an existing imported D1 user row and user_id when the verified Google email matches; existing login performs no user/profile INSERT, UPDATE, or UPSERT.
+- [x] Validate Google audience and verified-email claims while allowing legacy provider/sub mismatch to be reconciled by the verified email; Google token verification remains required.
+- [x] Clean only legacy Supabase/Givethra auth storage and cookies, preserving current auth session storage; cleanup also runs at Google-login click time.
+- [x] Add bounded timeout/error handling so failed login attempts cannot leave an infinite spinner or stale auth state; reconciliation failures receive a controlled one-time reload.
+- [x] Add regression tests and run the complete test suite, strict TypeScript check, and production build; deployment remains user-controlled.

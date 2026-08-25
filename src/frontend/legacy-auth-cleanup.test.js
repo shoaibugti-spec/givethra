@@ -30,8 +30,8 @@ describe("legacy authentication recovery", () => {
     expect(worker).toContain("verifySession(credential, env.JWT_SECRET)");
     expect(worker).toContain("!payload.sub || !payload.email || audience !== clientId");
     expect(worker).toContain("return null;");
-    expect(worker).toContain("const existingProfile = await env.DB.prepare");
-    expect(worker).toContain("const canonicalName = savedName && !savedName.includes(\"@\") ? savedName : identity.full_name;");
+    expect(worker).toContain("// Existing imported users are read-only during login.");
+    expect(worker).toContain("const selectExisting = () => env.DB.prepare");
     expect(worker).toContain("async function hydrateAuthenticatedUser(env, session)");
     expect(worker).toContain("p.full_name AS profile_full_name");
     expect(auth).toContain('fullName: data.user.full_name || "User"');
