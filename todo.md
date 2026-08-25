@@ -891,3 +891,9 @@
 - [x] Remove the duplicate Identity Verification, KYC Approved, and Givethra Verified labels from the public case header while preserving the separate case-document summary.
 - [x] Add regression coverage proving the public summary renders case-specific document approvals separately from identity-level badges.
 - [x] Re-run tests, strict TypeScript, and production build; keep deployment as a separate user-controlled step.
+
+## User Correction: Restore Platform Verification Badges
+- [x] Restore Identity Verified, KYC Approved, and Givethra Verified as the three platform-level badges on public case details.
+- [x] Keep the separate Case Verification Documents section below them for approved case-specific files.
+- [x] Add/update regression coverage so both platform badges and case documents are present together.
+- [x] Re-run tests, strict TypeScript, and production build; keep deployment user-controlled.
