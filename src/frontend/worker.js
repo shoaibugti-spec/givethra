@@ -1486,7 +1486,7 @@ async function handleRequest(request, env, ctx) {
       if (request.method === "GET") {
         const caseId = url.searchParams.get("case_id");
         const heroId = url.searchParams.get("hero_id");
-        const sql = "SELECT * FROM case_resolutions WHERE case_id = ?" + (heroId ? " AND hero_id = ?" : "");
+        const sql = "SELECT r.*, COALESCE(p.full_name, u.full_name) AS hero_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.hero_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS hero_cnic_number FROM case_resolutions r LEFT JOIN profiles p ON p.user_id = r.hero_id LEFT JOIN users u ON u.user_id = r.hero_id WHERE r.case_id = ?" + (heroId ? " AND r.hero_id = ?" : "");
         const bind = heroId ? [caseId, heroId] : [caseId];
         const rows = await env.DB.prepare(sql).bind(...bind).all();
         return json(rows.results || [], 200, origin);

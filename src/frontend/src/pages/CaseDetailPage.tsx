@@ -49,10 +49,8 @@ const GIVETHRA_USDT_TRC20 = "TNjaCQjQ5Yzm5tiVF8s121rUv5BH7y6hAC";
 function maskCnic(cnic?: string): string {
   if (!cnic) return "—";
   const digits = cnic.replace(/\D/g, "");
-  if (digits.length < 6) return cnic;
-  const shown = digits.slice(0, 6);
-  const masked = "*".repeat(Math.max(digits.length - 6, 4));
-  return `${shown.slice(0, 5)}-${shown.slice(5)}${masked}`;
+  if (digits.length <= 4) return digits || "—";
+  return `${digits.slice(0, 4)}${"*".repeat(Math.max(digits.length - 4, 4))}`;
 }
 
 function maskAccount(acc?: string): string {
@@ -76,6 +74,9 @@ function generateAffidavit(caseData: any, resolution: any, seekerKyc: any, heroN
   const today = new Date().toLocaleDateString();
   const seekerName = seekerKyc?.full_name || caseData.full_name || "Verified Help Seeker";
   const seekerCnic = maskCnic(seekerKyc?.cnic_number);
+  const heroCnic = maskCnic(resolution?.hero_cnic_number);
+  const location = [caseData.city, caseData.country].filter(Boolean).join(", ") || "—";
+  const accountReference = caseData.account_number || caseData.account_iban || caseData.reference_number;
   const completedDate = resolution?.completed_at ? new Date(resolution.completed_at).toLocaleDateString() : today;
   const verifyCode = `GVT-${caseId}-${Date.now().toString(36).toUpperCase()}`;
   const cur = caseData.currency || "USD";
@@ -120,7 +121,7 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
   <div class="row"><span class="label">Case ID</span><span class="value">GVT-${caseId}</span></div>
   <div class="row"><span class="label">Category</span><span class="value">${caseData.category || "—"}</span></div>
   <div class="row"><span class="label">Title</span><span class="value">${caseData.title || "—"}</span></div>
-  <div class="row"><span class="label">Location</span><span class="value">${caseData.city || ""}, ${caseData.country || ""}</span></div>
+  <div class="row"><span class="label">Location</span><span class="value">${location}</span></div>
   <div class="row"><span class="label">Date Issued</span><span class="value">${today}</span></div>
 </div>
 
@@ -129,36 +130,34 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
   <div class="row"><span class="label">Full Name</span><span class="value">${seekerName}</span></div>
   <div class="row"><span class="label">CNIC (partially masked)</span><span class="value">${seekerCnic}</span></div>
   <div class="row"><span class="label">Country</span><span class="value">${caseData.country || "—"}</span></div>
-  <div class="note">Note: Only the first 6 digits of the CNIC are shown. Remaining digits and contact details are kept private.</div>
+  <div class="note">Note: Only the first 4 CNIC digits are shown. Remaining digits and contact details are kept private.</div>
 </div>
 
 <div class="section">
   <h2>${isFundraising ? "Contribution Details" : "Institute / Provider Paid"}</h2>
-  ${isFundraising
-    ? `<div class="row"><span class="label">Contributed Via</span><span class="value">Givethra Fundraising</span></div>
-       <div class="row"><span class="label">For Institute</span><span class="value">${caseData.institute_name || "—"}</span></div>`
-    : `<div class="row"><span class="label">Institute / Provider</span><span class="value">${caseData.institute_name || "—"}</span></div>
-       <div class="row"><span class="label">Payment Method</span><span class="value">${caseData.payment_method || "—"}</span></div>
-       <div class="row"><span class="label">Account / Reference (masked)</span><span class="value">${maskAccount(caseData.account_number)}</span></div>`}
+  <div class="row"><span class="label">Institute / Provider</span><span class="value">${caseData.institute_name || "—"}</span></div>
+  <div class="row"><span class="label">Payment Method</span><span class="value">${caseData.payment_method || (isFundraising ? "Givethra Fundraising" : "—")}</span></div>
+  <div class="row"><span class="label">Account / Reference (masked)</span><span class="value">${maskAccount(accountReference)}</span></div>
 </div>
 
 <div class="section">
   <h2>Resolution Details</h2>
-  <div class="row"><span class="label">Helped By (Hero)</span><span class="value">${heroName || "Verified Hero"}</span></div>
-  <div class="row"><span class="label">Type</span><span class="value">${resolution?.resolution_type || "—"}</span></div>
+  <div class="row"><span class="label">Helped By (Hero)</span><span class="value">${heroName || resolution?.hero_name || "Verified Hero"}</span></div>
+  <div class="row"><span class="label">Hero CNIC (partially masked)</span><span class="value">${heroCnic}</span></div>
+  <div class="row"><span class="label">Type / Category</span><span class="value">${resolution?.resolution_type || caseData.category || "—"}</span></div>
   <div class="row"><span class="label">Amount Provided</span><span class="value">${paidAmount ? sym + " " + paidAmount + " " + cur : "—"}</span></div>
   <div class="row"><span class="label">Completion Date</span><span class="value">${completedDate}</span></div>
 </div>
 
 <div class="section">
   <h2>Declarations</h2>
-  <div class="declaration"><strong>Help Seeker:</strong> "I confirm that I have received the assistance described above through the Givethra platform, and that all information I provided was true and accurate."</div>
+  <div class="declaration"><strong>Help Seeker — ${seekerName}:</strong> "I confirm that I have received the assistance described above through the Givethra platform, and that all information I provided was true and accurate."</div>
   <div class="declaration"><strong>Hero (Helper):</strong> "I, ${heroName || "the helper"}, confirm that I provided the assistance described above ${isFundraising ? "through Givethra's fundraising for this case" : "directly to the institute"}, willingly and in good faith."</div>
   <div class="note">By accepting this resolution, both parties agree this matter is fully and finally settled. Neither party shall contact or solicit the other outside Givethra. Disputes must be raised through Givethra's official audit process.</div>
 </div>
 
 <div class="signatures">
-  <div class="sig-box"><div class="sig-line">Help Seeker</div><div style="font-size:11px;color:#666;">Digitally Confirmed</div></div>
+  <div class="sig-box"><div class="sig-line">${seekerName}</div><div style="font-size:11px;color:#666;">Help Seeker · Digitally Confirmed</div></div>
   <div class="sig-box"><div class="sig-line">${heroName || "Hero (Helper)"}</div><div style="font-size:11px;color:#666;">Digitally Confirmed</div></div>
 </div>
 

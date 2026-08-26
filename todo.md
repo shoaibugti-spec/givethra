@@ -1188,3 +1188,23 @@
 - [x] Ensure Pay & Close and Deposits expose the appropriate approval/rejection actions without changing existing records.
 - [x] Trace and repair why Heroes Wall is not visible on the homepage after a completed case.
 - [x] Add regression coverage, run tests/build, and synchronize the verified update.
+
+## Manual Cloudflare Deployment Regression
+- [x] Compare live asset bundle and Worker behavior with canonical GitHub commit a090b7f.
+- [x] Verify Admin Contributions and Direct Payments routes, response shape, filters, and new controls in the live deployment.
+- [x] Verify Heroes Wall route and homepage asset/rendering alignment.
+- [x] Apply only the minimum deployment-alignment repair and preserve all D1/R2 data.
+- [ ] Validate live behavior and document the correct manual deployment source/settings.
+
+## Reported Live Regression After Manual Deploy
+- [x] Compare the screenshot-reported Admin tab set and zero counts with the current live bundle and Worker API.
+- [x] Verify that the live deployment includes Contributions, Direct Payments, Pay & Close controls, Heroes Wall, completed cases, feedback, and affidavit paths.
+- [x] Reconcile any live/canonical mismatch without modifying D1/R2 data.
+- [x] Document the exact safe deployment source and required cache refresh.
+
+## Mobile Consistency and Affidavit Detail Correction
+- [x] Audit the case-detail responsive layout and identify missing/blank field mappings visible on smaller devices.
+- [x] Include seeker and helper names, case ID, category, title, location, country, amount, and completion date in both affidavit paths.
+- [x] Mask CNIC to first 4 digits and bank/account identifiers to last 3–4 digits while preserving required payment context.
+- [x] Add regression tests for affidavit content/privacy and mobile-safe layout classes.
+- [x] Run tests/build, synchronize the repair, and document the safe deployment refresh.

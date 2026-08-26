@@ -141,6 +141,20 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("setWalletBalance(prev => Math.max(prev - 1, 0))");
   });
 
+  it("includes complete participant details while masking private identifiers", () => {
+    expect(caseDetailSource).toContain('return `${digits.slice(0, 4)}${"*".repeat');
+    expect(caseDetailSource).toContain("Only the first 4 CNIC digits are shown");
+    expect(caseDetailSource).toContain("const heroCnic = maskCnic(resolution?.hero_cnic_number);");
+    expect(caseDetailSource).toContain("Help Seeker — ${seekerName}");
+    expect(caseDetailSource).toContain("${seekerName}</div>");
+    expect(caseDetailSource).toContain("const location = [caseData.city, caseData.country].filter(Boolean).join");
+    expect(caseDetailSource).toContain("const accountReference = caseData.account_number || caseData.account_iban || caseData.reference_number;");
+    expect(caseDetailSource).toContain("Type / Category");
+    const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
+    expect(workerSource).toContain("COALESCE(p.full_name, u.full_name) AS hero_name");
+    expect(workerSource).toContain("hero_cnic_number");
+  });
+
   it("keeps the Direct Payment lookup isolated from Contribution unlocks", () => {
     const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
     const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
