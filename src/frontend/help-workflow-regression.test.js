@@ -28,13 +28,13 @@ describe("help workflow persistence and credit rules", () => {
     expect(workerSource).toContain("seeker_confirmed_amount");
     expect(workerSource).toContain("completed_at");
     expect(caseDetailSource).toContain("After sending, submit your receipt below");
-    expect(caseDetailSource).toContain("Upload Receipt");
+    expect(caseDetailSource).toContain("Attach Payment Receipt *");
   });
 
   it("keeps fundraising proof classified for Givethra and direct proof for the institute", () => {
     expect(caseDetailSource).toContain("const paidTo = contributionOpen || myUnlock?.payment_type === \"partial\" ? \"givethra\" : \"institute\";");
     expect(caseDetailSource).toContain("Contribute to Givethra Fundraising");
-    expect(caseDetailSource).toContain("Institute Payment Details");
+    expect(caseDetailSource).toContain("Direct Payment Receiver Details");
   });
 });
 

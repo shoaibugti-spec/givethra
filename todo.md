@@ -1020,3 +1020,9 @@
 - [x] Enforce Contribution amount minimum of 100 and maximum of the current case remaining amount, including dynamic collected-progress limits.
 - [x] Keep Verification Appeal Video view-only after the applicable unlock, without exposing a download control.
 - [x] Add regression tests and verify the full frontend build before synchronization.
+
+## User-Reported Direct Payment Unlock Proof Regression
+- [x] Restore receiver payment details and case-specific reference fields for unlocked Direct/Full Payment.
+- [x] Ensure Direct Payment proof captures total amount paid, transaction ID, receipt attachment, and confirmation submission.
+- [x] Verify the submitted record reaches Admin with the correct institute destination and reviewable status.
+- [x] Add regression coverage and validate tests, typecheck, and production build before synchronization.

@@ -417,7 +417,23 @@ export default function CaseDetailPage() {
   const isExpired = caseData?.status === "expired";
   const isOwner = user?.id === caseData?.user_id;
   const isCompleted = caseData?.status === "completed";
-  const hasPaymentDetails = caseData?.institute_name || caseData?.account_number || caseData?.account_title || caseData?.account_iban;
+  const categoryDetails = caseData?.category_details && typeof caseData.category_details === "object" ? caseData.category_details : {};
+  const directPaymentRows = [
+    { label: "Receiver Name", value: caseData?.receiver_name || categoryDetails.receiver_name },
+    { label: "Receiver Contact", value: caseData?.receiver_contact || categoryDetails.receiver_contact, mono: true },
+    { label: "Receiver Bank", value: caseData?.receiver_bank || categoryDetails.receiver_bank },
+    { label: "Receiver Account Number", value: caseData?.receiver_account || categoryDetails.receiver_account, mono: true },
+    { label: "Receiver Address", value: caseData?.receiver_address || categoryDetails.receiver_address },
+    { label: "Receiver Shop / Business", value: caseData?.receiver_shop_name || categoryDetails.receiver_shop_name },
+    { label: "Provider / Institute", value: caseData?.institute_name || categoryDetails.provider },
+    { label: "Consumer / Reference Number", value: caseData?.consumer_no || categoryDetails.consumer_no || categoryDetails.consumer_number || categoryDetails.reference_no, mono: true },
+    { label: "Payment Method", value: caseData?.payment_method || categoryDetails.payment_method },
+    { label: "Account Title / Reference", value: caseData?.account_title || categoryDetails.account_title },
+    { label: "Account / Bill Number", value: caseData?.account_number || categoryDetails.account_number, mono: true },
+    { label: "IBAN", value: caseData?.account_iban || categoryDetails.account_iban, mono: true },
+    { label: "Institute Contact", value: caseData?.institute_contact || categoryDetails.institute_contact, mono: true },
+    { label: "Institute Address", value: caseData?.institute_address || categoryDetails.institute_address },
+  ].filter((row) => Boolean(row.value));
   const unlockMode = myUnlock?.payment_type || payMode;
   const canHelpAgain = (unlocked || contributionOpen) && !isOwner && !isCompleted && !isRejected && !isExpired;
 
@@ -468,13 +484,14 @@ export default function CaseDetailPage() {
 
   async function handleSubmitResolution() {
     if (!resType) { toast.error("Please select what you did"); return; }
-    if (!txId) { toast.error("Please enter transaction ID"); return; }
+    if (!txId.trim()) { toast.error("Please enter transaction ID / payment reference"); return; }
+    const paidNum = amountPaid ? parseFloat(amountPaid) : (contributionOpen ? pledgeNum : (myUnlock?.pledged_amount ?? null));
+    if (!paidNum || paidNum <= 0) { toast.error("Please enter the total amount you paid."); return; }
+    if (unlockMode === "full" && amountNeeded > 0 && paidNum < amountNeeded) { toast.error(`Direct Help requires the full amount: ${sym} ${amountNeeded} ${cur}.`); return; }
+    if (!receiptFile) { toast.error("Please attach your payment receipt before submitting proof."); return; }
     setSubmitting(true);
     try {
-      let receiptUrl = "";
-      if (receiptFile) receiptUrl = await uploadFile(receiptFile, `resolutions/${id}/${Date.now()}_receipt`);
-
-      const paidNum = amountPaid ? parseFloat(amountPaid) : (contributionOpen ? pledgeNum : (myUnlock?.pledged_amount ?? null));
+      const receiptUrl = await uploadFile(receiptFile, `resolutions/${id}/${Date.now()}_receipt`);
       const paidTo = contributionOpen || myUnlock?.payment_type === "partial" ? "givethra" : "institute";
 
       await insertCaseResolution({
@@ -976,18 +993,12 @@ export default function CaseDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {!isOwner && unlockMode === "full" && hasPaymentDetails && (
+                {!isOwner && unlockMode === "full" && (
                   <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
-                    <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h2 className="font-semibold">Institute Payment Details</h2></div>
-                    <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Pay the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} directly to the institute below.</div>
-                    <CopyRow label="Institute / Provider" value={caseData.institute_name} />
-                    <CopyRow label="Payment Method" value={caseData.payment_method} />
-                    <CopyRow label="Account Title / Reference" value={caseData.account_title} />
-                    <CopyRow label="Account / Bill Number" value={caseData.account_number} mono />
-                    <CopyRow label="IBAN" value={caseData.account_iban} mono />
-                    <CopyRow label="Institute Contact" value={caseData.institute_contact} mono />
-                    <CopyRow label="Institute Address" value={caseData.institute_address} />
-                    <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-700 dark:text-amber-400 mt-2">⚠️ Pay the institute directly. Keep your receipt — submit it below.</div>
+                    <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h2 className="font-semibold">Direct Payment Receiver Details</h2></div>
+                    <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} to the verified receiver below. For bills, use the listed provider and consumer/reference number.</div>
+                    {directPaymentRows.length > 0 ? directPaymentRows.map((row) => <CopyRow key={row.label} label={row.label} value={String(row.value)} mono={row.mono} />) : <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-700">Receiver payment details are not available yet. Please contact Givethra before sending money.</p>}
+                    <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-700 dark:text-amber-400 mt-2">Pay only to the receiver details shown above. Keep the payment receipt and transaction/reference number, then submit both below for Givethra review.</div>
                   </div>
                 )}
 
@@ -1051,16 +1062,17 @@ export default function CaseDetailPage() {
                             ))}
                           </div>
                         </div>
-                        <div className="space-y-2"><Label>Amount ({cur})</Label><Input type="number" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} placeholder={`e.g. ${remaining || 500}`} /></div>
-                        <div className="space-y-2"><Label>Transaction ID *</Label><Input value={txId} onChange={e => setTxId(e.target.value)} placeholder="TXN123456789" /></div>
+                        <div className="space-y-2"><Label>Amount Paid ({cur}) *</Label><Input type="number" min="1" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} placeholder={`e.g. ${remaining || amountNeeded || 500}`} /></div>
+                        <div className="space-y-2"><Label>Transaction ID / Payment Reference *</Label><Input value={txId} onChange={e => setTxId(e.target.value)} placeholder="TXN123456789" /></div>
                         <div className="space-y-2">
-                          <Label>Upload Receipt</Label>
-                          <input type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0] ?? null; setReceiptFile(f); setReceiptName(f?.name ?? ""); }} className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white file:text-sm" />
+                          <Label>Attach Payment Receipt *</Label>
+                          <p className="text-xs text-muted-foreground">Upload the receipt or payment slip so Givethra can verify the amount and reference with the receiver.</p>
+                          <input type="file" accept="image/*,.pdf" onChange={e => { const f = e.target.files?.[0] ?? null; setReceiptFile(f); setReceiptName(f?.name ?? ""); }} className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white file:text-sm" />
                           {receiptName && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {receiptName} (will upload when you submit)</p>}
                         </div>
                         <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Any details..." /></div>
                         <div className="flex gap-2">
-                          <Button className="flex-1" onClick={handleSubmitResolution} disabled={submitting}>{submitting ? "Submitting..." : "Submit"}</Button>
+                          <Button className="flex-1" onClick={handleSubmitResolution} disabled={submitting}>{submitting ? "Submitting..." : unlockMode === "full" ? "Submit Direct Payment Proof" : "Submit Contribution Proof"}</Button>
                           <Button variant="outline" onClick={() => setShowResolution(false)}>Cancel</Button>
                         </div>
                       </div>

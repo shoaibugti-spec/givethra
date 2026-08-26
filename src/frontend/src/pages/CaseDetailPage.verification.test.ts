@@ -62,6 +62,21 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("max={remaining}");
   });
 
+  it("restores Direct Payment receiver details and mandatory proof submission", () => {
+    expect(caseDetailSource).toContain("Direct Payment Receiver Details");
+    expect(caseDetailSource).toContain("receiver_name");
+    expect(caseDetailSource).toContain("receiver_bank");
+    expect(caseDetailSource).toContain("receiver_account");
+    expect(caseDetailSource).toContain("Consumer / Reference Number");
+    expect(caseDetailSource).toContain("Amount Paid ({cur}) *");
+    expect(caseDetailSource).toContain("Transaction ID / Payment Reference *");
+    expect(caseDetailSource).toContain("Attach Payment Receipt *");
+    expect(caseDetailSource).toContain('accept="image/*,.pdf"');
+    expect(caseDetailSource).toContain("Submit Direct Payment Proof");
+    expect(caseDetailSource).toContain("Please attach your payment receipt before submitting proof.");
+    expect(caseDetailSource).toContain('paid_to: paidTo');
+  });
+
   it("keeps verification appeal video view-only after unlock", () => {
     expect(caseDetailSource).toContain("Verification Appeal Video (View Only)");
     expect(caseDetailSource).toContain('controlsList="nodownload noplaybackrate"');
