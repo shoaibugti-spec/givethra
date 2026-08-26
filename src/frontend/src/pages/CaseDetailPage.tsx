@@ -304,7 +304,9 @@ export default function CaseDetailPage() {
         setPayMode(contributionUnlock ? "partial" : fullUnlock ? "full" : "choose");
         setMediaUnlocked(!!mediaUnlock || owner);
         setUserUnlockCount(count ?? 0);
-        setMyResolutions((res ?? []).slice().reverse());
+        const loadedResolutions = (res ?? []).slice().reverse();
+        setMyResolutions(loadedResolutions);
+        setShowResolution(Boolean(activeUnlock && loadedResolutions.length === 0));
         setSeekerKyc(kyc);
         const nm = (prof?.full_name || "").split(" ")[0];
         if (nm) setHeroName(nm);
@@ -478,6 +480,7 @@ export default function CaseDetailPage() {
         if (pledgeNum > 0) setAmountPaid(String(pledgeNum));
       } else if (amountNeeded > 0) setAmountPaid(String(remaining));
       setUnlocked(true);
+      setShowResolution(true);
       setWalletBalance(prev => Math.max(prev - charge, 0));
       setPayMode(mode);
       toast.success(isFreeContribution ? "🎉 Contribution unlocked FREE! This is your #" + (userUnlockCount + 1) + " free contribution help." : mode === "full" ? "Direct Help unlocked! 1 credit deducted." : "Contribution unlocked! 1 credit deducted.");

@@ -82,6 +82,14 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain('paid_to: paidTo');
   });
 
+  it("auto-opens the first-help proof form after unlock", () => {
+    expect(caseDetailSource).toContain("setShowResolution(Boolean(activeUnlock && loadedResolutions.length === 0));");
+    expect(caseDetailSource).toContain("setShowResolution(true);");
+    expect(caseDetailSource).toContain("Submit Direct Payment Proof");
+    expect(caseDetailSource).toContain("Submit Contribution Proof");
+    expect(caseDetailSource).toContain("Attach Payment Receipt *");
+  });
+
   it("keeps unlocked help content in the requested mobile-safe order", () => {
     const mediaPosition = caseDetailSource.indexOf("order-1 min-w-0 overflow-hidden rounded-2xl bg-card border border-border");
     const receiverPosition = caseDetailSource.indexOf("order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20");

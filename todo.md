@@ -1039,3 +1039,26 @@
 - [x] Apply the same complete proof structure to Direct and Contribution help flows without horizontal overflow or clipped controls.
 - [x] Ensure amount, transaction ID, and file attachment controls are visibly present and usable on narrow screens.
 - [x] Add DOM-order/responsive regression coverage and validate tests, typecheck, and production build.
+
+## User-Reported Traffic and Legacy Login Audit
+- [x] Inspect deployed site/API status and distinguish low traffic from authentication or backend failure without modifying data.
+- [x] Compare deployed asset/cache markers and login configuration signals with the canonical GitHub source.
+- [x] Check whether mobile clients can receive the latest responsive/proof bundle and identify any concrete stale-cache or deployment mismatch.
+- [x] Preserve a controlled real-user Contribution canary checklist covering receipt, transaction ID, Admin review, approval/rejection, and affidavit completion.
+
+## User-Reported Payment Proof Form Verification
+- [ ] Verify both Direct and Contribution unlocked forms visibly include amount, transaction/reference number, receipt file attachment, and submit action.
+- [ ] Verify the amount shown to the user matches the intended Direct total or Contribution amount and cannot be below/above the allowed case boundary.
+- [ ] Verify receipt URL, transaction ID, amount, payment destination, case ID, and helper ID reach Admin review with a pending status.
+- [ ] Validate the form on narrow mobile widths and add or update regression coverage before synchronization.
+
+## Urgent Contribution Proof Controls Regression
+- [x] Confirm unlocked Contribution visibly shows amount, transaction/reference ID, receipt/bank-slip attachment, and Submit Contribution Proof.
+- [x] Confirm the controls are not hidden by mobile layout or stale live bundle and remain tied to the existing Admin pending-review payload.
+- [x] Validate the contribution proof path and regression tests before synchronization; do not perform Admin approval/rejection without the user's real submitted test record.
+
+## User-Confirmed Collapsed Proof Form Regression
+- [x] Automatically open the first-help Direct proof form after Full Payment unlock.
+- [x] Automatically open the first-help Contribution proof form after Contribution unlock.
+- [x] Keep Amount, Transaction ID, receipt attachment, and submit controls visible immediately after receiver details on both mobile and desktop.
+- [x] Add regression coverage and validate the auto-open behavior before synchronization.
