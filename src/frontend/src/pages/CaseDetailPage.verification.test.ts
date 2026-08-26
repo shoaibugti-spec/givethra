@@ -40,5 +40,7 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("onClick={() => handleUnlock(\"full\")}");
     expect(caseDetailSource).toContain("Contribute to Givethra Fundraising");
     expect(caseDetailSource).toContain("GIVETHRA_NAYAPAY_IBAN");
+    expect(caseDetailSource).toContain("const paidTo = contributionOpen || myUnlock?.payment_type === \"partial\" ? \"givethra\" : \"institute\";");
+    expect(caseDetailSource).toContain("contributionOpen ? pledgeNum");
   });
 });

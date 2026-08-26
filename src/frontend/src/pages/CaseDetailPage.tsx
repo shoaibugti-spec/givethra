@@ -406,7 +406,7 @@ export default function CaseDetailPage() {
   const isCompleted = caseData?.status === "completed";
   const hasPaymentDetails = caseData?.institute_name || caseData?.account_number || caseData?.account_title || caseData?.account_iban;
   const unlockMode = myUnlock?.payment_type || payMode;
-  const canHelpAgain = unlocked && !isOwner && !isCompleted && !isRejected && !isExpired;
+  const canHelpAgain = (unlocked || contributionOpen) && !isOwner && !isCompleted && !isRejected && !isExpired;
 
   async function handleUnlock(mode: "full" | "partial") {
     if (!user) { navigate({ to: "/sign-in" }); return; }
@@ -449,8 +449,8 @@ export default function CaseDetailPage() {
       let receiptUrl = "";
       if (receiptFile) receiptUrl = await uploadFile(receiptFile, `resolutions/${id}/${Date.now()}_receipt`);
 
-      const paidNum = amountPaid ? parseFloat(amountPaid) : (myUnlock?.pledged_amount ?? null);
-      const paidTo = myUnlock?.payment_type === "partial" ? "givethra" : "institute";
+      const paidNum = amountPaid ? parseFloat(amountPaid) : (contributionOpen ? pledgeNum : (myUnlock?.pledged_amount ?? null));
+      const paidTo = contributionOpen || myUnlock?.payment_type === "partial" ? "givethra" : "institute";
 
       await insertCaseResolution({
         case_id: id,
@@ -921,7 +921,7 @@ export default function CaseDetailPage() {
                           </div>
                         </div>
                       )}
-                      <Button onClick={() => { setContributionOpen(true); setPayMode("partial"); }} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
+                      <Button onClick={() => { setContributionOpen(true); setPayMode("partial"); setAmountPaid(pledgeNum > 0 ? String(pledgeNum) : ""); }} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
                         <HandCoins className="h-4 w-4" />
                         Help Now — Contribute
                       </Button>

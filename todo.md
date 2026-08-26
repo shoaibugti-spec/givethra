@@ -959,3 +959,7 @@
 - [x] Keep Full Payment separately credit-gated and unlock it only after the required credit is consumed.
 - [x] Preserve existing help limits, payment safety, case data, and all unrelated flows.
 - [x] Add regression coverage and run contribution/payment tests, strict TypeScript, and production build; deployment remains user-controlled.
+
+## Contribution Flow Completion
+- [x] Allow the immediately opened contribution path to submit contribution proof as fundraising without requiring the full-payment unlock or misclassifying it as institute payment.
+- [x] Preserve full-payment credit gating and add regression coverage for contribution-mode proof submission.
