@@ -429,9 +429,10 @@ export default function CaseDetailPage() {
         payment_type: mode,
       });
 
-      if (mode === "partial") setAmountPaid(String(pledgeNum));
-      else if (amountNeeded > 0) setAmountPaid(String(remaining));
-
+            if (mode === "partial") {
+        setAmountPaid(String(pledgeNum));
+        setContributionOpen(true);
+      } else if (amountNeeded > 0) setAmountPaid(String(remaining));
       setUnlocked(true);
       setPayMode(mode);
       toast.success(isFreeContribution ? "🎉 Contribution unlocked FREE! This is your #" + (userUnlockCount + 1) + " free contribution help." : mode === "full" ? "Direct Help unlocked! 1 credit deducted." : "Contribution unlocked! 1 credit deducted.");
@@ -722,7 +723,7 @@ export default function CaseDetailPage() {
   // ============================================================
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 py-6 pb-24 md:pb-6 space-y-6">
         <button type="button" onClick={() => navigate({ to: "/cases" })} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" /> Back to cases
         </button>
@@ -922,7 +923,7 @@ export default function CaseDetailPage() {
                           </div>
                         </div>
                       )}
-                      <Button onClick={() => { setContributionOpen(true); setPayMode("partial"); setAmountPaid(pledgeNum > 0 ? String(pledgeNum) : ""); }} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
+                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
                         <HandCoins className="h-4 w-4" />
                         Help Now — Contribute
                       </Button>
@@ -962,7 +963,7 @@ export default function CaseDetailPage() {
 
                 <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
                   <h2 className="font-semibold">🎥 Verification Media</h2>
-                  {myUnlock && (
+                  {(myUnlock || unlockMode !== "choose") && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {caseData.selfie_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Live Selfie</p><img src={caseData.selfie_url} alt="Selfie" className="w-full rounded-lg border max-h-40 object-cover" /></div>}
                       {caseData.video_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Video Appeal</p><video src={caseData.video_url} controls className="w-full rounded-lg border max-h-40" /></div>}

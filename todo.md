@@ -993,3 +993,23 @@
 - [x] Keep existing Contribution unlocks visible in My Cases → Helping with contribution history and current status.
 - [x] Verify the existing affidavit PDF downloads for completed help records for both helper and seeker using non-sensitive case/payment context.
 - [x] Add regression coverage and run full tests, strict TypeScript, production build, and responsive checks; deployment remains user-controlled.
+
+## User-Reported Full Help-Flow Health Audit
+- [x] Verify both help modes are locked by default and only Contribution receives the first three free unlocks.
+- [x] Verify one Contribution unlock shows the remaining free count and opens the correct approved verification video and payment form.
+- [x] Verify Direct Help requires one credit and opens the correct case approval video and receiver-payment form only after unlock.
+- [x] Verify receipt, amount, Txn ID, pending, Admin approve/reject reason, My Cases status, totals, notifications, and affidavit downloads end to end.
+- [x] Verify feedback video and caption publish correctly to the social wall.
+- [x] Add/update regression coverage and run full tests, strict TypeScript, production build, and responsive checks; deployment remains user-controlled.
+
+## User-Reported Home Help Now Layout Regression
+- [ ] Restore the previous complete Case Detail presentation opened from Home Help Now.
+- [ ] Keep all verification badges, case story, progress/deadline, and responsive card structure visible and orderly.
+- [ ] Keep exactly two intended help controls: Direct Help locked behind 1 credit and Contribution with the three-free-help count plus amount input.
+- [ ] Do not alter payment APIs, Admin, My Cases, authentication, or unrelated pages; verify with mobile screenshot and regression tests.
+
+## User-Reported Device-Specific Contribution Layout Regression
+- [x] Compare the broken and working mobile widths for the public Case Detail Contribution panel.
+- [x] Prevent mobile overflow, clipped content, and fixed-navigation overlap while preserving the current payment form and actions.
+- [x] Add responsive regression coverage and verify representative mobile widths plus desktop build behavior.
+- [x] Keep cache refresh/deployment as a separate user-controlled step.

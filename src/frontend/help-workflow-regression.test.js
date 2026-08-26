@@ -18,7 +18,8 @@ describe("help workflow persistence and credit rules", () => {
   it("persists unlock metadata and prevents duplicate unlocks for the same mode", () => {
     expect(workerSource).toContain("case_id = ? AND hero_id = ? AND payment_type = ?");
     expect(workerSource).toContain("pledged_amount, credits_charged, payment_type, unlocked_at");
-    expect(caseDetailSource).toContain("setContributionOpen(true); setPayMode(\"partial\")");
+    expect(caseDetailSource).toContain("setContributionOpen(true);");
+    expect(caseDetailSource).toContain("onClick={() => handleUnlock(\"partial\")}");
     expect(caseDetailSource).toContain("const canHelpAgain = (unlocked || contributionOpen)");
   });
 

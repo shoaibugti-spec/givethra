@@ -16,6 +16,7 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("No additional case-specific documents are recorded in this case.");
     expect(caseDetailSource).toContain("documentItems");
     expect(caseDetailSource).toContain("item.source === \"document\"");
+    expect(caseDetailSource).toContain("max-w-4xl mx-auto px-4 py-6 pb-24 md:pb-6 space-y-6");
   });
 
   it("uses one combined case-story heading and deduplicates repeated story text", () => {
@@ -36,7 +37,8 @@ describe("public case verification presentation", () => {
   it("opens contribution instructions without consuming an unlock while full payment stays credit-gated", () => {
     expect(caseDetailSource).toContain("const [contributionOpen, setContributionOpen] = useState(false);");
     expect(caseDetailSource).toContain("!unlocked && !isOwner && !contributionOpen");
-    expect(caseDetailSource).toContain("setContributionOpen(true); setPayMode(\"partial\")");
+    expect(caseDetailSource).toContain("setContributionOpen(true);");
+    expect(caseDetailSource).toContain("onClick={() => handleUnlock(\"partial\")}");
     expect(caseDetailSource).toContain("onClick={() => handleUnlock(\"full\")}");
     expect(caseDetailSource).toContain("Contribute to Givethra Fundraising");
     expect(caseDetailSource).toContain("GIVETHRA_NAYAPAY_IBAN");
@@ -46,7 +48,7 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("Help Now — Direct Payment (1 credit)");
     expect(caseDetailSource).toContain("3 contribution helps are FREE");
     expect(caseDetailSource).toContain("Contribution helps after the first 3 require 1 credit.");
-    expect(caseDetailSource).toContain("{myUnlock && (");
+    expect(caseDetailSource).toContain("(myUnlock || unlockMode !== \"choose\") && (");
   });
 
   it("keeps the Direct Payment lookup isolated from Contribution unlocks", () => {
