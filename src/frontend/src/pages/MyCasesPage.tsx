@@ -12,6 +12,7 @@ import {
   getCasesByUser,
   getCaseUnlocksByHero,
   getCasesByIds,
+  getCaseResolutions,
 } from "@/lib/api";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -31,6 +32,7 @@ export default function MyCasesPage() {
   const navigate = useNavigate();
   const [myCases, setMyCases] = useState<any[]>([]);
   const [unlockedCases, setUnlockedCases] = useState<any[]>([]);
+  const [helpByCase, setHelpByCase] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
   const [caseFilter, setCaseFilter] = useState<"all" | "pending" | "rejected" | "completed">("all");
   const [helpFilter, setHelpFilter] = useState<"all" | "active" | "completed">("all");
@@ -59,11 +61,16 @@ export default function MyCasesPage() {
       // 2. Load cases that the user has unlocked (as a Hero)
       const unlocks = await getCaseUnlocksByHero(user.id);
       if (unlocks && unlocks.length > 0) {
-        const ids = unlocks.map((u: any) => u.case_id);
-        const unlockedData = await getCasesByIds(ids);
+        const ids: string[] = Array.from(new Set(unlocks.map((u: any) => String(u.case_id || "")).filter(Boolean)));
+        const [unlockedData, resolutionEntries] = await Promise.all([
+          getCasesByIds(ids),
+          Promise.all(ids.map(async (caseId) => [caseId, await getCaseResolutions(caseId, user.id)] as const)),
+        ]);
         setUnlockedCases(unlockedData ?? []);
+        setHelpByCase(Object.fromEntries(resolutionEntries.map(([caseId, rows]) => [caseId, Array.isArray(rows) ? rows : []])));
       } else {
         setUnlockedCases([]);
+        setHelpByCase({});
       }
     } catch (err) {
       console.error("Failed to load cases:", err);
@@ -91,6 +98,8 @@ export default function MyCasesPage() {
     const isRejected = c.status === "rejected";
     const isExpired = c.status === "expired";
     const isFree = c.was_free === true || c.submission_type === "free";
+    const helpRecords = isHelping ? (helpByCase[c.id] ?? []) : [];
+    const helpStatus = (status: string) => status === "completed" ? { label: "Completed", color: "text-teal-700 bg-teal-50 border-teal-200" } : status === "seeker_confirmed" ? { label: "Confirmed — Under Verification", color: "text-amber-700 bg-amber-50 border-amber-200" } : status === "disputed" ? { label: "Disputed", color: "text-red-700 bg-red-50 border-red-200" } : { label: "Pending Givethra Review", color: "text-blue-700 bg-blue-50 border-blue-200" };
 
     return (
       <div className={`rounded-xl border p-4 space-y-3 ${isRejected ? "border-red-300 bg-red-50/50 dark:bg-red-950/10" : isExpired ? "border-amber-300 bg-amber-50/50 dark:bg-amber-950/10" : "bg-card"}`}>
@@ -106,6 +115,22 @@ export default function MyCasesPage() {
             <p className="text-xs text-muted-foreground">📍 {c.city}, {c.country} {needed > 0 && `· ${s} ${needed} ${cur}`}</p>
           </div>
         </div>
+
+        {isHelping && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+            <p className="text-xs font-semibold text-primary flex items-center gap-1.5"><Heart className="h-3.5 w-3.5" /> Your Help on this case</p>
+            {helpRecords.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Help opened — receipt or payment proof has not been submitted yet.</p>
+            ) : helpRecords.map((help: any) => {
+              const status = helpStatus(String(help.status || "pending_confirmation"));
+              const amount = help.seeker_confirmed_amount ?? help.amount_paid;
+              return <div key={help.id} className="rounded-md border border-border bg-card/80 px-2.5 py-2 text-xs space-y-1">
+                <div className="flex items-center justify-between gap-2"><span className="font-medium">{help.paid_to === "givethra" ? "Contribution / Fundraising" : "Direct Help"}</span><span className={`rounded-full border px-2 py-0.5 font-semibold ${status.color}`}>{status.label}</span></div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground"><span>Amount: {amount != null ? `${s} ${amount} ${cur}` : "Not submitted"}</span>{help.transaction_id && <span>Txn: {help.transaction_id}</span>}</div>
+              </div>;
+            })}
+          </div>
+        )}
 
         {needed > 0 && !isRejected && !isExpired && (
           <div className="space-y-1">
@@ -309,10 +334,13 @@ export default function MyCasesPage() {
   const myExpired = myCases.filter(c => c.status === "expired");
   const showCaseStatus = (status: string) => caseFilter === "all" || caseFilter === status;
   const visibleHelping = unlockedCases.filter((c) => {
+    const records = helpByCase[c.id] ?? [];
     if (helpFilter === "all") return true;
-    if (helpFilter === "completed") return c.status === "completed";
-    return !["completed", "rejected", "expired"].includes(String(c.status));
+    if (helpFilter === "completed") return records.some((r: any) => r.status === "completed") || c.status === "completed";
+    return !records.length || records.some((r: any) => r.status !== "completed" && r.status !== "disputed") || !["completed", "rejected", "expired"].includes(String(c.status));
   });
+  const completedHelpCount = unlockedCases.filter((c) => (helpByCase[c.id] ?? []).some((r: any) => r.status === "completed") || c.status === "completed").length;
+  const activeHelpCount = unlockedCases.length - completedHelpCount;
 
   return (
     <Layout>
@@ -401,7 +429,7 @@ export default function MyCasesPage() {
                   ["completed", "Completed"],
                 ] as const).map(([value, label]) => (
                   <button key={value} type="button" role="tab" aria-selected={helpFilter === value} onClick={() => setHelpFilter(value)} className={`rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${helpFilter === value ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-                    {label} ({value === "all" ? unlockedCases.length : value === "active" ? unlockedCases.filter((c) => !["completed", "rejected", "expired"].includes(String(c.status))).length : unlockedCases.filter((c) => c.status === "completed").length})
+                    {label} ({value === "all" ? unlockedCases.length : value === "active" ? activeHelpCount : completedHelpCount})
                   </button>
                 ))}
               </div>
