@@ -2,7 +2,6 @@
 // Replaces Supabase with Cloudflare Worker APIs
 
 import InstallButton from "@/components/InstallButton";
-import FeedbackWall from "@/components/FeedbackWall";
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
@@ -1130,7 +1129,10 @@ export default function HomePage() {
       <section className="space-y-8 bg-background py-8" aria-label="Community impact">
         <HeroesWall />
         <KindnessWall />
-        <FeedbackWall />
+        <div className="mx-auto grid w-full max-w-3xl gap-3 px-4 sm:grid-cols-2">
+          <Link to="/heroes-wall" className="rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10"><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Completed impact</p><p className="mt-1 font-bold">Open Heroes Wall</p><p className="mt-1 text-sm text-muted-foreground">Browse verified completed help.</p></Link>
+          <Link to="/kindness-wall" className="rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10"><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Approved feedback</p><p className="mt-1 font-bold">Open Kindness Wall</p><p className="mt-1 text-sm text-muted-foreground">Read approved seeker stories.</p></Link>
+        </div>
       </section>
 
       <section className="max-w-3xl mx-auto px-4 pt-8">

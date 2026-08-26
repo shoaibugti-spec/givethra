@@ -42,6 +42,8 @@ const BecomeHeroPage = lazy(() => import("@/pages/BecomeHeroPage").catch(() => (
 const NeedHelpPage = lazy(() => import("@/pages/NeedHelpPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const OnboardingPage = lazy(() => import("@/pages/OnboardingPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const CommunityPage = lazy(() => import("@/pages/CommunityPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
+const HeroesWallPage = lazy(() => import("@/pages/HeroesWallPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
+const KindnessWallPage = lazy(() => import("@/pages/KindnessWallPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -109,6 +111,8 @@ const communityRoute = createRoute({
   path: "/community",
   component: () => <Suspense fallback={<PageLoader />}><CommunityPage /></Suspense>,
 });
+const heroesWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/heroes-wall", component: () => <Suspense fallback={<PageLoader />}><HeroesWallPage /></Suspense> });
+const kindnessWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/kindness-wall", component: () => <Suspense fallback={<PageLoader />}><KindnessWallPage /></Suspense> });
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -138,6 +142,8 @@ const routeTree = rootRoute.addChildren([
   needHelpRoute,
   onboardingRoute,
   communityRoute,
+  heroesWallRoute,
+  kindnessWallRoute,
 ]);
 const router = createRouter({ routeTree });
 
