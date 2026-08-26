@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { adminMarkSupportMessagesAsRead, adminSendSupportReply } from "./api";
+import { adminMarkSupportMessagesAsRead, adminSendSupportReply, getCaseById } from "./api";
 
 describe("adminSendSupportReply", () => {
   const fetchMock = vi.fn();
@@ -60,6 +60,16 @@ describe("adminSendSupportReply", () => {
       },
       body: JSON.stringify({ user_id: "recipient-1" }),
     });
+  });
+
+  it("falls back to the approved case index for a public case link when direct detail fails", async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "Authentication or database request failed" }), { status: 500 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: "case-1", status: "approved", title: "Help to pay rent." }]), { status: 200 }));
+
+    await expect(getCaseById("case-1")).resolves.toMatchObject({ id: "case-1", status: "approved" });
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "https://givethra.org/api/cases/case-1", expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "https://givethra.org/api/cases/approved", expect.any(Object));
   });
 
   it("surfaces a Worker error instead of accepting a failed reply request", async () => {

@@ -437,11 +437,21 @@ async function handleCases(request, env, user, url, parts, origin) {
       const ids = String(url.searchParams.get("ids") || "").split(",").map((value) => value.trim()).filter(Boolean).slice(0, 100);
       if (!ids.length) return json([], 200, origin);
       const placeholders = ids.map(() => "?").join(", ");
-      const visibility = isAdmin(user) ? "" : " AND (user_id = ? OR lower(status) IN ('approved', 'published', 'active'))";
-      const params = isAdmin(user) ? ids : [...ids, user.user_id];
+      const publicVisitor = !user;
+      const visibility = isAdmin(user) || publicVisitor ? " AND lower(status) IN ('approved', 'published', 'active')" : " AND (user_id = ? OR lower(status) IN ('approved', 'published', 'active'))";
+      const params = isAdmin(user) || publicVisitor ? ids : [...ids, user.user_id];
       const rows = await env.DB.prepare(`SELECT * FROM case_submissions WHERE id IN (${placeholders})${visibility}`).bind(...params).all();
       const found = new Map((rows.results || []).map((row) => [row.id, decodeCaseRow(row)]));
       return json(ids.map((value) => found.get(value)).filter(Boolean), 200, origin);
+    }
+    // Public approved case links are intentionally readable without a session.
+    // This is the guest path used by Home → Help Now and shared links.
+    if (parts[2] && parts[2] !== "counts" && parts[2] !== "category-counts") {
+      const publicRow = await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(parts[2]).first();
+      const publicStatus = String(publicRow?.status || "").toLowerCase();
+      if (publicRow && ["approved", "published", "active"].includes(publicStatus)) {
+        return json(decodeCaseRow(publicRow), 200, origin);
+      }
     }
     const target = requestedUserId(url);
     if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);

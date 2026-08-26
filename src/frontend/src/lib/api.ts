@@ -128,7 +128,18 @@ export async function getCasesByUser(userId: string) {
 
 export async function getCaseById(id: string) {
   const res = await fetch(`${WORKER_URL}/api/cases/${id}`, { headers: headers() });
-  return res.json();
+  const data = await res.json().catch(() => null);
+  if (res.ok && data && !data.error) return data;
+
+  // Public/shared links should remain usable if the direct detail route has a
+  // transient edge failure. The approved index is guest-readable by design.
+  const approvedRes = await fetch(`${WORKER_URL}/api/cases/approved`, { headers: headers() });
+  const approved = await approvedRes.json().catch(() => []);
+  if (approvedRes.ok && Array.isArray(approved)) {
+    const fallback = approved.find((row: any) => String(row?.id) === String(id));
+    if (fallback) return fallback;
+  }
+  return data || {};
 }
 
 export async function getCasesByIds(ids: string[]) {

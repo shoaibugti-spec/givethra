@@ -19,4 +19,12 @@ describe("public Worker routing", () => {
     expect(workerSource).not.toContain("env.BUCKET");
     expect(workerSource).toContain("env.UPLOADS");
   });
+
+  it("serves approved case detail and by-id data to guest visitors", () => {
+    expect(workerSource).toContain('// Public approved case links are intentionally readable without a session.');
+    expect(workerSource).toContain('const publicStatus = String(publicRow?.status || "").toLowerCase();');
+    expect(workerSource).toContain('if (publicRow && ["approved", "published", "active"].includes(publicStatus))');
+    expect(workerSource).toContain('const publicVisitor = !user;');
+    expect(workerSource).toContain('isAdmin(user) || publicVisitor ? " AND lower(status) IN');
+  });
 });

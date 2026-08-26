@@ -1090,3 +1090,21 @@
 - [x] Show each pending Contribution with a short case summary/category, helper, amount, Txn ID, receipt attachment, and pending status.
 - [x] Provide clear Approve and Reject controls with the required rejection reason in the dedicated section.
 - [x] Add regression coverage and validate the dedicated section before synchronization.
+
+## User-Reported Rs 100 Contribution Missing from Admin Queue
+- [ ] Trace the real test submission's persisted status and paid_to classification without modifying the record.
+- [ ] Ensure pending Contribution appears under Verify Help → Contributions and contributes to the correct count.
+- [ ] Keep Pay & Close limited to completed fundraising goals awaiting Givethra's final institute payment.
+- [ ] Verify receipt, amount, transaction ID, Approve/Reject controls, and notification count for the real test path.
+
+## User-Reported Under Verification Contribution Missing from Admin
+- [ ] Trace the existing Under Verification Contribution record read-only through D1/status/receipt fields.
+- [ ] Ensure the record appears in Admin → Contributions with case summary, amount, transaction ID, and receipt.
+- [ ] Ensure the existing record can be rejected or approved from the Contributions section without confusing Pay & Close.
+- [ ] Validate the fix and deployment state before reporting the result.
+
+## User-Reported Public Mobile Case Detail Regression
+- [x] Compare the screenshot's incomplete public Case Detail rendering with the canonical approved-case response at narrow mobile widths.
+- [x] Ensure case title, category, amount, location, story text, verification summary, and Help actions render clearly for guests.
+- [x] Keep Verification Media locked without pushing Direct/Contribution Help actions below the fold or hiding them.
+- [x] Validate public Help Now navigation without requiring Google login, then separately report legacy-login findings.
