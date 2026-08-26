@@ -1228,3 +1228,10 @@
 - [x] Add a separate Kindness Wall below Heroes Wall for approved seeker feedback video/caption cards with slider, likes, comments, and safe public visibility.
 - [x] Verify approval-to-completion, feedback publication, and helper/seeker affidavit paths without changing existing D1/R2 data.
 - [x] Add regression coverage, validate, synchronize, and document the matched deployment/cache refresh.
+
+## Urgent Help History and Completed Wall Visibility
+- [x] Trace why seeker My Requests and helper My Cases omit the approved/completed help record and collected amount.
+- [x] Ensure completed approved cases appear in Heroes Wall with solved count and total amount.
+- [x] Ensure approved seeker video/caption appears immediately in Kindness Wall.
+- [x] Preserve the existing ordering, mobile layout, affidavits, and all D1/R2 records.
+- [x] Add regression coverage, validate, synchronize, and document matched deployment requirements.

@@ -438,7 +438,7 @@ async function handleCases(request, env, user, url, parts, origin) {
       if (!ids.length) return json([], 200, origin);
       const placeholders = ids.map(() => "?").join(", ");
       const publicVisitor = !user;
-      const visibility = isAdmin(user) || publicVisitor ? " AND lower(status) IN ('approved', 'published', 'active')" : " AND (user_id = ? OR lower(status) IN ('approved', 'published', 'active'))";
+      const visibility = isAdmin(user) || publicVisitor ? " AND lower(status) IN ('approved', 'published', 'active', 'completed')" : " AND (user_id = ? OR lower(status) IN ('approved', 'published', 'active', 'completed'))";
       const params = isAdmin(user) || publicVisitor ? ids : [...ids, user.user_id];
       const rows = await env.DB.prepare(`SELECT * FROM case_submissions WHERE id IN (${placeholders})${visibility}`).bind(...params).all();
       const found = new Map((rows.results || []).map((row) => [row.id, decodeCaseRow(row)]));

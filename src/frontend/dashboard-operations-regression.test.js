@@ -73,6 +73,18 @@ describe("dashboard operations repair", () => {
     expect(adminSource).toContain('await loadData();');
   });
 
+  it("preserves completed cases in Hero history and exposes public kindness reads", () => {
+    expect(workerSource).toContain("lower(status) IN ('approved', 'published', 'active', 'completed')");
+    expect(workerSource).toContain('parts[0] === "api" && parts[1] === "feedbacks" && request.method === "GET"');
+    expect(workerSource).toContain('parts[0] === "api" && parts[1] === "feedback-likes" && request.method === "GET"');
+    expect(workerSource).toContain('parts[0] === "api" && parts[1] === "feedback-comments" && request.method === "GET"');
+    expect(apiSource).toContain("getCaseResolutionsByHero");
+    expect(myCasesSource).toContain("getCaseResolutionsByHero(user.id)");
+    const kindnessSource = fs.readFileSync(path.join(root, "src/components/KindnessWall.tsx"), "utf8");
+    expect(kindnessSource).toContain("Kindness Wall");
+    expect(kindnessSource).toContain("getFeedbacks(100)");
+  });
+
   it("shows submitted Contributions in Verify Help with proof details and reason-gated rejection", () => {
     expect(adminSource).toContain('const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"])');
     expect(adminSource).toContain("const pendingResolutions = resolutions.filter");
