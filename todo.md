@@ -1013,3 +1013,10 @@
 - [x] Prevent mobile overflow, clipped content, and fixed-navigation overlap while preserving the current payment form and actions.
 - [x] Add responsive regression coverage and verify representative mobile widths plus desktop build behavior.
 - [x] Keep cache refresh/deployment as a separate user-controlled step.
+
+## User-Requested Wallet and Contribution Unlock Refinement
+- [x] Show a clear no-credit wallet message for Direct/Full Payment and provide a one-click route to Wallet for deposit.
+- [x] Show accurate Contribution free-help progress: 3 total free Contribution unlocks, with remaining uses after each unlock and paid-credit messaging after the third.
+- [x] Enforce Contribution amount minimum of 100 and maximum of the current case remaining amount, including dynamic collected-progress limits.
+- [x] Keep Verification Appeal Video view-only after the applicable unlock, without exposing a download control.
+- [x] Add regression tests and verify the full frontend build before synchronization.

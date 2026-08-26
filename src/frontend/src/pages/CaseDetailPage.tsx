@@ -237,6 +237,8 @@ export default function CaseDetailPage() {
 
   // Get user's total unlock count (across all cases) for free unlock logic
   const [userUnlockCount, setUserUnlockCount] = useState(0);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletLoading, setWalletLoading] = useState(true);
   const isFirstThreeUnlocks = userUnlockCount < 3;
 
   // ===== MAIN LOAD EFFECT =====
@@ -298,6 +300,15 @@ export default function CaseDetailPage() {
         setSeekerKyc(kyc);
         const nm = (prof?.full_name || "").split(" ")[0];
         if (nm) setHeroName(nm);
+        setWalletLoading(true);
+        try {
+          const wallet = await getWallet(user.id);
+          setWalletBalance(Number(wallet?.balance ?? 0));
+        } catch {
+          setWalletBalance(0);
+        } finally {
+          setWalletLoading(false);
+        }
 
         // ✅ Feedback check moved to separate useEffect above
       }
@@ -399,6 +410,8 @@ export default function CaseDetailPage() {
   const percentDone = amountNeeded > 0 ? Math.min(Math.round((amountCollected / amountNeeded) * 100), 100) : 0;
   const fundraisingStarted = amountCollected > 0;
   const pledgeNum = parseFloat(pledgeAmount) || 0;
+  const freeContributionRemaining = Math.max(3 - userUnlockCount, 0);
+  const hasUnlockCredit = walletBalance >= 1;
 
   const isRejected = caseData?.status === "rejected";
   const isExpired = caseData?.status === "expired";
@@ -410,9 +423,18 @@ export default function CaseDetailPage() {
 
   async function handleUnlock(mode: "full" | "partial") {
     if (!user) { navigate({ to: "/sign-in" }); return; }
+    if (mode === "full" && !walletLoading && !hasUnlockCredit) {
+      toast.error("You have no credits. Please add credits in your Wallet before unlocking Direct Help.");
+      return;
+    }
     if (mode === "partial") {
-      if (!pledgeNum || pledgeNum <= 0) { toast.error("Please enter how much you want to help with."); return; }
-      if (amountNeeded > 0 && pledgeNum > remaining) { toast.error(`Only ${sym} ${remaining} ${cur} is remaining for this case.`); return; }
+      if (remaining <= 0) { toast.error("This case has already reached its fundraising goal."); return; }
+      if (pledgeNum < 100) { toast.error(`The minimum Contribution is ${sym} 100.`); return; }
+      if (pledgeNum > remaining) { toast.error(`The maximum Contribution is ${sym} ${remaining} ${cur} still needed.`); return; }
+      if (freeContributionRemaining === 0 && !walletLoading && !hasUnlockCredit) {
+        toast.error("Your 3 free Contributions are complete. Please add 1 credit in your Wallet to continue.");
+        return;
+      }
     }
     setUnlocking(true);
     try {
@@ -434,6 +456,7 @@ export default function CaseDetailPage() {
         setContributionOpen(true);
       } else if (amountNeeded > 0) setAmountPaid(String(remaining));
       setUnlocked(true);
+      setWalletBalance(prev => Math.max(prev - charge, 0));
       setPayMode(mode);
       toast.success(isFreeContribution ? "🎉 Contribution unlocked FREE! This is your #" + (userUnlockCount + 1) + " free contribution help." : mode === "full" ? "Direct Help unlocked! 1 credit deducted." : "Contribution unlocked! 1 credit deducted.");
       loadCase();
@@ -904,7 +927,15 @@ export default function CaseDetailPage() {
                       <p className="text-xs text-muted-foreground">You can help this case directly or contribute any amount.</p>
                       <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h4 className="font-bold text-sm">Pay the full bill directly</h4></div>
                       <p className="text-xs text-muted-foreground">You'll get the institute's payment details and pay the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} directly. Best if you can cover it all at once.</p>
-                      <Button onClick={() => handleUnlock("full")} disabled={unlocking} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
+                      {!walletLoading && !hasUnlockCredit && (
+                        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-2">
+                          <p><strong>You have 0 credits.</strong> Direct Help requires 1 credit to unlock.</p>
+                          <Button type="button" variant="outline" size="sm" onClick={() => navigate({ to: "/wallet" })} className="w-full gap-2 border-amber-400 text-amber-800 dark:text-amber-300">
+                            Add Credits in Wallet <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                      <Button onClick={() => handleUnlock("full")} disabled={unlocking || walletLoading} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
                         <Unlock className="h-4 w-4" />
                         Help Now — Direct Payment (1 credit)
                       </Button>
@@ -914,16 +945,28 @@ export default function CaseDetailPage() {
                     <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
                       <div className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" /><h4 className="font-bold text-sm">Contribute any amount (Fundraising)</h4></div>
                       <p className="text-xs text-muted-foreground">Contribute any amount to Givethra's fundraising. When the goal is reached, Givethra pays the institute. Many help together 🤝</p>
+                      <div className="rounded-lg border border-teal-300 bg-teal-50 dark:bg-teal-950/20 p-2.5 text-xs text-teal-800 dark:text-teal-300">
+                        {freeContributionRemaining > 0 ? <><strong>{freeContributionRemaining} of 3 free Contribution unlocks remaining.</strong> Your next Contribution unlock is free.</> : <><strong>Your 3 free Contribution unlocks are complete.</strong> This Contribution unlock requires 1 credit.</>}
+                      </div>
+                      {freeContributionRemaining === 0 && !walletLoading && !hasUnlockCredit && (
+                        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-2">
+                          <p><strong>You have 0 credits.</strong> Add 1 credit in your Wallet to unlock another Contribution.</p>
+                          <Button type="button" variant="outline" size="sm" onClick={() => navigate({ to: "/wallet" })} className="w-full gap-2 border-amber-400 text-amber-800 dark:text-amber-300">
+                            Add Credits in Wallet <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
                       {amountNeeded > 0 && (
                         <div className="space-y-1.5 pt-1">
-                          <Label className="text-xs">How much will you contribute? ({cur}) — {sym} {remaining} still needed</Label>
+                          <Label className="text-xs">How much will you contribute? ({cur}) — minimum {sym} 100, maximum {sym} {remaining} still needed</Label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">{sym}</span>
-                            <Input type="number" value={pledgeAmount} onChange={e => setPledgeAmount(e.target.value)} placeholder={`Up to ${remaining}`} className="pl-12 bg-card" max={remaining} />
+                            <Input type="number" min={100} value={pledgeAmount} onChange={e => setPledgeAmount(e.target.value)} placeholder={`100–${remaining}`} className="pl-12 bg-card" max={remaining} />
                           </div>
                         </div>
                       )}
-                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
+                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking || walletLoading || remaining < 100} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
+
                         <HandCoins className="h-4 w-4" />
                         Help Now — Contribute
                       </Button>
@@ -966,7 +1009,7 @@ export default function CaseDetailPage() {
                   {(myUnlock || unlockMode !== "choose") && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {caseData.selfie_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Live Selfie</p><img src={caseData.selfie_url} alt="Selfie" className="w-full rounded-lg border max-h-40 object-cover" /></div>}
-                      {caseData.video_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Video Appeal</p><video src={caseData.video_url} controls className="w-full rounded-lg border max-h-40" /></div>}
+                      {caseData.video_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Verification Appeal Video (View Only)</p><video src={caseData.video_url} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline onContextMenu={e => e.preventDefault()} className="w-full rounded-lg border max-h-40" /></div>}
                     </div>
                   )}
                 </div>

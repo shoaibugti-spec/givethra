@@ -51,6 +51,24 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("(myUnlock || unlockMode !== \"choose\") && (");
   });
 
+  it("shows wallet guidance and enforces Contribution amount and free-use rules", () => {
+    expect(caseDetailSource).toContain("const [walletBalance, setWalletBalance] = useState(0);");
+    expect(caseDetailSource).toContain("You have 0 credits.");
+    expect(caseDetailSource).toContain('navigate({ to: "/wallet" })');
+    expect(caseDetailSource).toContain("const freeContributionRemaining = Math.max(3 - userUnlockCount, 0);");
+    expect(caseDetailSource).toContain("freeContributionRemaining > 0");
+    expect(caseDetailSource).toContain("pledgeNum < 100");
+    expect(caseDetailSource).toContain("min={100}");
+    expect(caseDetailSource).toContain("max={remaining}");
+  });
+
+  it("keeps verification appeal video view-only after unlock", () => {
+    expect(caseDetailSource).toContain("Verification Appeal Video (View Only)");
+    expect(caseDetailSource).toContain('controlsList="nodownload noplaybackrate"');
+    expect(caseDetailSource).toContain("disablePictureInPicture");
+    expect(caseDetailSource).toContain("onContextMenu={e => e.preventDefault()}");
+  });
+
   it("keeps the Direct Payment lookup isolated from Contribution unlocks", () => {
     const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
     const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
