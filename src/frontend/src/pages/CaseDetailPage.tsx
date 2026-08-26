@@ -512,7 +512,8 @@ export default function CaseDetailPage() {
   }
 
   async function handleSubmitResolution() {
-    if (!resType) { toast.error("Please select what you did"); return; }
+    const submittedResType = unlockMode === "full" ? String(caseData?.category || "Direct Payment") : resType;
+    if (!submittedResType) { toast.error("Please select what you did"); return; }
     if (!txId.trim()) { toast.error("Please enter transaction ID / payment reference"); return; }
     const paidNum = amountPaid ? parseFloat(amountPaid) : (contributionOpen ? pledgeNum : (myUnlock?.pledged_amount ?? null));
     if (!paidNum || paidNum <= 0) { toast.error("Please enter the total amount you paid."); return; }
@@ -529,7 +530,7 @@ export default function CaseDetailPage() {
         case_id: id,
         hero_id: user?.id,
         seeker_id: caseData.user_id,
-        resolution_type: resType,
+        resolution_type: submittedResType,
         amount_paid: paidNum,
         transaction_id: txId,
         receipt_url: receiptUrl,
@@ -1090,12 +1091,16 @@ export default function CaseDetailPage() {
                     ) : (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label>{unlockMode === "partial" ? "Contribution Type *" : "Resolution Type *"}</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {(unlockMode === "partial" ? ["Contribution", "Partial Help", "Other"] : ["Bill Paid", "School Fee Paid", "Hospital Paid", "Bank Transfer", "Food Delivered", "Other"]).map(t => (
-                              <button key={t} type="button" onClick={() => setResType(t)} className={`px-3 py-2 rounded-lg border text-xs font-medium text-left ${resType === t ? "bg-primary text-white border-primary" : "border-border"}`}>{t}</button>
-                            ))}
-                          </div>
+                          <Label>{unlockMode === "partial" ? "Contribution Type *" : "Payment Category *"}</Label>
+                          {unlockMode === "full" ? (
+                            <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 text-sm font-semibold text-primary">{caseData?.category || "Direct Payment"}</div>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                              {["Contribution", "Partial Help", "Other"].map(t => (
+                                <button key={t} type="button" onClick={() => setResType(t)} className={`px-3 py-2 rounded-lg border text-xs font-medium text-left ${resType === t ? "bg-primary text-white border-primary" : "border-border"}`}>{t}</button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-2"><Label>Amount Paid ({cur}) *</Label><Input type="number" min="1" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} placeholder={`e.g. ${remaining || amountNeeded || 500}`} /></div>
                         <div className="space-y-2"><Label>Transaction ID / Payment Reference *</Label><Input value={txId} onChange={e => setTxId(e.target.value)} placeholder="TXN123456789" /></div>

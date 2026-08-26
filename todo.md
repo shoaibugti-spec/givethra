@@ -1068,3 +1068,8 @@
 - [x] Render a real visible receipt/bank-slip file input in unlocked Contribution.
 - [x] Render visible Transaction ID/Payment Reference and Amount fields in both modes.
 - [x] Keep the proof submit button in the same visible panel and validate both modes before the single final deployment.
+
+## User-Requested Direct Payment Category Label
+- [x] Replace Direct Payment Resolution Type choices with the current case Category.
+- [x] Preserve Contribution proof behavior and all other payment fields unchanged.
+- [x] Add focused regression coverage and validate tests, typecheck, and production build.

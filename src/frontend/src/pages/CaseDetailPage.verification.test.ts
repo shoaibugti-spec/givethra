@@ -67,6 +67,15 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("unlockMode === \"partial\" && paidNum > remaining");
   });
 
+  it("uses the case Category instead of free-form Resolution Type for Direct Payment", () => {
+    expect(caseDetailSource).toContain('const submittedResType = unlockMode === "full" ? String(caseData?.category || "Direct Payment") : resType;');
+    expect(caseDetailSource).toContain("Payment Category *");
+    expect(caseDetailSource).toContain("{caseData?.category || \"Direct Payment\"}");
+    expect(caseDetailSource).toContain("resolution_type: submittedResType");
+    expect(caseDetailSource).toContain('["Contribution", "Partial Help", "Other"]');
+    expect(caseDetailSource).not.toContain('"Bill Paid", "School Fee Paid", "Hospital Paid"');
+  });
+
   it("restores Direct Payment receiver details and mandatory proof submission", () => {
     expect(caseDetailSource).toContain("Direct Payment Receiver Details");
     expect(caseDetailSource).toContain("receiver_name");
