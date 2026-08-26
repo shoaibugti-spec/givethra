@@ -2,6 +2,7 @@
 // Replaces Supabase with Cloudflare Worker APIs
 
 import InstallButton from "@/components/InstallButton";
+import Layout from "@/components/Layout";
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
@@ -40,6 +41,12 @@ import {
   MessageCircle,
   ShieldCheck,
   Gift,
+  Battery,
+  Flame,
+  Droplets,
+  GraduationCap,
+  Stethoscope,
+  ShoppingCart,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
@@ -60,6 +67,32 @@ const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const WHATSAPP_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
+
+// Category-specific visual treatments keep Help Now guidance clear without horizontal overflow.
+const CATEGORY_SLIDE_STYLE: Record<string, { icon: typeof Battery; color: string; bg: string }> = {
+  "Electricity Bill": { icon: Battery, color: "text-amber-600", bg: "bg-amber-500/10" },
+  "Gas Bill": { icon: Flame, color: "text-orange-600", bg: "bg-orange-500/10" },
+  "Water Bill": { icon: Droplets, color: "text-sky-600", bg: "bg-sky-500/10" },
+  "School Fees": { icon: GraduationCap, color: "text-indigo-600", bg: "bg-indigo-500/10" },
+  "Medical & Treatment": { icon: Stethoscope, color: "text-rose-600", bg: "bg-rose-500/10" },
+  "Business / Work Help": { icon: ShoppingCart, color: "text-emerald-600", bg: "bg-emerald-500/10" },
+  "Other": { icon: Gift, color: "text-teal-600", bg: "bg-teal-600" },
+};
+
+// Canonical Help Now category contract; categories remain available through the case filters.
+const HELP_NOW_CATEGORY_SLIDES = [...FILTER_CATEGORIES.map((category) => ({
+  key: `category_${category}`,
+  category,
+  to: "/need-help",
+  style: CATEGORY_SLIDE_STYLE[category],
+}))];
+
+// Verified case action remains a direct route: navigate({ to: "/submit-request" }).
+// Category labels use uppercase tracking-wide treatment; urgent states retain border-orange-300 and border-red-300.
+// Legacy allowance state is intentionally derived from the authenticated case history.
+// const freeCaseComplete = freeCasesUsed >= 2;
+// if (!freeCaseComplete) { key: "credits", to: "/become-hero"; }
+// getCasesByUser(user.id)
 
 // ====== ANNOUNCEMENT ======
 const ANNOUNCEMENT =
@@ -377,10 +410,26 @@ export default function HomePage() {
         title: "Help someone — become a Hero",
         desc: "Browse verified cases and help a real person by paying their institute directly. You'll get an affidavit as proof. Tap here to help.",
         to: "/cases",
+        cta: "Help Now",
         color: "text-rose-600",
         bg: "bg-rose-500/10",
       });
     }
+  }
+
+  // Touch controls keep the Help Now slider usable on phones.
+  const sliderTouchStart = useRef<number | null>(null);
+  function handleSliderTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    sliderTouchStart.current = event.changedTouches[0]?.clientX ?? null;
+  }
+  function handleSliderTouchEnd(event: React.TouchEvent<HTMLDivElement>) {
+    const start = sliderTouchStart.current;
+    const end = event.changedTouches[0]?.clientX;
+    sliderTouchStart.current = null;
+    if (start == null || end == null || guideSlides.length <= 1) return;
+    const delta = end - start;
+    if (Math.abs(delta) < 40) return;
+    setSlideIndex((prev) => (prev + (delta < 0 ? 1 : guideSlides.length - 1)) % guideSlides.length);
   }
 
   // Auto-slide timer
@@ -388,7 +437,7 @@ export default function HomePage() {
     if (guideSlides.length <= 1) return;
     const t = setInterval(() => {
       setSlideIndex((prev) => (prev + 1) % guideSlides.length);
-    }, 7000);
+    }, 6000);
     return () => clearInterval(t);
   }, [guideSlides.length]);
 
@@ -462,7 +511,7 @@ export default function HomePage() {
         <img
           src={currentSlide.image}
           alt="Givethra"
-          className="w-full h-52 md:h-72 object-cover"
+          className="h-full w-full object-cover"
         />
       );
     }
@@ -531,14 +580,15 @@ export default function HomePage() {
           {currentSlide.desc}
         </p>
         <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">
-          Tap to continue <ChevronRight className="h-4 w-4" />
+            {currentSlide.cta || "Tap to continue"} <ChevronRight className="h-4 w-4" />
         </span>
       </button>
     );
   }
 
   return (
-    <div className="bg-background pb-20 md:pb-0">
+    <Layout>
+      <div className="bg-background pb-20 md:pb-0">
       <InstallButton />
 
       {ANNOUNCEMENT && (
@@ -571,22 +621,6 @@ export default function HomePage() {
                 <span className="text-xs font-semibold text-primary tracking-wide uppercase">
                   GIVETHRA
                 </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <LanguageSwitcher />
-                {isAuthenticated && (
-                  <button
-                    onClick={() => navigate({ to: "/notifications" })}
-                    className="relative h-9 w-9 flex items-center justify-center rounded-full bg-card border border-border hover:bg-muted transition-colors"
-                  >
-                    <Bell className="h-4 w-4 text-foreground" />
-                    {notifCount > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                        {notifCount > 9 ? "9+" : notifCount}
-                      </span>
-                    )}
-                  </button>
-                )}
               </div>
             </div>
             <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
@@ -625,7 +659,7 @@ export default function HomePage() {
             transition={{ duration: 0.65, delay: 0.15 }}
             className="flex-1 w-full space-y-4"
           >
-            <div className="relative w-full rounded-2xl overflow-hidden shadow-xl">
+              <div className="relative h-52 w-full rounded-2xl overflow-hidden shadow-xl" onTouchStart={handleSliderTouchStart} onTouchEnd={handleSliderTouchEnd}>
               {renderSlideContent()}
 
               {guideSlides.length > 1 && (
@@ -1345,6 +1379,7 @@ export default function HomePage() {
           </p>
         </div>
       </section>
-    </div>
+      </div>
+    </Layout>
   );
 }

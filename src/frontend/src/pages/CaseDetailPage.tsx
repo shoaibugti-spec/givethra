@@ -48,9 +48,9 @@ function maskCnic(cnic?: string): string {
   if (!cnic) return "—";
   const digits = cnic.replace(/\D/g, "");
   if (digits.length < 6) return cnic;
-  const shown = digits.slice(0, 6);
-  const masked = "*".repeat(Math.max(digits.length - 6, 4));
-  return `${shown.slice(0, 5)}-${shown.slice(5)}${masked}`;
+  const shown = digits.slice(0, 4);
+  const masked = "*".repeat(Math.max(digits.length - 4, 4));
+  return `${shown}${masked}`;
 }
 
 function maskAccount(acc?: string): string {
@@ -74,6 +74,7 @@ function generateAffidavit(caseData: any, resolution: any, seekerKyc: any, heroN
   const today = new Date().toLocaleDateString();
   const seekerName = seekerKyc?.full_name || caseData.full_name || "Verified Help Seeker";
   const seekerCnic = maskCnic(seekerKyc?.cnic_number);
+  const heroCnic = maskCnic(resolution?.hero_cnic_number);
   const completedDate = resolution?.completed_at ? new Date(resolution.completed_at).toLocaleDateString() : today;
   const verifyCode = `GVT-${caseId}-${Date.now().toString(36).toUpperCase()}`;
   const cur = caseData.currency || "USD";
@@ -127,7 +128,7 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
   <div class="row"><span class="label">Full Name</span><span class="value">${seekerName}</span></div>
   <div class="row"><span class="label">CNIC (partially masked)</span><span class="value">${seekerCnic}</span></div>
   <div class="row"><span class="label">Country</span><span class="value">${caseData.country || "—"}</span></div>
-  <div class="note">Note: Only the first 6 digits of the CNIC are shown. Remaining digits and contact details are kept private.</div>
+  <div class="note">Note: Only the first 4 digits of each CNIC are shown. Remaining digits and contact details are kept private.</div>
 </div>
 
 <div class="section">
@@ -143,6 +144,7 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
 <div class="section">
   <h2>Resolution Details</h2>
   <div class="row"><span class="label">Helped By (Hero)</span><span class="value">${heroName || "Verified Hero"}</span></div>
+  <div class="row"><span class="label">Hero CNIC (partially masked)</span><span class="value">${heroCnic}</span></div>
   <div class="row"><span class="label">Type</span><span class="value">${resolution?.resolution_type || "—"}</span></div>
   <div class="row"><span class="label">Amount Provided</span><span class="value">${paidAmount ? sym + " " + paidAmount + " " + cur : "—"}</span></div>
   <div class="row"><span class="label">Completion Date</span><span class="value">${completedDate}</span></div>
@@ -270,20 +272,26 @@ export default function CaseDetailPage() {
     setLoading(true);
     try {
       const data = await getCaseById(id);
+      if (!data || data.error || !data.id) {
+        throw new Error(data?.error || "Case details are unavailable");
+      }
       setCaseData(data);
 
       if (user && data) {
         const owner = data.user_id === user.id;
         const unlock = await getCaseUnlock(id, user.id);
         setMyUnlock(unlock);
-        setUnlocked(!!unlock || owner);
 
-        // Get total unlocks count for this user (across all cases)
+        // A completed helper may have a resolution even when the legacy unlock row is missing.
+        // Keep that verified history open so the affidavit remains accessible.
         const count = await getUserUnlockCount(user.id);
-        setUserUnlockCount(count ?? 0);
+        setUserUnlockCount(Number(count ?? 0));
 
         const res = await getCaseResolutions(id, user.id);
-        setMyResolutions((res ?? []).slice().reverse());
+        const resolutions = Array.isArray(res) ? res : [];
+        setMyResolutions(resolutions.slice().reverse());
+        const completed = String(data.status || "").toLowerCase() === "completed";
+        setUnlocked(!!unlock || owner || (completed && resolutions.length > 0));
 
         const kyc = await getKycSubmission(data.user_id);
         setSeekerKyc(kyc);
@@ -322,6 +330,7 @@ export default function CaseDetailPage() {
       setRecording(true);
       setPaused(false);
       setRecTimer(0);
+
       setFbVideoBlob(null);
       setFbVideoFile(null);
       setFbVideoName("");
@@ -347,7 +356,7 @@ export default function CaseDetailPage() {
       };
       recorder.start();
       timerRef.current = setInterval(() => {
-        setRecTimer(prev => { if (prev + 1 >= 60) { stopRecording(); return 60; } return prev + 1; });
+        setRecTimer(prev => { if (prev + 1 >= 90) { stopRecording(); return 90; } return prev + 1; });
       }, 1000);
     } catch { toast.error("Camera/microphone access denied."); }
   }
@@ -381,10 +390,11 @@ export default function CaseDetailPage() {
   const fundraisingStarted = amountCollected > 0;
   const pledgeNum = parseFloat(pledgeAmount) || 0;
 
-  const isRejected = caseData?.status === "rejected";
-  const isExpired = caseData?.status === "expired";
+  const normalizedStatus = String(caseData?.status || "").toLowerCase();
+  const isRejected = normalizedStatus === "rejected";
+  const isExpired = normalizedStatus === "expired";
   const isOwner = user?.id === caseData?.user_id;
-  const isCompleted = caseData?.status === "completed";
+  const isCompleted = normalizedStatus === "completed";
   const hasPaymentDetails = caseData?.institute_name || caseData?.account_number || caseData?.account_title || caseData?.account_iban;
   const unlockMode = myUnlock?.payment_type || payMode;
   const canHelpAgain = unlocked && !isOwner && !isCompleted && !isRejected && !isExpired;
@@ -698,6 +708,55 @@ export default function CaseDetailPage() {
   }
 
   // ============================================================
+  //  COMPLETED HELP VIEW (helper only)
+  // ============================================================
+  // Once a case is complete, a Hero keeps the verified history and affidavit
+  // but must not see actionable payment, contribution, receiver, or media controls.
+  if (isCompleted && !isOwner) {
+    return (
+      <Layout>
+        <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+          <button type="button" onClick={() => navigate({ to: "/my-cases" })} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ChevronLeft className="h-4 w-4" /> Back to My Cases
+          </button>
+          <section className="rounded-2xl border-2 border-green-200 bg-green-50 dark:bg-green-950/20 p-6 space-y-5">
+            <div className="text-center space-y-2">
+              <div className="text-4xl">🤲</div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Verified completed help</p>
+              <h1 className="text-2xl font-bold text-green-800 dark:text-green-200">Thank you for helping this case.</h1>
+              <p className="text-sm text-green-700 dark:text-green-300">The case is complete. Your payment and contribution actions are now closed. Your verified affidavit remains available below.</p>
+            </div>
+            <div className="rounded-xl bg-card border border-green-200 p-4 space-y-2">
+              <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Case</span><span className="font-semibold text-right">{caseData.title || "Verified case"}</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Category</span><span className="font-semibold text-right">{caseData.category || "—"}</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Verified help delivered</span><span className="font-bold text-primary">{sym} {amountCollected || myResolutions.reduce((sum, r) => sum + Number(r.seeker_confirmed_amount ?? r.amount_paid ?? 0), 0)} {cur}</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Status</span><span className="font-semibold text-green-700">Completed ✓</span></div>
+            </div>
+            <div className="space-y-3">
+              <h2 className="font-semibold text-green-800 dark:text-green-200">Your affidavit</h2>
+              {myResolutions.length > 0 ? myResolutions.map((r: any) => {
+                const resolutionStatus = String(r.status || "").toLowerCase();
+                const isVerified = resolutionStatus === "completed" || ((r.admin_confirmed === 1 || r.admin_confirmed === true || r.admin_confirmed === "1" || r.admin_confirmed === "true") && ["approved", "completed"].includes(resolutionStatus));
+                return (
+                  <div key={r.id} className="rounded-xl bg-card border border-green-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{sym} {r.seeker_confirmed_amount ?? r.amount_paid ?? 0} {cur}</p>
+                      <p className="text-xs text-muted-foreground">{r.resolution_type || "Verified assistance"} · {isVerified ? "Admin verified" : "Recorded"}</p>
+                    </div>
+                    {isVerified && <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, r.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> Download Affidavit</Button>}
+                  </div>
+                );
+              }) : (
+                <p className="rounded-xl bg-card border border-green-200 p-4 text-sm text-muted-foreground">Your verified resolution is still being prepared. Please refresh shortly or contact support.</p>
+              )}
+            </div>
+          </section>
+        </main>
+      </Layout>
+    );
+  }
+
+  // ============================================================
   //  NORMAL CASE VIEW (for all non-rejected, non-expired cases)
   // ============================================================
   return (
@@ -708,9 +767,9 @@ export default function CaseDetailPage() {
         </button>
 
         {/* === FREE UNLOCK ANNOUNCEMENT - TOP OF PAGE === */}
-        <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border-2 border-green-400 p-4 text-sm text-green-700 dark:text-green-300 text-center font-medium">
+        {!isCompleted && <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border-2 border-green-400 p-4 text-sm text-green-700 dark:text-green-300 text-center font-medium">
           🎉 Your first <strong>3 helps are FREE</strong>! After that, 1 credit per help.
-        </div>
+        </div>}
 
         <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
           <div className="flex items-start justify-between gap-3">
@@ -723,7 +782,7 @@ export default function CaseDetailPage() {
               <h1 className="text-2xl font-bold text-foreground">{caseData.title}</h1>
               <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" /> {caseData.city}, {caseData.country}</div>
             </div>
-            {caseData.deadline && (() => {
+            {!isCompleted && caseData.deadline && (() => {
             const daysLeft = Math.ceil((new Date(caseData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             if (daysLeft < 0) return null;
             return (
@@ -781,21 +840,22 @@ export default function CaseDetailPage() {
                     <FileText className="h-4 w-4" /> View Payment Receipt
                   </a>
                 )}
-                {existingFeedback ? (
+                {existingFeedback && existingFeedback.status !== "rejected" ? (
                   <div className="rounded-xl bg-card border border-border p-4 text-center space-y-1">
                     <Star className="h-6 w-6 text-amber-400 mx-auto" fill="currentColor" />
                     <p className="text-sm font-semibold text-foreground">Thank you for sharing your feedback! 🤲</p>
-                    <p className="text-xs text-muted-foreground">Your message is now on the Givethra community wall.</p>
+                    <p className="text-xs text-muted-foreground">{existingFeedback.status === "approved" ? "Your approved feedback is now on the Kindness Wall." : "Your feedback is awaiting Admin review before it appears on the Kindness Wall."}</p>
                   </div>
                 ) : (
                   <div className="rounded-xl bg-card border border-border p-4 space-y-3">
                     <div className="text-center">
+                      {existingFeedback?.status === "rejected" && <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">Your previous feedback was rejected{existingFeedback.rejection_reason ? `: ${existingFeedback.rejection_reason}` : "."} You can submit a new video and caption.</p>}
                       <h3 className="font-bold text-sm text-foreground">Share your feedback 🙏</h3>
                       <p className="text-xs text-muted-foreground">Tell everyone how Givethra helped you. Your message (with your first name) will appear on our community wall.</p>
                     </div>
                     <Textarea value={fbText} onChange={e => setFbText(e.target.value)} rows={4} placeholder="Write your thank-you message..." />
                     <div className="space-y-2">
-                      <Label className="text-xs">Add a video (optional)</Label>
+                      <Label className="text-xs">Add a video (required)</Label>
                       {fbVideoBlob ? (
                         <div className="space-y-2">
                           <video src={fbVideoBlob} controls className="w-full rounded-lg border max-h-48" />
@@ -876,7 +936,7 @@ export default function CaseDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {!isOwner && unlockMode === "full" && hasPaymentDetails && (
+                {!isOwner && !isCompleted && unlockMode === "full" && hasPaymentDetails && (
                   <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
                     <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h2 className="font-semibold">Institute Payment Details</h2></div>
                     <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Pay the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} directly to the institute below.</div>
@@ -891,7 +951,7 @@ export default function CaseDetailPage() {
                   </div>
                 )}
 
-                {!isOwner && unlockMode === "partial" && (
+                {!isOwner && !isCompleted && unlockMode === "partial" && (
                   <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
                     <div className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" /><h2 className="font-semibold">Contribute to Givethra Fundraising</h2></div>
                     <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send your contribution to Givethra. We collect all contributions and pay the institute once the goal is reached. You can contribute as many times as you like until the case is complete.</div>
@@ -930,7 +990,7 @@ export default function CaseDetailPage() {
                   );
                 })()}
 
-                <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
+                {!isCompleted && <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
                   <h2 className="font-semibold">🎥 Verification Media</h2>
                   {(myUnlock?.credits_charged ?? 0) > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -938,7 +998,7 @@ export default function CaseDetailPage() {
                       {caseData.video_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Video Appeal</p><video src={caseData.video_url} controls className="w-full rounded-lg border max-h-40" /></div>}
                     </div>
                   )}
-                </div>
+                </div>}
 
                 {!isOwner && myResolutions.length > 0 && (
                   <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
@@ -952,7 +1012,7 @@ export default function CaseDetailPage() {
                           <span className="text-sm font-bold text-primary">{sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</span>
                         </div>
                         {r.status === "completed" ? (
-                          <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, heroName)}><FileText className="h-3.5 w-3.5" /> Download Affidavit</Button>
+                          <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, r.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> Download Affidavit</Button>
                         ) : (
                           <p className="text-xs text-muted-foreground">{r.status === "seeker_confirmed" ? "Givethra is verifying this contribution." : r.status === "disputed" ? "This was disputed — Givethra will investigate." : "Waiting for confirmation."}</p>
                         )}
@@ -1089,6 +1149,7 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-green-700"><CheckCircle2 className="h-5 w-5" /><h2 className="font-bold">Help Confirmed</h2></div>
               <p className="text-sm text-muted-foreground">{sym} {res.seeker_confirmed_amount ?? res.amount_paid} {cur} — {res.resolution_type}</p>
+              <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => generateAffidavit(caseData, res, seekerKyc, res.hero_name || "Verified Hero")}><FileText className="h-3.5 w-3.5" /> Download Seeker Affidavit</Button>
             </div>
           ) : res.status === "disputed" ? (
             <div className="space-y-2">

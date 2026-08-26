@@ -67,7 +67,9 @@ export async function getCasesByUser(userId: string) {
 
 export async function getCaseById(id: string) {
   const res = await fetch(`${WORKER_URL}/api/cases/${id}`, { headers: headers() });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error || "Failed to load case details");
+  return data;
 }
 
 export async function getCasesByIds(ids: string[]) {

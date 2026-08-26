@@ -274,7 +274,7 @@ export default function AdminPage() {
   const [suspensions, setSuspensions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadSupport, setUnreadSupport] = useState(0);
-  const [resolutionView, setResolutionView] = useState<"pending" | "completed">("pending");
+  const [resolutionView, setResolutionView] = useState<"pending" | "rejected" | "completed">("pending");
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -422,6 +422,10 @@ export default function AdminPage() {
   }
 
   async function updateFeedback(fbId: string, status: string, reason = "") {
+    if (status === "rejected" && !reason.trim()) {
+      toast.error("Please provide a rejection reason.");
+      return;
+    }
     const fb = feedbacks.find((f) => f.id === fbId);
     await adminUpdateFeedback(fbId, { status, reviewed_at: new Date().toISOString(), reviewed_by: user?.email, rejection_reason: reason });
     if (fb?.user_id && fb.case_id) {
@@ -609,11 +613,13 @@ export default function AdminPage() {
   const pendingDirectResolutions = pendingResolutions.filter((r) => r.paid_to !== "givethra");
   const pendingContributionCount = pendingContributions.length;
   const pendingDirectCount = pendingDirectResolutions.length;
-  const completedContributions = resolutions.filter((r) => r.status === "completed" && r.paid_to === "givethra");
-  const completedDirectResolutions = resolutions.filter((r) => r.status === "completed" && r.paid_to !== "givethra");
-  const completedResolutionsCount = resolutions.filter((r) => r.status === "completed").length;
-  const visibleDirectResolutions = resolutionView === "pending" ? pendingDirectResolutions : completedDirectResolutions;
-  const visibleContributionResolutions = resolutionView === "pending" ? pendingContributions : completedContributions;
+  const rejectedContributions = resolutions.filter((r) => ["rejected", "disputed"].includes(String(r.status || "").toLowerCase()) && r.paid_to === "givethra");
+  const rejectedDirectResolutions = resolutions.filter((r) => ["rejected", "disputed"].includes(String(r.status || "").toLowerCase()) && r.paid_to !== "givethra");
+  const completedContributions = resolutions.filter((r) => ["approved", "completed"].includes(String(r.status || "").toLowerCase()) && r.paid_to === "givethra");
+  const completedDirectResolutions = resolutions.filter((r) => ["approved", "completed"].includes(String(r.status || "").toLowerCase()) && r.paid_to !== "givethra");
+  const completedResolutionsCount = resolutions.filter((r) => ["approved", "completed"].includes(String(r.status || "").toLowerCase())).length;
+  const visibleDirectResolutions = resolutionView === "pending" ? pendingDirectResolutions : resolutionView === "rejected" ? rejectedDirectResolutions : completedDirectResolutions;
+  const visibleContributionResolutions = resolutionView === "pending" ? pendingContributions : resolutionView === "rejected" ? rejectedContributions : completedContributions;
 
   const approvedCases = caseList.filter((c) => c.status === "approved");
   const completedCases = caseList.filter((c) => c.status === "completed");
@@ -806,11 +812,12 @@ export default function AdminPage() {
                 <ShieldIcon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <div className="space-y-2"><p>Review direct-help proofs, check the receipt and amount, then approve or reject each submission. Approved direct payments remain in the completed history.</p><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Pending Direct Payments</span><strong className="block text-lg text-primary">{pendingDirectCount}</strong></div><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Completed Direct Payments</span><strong className="block text-lg text-teal-600">{completedDirectResolutions.length}</strong></div></div></div>
               </div>
-              <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Direct payment status filters">
-                <button type="button" role="tab" aria-selected={resolutionView === "pending"} onClick={() => setResolutionView("pending")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${resolutionView === "pending" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>Pending ({pendingDirectCount})</button>
-                <button type="button" role="tab" aria-selected={resolutionView === "completed"} onClick={() => setResolutionView("completed")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${resolutionView === "completed" ? "bg-card text-teal-700 shadow-sm" : "text-muted-foreground"}`}>Approved / Completed ({completedDirectResolutions.length})</button>
+              <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Direct payment status filters">
+                <button type="button" role="tab" aria-selected={resolutionView === "pending"} onClick={() => setResolutionView("pending")} className={`rounded-lg px-2 py-2 text-xs font-semibold ${resolutionView === "pending" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>Pending ({pendingDirectCount})</button>
+                <button type="button" role="tab" aria-selected={resolutionView === "rejected"} onClick={() => setResolutionView("rejected")} className={`rounded-lg px-2 py-2 text-xs font-semibold ${resolutionView === "rejected" ? "bg-card text-red-700 shadow-sm" : "text-muted-foreground"}`}>Rejected ({rejectedDirectResolutions.length})</button>
+                <button type="button" role="tab" aria-selected={resolutionView === "completed"} onClick={() => setResolutionView("completed")} className={`rounded-lg px-2 py-2 text-xs font-semibold ${resolutionView === "completed" ? "bg-card text-teal-700 shadow-sm" : "text-muted-foreground"}`}>Completed ({completedDirectResolutions.length})</button>
               </div>
-              {visibleDirectResolutions.length === 0 ? <Empty text={resolutionView === "pending" ? "No Direct Payments awaiting verification" : "No approved direct payments yet"} /> :
+              {visibleDirectResolutions.length === 0 ? <Empty text={resolutionView === "pending" ? "No Direct Payments awaiting verification" : resolutionView === "rejected" ? "No rejected direct payments yet" : "No completed direct payments yet"} /> :
                 visibleDirectResolutions.map((r) => {
                   const c = caseList.find((cs) => cs.id === r.case_id);
                   return resolutionView === "pending"
@@ -820,11 +827,12 @@ export default function AdminPage() {
             </TabsContent>
             <TabsContent value="contributions" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Contributions</strong><p className="mt-1">Review every contribution receipt, amount, and transaction ID. Approved contributions remain visible in the completed history.</p></div>
-              <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Contribution status filters">
-                <button type="button" role="tab" aria-selected={resolutionView === "pending"} onClick={() => setResolutionView("pending")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${resolutionView === "pending" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>Pending ({pendingContributionCount})</button>
-                <button type="button" role="tab" aria-selected={resolutionView === "completed"} onClick={() => setResolutionView("completed")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${resolutionView === "completed" ? "bg-card text-teal-700 shadow-sm" : "text-muted-foreground"}`}>Approved / Completed ({completedContributions.length})</button>
+              <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Contribution status filters">
+                <button type="button" role="tab" aria-selected={resolutionView === "pending"} onClick={() => setResolutionView("pending")} className={`rounded-lg px-2 py-2 text-xs font-semibold ${resolutionView === "pending" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>Pending ({pendingContributionCount})</button>
+                <button type="button" role="tab" aria-selected={resolutionView === "rejected"} onClick={() => setResolutionView("rejected")} className={`rounded-lg px-2 py-2 text-xs font-semibold ${resolutionView === "rejected" ? "bg-card text-red-700 shadow-sm" : "text-muted-foreground"}`}>Rejected ({rejectedContributions.length})</button>
+                <button type="button" role="tab" aria-selected={resolutionView === "completed"} onClick={() => setResolutionView("completed")} className={`rounded-lg px-2 py-2 text-xs font-semibold ${resolutionView === "completed" ? "bg-card text-teal-700 shadow-sm" : "text-muted-foreground"}`}>Completed ({completedContributions.length})</button>
               </div>
-              {visibleContributionResolutions.length === 0 ? <Empty text={resolutionView === "pending" ? "No Contributions awaiting verification" : "No approved contributions yet"} /> :
+              {visibleContributionResolutions.length === 0 ? <Empty text={resolutionView === "pending" ? "No Contributions awaiting verification" : resolutionView === "rejected" ? "No rejected contributions yet" : "No completed contributions yet"} /> :
                 visibleContributionResolutions.map((r) => {
                   const c = caseList.find((cs) => cs.id === r.case_id);
                   return resolutionView === "pending"
@@ -858,7 +866,7 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="feedback" className="space-y-4 mt-4">
-              {feedbacks.filter((f) => !!f.case_id).length === 0 ? <Empty text="No case feedback yet" /> :
+              {feedbacks.filter((f) => !!f.case_id).length === 0 ? <Empty text="No seeker feedback submitted yet. A completed case appears here after the seeker sends the required caption and video." /> :
                 feedbacks.filter((f) => !!f.case_id).map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} />)}
             </TabsContent>
 
