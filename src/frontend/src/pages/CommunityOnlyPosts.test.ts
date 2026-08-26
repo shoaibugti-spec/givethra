@@ -18,7 +18,8 @@ describe("community-only Public Posts", () => {
   });
 
   it("keeps the composer in Community Posts and the feedback wall on HomePage", () => {
-    expect(communitySource).toContain("<PublicPostComposer />");
+    expect(communitySource).toContain("setNewPost");
+    expect(communitySource).toContain("What's on your mind? Share your thoughts...");
     expect(homeSource).toContain("<FeedbackWall />");
   });
 

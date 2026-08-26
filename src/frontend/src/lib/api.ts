@@ -28,11 +28,10 @@ export function getGuestId(): string {
     const randomId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const guestId = `guest:${randomId}`;
-    localStorage.setItem(key, guestId);
-    return guestId;
+    localStorage.setItem(key, randomId);
+    return randomId;
   } catch {
-    return `guest:${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 }
 
@@ -321,11 +320,30 @@ export async function getHeroesWall(limit = 24) {
   if (!res.ok) throw new Error(data?.error || `Heroes Wall request failed (${res.status})`);
   return data;
 }
-
+export async function getCommunityPosts() {
+  const res = await fetch(`${WORKER_URL}/api/community/posts`, {
+    headers: { ...headers(), "X-Guest-ID": getGuestId() },
+    cache: "no-store",
+  });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(data?.error || `Community posts request failed (${res.status})`);
+  return data;
+}
+export async function createCommunityPost(data: Record<string, unknown>) {
+  const payload = { ...data, guest_id: data.guest_id || getGuestId() };
+  const res = await fetch(`${WORKER_URL}/api/community/posts`, {
+    method: "POST",
+    headers: { ...headers(), "X-Guest-ID": String(payload.guest_id) },
+    body: JSON.stringify(payload),
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Community post request failed (${res.status})`);
+  return result;
+}
 export async function toggleLike(postId: string) {
   const res = await fetch(`${WORKER_URL}/api/community/posts/${encodeURIComponent(postId)}/likes`, {
     method: "POST",
-    headers: headers(),
+    headers: { ...headers(), "X-Guest-ID": getGuestId() },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || `Like request failed (${res.status})`);
@@ -342,8 +360,8 @@ export async function getPostComments(postId: string) {
 export async function addComment(postId: string, comment: string) {
   const res = await fetch(`${WORKER_URL}/api/community/posts/${encodeURIComponent(postId)}/comments`, {
     method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ comment }),
+    headers: { ...headers(), "X-Guest-ID": getGuestId() },
+    body: JSON.stringify({ comment, guest_id: getGuestId() }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || `Comment request failed (${res.status})`);
