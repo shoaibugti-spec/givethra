@@ -82,6 +82,21 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain('paid_to: paidTo');
   });
 
+  it("keeps unlocked help content in the requested mobile-safe order", () => {
+    const mediaPosition = caseDetailSource.indexOf("order-1 min-w-0 overflow-hidden rounded-2xl bg-card border border-border");
+    const receiverPosition = caseDetailSource.indexOf("order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20");
+    const proofPosition = caseDetailSource.indexOf("order-3 min-w-0 overflow-hidden rounded-2xl bg-card border border-border");
+    expect(mediaPosition).toBeGreaterThan(-1);
+    expect(receiverPosition).toBeGreaterThan(-1);
+    expect(proofPosition).toBeGreaterThan(-1);
+    expect(caseDetailSource).toContain("flex min-w-0 flex-col gap-4");
+    expect(caseDetailSource).toContain("break-words whitespace-normal");
+    expect(caseDetailSource).toContain("flex flex-col gap-2 sm:flex-row");
+    expect(caseDetailSource).toContain("order-1 min-w-0 overflow-hidden rounded-2xl bg-card border border-border");
+    expect(caseDetailSource).toContain("order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20");
+    expect(caseDetailSource).toContain("order-3 min-w-0 overflow-hidden rounded-2xl bg-card border border-border");
+  });
+
   it("keeps verification appeal video view-only after unlock", () => {
     expect(caseDetailSource).toContain("Verification Appeal Video (View Only)");
     expect(caseDetailSource).toContain('controlsList="nodownload noplaybackrate"');

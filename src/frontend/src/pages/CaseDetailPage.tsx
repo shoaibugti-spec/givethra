@@ -179,10 +179,10 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
 function CopyRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
   if (!value) return null;
   return (
-    <div className="flex items-center justify-between gap-2 py-2 border-b border-border last:border-0">
-      <div className="min-w-0">
+    <div className="flex min-w-0 items-start justify-between gap-2 py-2 border-b border-border last:border-0">
+      <div className="min-w-0 flex-1">
         <p className="text-[11px] text-muted-foreground">{label}</p>
-        <p className={`text-sm font-medium text-foreground truncate ${mono ? "font-mono" : ""}`}>{value}</p>
+        <p className={`break-words whitespace-normal text-sm font-medium text-foreground ${mono ? "font-mono" : ""}`}>{value}</p>
       </div>
       <button type="button" onClick={() => copyToClipboard(value, label)}
         className="shrink-0 h-8 w-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary transition-colors"
@@ -1012,10 +1012,10 @@ export default function CaseDetailPage() {
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="flex min-w-0 flex-col gap-4">
                 {!isOwner && unlockMode === "full" && (
-                  <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
-                    <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h2 className="font-semibold">Direct Payment Receiver Details</h2></div>
+                  <div className="order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20 p-4 sm:p-5 space-y-2">
+                    <div className="flex min-w-0 items-center gap-2"><Building2 className="h-5 w-5 shrink-0 text-primary" /><h2 className="min-w-0 break-words font-semibold">Direct Payment Receiver Details</h2></div>
                     <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} to the verified receiver below. For bills, use the listed provider and consumer/reference number.</div>
                     {directPaymentRows.length > 0 ? directPaymentRows.map((row) => <CopyRow key={row.label} label={row.label} value={String(row.value)} mono={row.mono} />) : <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-700">Receiver payment details are not available yet. Please contact Givethra before sending money.</p>}
                     <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-700 dark:text-amber-400 mt-2">Pay only to the receiver details shown above. Keep the payment receipt and transaction/reference number, then submit both below for Givethra review.</div>
@@ -1023,7 +1023,7 @@ export default function CaseDetailPage() {
                 )}
 
                 {!isOwner && unlockMode === "partial" && (
-                  <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
+                  <div className="order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20 p-4 sm:p-5 space-y-2">
                     <div className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" /><h2 className="font-semibold">Contribute to Givethra Fundraising</h2></div>
                     <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send your contribution to Givethra. We collect all contributions and pay the institute once the goal is reached. You can contribute as many times as you like until the case is complete.</div>
                     <div className="space-y-1.5 pt-1">
@@ -1042,8 +1042,8 @@ export default function CaseDetailPage() {
 
 
 
-                <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
-                  <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">🎥 Verification Media</h2>{mediaUnlocked && <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600">Unlocked</span>}</div>
+                <div className="order-1 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-4 sm:p-5 space-y-3">
+                  <div className="flex min-w-0 items-center justify-between gap-2"><h2 className="min-w-0 break-words font-semibold">🎥 Verification Media</h2>{mediaUnlocked && <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600">Unlocked</span>}</div>
                   {mediaUnlocked ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {caseData.selfie_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Live Selfie</p><img src={caseData.selfie_url} alt="Selfie" className="w-full rounded-lg border max-h-40 object-cover" /></div>}
@@ -1058,7 +1058,7 @@ export default function CaseDetailPage() {
                 </div>
 
                 {!isOwner && myResolutions.length > 0 && (
-                  <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
+                  <div className="order-4 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-4 sm:p-5 space-y-3">
                     <h2 className="font-semibold flex items-center gap-2"><Heart className="h-4 w-4 text-primary" /> My Help on this case ({myResolutions.length})</h2>
                     {myResolutions.map((r: any) => (
                       <div key={r.id} className="rounded-xl border border-border p-3 space-y-2">
@@ -1079,7 +1079,7 @@ export default function CaseDetailPage() {
                 )}
 
                 {canHelpAgain && (
-                  <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+                  <div className="order-3 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-4 sm:p-5 space-y-4">
                     <h2 className="font-semibold">🤝 {myResolutions.length > 0 ? "Help Again" : (unlockMode === "partial" ? "Submit Your Contribution Proof" : "Resolve This Case")}</h2>
                     {myResolutions.length > 0 && <p className="text-xs text-muted-foreground">You can help this case as many times as you like until it's complete. {sym} {remaining} still needed.</p>}
                     {!showResolution ? (
@@ -1103,9 +1103,9 @@ export default function CaseDetailPage() {
                           {receiptName && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {receiptName} (will upload when you submit)</p>}
                         </div>
                         <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Any details..." /></div>
-                        <div className="flex gap-2">
-                          <Button className="flex-1" onClick={handleSubmitResolution} disabled={submitting}>{submitting ? "Submitting..." : unlockMode === "full" ? "Submit Direct Payment Proof" : "Submit Contribution Proof"}</Button>
-                          <Button variant="outline" onClick={() => setShowResolution(false)}>Cancel</Button>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Button className="w-full sm:flex-1" onClick={handleSubmitResolution} disabled={submitting}>{submitting ? "Submitting..." : unlockMode === "full" ? "Submit Direct Payment Proof" : "Submit Contribution Proof"}</Button>
+                          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setShowResolution(false)}>Cancel</Button>
                         </div>
                       </div>
                     )}
@@ -1113,7 +1113,7 @@ export default function CaseDetailPage() {
                 )}
 
                 {!isOwner && isCompleted && myResolutions.length > 0 && (
-                  <div className="rounded-2xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 p-5 text-center space-y-2">
+                  <div className="order-5 min-w-0 overflow-hidden rounded-2xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 p-5 text-center space-y-2">
                     <div className="text-3xl">🤲</div>
                     <h2 className="font-bold text-teal-700">This case is complete!</h2>
                     <p className="text-sm text-teal-700">Thank you for your help. May Allah reward you. Your affidavits are above.</p>
@@ -1121,7 +1121,7 @@ export default function CaseDetailPage() {
                 )}
 
                 {isOwner && !isCompleted && (
-                  <OwnerResolutions caseId={id} caseData={caseData} seekerKyc={seekerKyc} onConfirm={handleSeekerConfirm} onDispute={handleSeekerDispute} sym={sym} cur={cur} />
+                  <div className="order-5 min-w-0"><OwnerResolutions caseId={id} caseData={caseData} seekerKyc={seekerKyc} onConfirm={handleSeekerConfirm} onDispute={handleSeekerDispute} sym={sym} cur={cur} /></div>
                 )}
               </div>
             )}

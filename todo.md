@@ -1033,3 +1033,9 @@
 - [x] Lock Verification Media separately for every user, requiring one credit to unlock; show Wallet guidance when credit is unavailable.
 - [x] Preserve repeat-help after an existing mode unlock without charging a second unlock for the same case/mode, and reflect completed case payment state.
 - [x] Require total amount, transaction ID, and receipt before Direct/Contribution proof confirmation; verify My Cases/Admin payload behavior with regression coverage.
+
+## User-Reported Mobile Proof Layout Regression
+- [x] Restore a mobile-first single-column order: Case Details, Verification Media, Payment Receiver Details, amount, transaction ID, receipt attachment, submit proof, then lower status/details.
+- [x] Apply the same complete proof structure to Direct and Contribution help flows without horizontal overflow or clipped controls.
+- [x] Ensure amount, transaction ID, and file attachment controls are visibly present and usable on narrow screens.
+- [x] Add DOM-order/responsive regression coverage and validate tests, typecheck, and production build.
