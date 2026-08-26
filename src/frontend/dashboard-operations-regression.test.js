@@ -21,6 +21,14 @@ describe("dashboard operations repair", () => {
     expect(apiSource).toContain("Failed to submit deposit");
   });
 
+  it("shows a dedicated pending Contribution count separate from Direct Payments", () => {
+    expect(adminSource).toContain('const pendingContributionCount = pendingResolutions.filter((r) => r.paid_to === "givethra").length;');
+    expect(adminSource).toContain('const pendingDirectCount = pendingResolutions.filter((r) => r.paid_to !== "givethra").length;');
+    expect(adminSource).toContain('label: "Pending Contributions", value: pendingContributionCount');
+    expect(adminSource).toContain("Pending Direct Payments");
+    expect(adminSource).toContain("{pendingContributionCount}");
+  });
+
   it("shows submitted Contributions in Verify Help with proof details and reason-gated rejection", () => {
     expect(adminSource).toContain('const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"])');
     expect(adminSource).toContain("const pendingResolutions = resolutions.filter");

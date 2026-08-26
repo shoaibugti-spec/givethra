@@ -568,6 +568,8 @@ export default function AdminPage() {
 
   const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"]);
   const pendingResolutions = resolutions.filter((r) => pendingResolutionStatuses.has(String(r.status || "").toLowerCase()));
+  const pendingContributionCount = pendingResolutions.filter((r) => r.paid_to === "givethra").length;
+  const pendingDirectCount = pendingResolutions.filter((r) => r.paid_to !== "givethra").length;
   const completedResolutionsCount = resolutions.filter((r) => r.status === "completed").length;
 
   const approvedCases = caseList.filter((c) => c.status === "approved");
@@ -642,6 +644,7 @@ export default function AdminPage() {
             { label: "Pending KYC", value: pendingKyc.length },
             { label: "Pending Cases", value: pendingCases.length },
             { label: "Verify Help", value: pendingResolutions.length },
+            { label: "Pending Contributions", value: pendingContributionCount },
             { label: "Ready to Pay", value: readyToClose.length },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-xl border bg-card p-4">
@@ -757,7 +760,7 @@ export default function AdminPage() {
             <TabsContent value="verify" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
                 <ShieldIcon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                <p>Verify each help — check the receipt and amount, then confirm to add it to the case's collected total. <strong>Direct</strong> helps close the case when full. <strong>Fundraising</strong> contributions add up; when the goal is reached, go to "Pay & Close" to pay the institute yourself.</p>
+                <div className="space-y-2"><p>Verify each help — check the receipt and amount, then confirm to add it to the case's collected total. <strong>Direct</strong> helps close the case when full. <strong>Fundraising</strong> contributions add up; when the goal is reached, go to "Pay & Close" to pay the institute yourself.</p><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Pending Contributions</span><strong className="block text-lg text-primary">{pendingContributionCount}</strong></div><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Pending Direct Payments</span><strong className="block text-lg text-primary">{pendingDirectCount}</strong></div></div></div>
               </div>
               {pendingResolutions.length === 0 ? <Empty text="No help awaiting verification" /> :
                 pendingResolutions.map((r) => {

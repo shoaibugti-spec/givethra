@@ -1079,3 +1079,8 @@
 - [x] Ensure Admin displays amount, transaction ID, receipt attachment, case, helper, seeker, and payment destination.
 - [x] Ensure approve/reject actions update the correct resolution status and require a meaningful rejection reason when rejecting.
 - [x] Add regression coverage and validate the Admin repair before synchronization.
+
+## User-Requested Admin Contribution Count
+- [x] Add a dedicated pending Contribution count to the Admin overview and Verify Help tab.
+- [x] Exclude Direct Payment, completed, rejected, and disputed records from that dedicated count.
+- [x] Add regression coverage for count accuracy and validate the Admin build before synchronization.
