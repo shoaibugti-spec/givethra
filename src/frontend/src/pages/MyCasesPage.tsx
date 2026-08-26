@@ -13,6 +13,7 @@ import {
   getCaseUnlocksByHero,
   getCasesByIds,
   getCaseResolutions,
+  getCaseResolutionsByHero,
 } from "@/lib/api";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -58,13 +59,26 @@ export default function MyCasesPage() {
       const cases = await getCasesByUser(user.id);
       setMyCases(cases ?? []);
 
-      // 2. Load cases that the user has unlocked (as a Hero)
-      const unlocks = await getCaseUnlocksByHero(user.id);
-      if (unlocks && unlocks.length > 0) {
-        const ids: string[] = Array.from(new Set(unlocks.map((u: any) => String(u.case_id || "")).filter(Boolean)));
+      // 2. Load both unlocks and resolution history. A completed case may no
+      // longer be present in an active unlock-only response, but its verified
+      // resolution must remain visible in My Cases for the Hero.
+      const [unlocks, heroResolutions] = await Promise.all([
+        getCaseUnlocksByHero(user.id),
+        getCaseResolutionsByHero(user.id),
+      ]);
+      const resolutionRows = Array.isArray(heroResolutions) ? heroResolutions : [];
+      const ids: string[] = Array.from(new Set([
+        ...(Array.isArray(unlocks) ? unlocks : []).map((u: any) => String(u.case_id || "")),
+        ...resolutionRows.map((r: any) => String(r.case_id || "")),
+      ].filter(Boolean)));
+      if (ids.length > 0) {
         const [unlockedData, resolutionEntries] = await Promise.all([
           getCasesByIds(ids),
-          Promise.all(ids.map(async (caseId) => [caseId, await getCaseResolutions(caseId, user.id)] as const)),
+          Promise.all(ids.map(async (caseId) => {
+            const directRows = resolutionRows.filter((row: any) => String(row.case_id) === caseId);
+            if (directRows.length) return [caseId, directRows] as const;
+            return [caseId, await getCaseResolutions(caseId, user.id)] as const;
+          })),
         ]);
         setUnlockedCases(unlockedData ?? []);
         setHelpByCase(Object.fromEntries(resolutionEntries.map(([caseId, rows]) => [caseId, Array.isArray(rows) ? rows : []])));

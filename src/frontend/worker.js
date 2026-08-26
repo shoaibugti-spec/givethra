@@ -881,6 +881,21 @@ async function handleRequest(request, env, ctx) {
     return handleHeroesWall(request, env, origin);
   }
 
+  if (parts[0] === "api" && parts[1] === "feedbacks" && request.method === "GET" && !url.searchParams.get("case_id") && !url.searchParams.get("user_id")) {
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 50), 1), 500);
+    const rows = await env.DB.prepare(
+      "SELECT f.*, u.full_name as user_name, c.title as case_title, c.status as case_status FROM feedbacks f LEFT JOIN users u ON f.user_id = u.user_id LEFT JOIN case_submissions c ON c.id = f.case_id WHERE lower(COALESCE(c.status, '')) = 'completed' ORDER BY f.created_at DESC LIMIT ?"
+    ).bind(limit).all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (parts[0] === "api" && parts[1] === "feedback-likes" && request.method === "GET") {
+    const rows = await env.DB.prepare("SELECT * FROM feedback_likes").all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (parts[0] === "api" && parts[1] === "feedback-comments" && request.method === "GET") {
+    const rows = await env.DB.prepare("SELECT fc.*, u.full_name as user_name FROM feedback_comments fc LEFT JOIN users u ON fc.user_id = u.user_id").all();
+    return json(rows.results || [], 200, origin);
+  }
   if (parts[0] === "api" && parts[1] === "community") {
     const user = await authenticate(request, env, googleClientId(env));
     if (parts[2] === "mark-read" && request.method === "PUT") {
@@ -1484,10 +1499,15 @@ async function handleRequest(request, env, ctx) {
     // Case resolutions
     if (parts[1] === "case-resolutions") {
       if (request.method === "GET") {
-        const caseId = url.searchParams.get("case_id");
-        const heroId = url.searchParams.get("hero_id");
-        const sql = "SELECT r.*, COALESCE(p.full_name, u.full_name) AS hero_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.hero_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS hero_cnic_number FROM case_resolutions r LEFT JOIN profiles p ON p.user_id = r.hero_id LEFT JOIN users u ON u.user_id = r.hero_id WHERE r.case_id = ?" + (heroId ? " AND r.hero_id = ?" : "");
-        const bind = heroId ? [caseId, heroId] : [caseId];
+        const caseId = String(url.searchParams.get("case_id") || "").trim();
+        const heroId = String(url.searchParams.get("hero_id") || "").trim();
+        const filters = [];
+        const bind = [];
+        if (caseId) { filters.push("r.case_id = ?"); bind.push(caseId); }
+        if (heroId) { filters.push("r.hero_id = ?"); bind.push(heroId); }
+        if (!filters.length) return json({ error: "case_id or hero_id is required" }, 400, origin);
+        if (!user || (heroId && user.user_id !== heroId)) return json({ error: "Forbidden" }, 403, origin);
+        const sql = "SELECT r.*, COALESCE(p.full_name, u.full_name) AS hero_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.hero_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS hero_cnic_number FROM case_resolutions r LEFT JOIN profiles p ON p.user_id = r.hero_id LEFT JOIN users u ON u.user_id = r.hero_id WHERE " + filters.join(" AND ") + " ORDER BY r.submitted_at DESC";
         const rows = await env.DB.prepare(sql).bind(...bind).all();
         return json(rows.results || [], 200, origin);
       }

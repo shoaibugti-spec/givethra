@@ -30,8 +30,10 @@ describe("public Community composer placement", () => {
 
 
 describe("homepage Heroes Wall", () => {
-  it("renders Heroes Wall and Social Wall immediately before Download App", () => {
+  it("renders Heroes Wall, Kindness Wall, and Social Wall immediately before Download App", () => {
     expect(homePageSource).toContain('import HeroesWall from "@/components/HeroesWall";');
+    expect(homePageSource).toContain('import KindnessWall from "@/components/KindnessWall";');
+    expect(homePageSource).toContain("<KindnessWall />");
     expect(homePageSource).toContain("<FeedbackWall />");
     expect(homePageSource).toContain("<HeroesWall />");
     expect(homePageSource.indexOf("<HeroesWall />")).toBeLessThan(homePageSource.indexOf("Download App"));
@@ -50,6 +52,16 @@ describe("homepage Heroes Wall", () => {
     expect(heroesWallSource).toContain("Total help delivered");
     expect(heroesWallSource).toContain('aria-label="Previous completed case"');
     expect(heroesWallSource).toContain('aria-label="Next completed case"');
+  });
+
+  it("keeps Kindness Wall on the approved feedback interaction contract", () => {
+    const kindnessWallSource = readFileSync(new URL("../components/KindnessWall.tsx", import.meta.url), "utf8");
+    const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
+    expect(kindnessWallSource).toContain("getFeedbacks(100)");
+    expect(kindnessWallSource).toContain("toggleFeedbackLike(current.id");
+    expect(kindnessWallSource).toContain("createComment({ feedback_id: current.id");
+    expect(kindnessWallSource).toContain("Kindness Wall");
+    expect(workerSource).toContain('parts[0] === "api" && parts[1] === "feedbacks" && request.method === "GET"');
   });
 
   it("uses public community interactions for each completed-case card", () => {

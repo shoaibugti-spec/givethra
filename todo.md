@@ -1214,3 +1214,17 @@
 - [x] Ensure completed Hero help cards, aggregate impact, likes/comments, and Social Wall content render in that homepage section.
 - [x] Restore Admin KYC, Cases, Contributions, Direct Payments, Pay & Close, and Deposits tabs with their existing records and explicit Approve/Reject controls.
 - [x] Add focused regression coverage, run tests/build, and synchronize the repair without changing D1/R2 data.
+
+## Reported Missing Help History and Heroes Wall Data
+- [x] Trace why My Cases returns Helping 0 and Completed 0 despite the completed help record.
+- [x] Trace why Heroes Wall reports authentication/database failure on mobile and public sessions.
+- [x] Reconcile completed resolution, aggregate metric, feedback, and affidavit data mappings without changing D1/R2 records.
+- [x] Add regression coverage for authenticated help history, public Heroes Wall loading, and complete affidavit fields/masking.
+- [x] Validate, synchronize, and document the safe deployment/cache refresh requirements.
+
+## Approved Help History, Heroes Wall, and Kindness Wall
+- [x] Keep approved/completed direct-help and contribution records visible in My Cases history instead of dropping them to zero.
+- [x] Repair Heroes Wall authentication/database loading and show completed approved cases with impact totals.
+- [x] Add a separate Kindness Wall below Heroes Wall for approved seeker feedback video/caption cards with slider, likes, comments, and safe public visibility.
+- [x] Verify approval-to-completion, feedback publication, and helper/seeker affidavit paths without changing existing D1/R2 data.
+- [x] Add regression coverage, validate, synchronize, and document the matched deployment/cache refresh.

@@ -7,6 +7,8 @@ const source = fs.readFileSync(path.resolve(__dirname, "MyCasesPage.tsx"), "utf8
 describe("My Cases help history", () => {
   it("loads resolutions alongside unlocked cases", () => {
     expect(source).toContain("getCaseResolutions");
+    expect(source).toContain("getCaseResolutionsByHero");
+    expect(source).toContain("resolutionRows.map");
     expect(source).toContain("Promise.all(ids.map(async (caseId)");
     expect(source).toContain("setHelpByCase");
   });

@@ -2,6 +2,7 @@ import InstallButton from "@/components/InstallButton";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
 import FeedbackWall from "@/components/FeedbackWall";
 import HeroesWall from "@/components/HeroesWall";
+import KindnessWall from "@/components/KindnessWall";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1311,6 +1312,7 @@ export default function HomePage() {
         </section>
 
                 <HeroesWall />
+        <KindnessWall />
         <FeedbackWall />
         <section className="mx-auto max-w-3xl px-4 pt-8">
           <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:flex-row">

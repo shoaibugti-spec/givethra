@@ -292,10 +292,17 @@ export async function insertCaseUnlock(data: any) {
 
 // ---------- CASE RESOLUTIONS ----------
 export async function getCaseResolutions(caseId: string, heroId?: string) {
-  let url = `${WORKER_URL}/api/case-resolutions?case_id=${caseId}`;
-  if (heroId) url += `&hero_id=${heroId}`;
+  let url = `${WORKER_URL}/api/case-resolutions?case_id=${encodeURIComponent(caseId)}`;
+  if (heroId) url += `&hero_id=${encodeURIComponent(heroId)}`;
   const res = await fetch(url, { headers: headers() });
   return res.json();
+}
+
+export async function getCaseResolutionsByHero(heroId: string) {
+  const res = await fetch(`${WORKER_URL}/api/case-resolutions?hero_id=${encodeURIComponent(heroId)}`, { headers: headers(), cache: "no-store" });
+  const result = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(result?.error || `Failed to load help history (${res.status})`);
+  return Array.isArray(result) ? result : [];
 }
 
 export async function insertCaseResolution(data: any) {
