@@ -1026,3 +1026,10 @@
 - [x] Ensure Direct Payment proof captures total amount paid, transaction ID, receipt attachment, and confirmation submission.
 - [x] Verify the submitted record reaches Admin with the correct institute destination and reviewable status.
 - [x] Add regression coverage and validate tests, typecheck, and production build before synchronization.
+
+## User-Requested Per-Case Unlock and Verification Media State Refinement
+- [x] Keep Direct and Contribution unlocks one-time per case and per mode; new cases require their own unlock rule.
+- [x] Keep Contribution amount entry closed until Contribution mode is unlocked, then show the case remaining amount and enforce complete proof flow.
+- [x] Lock Verification Media separately for every user, requiring one credit to unlock; show Wallet guidance when credit is unavailable.
+- [x] Preserve repeat-help after an existing mode unlock without charging a second unlock for the same case/mode, and reflect completed case payment state.
+- [x] Require total amount, transaction ID, and receipt before Direct/Contribution proof confirmation; verify My Cases/Admin payload behavior with regression coverage.

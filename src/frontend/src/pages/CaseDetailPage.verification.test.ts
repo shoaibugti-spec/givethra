@@ -25,7 +25,7 @@ describe("public case verification presentation", () => {
   });
 
   it("loads independent Case Detail data requests in parallel", () => {
-    expect(caseDetailSource).toContain("const [unlock, count, res, kyc, prof] = await Promise.all([");
+    expect(caseDetailSource).toContain("const [fullUnlock, contributionUnlock, mediaUnlock, count, res, kyc, prof] = await Promise.all([");
   });
 
   it("keeps the three badges before the visible case-document block and prevents deadline wrapping", () => {
@@ -48,7 +48,7 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("Help Now — Direct Payment (1 credit)");
     expect(caseDetailSource).toContain("3 contribution helps are FREE");
     expect(caseDetailSource).toContain("Contribution helps after the first 3 require 1 credit.");
-    expect(caseDetailSource).toContain("(myUnlock || unlockMode !== \"choose\") && (");
+    expect(caseDetailSource).toContain("{mediaUnlocked ? (");
   });
 
   it("shows wallet guidance and enforces Contribution amount and free-use rules", () => {
@@ -84,11 +84,22 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("onContextMenu={e => e.preventDefault()}");
   });
 
+  it("keeps Verification Media separately locked behind one credit", () => {
+    expect(caseDetailSource).toContain('getCaseUnlock(id, user.id, "media")');
+    expect(caseDetailSource).toContain('payment_type: "media"');
+    expect(caseDetailSource).toContain("Verification Media is locked.");
+    expect(caseDetailSource).toContain("Unlock Verification Media (1 credit)");
+    expect(caseDetailSource).toContain("view verification media");
+    expect(caseDetailSource).toContain("setMediaUnlocked(!!mediaUnlock || owner)");
+  });
+
   it("keeps the Direct Payment lookup isolated from Contribution unlocks", () => {
     const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
     const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
-    expect(apiSource).toContain("paymentType: \"full\" | \"partial\" = \"full\"");
+    expect(apiSource).toContain("paymentType: \"full\" | \"partial\" | \"media\" = \"full\"");
     expect(apiSource).toContain("payment_type=${paymentType}");
     expect(workerSource).toContain('filters.push("payment_type = ?")');
+    expect(workerSource).toContain('requestedType === "media"');
+    expect(workerSource).toContain('body?.payment_type === "media"');
   });
 });

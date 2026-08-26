@@ -205,6 +205,8 @@ export default function CaseDetailPage() {
   const [showResolution, setShowResolution] = useState(false);
   const [myResolutions, setMyResolutions] = useState<any[]>([]);
   const [myUnlock, setMyUnlock] = useState<any>(null);
+  const [mediaUnlocked, setMediaUnlocked] = useState(false);
+  const [mediaUnlocking, setMediaUnlocking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [heroName, setHeroName] = useState("Verified Hero");
 
@@ -286,15 +288,21 @@ export default function CaseDetailPage() {
 
       if (user && data) {
         const owner = data.user_id === user.id;
-        const [unlock, count, res, kyc, prof] = await Promise.all([
-          getCaseUnlock(id, user.id),
+        const [fullUnlock, contributionUnlock, mediaUnlock, count, res, kyc, prof] = await Promise.all([
+          getCaseUnlock(id, user.id, "full"),
+          getCaseUnlock(id, user.id, "partial"),
+          getCaseUnlock(id, user.id, "media"),
           getUserUnlockCount(user.id),
           getCaseResolutions(id, user.id),
           getKycSubmission(data.user_id),
           getProfile(user.id),
         ]);
-        setMyUnlock(unlock);
-        setUnlocked(!!unlock || owner);
+        const activeUnlock = fullUnlock || contributionUnlock || null;
+        setMyUnlock(activeUnlock);
+        setUnlocked(!!activeUnlock || owner);
+        setContributionOpen(!!contributionUnlock);
+        setPayMode(contributionUnlock ? "partial" : fullUnlock ? "full" : "choose");
+        setMediaUnlocked(!!mediaUnlock || owner);
         setUserUnlockCount(count ?? 0);
         setMyResolutions((res ?? []).slice().reverse());
         setSeekerKyc(kyc);
@@ -480,6 +488,26 @@ export default function CaseDetailPage() {
       toast.error("Failed to unlock case: " + err.message);
     }
     finally { setUnlocking(false); }
+  }
+
+  async function handleUnlockMedia() {
+    if (!user) { navigate({ to: "/sign-in" }); return; }
+    if (walletLoading) return;
+    if (walletBalance < 1) {
+      toast.error("You have no credits. Please add 1 credit in your Wallet to view verification media.");
+      return;
+    }
+    setMediaUnlocking(true);
+    try {
+      await insertCaseUnlock({ case_id: id, hero_id: user.id, pledged_amount: null, credits_charged: 1, payment_type: "media" });
+      setMediaUnlocked(true);
+      setWalletBalance(prev => Math.max(prev - 1, 0));
+      toast.success("Verification Media unlocked. 1 credit deducted.");
+    } catch (err: any) {
+      toast.error("Failed to unlock Verification Media: " + (err?.message || "Please try again."));
+    } finally {
+      setMediaUnlocking(false);
+    }
   }
 
   async function handleSubmitResolution() {
@@ -1016,11 +1044,16 @@ export default function CaseDetailPage() {
 
 
                 <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
-                  <h2 className="font-semibold">🎥 Verification Media</h2>
-                  {(myUnlock || unlockMode !== "choose") && (
+                  <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">🎥 Verification Media</h2>{mediaUnlocked && <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600">Unlocked</span>}</div>
+                  {mediaUnlocked ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {caseData.selfie_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Live Selfie</p><img src={caseData.selfie_url} alt="Selfie" className="w-full rounded-lg border max-h-40 object-cover" /></div>}
                       {caseData.video_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Verification Appeal Video (View Only)</p><video src={caseData.video_url} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline onContextMenu={e => e.preventDefault()} className="w-full rounded-lg border max-h-40" /></div>}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-2 text-sm text-amber-800 dark:text-amber-300">
+                      <p><strong>Verification Media is locked.</strong> Unlock it with 1 credit to view the approved selfie and appeal video.</p>
+                      {isAuthenticated && !walletLoading && walletBalance < 1 ? <Button type="button" variant="outline" onClick={() => navigate({ to: "/wallet" })} className="w-full gap-2 border-amber-400 text-amber-800 dark:text-amber-300">Add 1 Credit in Wallet <ExternalLink className="h-3.5 w-3.5" /></Button> : <Button type="button" onClick={handleUnlockMedia} disabled={!isAuthenticated || mediaUnlocking || walletLoading} className="w-full gap-2">{mediaUnlocking ? "Unlocking..." : "Unlock Verification Media (1 credit)"}</Button>}
                     </div>
                   )}
                 </div>

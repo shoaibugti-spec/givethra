@@ -1389,7 +1389,7 @@ async function handleRequest(request, env, ctx) {
         const caseId = url.searchParams.get("case_id");
         const heroId = url.searchParams.get("hero_id");
         const requestedType = url.searchParams.get("payment_type");
-        const paymentType = requestedType === "full" || requestedType === "partial" ? requestedType : null;
+        const paymentType = requestedType === "full" || requestedType === "partial" || requestedType === "media" ? requestedType : null;
         const filters = [];
         const bind = [];
         if (caseId) { filters.push("case_id = ?"); bind.push(caseId); }
@@ -1403,7 +1403,7 @@ async function handleRequest(request, env, ctx) {
         const body = await readJson(request);
         const caseId = String(body?.case_id || "").trim();
         const heroId = String(body?.hero_id || "").trim();
-        const paymentType = body?.payment_type === "full" ? "full" : "partial";
+        const paymentType = body?.payment_type === "full" ? "full" : body?.payment_type === "media" ? "media" : "partial";
         if (!user || !caseId || !heroId || user.user_id !== heroId) return json({ error: "Unauthorized unlock request" }, 403, origin);
         const existing = await env.DB.prepare("SELECT * FROM case_unlocks WHERE case_id = ? AND hero_id = ? AND payment_type = ? ORDER BY unlocked_at DESC LIMIT 1").bind(caseId, heroId, paymentType).first();
         if (existing) return json(existing, 200, origin);

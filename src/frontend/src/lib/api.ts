@@ -180,7 +180,7 @@ export async function getCategoryCounts() {
 }
 
 // ---------- CASE UNLOCKS ----------
-export async function getCaseUnlock(caseId: string, heroId: string, paymentType: "full" | "partial" = "full") {
+export async function getCaseUnlock(caseId: string, heroId: string, paymentType: "full" | "partial" | "media" = "full") {
   const res = await fetch(
     `${WORKER_URL}/api/case-unlocks?case_id=${caseId}&hero_id=${heroId}&payment_type=${paymentType}`,
     { headers: headers() }
