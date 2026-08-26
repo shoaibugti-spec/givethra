@@ -46,8 +46,8 @@ describe("dashboard operations repair", () => {
   });
 
   it("keeps Admin proof actions wired to persisted status and rejection-note updates", () => {
-    expect(adminSource).toContain('onClick={() => onConfirm(r)}');
-    expect(adminSource).toContain('onClick={() => onReject(r, rejectionReason)}');
+    expect(adminSource).toContain('<Button type="button" size="sm" className="w-full sm:flex-1 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onConfirm(r)}>');
+    expect(adminSource).toContain('<Button type="button" size="sm" variant="outline" className="w-full sm:w-auto text-red-600 border-red-300" disabled={!rejectionReason.trim()} onClick={() => onReject(r, rejectionReason)}>');
     expect(adminSource).toContain('status: "completed", admin_confirmed: true');
     expect(adminSource).toContain('status: "disputed", admin_confirmed: false, notes: trimmedReason');
     expect(workerSource).toContain('const allowed = ["status", "admin_confirmed", "admin_confirmed_at", "completed_at", "notes"];');

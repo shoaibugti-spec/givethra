@@ -1162,3 +1162,9 @@
 - [x] Repair both actions so they persist the correct status and rejection reason, then refresh the Admin queue.
 - [x] Surface API/Worker errors clearly and preserve all receipt, amount, Txn ID, and payment records.
 - [x] Add regression coverage and validate the action paths before synchronization.
+
+## Reopened Admin Approve and Reject Button Failure
+- [x] Reproduce and trace both buttons from the rendered Admin card through the API helper and Worker route.
+- [x] Repair the exact failing request or mutation while preserving payment proof data.
+- [x] Add regression coverage for successful approval and rejection payloads and queue refresh behavior.
+- [x] Run tests/build and synchronize the verified repair.

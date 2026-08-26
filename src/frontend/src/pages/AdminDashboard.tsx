@@ -1223,10 +1223,10 @@ function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
       <div className="space-y-2 pt-1 border-t border-border">
         <Textarea aria-label="Rejection reason" placeholder="Rejection reason (required when rejecting)" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} rows={2} className="text-sm" />
         <div className="flex flex-col sm:flex-row gap-2">
-          <Button size="sm" className="w-full sm:flex-1 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onConfirm(r)}>
+          <Button type="button" size="sm" className="w-full sm:flex-1 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onConfirm(r)}>
             <CheckCircle className="h-3.5 w-3.5 mr-1" /> Verify & Add {s} {confirmedAmt}
           </Button>
-          <Button size="sm" variant="outline" className="w-full sm:w-auto text-red-600 border-red-300" disabled={!rejectionReason.trim()} onClick={() => onReject(r, rejectionReason)}>
+          <Button type="button" size="sm" variant="outline" className="w-full sm:w-auto text-red-600 border-red-300" disabled={!rejectionReason.trim()} onClick={() => onReject(r, rejectionReason)}>
             <XCircle className="h-3.5 w-3.5 mr-1" /> Reject Proof
           </Button>
         </div>
