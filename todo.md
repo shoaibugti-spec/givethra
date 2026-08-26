@@ -1047,10 +1047,10 @@
 - [x] Preserve a controlled real-user Contribution canary checklist covering receipt, transaction ID, Admin review, approval/rejection, and affidavit completion.
 
 ## User-Reported Payment Proof Form Verification
-- [ ] Verify both Direct and Contribution unlocked forms visibly include amount, transaction/reference number, receipt file attachment, and submit action.
-- [ ] Verify the amount shown to the user matches the intended Direct total or Contribution amount and cannot be below/above the allowed case boundary.
-- [ ] Verify receipt URL, transaction ID, amount, payment destination, case ID, and helper ID reach Admin review with a pending status.
-- [ ] Validate the form on narrow mobile widths and add or update regression coverage before synchronization.
+- [x] Verify both Direct and Contribution unlocked forms visibly include amount, transaction/reference number, receipt file attachment, and submit action.
+- [x] Verify the amount shown to the user matches the intended Direct total or Contribution amount and cannot be below/above the allowed case boundary.
+- [x] Verify receipt URL, transaction ID, amount, payment destination, case ID, and helper ID reach Admin review with a pending status.
+- [x] Validate the form on narrow mobile widths and add or update regression coverage before synchronization.
 
 ## Urgent Contribution Proof Controls Regression
 - [x] Confirm unlocked Contribution visibly shows amount, transaction/reference ID, receipt/bank-slip attachment, and Submit Contribution Proof.
@@ -1062,3 +1062,9 @@
 - [x] Automatically open the first-help Contribution proof form after Contribution unlock.
 - [x] Keep Amount, Transaction ID, receipt attachment, and submit controls visible immediately after receiver details on both mobile and desktop.
 - [x] Add regression coverage and validate the auto-open behavior before synchronization.
+
+## Definitive Payment-Proof Visibility Requirement
+- [x] Render a real visible receipt/bank-slip file input in unlocked Direct Payment.
+- [x] Render a real visible receipt/bank-slip file input in unlocked Contribution.
+- [x] Render visible Transaction ID/Payment Reference and Amount fields in both modes.
+- [x] Keep the proof submit button in the same visible panel and validate both modes before the single final deployment.

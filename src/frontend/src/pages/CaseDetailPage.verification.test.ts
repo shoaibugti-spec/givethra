@@ -82,6 +82,15 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain('paid_to: paidTo');
   });
 
+  it("keeps first-help proof controls directly visible without a hidden CTA", () => {
+    expect(caseDetailSource).toContain("(!showResolution && myResolutions.length > 0) ? (");
+    expect(caseDetailSource).toContain('type="file" accept="image/*,.pdf"');
+    expect(caseDetailSource).toContain("Transaction ID / Payment Reference *");
+    expect(caseDetailSource).toContain("Amount Paid ({cur}) *");
+    expect(caseDetailSource).toContain("Submit Contribution Proof");
+    expect(caseDetailSource).toContain("Submit Direct Payment Proof");
+  });
+
   it("auto-opens the first-help proof form after unlock", () => {
     expect(caseDetailSource).toContain("setShowResolution(Boolean(activeUnlock && loadedResolutions.length === 0));");
     expect(caseDetailSource).toContain("setShowResolution(true);");

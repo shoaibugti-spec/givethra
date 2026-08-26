@@ -1085,8 +1085,8 @@ export default function CaseDetailPage() {
                   <div className="order-3 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-4 sm:p-5 space-y-4">
                     <h2 className="font-semibold">🤝 {myResolutions.length > 0 ? "Help Again" : (unlockMode === "partial" ? "Submit Your Contribution Proof" : "Resolve This Case")}</h2>
                     {myResolutions.length > 0 && <p className="text-xs text-muted-foreground">You can help this case as many times as you like until it's complete. {sym} {remaining} still needed.</p>}
-                    {!showResolution ? (
-                      <Button onClick={() => setShowResolution(true)} className="w-full gap-2"><Heart className="h-4 w-4" /> {myResolutions.length > 0 ? "Add More Help" : (unlockMode === "partial" ? "I Contributed — Submit Proof" : "I Helped — Submit Proof")}</Button>
+                    {(!showResolution && myResolutions.length > 0) ? (
+                      <Button onClick={() => setShowResolution(true)} className="w-full gap-2"><Heart className="h-4 w-4" /> Add More Help</Button>
                     ) : (
                       <div className="space-y-4">
                         <div className="space-y-2">
