@@ -296,6 +296,42 @@ export async function insertDeposit(data: any) {
   return res.json();
 }
 
+// ---------- PUBLIC IMPACT WALLS ----------
+export async function getHeroesWall(limit = 24) {
+  const res = await fetch(`${WORKER_URL}/api/heroes-wall?limit=${limit}`, { headers: headers(), cache: "no-store" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `Heroes Wall request failed (${res.status})`);
+  return data;
+}
+
+export async function toggleLike(postId: string) {
+  const res = await fetch(`${WORKER_URL}/api/community/posts/${encodeURIComponent(postId)}/likes`, {
+    method: "POST",
+    headers: headers(),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `Like request failed (${res.status})`);
+  return data;
+}
+
+export async function getPostComments(postId: string) {
+  const res = await fetch(`${WORKER_URL}/api/community/posts/${encodeURIComponent(postId)}/comments`, { headers: headers() });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(data?.error || `Comments request failed (${res.status})`);
+  return data;
+}
+
+export async function addComment(postId: string, comment: string) {
+  const res = await fetch(`${WORKER_URL}/api/community/posts/${encodeURIComponent(postId)}/comments`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ comment }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `Comment request failed (${res.status})`);
+  return data;
+}
+
 // ---------- FEEDBACK ----------
 export async function getFeedbacks(limit = 50) {
   const res = await fetch(

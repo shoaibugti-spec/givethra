@@ -46,7 +46,7 @@ describe("homepage Heroes Wall", () => {
     const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
     const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
     expect(apiSource).toContain("/api/heroes-wall");
-    expect(workerSource).toContain("lower(COALESCE(status, '')) = 'completed'");
+    expect(workerSource).toContain("lower(COALESCE(c.status, '')) = 'completed'");
     expect(workerSource).toContain("lower(COALESCE(r.status, '')) IN ('approved', 'completed')");
     expect(workerSource).toContain("verified_amount");
     expect(workerSource).toContain("solved_cases");

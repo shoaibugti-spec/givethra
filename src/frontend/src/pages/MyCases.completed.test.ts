@@ -8,6 +8,9 @@ const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "
 describe("completed help visibility", () => {
   it("loads helper resolution history separately from active unlocks", () => {
     expect(apiSource).toContain("getCaseResolutionsByHero");
+    expect(apiSource).toContain("getHeroesWall");
+    expect(apiSource).toContain("/api/heroes-wall");
+    expect(apiSource).toContain("/api/community/posts/");
     expect(myCasesSource).toContain("getCaseResolutionsByHero(user.id)");
     expect(myCasesSource).toContain("caseIds = Array.from(new Set");
   });
