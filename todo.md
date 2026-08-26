@@ -1235,3 +1235,10 @@
 - [x] Ensure approved seeker video/caption appears immediately in Kindness Wall.
 - [x] Preserve the existing ordering, mobile layout, affidavits, and all D1/R2 records.
 - [x] Add regression coverage, validate, synchronize, and document matched deployment requirements.
+
+## Uniform Admin Status Sections and Automatic Public Walls
+- [x] Audit KYC, Cases, Contributions, Direct Payments, Pay & Close, and Deposits for consistent Pending and Approved/Completed sections.
+- [x] Show complete record summaries and the correct approval/rejection controls in each applicable Admin section.
+- [x] Repair Heroes Wall authentication/data loading so an Admin-approved completed case appears with solved count and total help delivered.
+- [x] Ensure approved seeker feedback video/caption automatically appears in Kindness Wall with slider, likes, and comments.
+- [x] Add regression coverage, validate, synchronize, and document matched Worker/assets deployment.

@@ -25,15 +25,17 @@ describe("dashboard operations repair", () => {
     expect(adminSource).toContain('value="contributions"');
     expect(adminSource).toContain('>Contributions {pendingContributionCount > 0');
     expect(adminSource).toContain('No Contributions awaiting verification');
-    expect(adminSource).toContain('pendingContributions.map');
+    expect(adminSource).toContain('visibleContributionResolutions.map');
+    expect(adminSource).toContain('aria-label="Contribution status filters"');
+    expect(adminSource).toContain('aria-label="Direct payment status filters"');
     expect(adminSource).toContain('value="verify">Direct Payments');
   });
 
   it("separates pending and completed payment histories by domain", () => {
     expect(adminSource).toContain('const completedContributions = resolutions.filter((r) => r.status === "completed" && r.paid_to === "givethra");');
     expect(adminSource).toContain('const completedDirectResolutions = resolutions.filter((r) => r.status === "completed" && r.paid_to !== "givethra");');
-    expect(adminSource).toContain("Completed Contributions:");
-    expect(adminSource).toContain("Completed Direct Payments:");
+    expect(adminSource).toContain("Approved / Completed ({completedContributions.length})");
+    expect(adminSource).toContain("Approved / Completed ({completedDirectResolutions.length})");
     expect(adminSource).toContain("Reject / Return to Review");
     expect(adminSource).toContain("Approve & Mark as Paid");
     expect(adminSource).toContain("rejection_reason: trimmed");

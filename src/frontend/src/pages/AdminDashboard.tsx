@@ -274,6 +274,7 @@ export default function AdminPage() {
   const [suspensions, setSuspensions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadSupport, setUnreadSupport] = useState(0);
+  const [resolutionView, setResolutionView] = useState<"pending" | "completed">("pending");
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -611,6 +612,8 @@ export default function AdminPage() {
   const completedContributions = resolutions.filter((r) => r.status === "completed" && r.paid_to === "givethra");
   const completedDirectResolutions = resolutions.filter((r) => r.status === "completed" && r.paid_to !== "givethra");
   const completedResolutionsCount = resolutions.filter((r) => r.status === "completed").length;
+  const visibleDirectResolutions = resolutionView === "pending" ? pendingDirectResolutions : completedDirectResolutions;
+  const visibleContributionResolutions = resolutionView === "pending" ? pendingContributions : completedContributions;
 
   const approvedCases = caseList.filter((c) => c.status === "approved");
   const completedCases = caseList.filter((c) => c.status === "completed");
@@ -801,23 +804,33 @@ export default function AdminPage() {
             <TabsContent value="verify" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
                 <ShieldIcon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                <div className="space-y-2"><p>Verify each help — check the receipt and amount, then confirm to add it to the case's collected total. <strong>Direct</strong> helps close the case when full. <strong>Fundraising</strong> contributions add up; when the goal is reached, go to "Pay & Close" to pay the institute yourself.</p><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Pending Contributions</span><strong className="block text-lg text-primary">{pendingContributionCount}</strong></div><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Pending Direct Payments</span><strong className="block text-lg text-primary">{pendingDirectCount}</strong></div></div></div>
+                <div className="space-y-2"><p>Review direct-help proofs, check the receipt and amount, then approve or reject each submission. Approved direct payments remain in the completed history.</p><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Pending Direct Payments</span><strong className="block text-lg text-primary">{pendingDirectCount}</strong></div><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Completed Direct Payments</span><strong className="block text-lg text-teal-600">{completedDirectResolutions.length}</strong></div></div></div>
               </div>
-                            {pendingDirectResolutions.length === 0 ? <Empty text="No Direct Payments awaiting verification" /> :
-                pendingDirectResolutions.map((r) => {
+              <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Direct payment status filters">
+                <button type="button" role="tab" aria-selected={resolutionView === "pending"} onClick={() => setResolutionView("pending")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${resolutionView === "pending" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>Pending ({pendingDirectCount})</button>
+                <button type="button" role="tab" aria-selected={resolutionView === "completed"} onClick={() => setResolutionView("completed")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${resolutionView === "completed" ? "bg-card text-teal-700 shadow-sm" : "text-muted-foreground"}`}>Approved / Completed ({completedDirectResolutions.length})</button>
+              </div>
+              {visibleDirectResolutions.length === 0 ? <Empty text={resolutionView === "pending" ? "No Direct Payments awaiting verification" : "No approved direct payments yet"} /> :
+                visibleDirectResolutions.map((r) => {
                   const c = caseList.find((cs) => cs.id === r.case_id);
-                  return <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />;
+                  return resolutionView === "pending"
+                    ? <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />
+                    : <div key={r.id} className="rounded-xl border bg-card p-4"><div className="flex items-center justify-between gap-3"><strong>{c?.title || "Direct payment"}</strong><span className="rounded-full bg-teal-100 px-2 py-1 text-xs font-semibold text-teal-700">APPROVED / COMPLETED</span></div><p className="mt-2 text-sm text-muted-foreground">Case: {r.case_id} · Amount: {sym(c?.currency)} {Number(r.amount_paid ?? r.amount ?? 0).toLocaleString()} · TXN: {r.transaction_id || "—"}</p><p className="mt-1 text-xs text-muted-foreground">Approved proof and receipt remain available in the case resolution history.</p></div>;
                 })}
-              <div className="rounded-xl border bg-card p-4"><strong>Completed Direct Payments: {completedDirectResolutions.length}</strong><p className="mt-1 text-xs text-muted-foreground">Approved direct payments remain visible here for audit history.</p></div>
             </TabsContent>
             <TabsContent value="contributions" className="space-y-4 mt-4">
-              <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Pending Contributions: {pendingContributionCount}</strong><p className="mt-1">Review each receipt, amount, and transaction ID before approving. The case summary and helper details are shown on every card.</p></div>
-              {pendingContributions.length === 0 ? <Empty text="No Contributions awaiting verification" /> :
-                pendingContributions.map((r) => {
+              <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Contributions</strong><p className="mt-1">Review every contribution receipt, amount, and transaction ID. Approved contributions remain visible in the completed history.</p></div>
+              <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Contribution status filters">
+                <button type="button" role="tab" aria-selected={resolutionView === "pending"} onClick={() => setResolutionView("pending")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${resolutionView === "pending" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>Pending ({pendingContributionCount})</button>
+                <button type="button" role="tab" aria-selected={resolutionView === "completed"} onClick={() => setResolutionView("completed")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${resolutionView === "completed" ? "bg-card text-teal-700 shadow-sm" : "text-muted-foreground"}`}>Approved / Completed ({completedContributions.length})</button>
+              </div>
+              {visibleContributionResolutions.length === 0 ? <Empty text={resolutionView === "pending" ? "No Contributions awaiting verification" : "No approved contributions yet"} /> :
+                visibleContributionResolutions.map((r) => {
                   const c = caseList.find((cs) => cs.id === r.case_id);
-                  return <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />;
+                  return resolutionView === "pending"
+                    ? <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />
+                    : <div key={r.id} className="rounded-xl border bg-card p-4"><div className="flex items-center justify-between gap-3"><strong>{c?.title || "Contribution"}</strong><span className="rounded-full bg-teal-100 px-2 py-1 text-xs font-semibold text-teal-700">APPROVED / COMPLETED</span></div><p className="mt-2 text-sm text-muted-foreground">Case: {r.case_id} · Amount: {sym(c?.currency)} {Number(r.amount_paid ?? r.amount ?? 0).toLocaleString()} · TXN: {r.transaction_id || "—"}</p><p className="mt-1 text-xs text-muted-foreground">Approved contribution and receipt remain available in the case resolution history.</p></div>;
                 })}
-              <div className="rounded-xl border bg-card p-4"><strong>Completed Contributions: {completedContributions.length}</strong><p className="mt-1 text-xs text-muted-foreground">Approved contributions remain visible here for collection audit history.</p></div>
             </TabsContent>
             <TabsContent value="pay" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-teal-50 dark:bg-teal-950/20 p-4 text-sm text-teal-700 flex items-start gap-2">
