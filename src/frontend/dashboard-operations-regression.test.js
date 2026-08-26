@@ -29,6 +29,24 @@ describe("dashboard operations repair", () => {
     expect(adminSource).toContain('value="verify">Direct Payments');
   });
 
+  it("separates pending and completed payment histories by domain", () => {
+    expect(adminSource).toContain('const completedContributions = resolutions.filter((r) => r.status === "completed" && r.paid_to === "givethra");');
+    expect(adminSource).toContain('const completedDirectResolutions = resolutions.filter((r) => r.status === "completed" && r.paid_to !== "givethra");');
+    expect(adminSource).toContain("Completed Contributions:");
+    expect(adminSource).toContain("Completed Direct Payments:");
+    expect(adminSource).toContain("Reject / Return to Review");
+    expect(adminSource).toContain("Approve & Mark as Paid");
+    expect(adminSource).toContain("rejection_reason: trimmed");
+  });
+
+  it("shows the Heroes Wall shell even when no completed case is available yet", () => {
+    const heroesSource = fs.readFileSync(path.join(root, "src/components/HeroesWall.tsx"), "utf8");
+    expect(heroesSource).toContain("if (loading) return null;");
+    expect(heroesSource).toContain("Completed cases will appear here after the verified help flow is finished.");
+    expect(heroesSource).toContain("setLoadError");
+    expect(heroesSource).toContain("getHeroesWall()");
+  });
+
   it("shows a dedicated pending Contribution count separate from Direct Payments", () => {
     expect(adminSource).toContain('const pendingContributions = pendingResolutions.filter((r) => r.paid_to === "givethra");');
     expect(adminSource).toContain('const pendingDirectResolutions = pendingResolutions.filter((r) => r.paid_to !== "givethra");');

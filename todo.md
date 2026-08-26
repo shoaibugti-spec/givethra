@@ -1181,3 +1181,10 @@
 - [x] Repair any confirmed missing transition or document-generation behavior without changing existing payment records.
 - [x] Add regression coverage for the completed-case, feedback, Social Wall, and helper/seeker affidavit loop.
 - [ ] Run the full validation suite and synchronize the verified repair.
+
+## Admin Domain Queues and Heroes Wall Visibility
+- [x] Audit KYC, Cases, Contributions, Direct Payments, Pay & Close, and Deposits tabs for correct pending/complete filters and approve/reject controls.
+- [x] Ensure Direct Payments contains only direct-payment records and Contributions contains only contribution records, with clear two-action controls.
+- [x] Ensure Pay & Close and Deposits expose the appropriate approval/rejection actions without changing existing records.
+- [x] Trace and repair why Heroes Wall is not visible on the homepage after a completed case.
+- [x] Add regression coverage, run tests/build, and synchronize the verified update.

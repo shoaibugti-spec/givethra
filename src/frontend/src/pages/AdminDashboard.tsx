@@ -520,12 +520,29 @@ export default function AdminPage() {
 
 
   async function markAsPaidAndClose(c: any, receiptUrl: string) {
-    await adminCloseCase(c.id, { status: "completed", closed_by_admin: true, paid_receipt_url: receiptUrl || null });
-    if (c.user_id) {
-      await sendNotification(c.user_id, "case_completed", "Your bill is paid! 🎉", `Wonderful news! Many kind people came together and your case "${c.title}" is fully helped. Givethra has paid the institute. You can view the receipt on your case. May Allah bless everyone who helped. 🤲`, `/cases/${c.id}`);
+    try {
+      await adminCloseCase(c.id, { status: "completed", closed_by_admin: true, paid_receipt_url: receiptUrl || null });
+      if (c.user_id) {
+        await sendNotification(c.user_id, "case_completed", "Your bill is paid! 🎉", `Wonderful news! Many kind people came together and your case "${c.title}" is fully helped. Givethra has paid the institute. You can view the receipt on your case. May Allah bless everyone who helped. 🤲`, `/cases/${c.id}`);
+      }
+      toast.success("Case marked as PAID and closed! Seeker notified.");
+      loadData();
+    } catch (error: any) {
+      console.error("Pay & Close failed:", error);
+      toast.error(`Failed to close case: ${error?.message || "Please try again."}`);
     }
-    toast.success("Case marked as PAID and closed! Seeker notified.");
-    loadData();
+  }
+  async function rejectPayClose(c: any, reason: string) {
+    const trimmed = String(reason || "").trim();
+    if (!trimmed) { toast.error("Please provide a reason before returning this case."); return; }
+    try {
+      await adminCloseCase(c.id, { status: "approved", closed_by_admin: false, rejection_reason: trimmed, paid_receipt_url: null });
+      toast.success("Pay & Close request returned for review.");
+      loadData();
+    } catch (error: any) {
+      console.error("Pay & Close rejection failed:", error);
+      toast.error(`Failed to return case: ${error?.message || "Please try again."}`);
+    }
   }
 
   async function approveDeposit(dep: any, finalCredits: number) {
@@ -591,6 +608,8 @@ export default function AdminPage() {
   const pendingDirectResolutions = pendingResolutions.filter((r) => r.paid_to !== "givethra");
   const pendingContributionCount = pendingContributions.length;
   const pendingDirectCount = pendingDirectResolutions.length;
+  const completedContributions = resolutions.filter((r) => r.status === "completed" && r.paid_to === "givethra");
+  const completedDirectResolutions = resolutions.filter((r) => r.status === "completed" && r.paid_to !== "givethra");
   const completedResolutionsCount = resolutions.filter((r) => r.status === "completed").length;
 
   const approvedCases = caseList.filter((c) => c.status === "approved");
@@ -789,6 +808,7 @@ export default function AdminPage() {
                   const c = caseList.find((cs) => cs.id === r.case_id);
                   return <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />;
                 })}
+              <div className="rounded-xl border bg-card p-4"><strong>Completed Direct Payments: {completedDirectResolutions.length}</strong><p className="mt-1 text-xs text-muted-foreground">Approved direct payments remain visible here for audit history.</p></div>
             </TabsContent>
             <TabsContent value="contributions" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Pending Contributions: {pendingContributionCount}</strong><p className="mt-1">Review each receipt, amount, and transaction ID before approving. The case summary and helper details are shown on every card.</p></div>
@@ -797,6 +817,7 @@ export default function AdminPage() {
                   const c = caseList.find((cs) => cs.id === r.case_id);
                   return <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />;
                 })}
+              <div className="rounded-xl border bg-card p-4"><strong>Completed Contributions: {completedContributions.length}</strong><p className="mt-1 text-xs text-muted-foreground">Approved contributions remain visible here for collection audit history.</p></div>
             </TabsContent>
             <TabsContent value="pay" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-teal-50 dark:bg-teal-950/20 p-4 text-sm text-teal-700 flex items-start gap-2">
@@ -804,7 +825,7 @@ export default function AdminPage() {
                 <p>These fundraising cases have reached their goal! Pay the institute's bill yourself, upload the receipt, and close the case. The seeker will be notified that everyone helped together.</p>
               </div>
               {readyToClose.length === 0 ? <Empty text="No cases ready to pay yet" /> :
-                readyToClose.map((c) => <PayCloseCard key={c.id} c={c} profileMap={profileMap} onClose={markAsPaidAndClose} />)}
+                readyToClose.map((c) => <PayCloseCard key={c.id} c={c} profileMap={profileMap} onClose={markAsPaidAndClose} onReject={rejectPayClose} />)}
             </TabsContent>
 
             <TabsContent value="deposits" className="space-y-4 mt-4">
@@ -1109,13 +1130,14 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
 // ============================================================
 //  PAY & CLOSE CARD
 // ============================================================
-function PayCloseCard({ c, profileMap, onClose }: any) {
+function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
   const cur = c.currency || "USD";
   const s = sym(cur);
   const seeker = profileMap[c.user_id];
   const [receiptUrl, setReceiptUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [reason, setReason] = useState("");
 
   async function uploadReceipt(file: File | null) {
     if (!file) return;
@@ -1154,9 +1176,13 @@ function PayCloseCard({ c, profileMap, onClose }: any) {
         <Input type="file" accept="image/*,.pdf" onChange={(e) => uploadReceipt(e.target.files?.[0] ?? null)} className="text-sm" />
         {uploading && <p className="text-xs text-amber-600">⏳ Uploading...</p>}
         {receiptUrl && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Receipt uploaded</p>}
-        <Button size="sm" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={closing || uploading}
+        <Button type="button" size="sm" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={closing || uploading}
           onClick={async () => { setClosing(true); await onClose(c, receiptUrl); setClosing(false); }}>
-          <CheckCircle className="h-3.5 w-3.5 mr-1" /> Mark as Paid & Close Case
+          <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Mark as Paid
+        </Button>
+        <Textarea placeholder="Reason for returning this Pay & Close request" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+        <Button type="button" size="sm" variant="outline" className="w-full text-red-600 border-red-300" disabled={closing || uploading} onClick={async () => { setClosing(true); await onReject(c, reason); setClosing(false); }}>
+          <XCircle className="h-3.5 w-3.5 mr-1" /> Reject / Return to Review
         </Button>
         <p className="text-[11px] text-muted-foreground">Pay the institute, upload the receipt, then close. The seeker sees the receipt and gets a thank-you notification.</p>
       </div>

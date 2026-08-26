@@ -37,15 +37,18 @@ export default function HeroesWall() {
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   async function loadWall() {
     try {
       const result = await getHeroesWall();
+      setLoadError("");
       setItems(Array.isArray(result?.cases) ? result.cases : []);
       setMetrics(result?.metrics || { solved_cases: 0, total_amount: 0, currency: "PKR" });
       setIndex(0);
-    } catch {
+    } catch (error: any) {
       setItems([]);
+      setLoadError(error?.message || "Heroes Wall is temporarily unavailable.");
     } finally {
       setLoading(false);
     }
@@ -108,7 +111,7 @@ export default function HeroesWall() {
     }
   }
 
-  if (loading || !items.length) return null;
+  if (loading) return null;
 
   return (
     <section aria-labelledby="heroes-wall-title" className="bg-muted/20 px-4 py-10">
@@ -125,7 +128,7 @@ export default function HeroesWall() {
           </div>
         </div>
         <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-          <article className="p-5 sm:p-7">
+          {!items.length ? <div className="p-6 text-center text-sm text-muted-foreground">{loadError || "Completed cases will appear here after the verified help flow is finished."}</div> : <article className="p-5 sm:p-7">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Completed case {index + 1} of {items.length}</p><h3 className="mt-1 truncate text-xl font-bold">{current.title || "A case completed with community help"}</h3><p className="mt-1 text-sm text-muted-foreground">{current.category || "Verified help"}</p></div>
               <span className="shrink-0 rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-700">Help complete</span>
@@ -134,7 +137,7 @@ export default function HeroesWall() {
             <div className="mt-5"><div className="mb-2 flex justify-between text-sm"><span className="font-semibold">Verified impact</span><span className="font-bold text-teal-600">{money(current.currency, Number(current.amount_collected || current.amount_needed || 0))}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-teal-500" style={{ width: `${progress}%` }} /></div></div>
             <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-border pt-3"><button type="button" onClick={handleLike} className={`flex items-center gap-1.5 text-sm font-medium ${currentLike ? "text-rose-500" : "text-muted-foreground hover:text-rose-500"}`}><Heart className="h-4 w-4" fill={currentLike ? "currentColor" : "none"} /> Like <span>({Number(current.likes_count || 0)})</span></button><button type="button" onClick={toggleComments} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary"><MessageCircle className="h-4 w-4" /> Comment <span>({Number(current.comments_count || 0)})</span></button><div className="ml-auto flex gap-1"><Button type="button" variant="outline" size="icon" aria-label="Previous completed case" disabled={index === 0} onClick={() => setIndex((value) => Math.max(0, value - 1))}><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="icon" aria-label="Next completed case" disabled={index === items.length - 1} onClick={() => setIndex((value) => Math.min(items.length - 1, value + 1))}><ChevronRight className="h-4 w-4" /></Button></div></div>
             {openComments[current.post_id] && <div className="mt-4 space-y-3"><div className="max-h-48 space-y-2 overflow-y-auto">{currentComments.length ? currentComments.map((comment) => <div key={comment.id} className="rounded-xl bg-muted/40 px-3 py-2"><p className="text-xs font-semibold">{comment.user_name || "A Givethra member"}</p><p className="text-sm break-words">{comment.comment}</p></div>) : <p className="text-sm text-muted-foreground">No comments yet.</p>}</div><div className="flex items-end gap-2"><textarea aria-label="Comment on completed case" value={currentCommentText} onChange={(event) => setCommentText((prev) => ({ ...prev, [current.post_id]: event.target.value }))} placeholder="Write a kind comment..." rows={2} className="min-h-10 flex-1 resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm" /><Button type="button" size="icon" aria-label="Post comment" disabled={posting || !currentCommentText.trim()} onClick={handleComment}><Send className="h-4 w-4" /></Button></div></div>}
-          </article>
+          </article>}
         </div>
       </div>
     </section>
