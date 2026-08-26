@@ -1114,3 +1114,45 @@
 - [x] Contribution unlock keeps Verification Media locked until a separate one-credit media unlock.
 - [x] Preserve Wallet guidance for Contribution users without media-unlock credit.
 - [x] Add regression coverage and validate tests, typecheck, and production build before synchronization.
+
+## User-Reported New Admin Review Incident
+- [x] Trace the new Contribution and Direct Payment records from My Cases/D1 into their correct Admin queues.
+- [x] Ensure receipt, amount, transaction ID, case, helper, seeker, and payment destination are visible for both records.
+- [ ] Ensure Admin approval/rejection transitions update My Cases, collection, notifications, and completion behavior correctly.
+- [ ] Add regression coverage and validate the complete Admin workflow before synchronization.
+
+## User-Reported Live Admin Deployment Mismatch
+- [x] Compare the live Admin asset and Worker version with GitHub main after the user's manual deployment.
+- [x] Confirm the two persisted test records remain visible to the correct review queues.
+- [x] Identify and resolve any remaining deployed-version or route mismatch without changing payment records.
+- [ ] Save the final validated state and provide one exact publish/refresh/test instruction.
+
+## User-Reported Latest Proof Visibility Incident
+- [ ] Query the newest production D1 proof records and verify receipt URL, Txn ID, amount, paid_to, and status.
+- [ ] Match those exact records against the Admin Direct Payments and Contributions filters/endpoints.
+- [ ] Repair any confirmed queue visibility defect and validate approval/rejection readiness.
+- [ ] Synchronize the verified repair and provide one exact refresh/test instruction.
+
+## User-Reported All-Records Admin Visibility Incident
+- [x] Inventory every production case_resolutions record read-only, including the latest real payment.
+- [x] Reconcile all records against Admin Contributions and Direct Payments queues, counts, filters, and pagination.
+- [ ] Repair any confirmed record-visibility defect without changing payment data.
+- [ ] Validate complete counts, receipt/Txn visibility, and review controls before synchronization.
+
+## User-Reported Admin Count Contradiction
+- [x] Verify the live Admin bundle, Admin resolutions endpoint, admin authorization context, and production D1 pending counts.
+- [x] Identify whether the empty panel is caused by stale assets, wrong Worker binding, authorization, filtering, or hidden tab state.
+- [x] Apply only a confirmed visibility correction and preserve all payment records.
+- [ ] Validate the final Admin counts and provide one precise deployment/refresh instruction.
+
+## Confirmed Admin Zero-Count Data-Path Mismatch
+- [ ] Reconcile the exact production records visible in My Cases with the Admin resolutions response and frontend mapping.
+- [ ] Normalize the Admin response so all pending Contribution and Direct records are counted and rendered.
+- [ ] Preserve receipt, amount, Txn ID, case summary, and review controls for every record.
+- [ ] Add all-record regression tests and validate before the final synchronization.
+
+## Confirmed Admin Zero-Count Data-Path Mismatch — Active Repair
+- [x] Reconcile the exact production records visible in My Cases with the Admin resolutions response and frontend mapping.
+- [x] Normalize the Admin response so all pending Contribution and Direct records are counted and rendered.
+- [x] Preserve receipt, amount, Txn ID, case summary, and review controls for every record.
+- [x] Add all-record regression tests and validate before the final synchronization.

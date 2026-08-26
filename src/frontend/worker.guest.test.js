@@ -26,3 +26,11 @@ describe("public Community guest flow", () => {
     expect(communitySource).not.toContain('toast.error("Please sign in to comment.")');
   });
 });
+
+
+describe("anonymous case summary safety", () => {
+  it("returns zero counts without dereferencing a missing user session", () => {
+    expect(workerSource).toContain("const countUserId = target || user?.user_id;");
+    expect(workerSource).toContain("return json({ total: 0, pending: 0, active_or_completed: 0, rejected: 0 }, 200, origin);");
+  });
+});

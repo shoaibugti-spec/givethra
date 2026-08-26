@@ -1780,9 +1780,12 @@ export default function SubmitRequestPage() {
 
       const allDocUrls: Record<string, string> = { ...catDocUrls };
       const photoUrls: string[] = Object.values(allDocUrls);
-      const docMeta: Record<string, string> = {};
+      const docMeta: Record<string, { url: string; original_name: string }> = {};
       Object.keys(allDocUrls).forEach((k) => {
-        docMeta[k] = allDocUrls[k];
+        docMeta[k] = {
+          url: allDocUrls[k],
+          original_name: catDocNames[k] || k,
+        };
       });
 
       const finalInstitute = easy

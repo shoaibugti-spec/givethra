@@ -39,6 +39,12 @@ describe("dashboard operations repair", () => {
     expect(adminSource).toContain("{pendingContributionCount}");
   });
 
+  it("loads all Admin resolutions through the real submitted_at ordering column", () => {
+    expect(apiSource).toContain("/api/admin/resolutions");
+    expect(workerSource).toContain('resolutions: { table: "case_resolutions", order: "submitted_at" }');
+    expect(workerSource).not.toContain('resolutions: { table: "case_resolutions", order: "created_at" }');
+  });
+
   it("shows submitted Contributions in Verify Help with proof details and reason-gated rejection", () => {
     expect(adminSource).toContain('const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"])');
     expect(adminSource).toContain("const pendingResolutions = resolutions.filter");

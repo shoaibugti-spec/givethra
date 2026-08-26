@@ -1213,7 +1213,7 @@ async function handleRequest(request, env, ctx) {
           users: { table: "users", order: "updated_at" },
           kyc: { table: "kyc_submissions", order: "submitted_at" },
           cases: { table: "case_submissions", order: "submitted_at" },
-          resolutions: { table: "case_resolutions", order: "created_at" },
+          resolutions: { table: "case_resolutions", order: "submitted_at" },
           deposits: { table: "deposits", order: "submitted_at" },
           profiles: { table: "profiles", order: "updated_at" },
           wallets: { table: "wallets", order: "updated_at" },
