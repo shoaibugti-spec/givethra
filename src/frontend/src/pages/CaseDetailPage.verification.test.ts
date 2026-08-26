@@ -57,9 +57,14 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain('navigate({ to: "/wallet" })');
     expect(caseDetailSource).toContain("const freeContributionRemaining = Math.max(3 - userUnlockCount, 0);");
     expect(caseDetailSource).toContain("freeContributionRemaining > 0");
-    expect(caseDetailSource).toContain("pledgeNum < 100");
+    expect(caseDetailSource).toContain("paidNum < 100");
     expect(caseDetailSource).toContain("min={100}");
     expect(caseDetailSource).toContain("max={remaining}");
+    expect(caseDetailSource).toContain("Unlock this Contribution first. The amount field and Givethra payment details will open after the unlock.");
+    expect(caseDetailSource).toContain("setContributionOpen(true);");
+    expect(caseDetailSource).toContain("setAmountPaid(e.target.value)");
+    expect(caseDetailSource).toContain("unlockMode === \"partial\" && paidNum < 100");
+    expect(caseDetailSource).toContain("unlockMode === \"partial\" && paidNum > remaining");
   });
 
   it("restores Direct Payment receiver details and mandatory proof submission", () => {
@@ -91,6 +96,7 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("Unlock Verification Media (1 credit)");
     expect(caseDetailSource).toContain("view verification media");
     expect(caseDetailSource).toContain("setMediaUnlocked(!!mediaUnlock || owner)");
+    expect(caseDetailSource).toContain("setWalletBalance(prev => Math.max(prev - 1, 0))");
   });
 
   it("keeps the Direct Payment lookup isolated from Contribution unlocks", () => {

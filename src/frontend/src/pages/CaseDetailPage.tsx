@@ -453,8 +453,6 @@ export default function CaseDetailPage() {
     }
     if (mode === "partial") {
       if (remaining <= 0) { toast.error("This case has already reached its fundraising goal."); return; }
-      if (pledgeNum < 100) { toast.error(`The minimum Contribution is ${sym} 100.`); return; }
-      if (pledgeNum > remaining) { toast.error(`The maximum Contribution is ${sym} ${remaining} ${cur} still needed.`); return; }
       if (freeContributionRemaining === 0 && !walletLoading && !hasUnlockCredit) {
         toast.error("Your 3 free Contributions are complete. Please add 1 credit in your Wallet to continue.");
         return;
@@ -476,8 +474,8 @@ export default function CaseDetailPage() {
       });
 
             if (mode === "partial") {
-        setAmountPaid(String(pledgeNum));
         setContributionOpen(true);
+        if (pledgeNum > 0) setAmountPaid(String(pledgeNum));
       } else if (amountNeeded > 0) setAmountPaid(String(remaining));
       setUnlocked(true);
       setWalletBalance(prev => Math.max(prev - charge, 0));
@@ -516,6 +514,8 @@ export default function CaseDetailPage() {
     const paidNum = amountPaid ? parseFloat(amountPaid) : (contributionOpen ? pledgeNum : (myUnlock?.pledged_amount ?? null));
     if (!paidNum || paidNum <= 0) { toast.error("Please enter the total amount you paid."); return; }
     if (unlockMode === "full" && amountNeeded > 0 && paidNum < amountNeeded) { toast.error(`Direct Help requires the full amount: ${sym} ${amountNeeded} ${cur}.`); return; }
+    if (unlockMode === "partial" && paidNum < 100) { toast.error(`The minimum Contribution is ${sym} 100.`); return; }
+    if (unlockMode === "partial" && paidNum > remaining) { toast.error(`The maximum Contribution is ${sym} ${remaining} ${cur} still needed.`); return; }
     if (!receiptFile) { toast.error("Please attach your payment receipt before submitting proof."); return; }
     setSubmitting(true);
     try {
@@ -1001,15 +1001,7 @@ export default function CaseDetailPage() {
                           </Button>
                         </div>
                       )}
-                      {amountNeeded > 0 && (
-                        <div className="space-y-1.5 pt-1">
-                          <Label className="text-xs">How much will you contribute? ({cur}) — minimum {sym} 100, maximum {sym} {remaining} still needed</Label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">{sym}</span>
-                            <Input type="number" min={100} value={pledgeAmount} onChange={e => setPledgeAmount(e.target.value)} placeholder={`100–${remaining}`} className="pl-12 bg-card" max={remaining} />
-                          </div>
-                        </div>
-                      )}
+                      <p className="text-xs text-muted-foreground">Unlock this Contribution first. The amount field and Givethra payment details will open after the unlock.</p>
                       <Button onClick={() => handleUnlock("partial")} disabled={unlocking || walletLoading || remaining < 100} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
 
                         <HandCoins className="h-4 w-4" />
@@ -1034,6 +1026,13 @@ export default function CaseDetailPage() {
                   <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
                     <div className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" /><h2 className="font-semibold">Contribute to Givethra Fundraising</h2></div>
                     <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send your contribution to Givethra. We collect all contributions and pay the institute once the goal is reached. You can contribute as many times as you like until the case is complete.</div>
+                    <div className="space-y-1.5 pt-1">
+                      <Label className="text-xs">How much will you contribute? ({cur}) — minimum {sym} 100, maximum {sym} {remaining} still needed</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">{sym}</span>
+                        <Input type="number" min={100} max={remaining} value={pledgeAmount} onChange={e => { setPledgeAmount(e.target.value); setAmountPaid(e.target.value); }} placeholder={`100–${remaining}`} className="pl-12" />
+                      </div>
+                    </div>
                     <CopyRow label="NayaPay Title" value={GIVETHRA_NAYAPAY_TITLE} />
                     <CopyRow label="NayaPay Account / IBAN" value={GIVETHRA_NAYAPAY_IBAN} mono />
                     <CopyRow label="Binance USDT (TRC20) — International" value={GIVETHRA_USDT_TRC20} mono />
