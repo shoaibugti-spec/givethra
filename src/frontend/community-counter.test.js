@@ -25,6 +25,11 @@ describe("Community unread counter", () => {
     expect(feedbackWallSource).toContain("fb.comment || fb.text_message");
     expect(feedbackWallSource).toContain("Feedback for: {fb.case_title}");
     expect(feedbackWallSource).toContain("src={fb.video_url}");
+    const caseDetailSource = fs.readFileSync(path.join(root, "src/pages/CaseDetailPage.tsx"), "utf8");
+    expect(caseDetailSource).toContain("comment: fbText.trim() || null");
+    expect(caseDetailSource).not.toContain("text_message: fbText.trim() || null");
+    expect(caseDetailSource).toContain("Your verified help affidavits");
+    expect(caseDetailSource).toContain("getCaseResolutions(id, owner ? undefined : user.id)");
   });
 
   it("shows a ranked popular slider and refreshes it hourly without blocking", () => {

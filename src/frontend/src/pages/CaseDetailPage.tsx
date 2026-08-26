@@ -293,7 +293,7 @@ export default function CaseDetailPage() {
           getCaseUnlock(id, user.id, "partial"),
           getCaseUnlock(id, user.id, "media"),
           getUserUnlockCount(user.id),
-          getCaseResolutions(id, user.id),
+          getCaseResolutions(id, owner ? undefined : user.id),
           getKycSubmission(data.user_id),
           getProfile(user.id),
         ]);
@@ -603,11 +603,11 @@ export default function CaseDetailPage() {
         case_id: id,
         user_id: user?.id,
         first_name: firstName,
-        text_message: fbText.trim() || null,
+        comment: fbText.trim() || null,
         video_url: fbVideoUrl || null,
         status: "pending_review",
       });
-      toast.success("Thank you! Your feedback is submitted for Givethra's review. Once approved, it will appear on the wall and you can submit a new case.");
+      toast.success("Thank you! Your feedback is now shared on the Givethra community wall.");
       setFbText(""); setFbVideoFile(null); setFbVideoName(""); setFbVideoBlob(null);
       // Refresh feedback state
       await checkExistingFeedback();
@@ -907,6 +907,16 @@ export default function CaseDetailPage() {
                   <a href={caseData.paid_receipt_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg bg-card border border-teal-300 p-3 text-sm text-teal-700 font-medium">
                     <FileText className="h-4 w-4" /> View Payment Receipt
                   </a>
+                )}
+                {isOwner && myResolutions.some((resolution) => resolution.status === "completed") && (
+                  <div className="space-y-2 rounded-xl border border-teal-200 bg-card p-4">
+                    <p className="text-sm font-semibold text-teal-700">Your verified help affidavits</p>
+                    {myResolutions.filter((resolution) => resolution.status === "completed").map((resolution) => (
+                      <Button key={resolution.id} type="button" size="sm" variant="outline" className="w-full gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, resolution, seekerKyc, resolution.hero_name || "Verified Hero")}>
+                        <FileText className="h-3.5 w-3.5" /> Download Affidavit · {sym} {resolution.seeker_confirmed_amount ?? resolution.amount_paid}
+                      </Button>
+                    ))}
+                  </div>
                 )}
                 {existingFeedback ? (
                   <div className="rounded-xl bg-card border border-border p-4 text-center space-y-1">

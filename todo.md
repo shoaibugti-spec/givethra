@@ -1175,3 +1175,9 @@
 - [x] Add a mobile-first Heroes Wall slider to the homepage without removing or altering the existing Social Wall.
 - [x] Add regression coverage for completed-case filtering, aggregate metrics, likes/comments, and responsive slider behavior.
 - [ ] Verify the feature, save a checkpoint, and provide the updated project version.
+
+## End-to-End Completed Help Flow Verification
+- [x] Audit full-funding completion, Heroes Wall publication, seeker feedback/Social Wall publication, notifications, and both affidavit paths.
+- [x] Repair any confirmed missing transition or document-generation behavior without changing existing payment records.
+- [x] Add regression coverage for the completed-case, feedback, Social Wall, and helper/seeker affidavit loop.
+- [ ] Run the full validation suite and synchronize the verified repair.
