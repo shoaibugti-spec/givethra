@@ -21,6 +21,17 @@ describe("dashboard operations repair", () => {
     expect(apiSource).toContain("Failed to submit deposit");
   });
 
+  it("shows submitted Contributions in Verify Help with proof details and reason-gated rejection", () => {
+    expect(adminSource).toContain('const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"])');
+    expect(adminSource).toContain("const pendingResolutions = resolutions.filter");
+    expect(adminSource).toContain('View Payment Receipt');
+    expect(adminSource).toContain('TXN ID:</span>');
+    expect(adminSource).toContain('aria-label="Rejection reason"');
+    expect(adminSource).toContain('disabled={!rejectionReason.trim()}');
+    expect(adminSource).toContain('status: "disputed", admin_confirmed: false, notes: trimmedReason');
+    expect(adminSource).toContain('"help_rejected"');
+  });
+
   it("supports Admin deposit approval and rejection through a real update route", () => {
     expect(workerSource).toContain('parts[2] === "deposits" && recordId');
     expect(workerSource).toContain('"method", "amount", "currency", "transaction_id", "proof_url", "status", "credits", "reviewed_at", "reviewed_by", "rejection_reason"');

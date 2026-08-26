@@ -1073,3 +1073,9 @@
 - [x] Replace Direct Payment Resolution Type choices with the current case Category.
 - [x] Preserve Contribution proof behavior and all other payment fields unchanged.
 - [x] Add focused regression coverage and validate tests, typecheck, and production build.
+
+## User-Reported Admin Contribution Review Regression
+- [x] Trace submitted Contribution records into the Admin review queue and notification count without changing existing payment data.
+- [x] Ensure Admin displays amount, transaction ID, receipt attachment, case, helper, seeker, and payment destination.
+- [x] Ensure approve/reject actions update the correct resolution status and require a meaningful rejection reason when rejecting.
+- [x] Add regression coverage and validate the Admin repair before synchronization.

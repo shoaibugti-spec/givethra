@@ -491,9 +491,12 @@ export default function AdminPage() {
     loadData();
   }
 
-  async function rejectResolution(res: any) {
-    await adminUpdateResolution(res.id, { status: "disputed", admin_confirmed: false });
-    toast.success("Resolution marked disputed.");
+  async function rejectResolution(res: any, reason: string) {
+    const trimmedReason = String(reason || "").trim();
+    if (!trimmedReason) { toast.error("Please provide a rejection reason."); return; }
+    await adminUpdateResolution(res.id, { status: "disputed", admin_confirmed: false, notes: trimmedReason });
+    if (res.hero_id) await sendNotification(res.hero_id, "help_rejected", "Help proof needs correction", `Givethra could not verify your payment proof. Reason: ${trimmedReason}`, `/cases/${res.case_id}`);
+    toast.success("Resolution rejected with reason.");
     loadData();
   }
 
@@ -563,7 +566,8 @@ export default function AdminPage() {
   const approvedDepositsCount = deposits.filter((d) => d.status === "approved").length;
   const rejectedDepositsCount = deposits.filter((d) => d.status === "rejected").length;
 
-  const pendingResolutions = resolutions.filter((r) => r.status === "seeker_confirmed");
+  const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"]);
+  const pendingResolutions = resolutions.filter((r) => pendingResolutionStatuses.has(String(r.status || "").toLowerCase()));
   const completedResolutionsCount = resolutions.filter((r) => r.status === "completed").length;
 
   const approvedCases = caseList.filter((c) => c.status === "approved");
@@ -1132,6 +1136,7 @@ function PayCloseCard({ c, profileMap, onClose }: any) {
 //  VERIFY CARD
 // ============================================================
 function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
+  const [rejectionReason, setRejectionReason] = useState("");
   const cur = c?.currency || "USD";
   const s = sym(cur);
   const helper = profileMap[r.hero_id];
@@ -1183,13 +1188,17 @@ function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
         </div>
       )}
 
-      <div className="flex gap-2 pt-1">
-        <Button size="sm" className="flex-1 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onConfirm(r)}>
-          <CheckCircle className="h-3.5 w-3.5 mr-1" /> Verify & Add {s} {confirmedAmt}
-        </Button>
-        <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onReject(r)}>
-          <XCircle className="h-3.5 w-3.5 mr-1" /> Dispute
-        </Button>
+      <div className="space-y-2 pt-1 border-t border-border">
+        <Textarea aria-label="Rejection reason" placeholder="Rejection reason (required when rejecting)" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} rows={2} className="text-sm" />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button size="sm" className="w-full sm:flex-1 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onConfirm(r)}>
+            <CheckCircle className="h-3.5 w-3.5 mr-1" /> Verify & Add {s} {confirmedAmt}
+          </Button>
+          <Button size="sm" variant="outline" className="w-full sm:w-auto text-red-600 border-red-300" disabled={!rejectionReason.trim()} onClick={() => onReject(r, rejectionReason)}>
+            <XCircle className="h-3.5 w-3.5 mr-1" /> Reject Proof
+          </Button>
+        </div>
+        {!rejectionReason.trim() && <p className="text-[11px] text-muted-foreground">Add a clear reason before rejecting this payment proof.</p>}
       </div>
       <p className="text-[11px] text-muted-foreground">⚠️ Check the receipt before verifying. {isFundraising ? "This money came to Givethra — you'll pay the institute once the goal is reached." : "This was paid directly to the institute."}</p>
     </div>
