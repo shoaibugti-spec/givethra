@@ -499,33 +499,86 @@ async function handleHeroesWall(request, env, origin) {
   if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
   const url = new URL(request.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 100);
+  // A case is public on the Heroes Wall once either the case itself is closed
+  // or an admin-approved direct/contribution resolution has completed it. The
+  // resolution fallback is important because some legacy admin flows close the
+  // payment record before mirroring status onto case_submissions.
   const rows = await env.DB.prepare(
-    `SELECT id, user_id, title, category, currency, amount_needed, amount_collected, updated_at
-     FROM case_submissions
-     WHERE lower(COALESCE(status, '')) = 'completed'
-     ORDER BY updated_at DESC
+    `SELECT c.id, c.user_id, c.title, c.category, c.currency, c.amount_needed,
+            c.amount_collected, c.submitted_at AS updated_at,
+            COALESCE(
+              NULLIF(c.amount_collected, 0),
+              (SELECT SUM(COALESCE(r.amount_paid, 0)) FROM case_resolutions r
+               WHERE r.case_id = c.id
+                 AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
+                 AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')),
+              c.amount_needed, 0
+            ) AS verified_amount,
+            COALESCE(
+              (SELECT MAX(COALESCE(r.completed_at, r.admin_confirmed_at, r.submitted_at))
+               FROM case_resolutions r
+               WHERE r.case_id = c.id
+                 AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
+                 AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')),
+              c.submitted_at
+            ) AS completed_at
+     FROM case_submissions c
+     WHERE lower(COALESCE(c.status, '')) = 'completed'
+        OR EXISTS (
+          SELECT 1 FROM case_resolutions r
+          WHERE r.case_id = c.id
+            AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
+            AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')
+        )
+     ORDER BY COALESCE(completed_at, c.submitted_at) DESC
      LIMIT ?`
   ).bind(limit).all();
-  const completedCases = rows.results || [];
+  const completedCases = (rows.results || []).map((row) => ({
+    ...row,
+    amount_collected: Number(row.verified_amount || row.amount_collected || row.amount_needed || 0),
+  }));
   if (!completedCases.length) return json({ cases: [], metrics: { solved_cases: 0, total_amount: 0, currency: "PKR" } }, 200, origin);
-  await env.DB.batch(completedCases.map((caseRow) => env.DB.prepare(
-    `INSERT OR IGNORE INTO community_posts (id, user_id, display_name, message, created_at)
-     VALUES (?, ?, 'Givethra Heroes', ?, ?)`
-  ).bind(`hero-${caseRow.id}`, caseRow.user_id || null, `Heroes helped complete: ${caseRow.title || "A Givethra case"}`, caseRow.updated_at || now())));
+
+  // Social post creation is best-effort. A missing/older social table must not
+  // hide a verified completed case or turn the entire public wall into an API
+  // error during an upgrade.
+  for (const caseRow of completedCases) {
+    try {
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO community_posts (id, user_id, display_name, message, created_at)
+         VALUES (?, ?, 'Givethra Heroes', ?, ?)`
+      ).bind(`hero-${caseRow.id}`, caseRow.user_id || null, `Heroes helped complete: ${caseRow.title || "A Givethra case"}`, caseRow.completed_at || caseRow.updated_at || caseRow.submitted_at || now()).run();
+    } catch (error) {
+      console.error("Heroes Wall social post sync failed", error);
+    }
+  }
   const wallCases = [];
   for (const caseRow of completedCases) {
     const postId = `hero-${caseRow.id}`;
-    const [post, likes, comments] = await Promise.all([
-      env.DB.prepare("SELECT id, message, created_at FROM community_posts WHERE id = ?").bind(postId).first(),
-      env.DB.prepare("SELECT COUNT(*) AS count FROM community_post_likes WHERE post_id = ?").bind(postId).first(),
-      env.DB.prepare("SELECT COUNT(*) AS count FROM community_post_comments WHERE post_id = ?").bind(postId).first(),
-    ]);
-    wallCases.push({ ...caseRow, post_id: postId, post_message: post?.message || `Heroes helped complete: ${caseRow.title || "A Givethra case"}`, post_created_at: post?.created_at || caseRow.updated_at, likes_count: Number(likes?.count || 0), comments_count: Number(comments?.count || 0) });
+    let post = null;
+    let likes = null;
+    let comments = null;
+    try {
+      [post, likes, comments] = await Promise.all([
+        env.DB.prepare("SELECT id, message, created_at FROM community_posts WHERE id = ?").bind(postId).first(),
+        env.DB.prepare("SELECT COUNT(*) AS count FROM community_post_likes WHERE post_id = ?").bind(postId).first(),
+        env.DB.prepare("SELECT COUNT(*) AS count FROM community_post_comments WHERE post_id = ?").bind(postId).first(),
+      ]);
+    } catch (error) {
+      console.error("Heroes Wall social counters unavailable", error);
+    }
+    wallCases.push({
+      ...caseRow,
+      post_id: postId,
+      post_message: post?.message || `Heroes helped complete: ${caseRow.title || "A Givethra case"}`,
+      post_created_at: post?.created_at || caseRow.completed_at || caseRow.updated_at || caseRow.submitted_at,
+      likes_count: Number(likes?.count || 0),
+      comments_count: Number(comments?.count || 0),
+    });
   }
-  const totalAmount = completedCases.reduce((sum, caseRow) => sum + Math.max(Number(caseRow.amount_collected || caseRow.amount_needed || 0), 0), 0);
+  const totalAmount = completedCases.reduce((sum, caseRow) => sum + Math.max(Number(caseRow.verified_amount || caseRow.amount_collected || caseRow.amount_needed || 0), 0), 0);
   return json({ cases: wallCases, metrics: { solved_cases: completedCases.length, total_amount: totalAmount, currency: completedCases[0]?.currency || "PKR" } }, 200, origin);
 }
-
 // ============================================================
 //  COMMUNITY POSTS HANDLER
 // ============================================================

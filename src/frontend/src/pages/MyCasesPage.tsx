@@ -11,9 +11,8 @@ import { useState, useEffect } from "react";
 import {
   getCasesByUser,
   getCaseUnlocksByHero,
-  getCasesByIds,
-  getCaseResolutions,
   getCaseResolutionsByHero,
+  getCasesByIds,
 } from "@/lib/api";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -33,10 +32,7 @@ export default function MyCasesPage() {
   const navigate = useNavigate();
   const [myCases, setMyCases] = useState<any[]>([]);
   const [unlockedCases, setUnlockedCases] = useState<any[]>([]);
-  const [helpByCase, setHelpByCase] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
-  const [caseFilter, setCaseFilter] = useState<"all" | "pending" | "rejected" | "completed">("all");
-  const [helpFilter, setHelpFilter] = useState<"all" | "active" | "completed">("all");
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -55,36 +51,50 @@ export default function MyCasesPage() {
     if (!user) return;
     setLoading(true);
     try {
-      // 1. Load user's own cases
+      // 1. Load the user's own requests.
       const cases = await getCasesByUser(user.id);
       setMyCases(cases ?? []);
 
-      // 2. Load both unlocks and resolution history. A completed case may no
-      // longer be present in an active unlock-only response, but its verified
-      // resolution must remain visible in My Cases for the Hero.
-      const [unlocks, heroResolutions] = await Promise.all([
+      // 2. Load both active unlocks and resolution history. Completed help is
+      // deliberately retained in case_resolutions after the case leaves the
+      // active unlock list, so it must be merged back into this history view.
+      const [unlocksResult, resolutionsResult] = await Promise.all([
         getCaseUnlocksByHero(user.id),
         getCaseResolutionsByHero(user.id),
       ]);
-      const resolutionRows = Array.isArray(heroResolutions) ? heroResolutions : [];
-      const ids: string[] = Array.from(new Set([
-        ...(Array.isArray(unlocks) ? unlocks : []).map((u: any) => String(u.case_id || "")),
-        ...resolutionRows.map((r: any) => String(r.case_id || "")),
-      ].filter(Boolean)));
-      if (ids.length > 0) {
-        const [unlockedData, resolutionEntries] = await Promise.all([
-          getCasesByIds(ids),
-          Promise.all(ids.map(async (caseId) => {
-            const directRows = resolutionRows.filter((row: any) => String(row.case_id) === caseId);
-            if (directRows.length) return [caseId, directRows] as const;
-            return [caseId, await getCaseResolutions(caseId, user.id)] as const;
-          })),
-        ]);
-        setUnlockedCases(unlockedData ?? []);
-        setHelpByCase(Object.fromEntries(resolutionEntries.map(([caseId, rows]) => [caseId, Array.isArray(rows) ? rows : []])));
+      const unlocks = Array.isArray(unlocksResult) ? unlocksResult : [];
+      const resolutions = Array.isArray(resolutionsResult) ? resolutionsResult : [];
+      const caseIds = Array.from(new Set([
+        ...unlocks.map((unlock: any) => String(unlock.case_id || "")).filter(Boolean),
+        ...resolutions.map((resolution: any) => String(resolution.case_id || "")).filter(Boolean),
+      ]));
+      if (caseIds.length > 0) {
+        const unlockedData = await getCasesByIds(caseIds);
+        const resolutionByCase = new Map<string, any>();
+        resolutions.forEach((resolution: any) => {
+          const key = String(resolution.case_id || "");
+          const current = resolutionByCase.get(key);
+          if (!current || new Date(String(resolution.completed_at || resolution.admin_confirmed_at || resolution.submitted_at || 0)).getTime() > new Date(String(current.completed_at || current.admin_confirmed_at || current.submitted_at || 0)).getTime()) {
+            resolutionByCase.set(key, resolution);
+          }
+        });
+        const merged = (Array.isArray(unlockedData) ? unlockedData : []).map((caseRecord: any) => {
+          const resolution = resolutionByCase.get(String(caseRecord.id));
+          const resolutionStatus = String(resolution?.status || "").toLowerCase();
+          const adminConfirmed = resolution?.admin_confirmed === true || resolution?.admin_confirmed === 1 || String(resolution?.admin_confirmed || "").toLowerCase() === "true" || String(resolution?.admin_confirmed || "") === "1";
+          const isCompleted = resolutionStatus === "completed" || (adminConfirmed && resolutionStatus === "approved");
+          return resolution && isCompleted ? {
+            ...caseRecord,
+            status: "completed",
+            amount_collected: Number(resolution.amount_paid ?? resolution.seeker_confirmed_amount ?? caseRecord.amount_collected ?? 0),
+            completed_at: resolution.completed_at || resolution.admin_confirmed_at || caseRecord.updated_at,
+            resolution_id: resolution.id,
+            affidavit_available: true,
+          } : caseRecord;
+        });
+        setUnlockedCases(merged);
       } else {
         setUnlockedCases([]);
-        setHelpByCase({});
       }
     } catch (err) {
       console.error("Failed to load cases:", err);
@@ -96,7 +106,7 @@ export default function MyCasesPage() {
 
   const statusConfig: any = {
     pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Under Review", color: "bg-orange-100 text-orange-700" },
-    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Published", color: "bg-teal-100 text-teal-700" },
+    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Published", color: "bg-green-100 text-green-700" },
     rejected: { icon: <XCircle className="h-3.5 w-3.5" />, label: "Rejected", color: "bg-red-100 text-red-700" },
     completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Completed", color: "bg-blue-100 text-blue-700" },
     expired: { icon: <CalendarClock className="h-3.5 w-3.5" />, label: "Expired", color: "bg-amber-100 text-amber-700" },
@@ -112,8 +122,6 @@ export default function MyCasesPage() {
     const isRejected = c.status === "rejected";
     const isExpired = c.status === "expired";
     const isFree = c.was_free === true || c.submission_type === "free";
-    const helpRecords = isHelping ? (helpByCase[c.id] ?? []) : [];
-    const helpStatus = (status: string) => status === "completed" ? { label: "Completed", color: "text-teal-700 bg-teal-50 border-teal-200" } : status === "seeker_confirmed" ? { label: "Confirmed — Under Verification", color: "text-amber-700 bg-amber-50 border-amber-200" } : status === "disputed" ? { label: "Disputed", color: "text-red-700 bg-red-50 border-red-200" } : { label: "Pending Givethra Review", color: "text-blue-700 bg-blue-50 border-blue-200" };
 
     return (
       <div className={`rounded-xl border p-4 space-y-3 ${isRejected ? "border-red-300 bg-red-50/50 dark:bg-red-950/10" : isExpired ? "border-amber-300 bg-amber-50/50 dark:bg-amber-950/10" : "bg-card"}`}>
@@ -130,26 +138,10 @@ export default function MyCasesPage() {
           </div>
         </div>
 
-        {isHelping && (
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
-            <p className="text-xs font-semibold text-primary flex items-center gap-1.5"><Heart className="h-3.5 w-3.5" /> Your Help on this case</p>
-            {helpRecords.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Help opened — receipt or payment proof has not been submitted yet.</p>
-            ) : helpRecords.map((help: any) => {
-              const status = helpStatus(String(help.status || "pending_confirmation"));
-              const amount = help.seeker_confirmed_amount ?? help.amount_paid;
-              return <div key={help.id} className="rounded-md border border-border bg-card/80 px-2.5 py-2 text-xs space-y-1">
-                <div className="flex items-center justify-between gap-2"><span className="font-medium">{help.paid_to === "givethra" ? "Contribution / Fundraising" : "Direct Help"}</span><span className={`rounded-full border px-2 py-0.5 font-semibold ${status.color}`}>{status.label}</span></div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground"><span>Amount: {amount != null ? `${s} ${amount} ${cur}` : "Not submitted"}</span>{help.transaction_id && <span>Txn: {help.transaction_id}</span>}</div>
-              </div>;
-            })}
-          </div>
-        )}
-
         {needed > 0 && !isRejected && !isExpired && (
           <div className="space-y-1">
             <div className="flex justify-between text-[11px] font-medium">
-              <span className="text-teal-600">{s} {collected} raised</span>
+              <span className="text-green-600">{s} {collected} raised</span>
               <span className="text-muted-foreground">{pct}% · {s} {Math.max(needed - collected, 0)} left</span>
             </div>
             <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
@@ -191,20 +183,20 @@ export default function MyCasesPage() {
               </div>
 
               {/* Refund/Free Status */}
-              <div className={`rounded-lg border p-3 ${isFree ? "bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:border-teal-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
+              <div className={`rounded-lg border p-3 ${isFree ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
                 <div className="flex items-start gap-2">
                   {isFree ? (
-                    <RefreshCw className="h-5 w-5 text-teal-600 dark:text-teal-400 mt-0.5 shrink-0" />
+                    <RefreshCw className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
                   ) : (
                     <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                   )}
                   <div>
-                    <p className={`text-sm font-semibold ${isFree ? "text-teal-800 dark:text-teal-300" : "text-blue-800 dark:text-blue-300"}`}>
+                    <p className={`text-sm font-semibold ${isFree ? "text-green-800 dark:text-green-300" : "text-blue-800 dark:text-blue-300"}`}>
                       {isFree 
                         ? "🎁 Your free submission has been returned!" 
                         : "💳 1 credit has been refunded to your account!"}
                     </p>
-                    <p className={`text-xs mt-0.5 ${isFree ? "text-teal-700 dark:text-teal-400" : "text-blue-700 dark:text-blue-400"}`}>
+                    <p className={`text-xs mt-0.5 ${isFree ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
                       {isFree 
                         ? "You can submit a new case for FREE again. Your free case allowance is restored." 
                         : "You can re-submit this case using your refunded credit. No extra cost."}
@@ -276,20 +268,20 @@ export default function MyCasesPage() {
                 )}
               </div>
 
-              <div className={`rounded-lg border p-3 ${isFree ? "bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:border-teal-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
+              <div className={`rounded-lg border p-3 ${isFree ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
                 <div className="flex items-start gap-2">
                   {isFree ? (
-                    <RefreshCw className="h-5 w-5 text-teal-600 dark:text-teal-400 mt-0.5 shrink-0" />
+                    <RefreshCw className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
                   ) : (
                     <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                   )}
                   <div>
-                    <p className={`text-sm font-semibold ${isFree ? "text-teal-800 dark:text-teal-300" : "text-blue-800 dark:text-blue-300"}`}>
+                    <p className={`text-sm font-semibold ${isFree ? "text-green-800 dark:text-green-300" : "text-blue-800 dark:text-blue-300"}`}>
                       {isFree 
                         ? "🎁 Your free submission is still available!" 
                         : "💳 1 credit has been refunded to your account!"}
                     </p>
-                    <p className={`text-xs mt-0.5 ${isFree ? "text-teal-700 dark:text-teal-400" : "text-blue-700 dark:text-blue-400"}`}>
+                    <p className={`text-xs mt-0.5 ${isFree ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
                       {isFree 
                         ? "You can submit a brand new case for FREE." 
                         : "You can submit a new case using your refunded credit."}
@@ -334,7 +326,7 @@ export default function MyCasesPage() {
         {!isRejected && (
           <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}>
             {isHelping ? <Heart className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            {isHelping ? "Continue Helping" : "View Details"}
+            {isHelping && c.status === "completed" ? "View Affidavit & Completed Help" : isHelping ? "Continue Helping" : "View Details"}
           </Button>
         )}
       </div>
@@ -346,15 +338,6 @@ export default function MyCasesPage() {
   const myCompleted = myCases.filter(c => c.status === "completed");
   const myRejected = myCases.filter(c => c.status === "rejected");
   const myExpired = myCases.filter(c => c.status === "expired");
-  const showCaseStatus = (status: string) => caseFilter === "all" || caseFilter === status;
-  const visibleHelping = unlockedCases.filter((c) => {
-    const records = helpByCase[c.id] ?? [];
-    if (helpFilter === "all") return true;
-    if (helpFilter === "completed") return records.some((r: any) => r.status === "completed") || c.status === "completed";
-    return !records.length || records.some((r: any) => r.status !== "completed" && r.status !== "disputed") || !["completed", "rejected", "expired"].includes(String(c.status));
-  });
-  const completedHelpCount = unlockedCases.filter((c) => (helpByCase[c.id] ?? []).some((r: any) => r.status === "completed") || c.status === "completed").length;
-  const activeHelpCount = unlockedCases.length - completedHelpCount;
 
   return (
     <Layout>
@@ -377,18 +360,6 @@ export default function MyCasesPage() {
             </TabsList>
 
             <TabsContent value="requests" className="space-y-5 mt-4">
-              <div className="grid grid-cols-4 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="My case status filters">
-                {([
-                  ["all", "All"],
-                  ["pending", "Pending"],
-                  ["rejected", "Rejected"],
-                  ["completed", "Completed"],
-                ] as const).map(([value, label]) => (
-                  <button key={value} type="button" role="tab" aria-selected={caseFilter === value} onClick={() => setCaseFilter(value)} className={`rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${caseFilter === value ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-                    {label} ({value === "all" ? myCases.length : value === "pending" ? myPending.length : value === "rejected" ? myRejected.length : myCompleted.length})
-                  </button>
-                ))}
-              </div>
               {myCases.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FileText className="h-10 w-10 mx-auto opacity-30 mb-2" />
@@ -397,7 +368,7 @@ export default function MyCasesPage() {
                 </div>
               ) : (
                 <>
-                  {showCaseStatus("expired") && myExpired.length > 0 && (
+                  {myExpired.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-amber-600 flex items-center gap-1.5">
                         <CalendarClock className="h-4 w-4" /> Expired ({myExpired.length})
@@ -405,7 +376,7 @@ export default function MyCasesPage() {
                       {myExpired.map(c => <CaseRow key={c.id} c={c} />)}
                     </div>
                   )}
-                  {showCaseStatus("rejected") && myRejected.length > 0 && (
+                  {myRejected.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
                         <XCircle className="h-4 w-4" /> Rejected ({myRejected.length})
@@ -413,19 +384,19 @@ export default function MyCasesPage() {
                       {myRejected.map(c => <CaseRow key={c.id} c={c} />)}
                     </div>
                   )}
-                  {showCaseStatus("pending") && myPending.length > 0 && (
+                  {myPending.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-muted-foreground">⏳ Under Review ({myPending.length})</h3>
                       {myPending.map(c => <CaseRow key={c.id} c={c} />)}
                     </div>
                   )}
-                  {showCaseStatus("approved") && myActive.length > 0 && (
+                  {myActive.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-muted-foreground">✅ Published ({myActive.length})</h3>
                       {myActive.map(c => <CaseRow key={c.id} c={c} />)}
                     </div>
                   )}
-                  {showCaseStatus("completed") && myCompleted.length > 0 && (
+                  {myCompleted.length > 0 && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-muted-foreground">🎉 Completed ({myCompleted.length})</h3>
                       {myCompleted.map(c => <CaseRow key={c.id} c={c} />)}
@@ -436,25 +407,14 @@ export default function MyCasesPage() {
             </TabsContent>
 
             <TabsContent value="helping" className="space-y-3 mt-4">
-              <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Help status filters">
-                {([
-                  ["all", "All Help"],
-                  ["active", "Active"],
-                  ["completed", "Completed"],
-                ] as const).map(([value, label]) => (
-                  <button key={value} type="button" role="tab" aria-selected={helpFilter === value} onClick={() => setHelpFilter(value)} className={`rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${helpFilter === value ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-                    {label} ({value === "all" ? unlockedCases.length : value === "active" ? activeHelpCount : completedHelpCount})
-                  </button>
-                ))}
-              </div>
-              {visibleHelping.length === 0 ? (
+              {unlockedCases.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Heart className="h-10 w-10 mx-auto opacity-30 mb-2" />
                   <p>You haven't unlocked any cases yet.</p>
                   <Button size="sm" className="mt-3" onClick={() => navigate({ to: "/cases" })}>Browse Cases</Button>
                 </div>
               ) : (
-                visibleHelping.map(c => <CaseRow key={c.id} c={c} isHelping />)
+                unlockedCases.map(c => <CaseRow key={c.id} c={c} isHelping />)
               )}
             </TabsContent>
           </Tabs>

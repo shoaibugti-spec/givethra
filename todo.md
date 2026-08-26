@@ -1249,3 +1249,15 @@
 - [x] Keep CNIC limited to first 4 digits and bank/account identifiers limited to last 3–4 digits, masking all remaining sensitive data.
 - [x] Add regression coverage for symmetric participant content, non-sensitive field presence, and privacy masking.
 - [x] Validate, synchronize, and document the deployment/cache refresh requirement.
+
+## Urgent Heroes Wall Completed Case Visibility
+- [x] Trace why the approved/completed case is not returned to Heroes Wall and why metrics remain zero.
+- [x] Ensure Case 1 and its verified total help amount render immediately after completion, with later completed cases added automatically.
+- [x] Preserve Kindness Wall, feedback publication, mobile layout, and all existing payment/case records.
+- [x] Add regression coverage, validate, synchronize, and document the matched Worker/assets deployment and cache refresh.
+
+## Reported Completed Help Regression — My Cases, Heroes Wall, Affidavit
+- [x] Trace the shared API/data mapping that makes approved completed help appear as Helping/Completed instead of zero.
+- [x] Restore the completed case on Heroes Wall with Case 1, verified total amount, and automatic later-case aggregation.
+- [x] Restore a clear affidavit download/view entry point from the completed help record.
+- [x] Keep unrelated pages, payment records, Kindness Wall, and mobile layout unchanged; add tests and validate before checkpoint.

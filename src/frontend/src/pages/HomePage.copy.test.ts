@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const homePageSource = readFileSync(new URL("./HomePage.tsx", import.meta.url), "utf8");
 const communityPageSource = readFileSync(new URL("./CommunityPage.tsx", import.meta.url), "utf8");
+const myCasesPageSource = readFileSync(new URL("./MyCasesPage.tsx", import.meta.url), "utf8");
 
 describe("public Community composer placement", () => {
   it("keeps the homepage focused on cases and does not render a duplicate post composer", () => {
@@ -46,6 +47,8 @@ describe("homepage Heroes Wall", () => {
     const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
     expect(apiSource).toContain("/api/heroes-wall");
     expect(workerSource).toContain("lower(COALESCE(status, '')) = 'completed'");
+    expect(workerSource).toContain("lower(COALESCE(r.status, '')) IN ('approved', 'completed')");
+    expect(workerSource).toContain("verified_amount");
     expect(workerSource).toContain("solved_cases");
     expect(heroesWallSource).toContain("Heroes Wall");
     expect(heroesWallSource).toContain("Cases solved");
@@ -62,6 +65,22 @@ describe("homepage Heroes Wall", () => {
     expect(kindnessWallSource).toContain("createComment({ feedback_id: current.id");
     expect(kindnessWallSource).toContain("Kindness Wall");
     expect(workerSource).toContain('parts[0] === "api" && parts[1] === "feedbacks" && request.method === "GET"');
+  });
+
+  it("keeps the wall available when social counters or post sync are unavailable", () => {
+    const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
+    expect(workerSource).toContain("Heroes Wall social post sync failed");
+    expect(workerSource).toContain("Heroes Wall social counters unavailable");
+    expect(workerSource).toContain("caseRow.verified_amount");
+  });
+
+  it("retains completed helper resolutions and exposes the affidavit entry point", () => {
+    const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
+    expect(apiSource).toContain("getCaseResolutionsByHero");
+    expect(myCasesPageSource).toContain("getCaseResolutionsByHero(user.id)");
+    expect(myCasesPageSource).toContain('status: "completed"');
+    expect(myCasesPageSource).toContain("affidavit_available: true");
+    expect(myCasesPageSource).toContain("View Affidavit & Completed Help");
   });
 
   it("uses public community interactions for each completed-case card", () => {

@@ -1,4 +1,6 @@
-// src/frontend/src/lib/api.ts
+// ============================================================
+// FILE: src/frontend/src/lib/api.ts
+// ============================================================
 
 // Cloudflare Worker API client – all backend calls go through this file
 
@@ -16,34 +18,13 @@ function getAuthToken(): string | null {
   }
 }
 
-// Keep a non-sensitive browser-only identity for public Community actions.
-// The Worker stores it as a guest actor key; it is not an account credential.
-export function getGuestId(): string {
-  try {
-    const existing = localStorage.getItem("givethra_guest_id");
-    if (existing) return existing;
-    const generated = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-    localStorage.setItem("givethra_guest_id", generated);
-    return generated;
-  } catch {
-    return "session-guest";
-  }
-}
-
-// Helper to build request headers with authorization and public guest identity.
+// Helper to build request headers with authorization
 function headers(): HeadersInit {
   const token = getAuthToken();
   return {
     "Content-Type": "application/json",
-    "X-Guest-ID": getGuestId(),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
-}
-
-async function readApiJson<T>(res: Response, fallback: T, context: string): Promise<T> {
-  const result = await res.json().catch(() => fallback as unknown);
-  if (!res.ok) throw new Error((result as any)?.error || `${context} (${res.status})`);
-  return result as T;
 }
 
 // ---------- AUTH ----------
@@ -56,76 +37,10 @@ export async function verifyToken(): Promise<{ valid: boolean; user?: any }> {
   return res.json();
 }
 
-// ---------- COMMUNITY POSTS ----------
-export async function getCommunityPosts() {
-  const res = await fetch(`${WORKER_URL}/api/community/posts`, { headers: headers() });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.error || `Community request failed (${res.status})`);
-  return Array.isArray(data) ? data : [];
-}
-
-export async function markCommunityPostsAsRead() {
-  const res = await fetch(`${WORKER_URL}/api/community/mark-read`, {
-    method: "PUT",
-    headers: headers(),
-  });
-  return res.json();
-}
-
-export async function createCommunityPost(data: any) {
-  const res = await fetch(`${WORKER_URL}/api/community/posts`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(data),
-  });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Failed to create post (${res.status})`);
-  return result;
-}
-
-export async function toggleLike(postId: string) {
-  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/likes`, {
-    method: "POST",
-    headers: headers(),
-  });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok || typeof result?.liked !== "boolean") {
-    throw new Error(result?.error || `Failed to update like (${res.status})`);
-  }
-  return result;
-}
-
-export async function getPostComments(postId: string) {
-  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/comments`, {
-    headers: headers(),
-  });
-  const result = await res.json().catch(() => []);
-  if (!res.ok) throw new Error(result?.error || `Failed to load comments (${res.status})`);
-  return Array.isArray(result) ? result : [];
-}
-
-export async function addComment(postId: string, comment: string) {
-  const res = await fetch(`${WORKER_URL}/api/community/posts/${postId}/comments`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ comment }),
-  });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok || !result?.id) throw new Error(result?.error || `Failed to add comment (${res.status})`);
-  return result;
-}
-
 // ---------- CASES ----------
 export async function getApprovedCases() {
   const res = await fetch(`${WORKER_URL}/api/cases/approved`, { headers: headers() });
   return res.json();
-}
-
-export async function getHeroesWall() {
-  const res = await fetch(`${WORKER_URL}/api/heroes-wall`, { headers: headers(), cache: "no-store" });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Failed to load Heroes Wall (${res.status})`);
-  return result;
 }
 
 export async function getCasesByUser(userId: string) {
@@ -135,18 +50,7 @@ export async function getCasesByUser(userId: string) {
 
 export async function getCaseById(id: string) {
   const res = await fetch(`${WORKER_URL}/api/cases/${id}`, { headers: headers() });
-  const data = await res.json().catch(() => null);
-  if (res.ok && data && !data.error) return data;
-
-  // Public/shared links should remain usable if the direct detail route has a
-  // transient edge failure. The approved index is guest-readable by design.
-  const approvedRes = await fetch(`${WORKER_URL}/api/cases/approved`, { headers: headers() });
-  const approved = await approvedRes.json().catch(() => []);
-  if (approvedRes.ok && Array.isArray(approved)) {
-    const fallback = approved.find((row: any) => String(row?.id) === String(id));
-    if (fallback) return fallback;
-  }
-  return data || {};
+  return res.json();
 }
 
 export async function getCasesByIds(ids: string[]) {
@@ -174,33 +78,15 @@ export async function getCaseCounts(userId: string) {
   return res.json();
 }
 
-export async function getCaseCount(userId: string): Promise<number> {
-  try {
-    const counts = await getCaseCounts(userId);
-    return Number(counts?.total || 0);
-  } catch {
-    return 0;
-  }
-}
-
-export async function getHelpCount(userId: string): Promise<number> {
-  try {
-    const unlocks = await getCaseUnlocksByHero(userId);
-    return Array.isArray(unlocks) ? unlocks.length : 0;
-  } catch {
-    return 0;
-  }
-}
-
 export async function getCategoryCounts() {
   const res = await fetch(`${WORKER_URL}/api/cases/category-counts`, { headers: headers() });
   return res.json();
 }
 
 // ---------- CASE UNLOCKS ----------
-export async function getCaseUnlock(caseId: string, heroId: string, paymentType: "full" | "partial" | "media" = "full") {
+export async function getCaseUnlock(caseId: string, heroId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/case-unlocks?case_id=${caseId}&hero_id=${heroId}&payment_type=${paymentType}`,
+    `${WORKER_URL}/api/case-unlocks?case_id=${caseId}&hero_id=${heroId}`,
     { headers: headers() }
   );
   const data = await res.json();
@@ -234,7 +120,7 @@ export async function upsertUserSuspension(data: Record<string, unknown>) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return readApiJson(res, {}, "Failed to update user suspension");
+  return res.json();
 }
 
 export async function getCategoryOffer(category: string) {
@@ -292,17 +178,15 @@ export async function insertCaseUnlock(data: any) {
 
 // ---------- CASE RESOLUTIONS ----------
 export async function getCaseResolutions(caseId: string, heroId?: string) {
-  let url = `${WORKER_URL}/api/case-resolutions?case_id=${encodeURIComponent(caseId)}`;
-  if (heroId) url += `&hero_id=${encodeURIComponent(heroId)}`;
+  let url = `${WORKER_URL}/api/case-resolutions?case_id=${caseId}`;
+  if (heroId) url += `&hero_id=${heroId}`;
   const res = await fetch(url, { headers: headers() });
   return res.json();
 }
 
 export async function getCaseResolutionsByHero(heroId: string) {
-  const res = await fetch(`${WORKER_URL}/api/case-resolutions?hero_id=${encodeURIComponent(heroId)}`, { headers: headers(), cache: "no-store" });
-  const result = await res.json().catch(() => []);
-  if (!res.ok) throw new Error(result?.error || `Failed to load help history (${res.status})`);
-  return Array.isArray(result) ? result : [];
+  const res = await fetch(`${WORKER_URL}/api/case-resolutions?hero_id=${encodeURIComponent(heroId)}`, { headers: headers() });
+  return res.json();
 }
 
 export async function insertCaseResolution(data: any) {
@@ -352,12 +236,10 @@ export async function updateKycSubmission(id: string, data: any) {
 }
 
 // ---------- PROFILES ----------
-async function readProfileResponse<T = any>(res: Response): Promise<T> {
+async function readApiResponse<T = any>(res: Response): Promise<T> {
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message = typeof payload?.error === "string"
-      ? payload.error
-      : `Profile request failed (HTTP ${res.status}).`;
+    const message = typeof payload?.error === "string" ? payload.error : `Request failed (HTTP ${res.status}).`;
     throw new Error(message);
   }
   return payload as T;
@@ -368,7 +250,7 @@ export async function getProfile(userId: string) {
     headers: headers(),
     cache: "no-store",
   });
-  return readProfileResponse(res);
+  return readApiResponse(res);
 }
 
 export async function updateProfile(userId: string, data: any) {
@@ -378,7 +260,7 @@ export async function updateProfile(userId: string, data: any) {
     cache: "no-store",
     body: JSON.stringify(data),
   });
-  return readProfileResponse(res);
+  return readApiResponse(res);
 }
 
 // ---------- WALLET ----------
@@ -402,9 +284,7 @@ export async function getDeposits(userId: string) {
     `${WORKER_URL}/api/deposits?user_id=${userId}`,
     { headers: headers() }
   );
-  const result = await res.json().catch(() => ([]));
-  if (!res.ok) throw new Error(result?.error || `Failed to load deposits (${res.status})`);
-  return result;
+  return res.json();
 }
 
 export async function insertDeposit(data: any) {
@@ -413,9 +293,7 @@ export async function insertDeposit(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Failed to submit deposit (${res.status})`);
-  return result;
+  return res.json();
 }
 
 // ---------- FEEDBACK ----------
@@ -497,8 +375,7 @@ export async function getUnreadNotificationsCount(userId: string) {
     `${WORKER_URL}/api/notifications/unread-count?user_id=${userId}`,
     { headers: headers() }
   );
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `Failed to load notification count (${res.status})`);
+  const data = await res.json();
   return data.count ?? 0;
 }
 
@@ -508,9 +385,7 @@ export async function markAllNotificationsAsRead(userId: string) {
     headers: headers(),
     body: JSON.stringify({ user_id: userId }),
   });
-  const result = await res.json();
-  if (res.ok && typeof window !== "undefined") window.dispatchEvent(new Event("notification-updated"));
-  return result;
+  return res.json();
 }
 
 export async function deleteAllNotifications(userId: string) {
@@ -528,10 +403,7 @@ export async function createNotification(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Failed to create notification (${res.status})`);
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("notification-updated"));
-  return result;
+  return res.json();
 }
 
 export async function checkNotificationExists(userId: string, type: string) {
@@ -539,24 +411,13 @@ export async function checkNotificationExists(userId: string, type: string) {
   return Array.isArray(result) && result.some((n: any) => n.type === type);
 }
 
-export async function adminBroadcastNotification(data: { user_ids: string[]; type: string; title: string; message: string; link?: string }) {
-  const res = await fetch(`${WORKER_URL}/api/admin/notifications/broadcast`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(data),
-  });
-  return readApiJson(res, { sent: 0, failed: 0 }, "Failed to send notification broadcast");
-}
-
 // ---------- SUPPORT CHAT ----------
 export async function getSupportMessages(userId: string) {
   const res = await fetch(
     `${WORKER_URL}/api/support/messages?user_id=${userId}`,
-    { headers: { ...headers(), "Cache-Control": "no-store" }, cache: "no-store" }
+    { headers: headers() }
   );
-  const result = await res.json().catch(() => ([]));
-  if (!res.ok) throw new Error(result?.error || `Failed to load support messages (${res.status})`);
-  return result;
+  return res.json();
 }
 
 export async function sendSupportMessage(data: any) {
@@ -578,9 +439,7 @@ export async function markSupportMessagesAsRead(userId: string) {
     headers: headers(),
     body: JSON.stringify({ user_id: userId }),
   });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Failed to mark support messages read (${res.status})`);
-  return result;
+  return res.json();
 }
 
 export async function getUnreadChatMessagesCount(userId: string) {
@@ -588,8 +447,7 @@ export async function getUnreadChatMessagesCount(userId: string) {
     `${WORKER_URL}/api/support/unread-count?user_id=${userId}`,
     { headers: headers() }
   );
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `Failed to load unread support count (${res.status})`);
+  const data = await res.json();
   return data.count ?? 0;
 }
 
@@ -599,9 +457,7 @@ export async function getUserSettings(userId: string) {
     `${WORKER_URL}/api/user-settings/${userId}`,
     { headers: headers() }
   );
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Failed to load settings (${res.status})`);
-  return result;
+  return res.json();
 }
 
 export async function updateUserSettings(userId: string, data: any) {
@@ -610,9 +466,7 @@ export async function updateUserSettings(userId: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Failed to save settings (${res.status})`);
-  return result;
+  return res.json();
 }
 
 // ---------- FILE UPLOAD ----------
@@ -636,67 +490,45 @@ export async function uploadFileToStorage(file: File, path: string): Promise<str
   return data.url;
 }
 
-// ---------- KYC STATUS (shortcut) ----------
-export async function getKycStatus(userId: string): Promise<{ status: string }> {
-  try {
-    const submissions = await getKycSubmission(userId);
-    if (!submissions) return { status: "none" };
-    return { status: submissions.status || "pending" };
-  } catch {
-    return { status: "none" };
-  }
-}
-
 // ---------- ADMIN APIs ----------
 export async function adminGetAllKyc() {
   const res = await fetch(`${WORKER_URL}/api/admin/kyc`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin KYC");
+  return res.json();
 }
 
 export async function adminGetAllCases() {
   const res = await fetch(`${WORKER_URL}/api/admin/cases`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin cases");
+  return res.json();
 }
 
 export async function adminGetAllResolutions() {
   const res = await fetch(`${WORKER_URL}/api/admin/resolutions`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin resolutions");
+  return res.json();
 }
 
 export async function adminGetAllDeposits() {
   const res = await fetch(`${WORKER_URL}/api/admin/deposits`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin deposits");
+  return res.json();
 }
 
 export async function adminGetAllProfiles() {
   const res = await fetch(`${WORKER_URL}/api/admin/profiles`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin profiles");
+  return res.json();
 }
 
 export async function adminGetAllWallets() {
   const res = await fetch(`${WORKER_URL}/api/admin/wallets`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin wallets");
+  return res.json();
 }
 
 export async function adminGetAllUnlocks() {
   const res = await fetch(`${WORKER_URL}/api/admin/unlocks`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin unlocks");
+  return res.json();
 }
 
 export async function adminGetAllSupportMessages() {
-  const res = await fetch(`${WORKER_URL}/api/admin/support-messages`, { headers: { ...headers(), "Cache-Control": "no-store" }, cache: "no-store" });
-  return readApiJson(res, [], "Failed to load Admin support messages");
-}
-
-export async function adminMarkSupportMessagesAsRead(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/admin/support/mark-read`, {
-    method: "PUT",
-    headers: headers(),
-    body: JSON.stringify({ user_id: userId }),
-  });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Failed to mark support messages read (${res.status})`);
-  return result;
+  const res = await fetch(`${WORKER_URL}/api/admin/support-messages`, { headers: headers() });
+  return res.json();
 }
 
 export async function adminSendSupportReply(data: Record<string, unknown>) {
@@ -712,18 +544,19 @@ export async function adminSendSupportReply(data: Record<string, unknown>) {
 
 export async function adminGetAllFeedbacks() {
   const res = await fetch(`${WORKER_URL}/api/admin/feedbacks`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin feedback");
+  return res.json();
 }
 
 export async function adminGetAllOffers() {
   const res = await fetch(`${WORKER_URL}/api/admin/offers`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin offers");
+  return res.json();
 }
 
 export async function adminGetAllSuspensions() {
   const res = await fetch(`${WORKER_URL}/api/admin/suspensions`, { headers: headers() });
-  return readApiJson(res, [], "Failed to load Admin suspensions");
+  return res.json();
 }
+
 
 export async function adminUpdateKyc(id: string, data: any) {
   const res = await fetch(`${WORKER_URL}/api/admin/kyc/${id}`, {
@@ -731,7 +564,7 @@ export async function adminUpdateKyc(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return readApiJson(res, {}, "Failed to update Admin KYC");
+  return res.json();
 }
 
 export async function adminUpdateCase(id: string, data: any) {
@@ -740,7 +573,7 @@ export async function adminUpdateCase(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return readApiJson(res, {}, "Failed to update Admin case");
+  return res.json();
 }
 
 export async function adminUpdateFeedback(id: string, data: any) {
@@ -749,7 +582,7 @@ export async function adminUpdateFeedback(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return readApiJson(res, {}, "Failed to update Admin feedback");
+  return res.json();
 }
 
 export async function adminUpdateResolution(id: string, data: any) {
@@ -758,7 +591,7 @@ export async function adminUpdateResolution(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return readApiJson(res, {}, "Failed to update Admin resolution");
+  return res.json();
 }
 
 export async function adminUpdateDeposit(id: string, data: any) {
@@ -767,9 +600,7 @@ export async function adminUpdateDeposit(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Failed to update deposit (${res.status})`);
-  return result;
+  return res.json();
 }
 
 export async function adminCloseCase(id: string, data: any) {
@@ -778,14 +609,14 @@ export async function adminCloseCase(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return readApiJson(res, {}, "Failed to close Admin case");
+  return res.json();
 }
 
-export async function adminGetUserSuspension(userId: string): Promise<{ user_id?: string; suspension_count?: number; is_active?: boolean | number; suspended_at?: string | null; unlocked_at?: string | null } | null> {
+export async function adminGetUserSuspension(userId: string) {
   const res = await fetch(`${WORKER_URL}/api/admin/user-suspension/${userId}`, {
     headers: headers(),
   });
-  return readApiJson<{ user_id?: string; suspension_count?: number; is_active?: boolean | number; suspended_at?: string | null; unlocked_at?: string | null } | null>(res, null, "Failed to load user suspension");
+  return res.json();
 }
 
 export async function adminUpsertUserSuspension(data: any) {
@@ -794,7 +625,7 @@ export async function adminUpsertUserSuspension(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return readApiJson(res, {}, "Failed to update user suspension");
+  return res.json();
 }
 
 export async function adminUpdateProfile(userId: string, data: any) {
@@ -806,11 +637,11 @@ export async function adminUpdateProfile(userId: string, data: any) {
   return res.json();
 }
 
-export async function adminGetWalletsByUser(userId: string): Promise<{ user_id?: string; balance?: number; updated_at?: string } | null> {
+export async function adminGetWalletsByUser(userId: string) {
   const res = await fetch(`${WORKER_URL}/api/admin/wallets?user_id=${userId}`, {
     headers: headers(),
   });
-  const data = await readApiJson<Array<{ user_id?: string; balance?: number; updated_at?: string }>>(res, [], "Failed to load Admin wallet");
+  const data = await res.json();
   return data[0] || null;
 }
 
@@ -820,7 +651,7 @@ export async function adminUpsertWallet(userId: string, balance: number) {
     headers: headers(),
     body: JSON.stringify({ user_id: userId, balance }),
   });
-  return readApiJson(res, {}, "Failed to update wallet");
+  return res.json();
 }
 
 export async function adminGetCategoryOffer(category: string) {
@@ -878,4 +709,43 @@ export async function deleteUserAccount(userId: string) {
     body: JSON.stringify({ user_id: userId }),
   });
   return res.json();
+}
+
+// ========== EXTRA FUNCTIONS FOR userGuide.ts ==========
+export async function getKycStatus(userId: string): Promise<{ status: string }> {
+  try {
+    const submission = await getKycSubmission(userId);
+    return { status: submission?.status || 'none' };
+  } catch {
+    return { status: 'none' };
+  }
+}
+
+export async function getHelpCount(userId: string): Promise<number> {
+  try {
+    const unlocks = await getCaseUnlocksByHero(userId);
+    return Array.isArray(unlocks) ? unlocks.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function getCaseCount(userId: string): Promise<number> {
+  try {
+    const counts = await getCaseCounts(userId);
+    return counts?.total ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function getChatMessages(userId: string) {
+  const res = await fetch(`${WORKER_URL}/api/support/messages?user_id=${userId}`, {
+    headers: headers(),
+  });
+  return res.json();
+}
+
+export async function sendChatMessage(data: any) {
+  return sendSupportMessage(data);
 }
