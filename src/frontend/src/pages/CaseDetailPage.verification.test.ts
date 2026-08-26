@@ -130,13 +130,14 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("onContextMenu={e => e.preventDefault()}");
   });
 
-  it("keeps Verification Media separately locked behind one credit", () => {
+  it("grants media from Direct Payment but keeps Contribution media separately locked", () => {
     expect(caseDetailSource).toContain('getCaseUnlock(id, user.id, "media")');
     expect(caseDetailSource).toContain('payment_type: "media"');
     expect(caseDetailSource).toContain("Verification Media is locked.");
     expect(caseDetailSource).toContain("Unlock Verification Media (1 credit)");
     expect(caseDetailSource).toContain("view verification media");
-    expect(caseDetailSource).toContain("setMediaUnlocked(!!mediaUnlock || owner)");
+    expect(caseDetailSource).toContain("setMediaUnlocked(!!mediaUnlock || !!fullUnlock || owner)");
+    expect(caseDetailSource).toContain("Contribution remains separately gated behind its own media credit.");
     expect(caseDetailSource).toContain("setWalletBalance(prev => Math.max(prev - 1, 0))");
   });
 

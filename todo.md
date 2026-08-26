@@ -1108,3 +1108,9 @@
 - [x] Ensure case title, category, amount, location, story text, verification summary, and Help actions render clearly for guests.
 - [x] Keep Verification Media locked without pushing Direct/Contribution Help actions below the fold or hiding them.
 - [x] Validate public Help Now navigation without requiring Google login, then separately report legacy-login findings.
+
+## User-Requested Media Access Rule
+- [x] Direct Payment unlock automatically grants Verification Media access for that user and case.
+- [x] Contribution unlock keeps Verification Media locked until a separate one-credit media unlock.
+- [x] Preserve Wallet guidance for Contribution users without media-unlock credit.
+- [x] Add regression coverage and validate tests, typecheck, and production build before synchronization.

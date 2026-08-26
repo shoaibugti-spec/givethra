@@ -302,7 +302,9 @@ export default function CaseDetailPage() {
         setUnlocked(!!activeUnlock || owner);
         setContributionOpen(!!contributionUnlock);
         setPayMode(contributionUnlock ? "partial" : fullUnlock ? "full" : "choose");
-        setMediaUnlocked(!!mediaUnlock || owner);
+        // A paid Direct Payment unlock includes the verification context;
+        // Contribution remains separately gated behind its own media credit.
+        setMediaUnlocked(!!mediaUnlock || !!fullUnlock || owner);
         setUserUnlockCount(count ?? 0);
         const loadedResolutions = (res ?? []).slice().reverse();
         setMyResolutions(loadedResolutions);
