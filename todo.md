@@ -1084,3 +1084,9 @@
 - [x] Add a dedicated pending Contribution count to the Admin overview and Verify Help tab.
 - [x] Exclude Direct Payment, completed, rejected, and disputed records from that dedicated count.
 - [x] Add regression coverage for count accuracy and validate the Admin build before synchronization.
+
+## User-Reported Missing Admin Contributions Section
+- [x] Add a dedicated Contributions tab/section in Admin separate from Direct Payment review.
+- [x] Show each pending Contribution with a short case summary/category, helper, amount, Txn ID, receipt attachment, and pending status.
+- [x] Provide clear Approve and Reject controls with the required rejection reason in the dedicated section.
+- [x] Add regression coverage and validate the dedicated section before synchronization.

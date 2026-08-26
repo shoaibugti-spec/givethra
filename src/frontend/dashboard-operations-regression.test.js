@@ -21,9 +21,19 @@ describe("dashboard operations repair", () => {
     expect(apiSource).toContain("Failed to submit deposit");
   });
 
+  it("provides a dedicated Contributions review tab separate from Direct Payments", () => {
+    expect(adminSource).toContain('value="contributions"');
+    expect(adminSource).toContain('>Contributions {pendingContributionCount > 0');
+    expect(adminSource).toContain('No Contributions awaiting verification');
+    expect(adminSource).toContain('pendingContributions.map');
+    expect(adminSource).toContain('value="verify">Direct Payments');
+  });
+
   it("shows a dedicated pending Contribution count separate from Direct Payments", () => {
-    expect(adminSource).toContain('const pendingContributionCount = pendingResolutions.filter((r) => r.paid_to === "givethra").length;');
-    expect(adminSource).toContain('const pendingDirectCount = pendingResolutions.filter((r) => r.paid_to !== "givethra").length;');
+    expect(adminSource).toContain('const pendingContributions = pendingResolutions.filter((r) => r.paid_to === "givethra");');
+    expect(adminSource).toContain('const pendingDirectResolutions = pendingResolutions.filter((r) => r.paid_to !== "givethra");');
+    expect(adminSource).toContain('const pendingContributionCount = pendingContributions.length;');
+    expect(adminSource).toContain('const pendingDirectCount = pendingDirectResolutions.length;');
     expect(adminSource).toContain('label: "Pending Contributions", value: pendingContributionCount');
     expect(adminSource).toContain("Pending Direct Payments");
     expect(adminSource).toContain("{pendingContributionCount}");

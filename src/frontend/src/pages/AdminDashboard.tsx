@@ -568,8 +568,10 @@ export default function AdminPage() {
 
   const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"]);
   const pendingResolutions = resolutions.filter((r) => pendingResolutionStatuses.has(String(r.status || "").toLowerCase()));
-  const pendingContributionCount = pendingResolutions.filter((r) => r.paid_to === "givethra").length;
-  const pendingDirectCount = pendingResolutions.filter((r) => r.paid_to !== "givethra").length;
+  const pendingContributions = pendingResolutions.filter((r) => r.paid_to === "givethra");
+  const pendingDirectResolutions = pendingResolutions.filter((r) => r.paid_to !== "givethra");
+  const pendingContributionCount = pendingContributions.length;
+  const pendingDirectCount = pendingDirectResolutions.length;
   const completedResolutionsCount = resolutions.filter((r) => r.status === "completed").length;
 
   const approvedCases = caseList.filter((c) => c.status === "approved");
@@ -679,7 +681,8 @@ export default function AdminPage() {
               <TabsTrigger value="users">Users {usersList.length > 0 && <span className="ml-1 bg-muted text-foreground text-[10px] rounded-full px-1.5">{usersList.length}</span>}</TabsTrigger>
               <TabsTrigger value="kyc">KYC {pendingKyc.length > 0 && <span className="ml-1 bg-primary text-white text-[10px] rounded-full px-1.5">{pendingKyc.length}</span>}</TabsTrigger>
               <TabsTrigger value="cases">Cases {pendingCases.length > 0 && <span className="ml-1 bg-primary text-white text-[10px] rounded-full px-1.5">{pendingCases.length}</span>}</TabsTrigger>
-              <TabsTrigger value="verify">Verify Help {pendingResolutions.length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{pendingResolutions.length}</span>}</TabsTrigger>
+              <TabsTrigger value="verify">Direct Payments {pendingDirectCount > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{pendingDirectCount}</span>}</TabsTrigger>
+              <TabsTrigger value="contributions">Contributions {pendingContributionCount > 0 && <span className="ml-1 bg-primary text-white text-[10px] rounded-full px-1.5">{pendingContributionCount}</span>}</TabsTrigger>
               <TabsTrigger value="pay">Pay & Close {readyToClose.length > 0 && <span className="ml-1 bg-teal-500 text-white text-[10px] rounded-full px-1.5">{readyToClose.length}</span>}</TabsTrigger>
               <TabsTrigger value="deposits">Deposits {pendingDeposits.length > 0 && <span className="ml-1 bg-primary text-white text-[10px] rounded-full px-1.5">{pendingDeposits.length}</span>}</TabsTrigger>
               <TabsTrigger value="notify">Notify</TabsTrigger>
@@ -762,13 +765,20 @@ export default function AdminPage() {
                 <ShieldIcon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <div className="space-y-2"><p>Verify each help — check the receipt and amount, then confirm to add it to the case's collected total. <strong>Direct</strong> helps close the case when full. <strong>Fundraising</strong> contributions add up; when the goal is reached, go to "Pay & Close" to pay the institute yourself.</p><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Pending Contributions</span><strong className="block text-lg text-primary">{pendingContributionCount}</strong></div><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Pending Direct Payments</span><strong className="block text-lg text-primary">{pendingDirectCount}</strong></div></div></div>
               </div>
-              {pendingResolutions.length === 0 ? <Empty text="No help awaiting verification" /> :
-                pendingResolutions.map((r) => {
+                            {pendingDirectResolutions.length === 0 ? <Empty text="No Direct Payments awaiting verification" /> :
+                pendingDirectResolutions.map((r) => {
                   const c = caseList.find((cs) => cs.id === r.case_id);
                   return <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />;
                 })}
             </TabsContent>
-
+            <TabsContent value="contributions" className="space-y-4 mt-4">
+              <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Pending Contributions: {pendingContributionCount}</strong><p className="mt-1">Review each receipt, amount, and transaction ID before approving. The case summary and helper details are shown on every card.</p></div>
+              {pendingContributions.length === 0 ? <Empty text="No Contributions awaiting verification" /> :
+                pendingContributions.map((r) => {
+                  const c = caseList.find((cs) => cs.id === r.case_id);
+                  return <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />;
+                })}
+            </TabsContent>
             <TabsContent value="pay" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-teal-50 dark:bg-teal-950/20 p-4 text-sm text-teal-700 flex items-start gap-2">
                 <HandCoins className="h-4 w-4 shrink-0 mt-0.5" />
