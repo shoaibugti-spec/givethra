@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { COUNTRIES } from "@/lib/countries";
 import {
   getKycStatus,
   getWallet,
@@ -123,43 +124,6 @@ const CATEGORIES = [
   "Emergency Help",
 ];
 
-// ============================================================
-//  COUNTRIES LIST (moved outside component)
-// ============================================================
-const COUNTRIES = [
-  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda",
-  "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain",
-  "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan",
-  "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria",
-  "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada",
-  "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros",
-  "Congo (Congo-Brazzaville)", "Congo (DRC)", "Costa Rica", "Croatia", "Cuba",
-  "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic",
-  "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia",
-  "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia",
-  "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau",
-  "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran",
-  "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan",
-  "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho",
-  "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar",
-  "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania",
-  "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro",
-  "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands",
-  "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia",
-  "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea",
-  "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania",
-  "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent",
-  "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal",
-  "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia",
-  "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan",
-  "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
-  "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga",
-  "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda",
-  "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay",
-  "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen",
-  "Zambia", "Zimbabwe",
-];
-
 const STEPS = ["Basic Info", "Category Details", "Verification", "Review"];
 
 const CASE_CURRENCIES = ["PKR", "USD", "SAR", "AED", "GBP", "EUR", "INR", "BDT", "TRY"];
@@ -183,7 +147,7 @@ const SS_KEY = "givethra_submit_draft_v4";
 const COMMON_GUIDE_TAIL = [
   "Upload clear documents so Givethra can verify your case.",
   "Take a live selfie and record a video explaining your need in your own words.",
-  "Your first two cases are FREE. From the third case onward, a 1 credit listing fee applies.",
+  "Your first case is FREE. After that, a 1 credit listing fee applies.",
 ];
 
 // ===== SUSPENSION CONSTANTS =====
@@ -214,7 +178,7 @@ const FEE_SUB_OPTIONS = [
   { value: "university", label: "🏛️ University Fee" },
 ];
 
-// ===== EDUCATION FIELDS =====
+// ===== EDUCATION FIELDS (unchanged) =====
 const EDUCATION_ADMISSION_FIELDS = {
   School: [
     { key: "institute_name", label: "School Name", required: true, placeholder: "e.g. Beaconhouse School System" },
@@ -343,7 +307,7 @@ const PAYMENT_RECEIVER_CATS = new Set([
   "Other",
 ]);
 
-// ===== LIST_CATS =====
+// ===== LIST_CATS (unchanged) =====
 const LIST_CATS: Record<
   string,
   {
@@ -704,6 +668,7 @@ export default function SubmitRequestPage() {
     if (isSuspended) return false;
     if (isFreeDisabled) return false;
     if (userFreeCasesUsed >= MAX_FREE_CASES) return false;
+    if (userRejectionCount >= 3) return false;
     return true;
   };
 
@@ -765,16 +730,14 @@ export default function SubmitRequestPage() {
       const cases = await getCasesByUser(user.id);
       const totalCases = cases?.length || 0;
       const rejectedCases = cases?.filter((c: any) => c.status === "rejected").length || 0;
-      
-      // ✅ FIX: Count all free cases regardless of status (including rejected)
-      const freeCasesUsed = cases?.filter((c: any) => c.was_free === true).length || 0;
+      // Only count approved/active cases as truly consumed free cases. Rejected cases do not consume free quota.
+      const freeCasesUsed = cases?.filter((c: any) => c.was_free === true && c.status !== "rejected").length || 0;
 
       setUserTotalCases(totalCases);
       setUserRejectionCount(rejectedCases);
       setUserFreeCasesUsed(freeCasesUsed);
 
-      // Free disabled if free cases used >= 2 OR rejections >= 3
-      const freeDisabled = freeCasesUsed >= MAX_FREE_CASES;
+      const freeDisabled = rejectedCases >= 3 || freeCasesUsed >= MAX_FREE_CASES;
       setIsFreeDisabled(freeDisabled);
 
       const suspensionData = await getUserSuspension(user.id);
@@ -812,21 +775,18 @@ export default function SubmitRequestPage() {
       });
 
       setIsSuspended(false);
-      setSuspensionCount(0);
+      setSuspensionCount(suspensionCount + 1);
       setUserRejectionCount(0);
-      // Reset free cases used when unlocked
-      setUserFreeCasesUsed(0);
-      setIsFreeDisabled(false);
 
       await sendNotification(
         user.id,
         "system",
         "🔓 Account Unlocked",
-        `Your account has been unlocked using ${UNLOCK_CREDITS_REQUIRED} credits. Your free case quota has been reset.`,
+        `Your account has been unlocked using ${UNLOCK_CREDITS_REQUIRED} credits.`,
         "/dashboard"
       );
 
-      toast.success(`✅ Account unlocked! ${UNLOCK_CREDITS_REQUIRED} credits deducted. Free cases reset.`);
+      toast.success(`✅ Account unlocked! ${UNLOCK_CREDITS_REQUIRED} credits deducted.`);
       await loadUserStats();
     } catch (err) {
       toast.error(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
@@ -836,7 +796,7 @@ export default function SubmitRequestPage() {
   }
 
   // ============================================================
-  //  EXTRA CONDITIONAL DOCS
+  //  ✅ COMPLETE extraConditionalDocs() - FIXED (unchanged)
   // ============================================================
   function extraConditionalDocs(): { key: string; label: string; hint?: string }[] {
     const list: { key: string; label: string; hint?: string }[] = [];
@@ -883,7 +843,9 @@ export default function SubmitRequestPage() {
       list.push({ key: "livestock_proof", label: "Proof of Livestock / Farming", hint: "Photo or document showing your livestock/farming" });
     }
 
-    // Gender-based documents
+    // ============================================================
+    //  ✅ GENDER-BASED DOCUMENTS - ONE "Widow" FOR BOTH
+    // ============================================================
     if (gender === "Male") {
       if (maritalStatus === "Single") {
         list.push({ key: "frc", label: "Family Registration Certificate (FRC)", hint: "Required for single male" });
@@ -1150,7 +1112,7 @@ export default function SubmitRequestPage() {
     setHasClaimedOfferBefore((count ?? 0) > 0);
   }
 
-  const isFirstCaseFree = userFreeCasesUsed < MAX_FREE_CASES && canUseFreeCase();
+  const isFirstCaseFree = activeCaseCount === 0 && canUseFreeCase();
   const offerApplies =
     !!offer &&
     offer.is_active &&
@@ -1171,6 +1133,12 @@ export default function SubmitRequestPage() {
       const completedCases = cases?.filter((c: any) => c.status === "completed") || [];
 
       if (completedCases.length > 0) {
+        // We need to check feedbacks for these cases
+        // For now, we'll assume no blocking; in real implementation, we'd call a feedback API
+        // Since feedbacks are also migrated, we'll use a placeholder
+        // Actually we can fetch feedbacks from the worker if needed
+        // For simplicity, we'll set blockedByFeedback to null
+        // In a production environment, you'd have a `getFeedbackByCase` API
         setBlockedByFeedback(null);
       } else {
         setBlockedByFeedback(null);
@@ -1198,6 +1166,7 @@ export default function SubmitRequestPage() {
       const settings = await getUserSettings(user.id);
       if (settings?.currency && settings.currency !== "USD") setCurrency(settings.currency);
       const counts = await getCaseCounts(user.id);
+      // Count active cases (pending, approved, completed)
       const activeCount = (counts?.pending || 0) + (counts?.approved || 0) + (counts?.completed || 0);
       setActiveCaseCount(activeCount);
     } catch (err) {
@@ -1218,6 +1187,7 @@ export default function SubmitRequestPage() {
       throw new Error(`File size (${fileSizeMB.toFixed(1)}MB) exceeds 50MB limit. Please record a shorter video.`);
     }
 
+    // Use the new upload function from api.ts
     try {
       const url = await uploadFileToStorage(file, path);
       return url;
@@ -1317,7 +1287,7 @@ export default function SubmitRequestPage() {
   }
 
   // ============================================================
-  //  VIDEO RECORDING - FIXED (60 seconds max, with audio improvements)
+  //  VIDEO RECORDING - FIXED (90 seconds max, low quality, live preview)
   // ============================================================
   async function startVideoRecording() {
     try {
@@ -1341,7 +1311,6 @@ export default function SubmitRequestPage() {
           noiseSuppression: true,
           autoGainControl: true,
           channelCount: 1,
-          sampleRate: 48000,
         },
       });
 
@@ -1359,9 +1328,8 @@ export default function SubmitRequestPage() {
       }, 50);
 
       const recorder = new MediaRecorder(s, {
-        mimeType: "video/webm;codecs=vp8,opus",
+        mimeType: "video/webm;codecs=vp8",
         videoBitsPerSecond: 1500000,
-        audioBitsPerSecond: 128000, // ✅ Better audio quality
       });
 
       mediaRecorderRef.current = recorder;
@@ -1415,10 +1383,10 @@ export default function SubmitRequestPage() {
       const interval = setInterval(() => {
         sec++;
         setVideoTimer(sec);
-        if (sec >= 60) {
+        if (sec >= 90) {
           clearInterval(interval);
           if (recorder.state === "recording") recorder.stop();
-          toast.info("Auto-stopped at 60 seconds to keep file size small.");
+          toast.info("Auto-stopped at 90 seconds to keep file size within the upload limit.");
         }
       }, 1000);
 
@@ -1708,7 +1676,7 @@ export default function SubmitRequestPage() {
       return;
     }
     if (!videoUrl) {
-      toast.error("Please record a video appeal (60 seconds)");
+      toast.error("Please record a video appeal (up to 90 seconds)");
       return;
     }
 
@@ -1729,10 +1697,9 @@ export default function SubmitRequestPage() {
       // Fetch fresh case data
       const freshCases = await getCasesByUser(uid);
       const freshRejections = freshCases?.filter((c: any) => c.status === "rejected").length || 0;
-      // Count all free cases regardless of status
       const freshFreeUsed = freshCases?.filter((c: any) => c.was_free === true).length || 0;
 
-      const freeDisabled = freshFreeUsed >= MAX_FREE_CASES;
+      const freeDisabled = freshRejections >= 3 || freshFreeUsed >= MAX_FREE_CASES;
       const userSuspended = freshRejections >= MAX_REJECTIONS_BEFORE_SUSPENSION;
 
       if (userSuspended) {
@@ -1749,8 +1716,7 @@ export default function SubmitRequestPage() {
         return;
       }
 
-      // The first two submitted cases are free, regardless of review status.
-      const firstFree = freshFreeUsed < MAX_FREE_CASES && !freeDisabled;
+      const firstFree = (freshCases?.length || 0) === 0 && !freeDisabled;
 
       let offerFree = false;
       let currentOffer: any = null;
@@ -1780,12 +1746,9 @@ export default function SubmitRequestPage() {
 
       const allDocUrls: Record<string, string> = { ...catDocUrls };
       const photoUrls: string[] = Object.values(allDocUrls);
-      const docMeta: Record<string, { url: string; original_name: string }> = {};
+      const docMeta: Record<string, string> = {};
       Object.keys(allDocUrls).forEach((k) => {
-        docMeta[k] = {
-          url: allDocUrls[k],
-          original_name: catDocNames[k] || k,
-        };
+        docMeta[k] = allDocUrls[k];
       });
 
       const finalInstitute = easy
@@ -1915,6 +1878,7 @@ export default function SubmitRequestPage() {
         finalAmount = parseFloat(amount) || 0;
       }
 
+      // Build the case object
       const caseData = {
         user_id: uid,
         category,
@@ -2120,6 +2084,7 @@ export default function SubmitRequestPage() {
     );
   }
 
+  // ===== FIXED: Removed extra } at line 2090 =====
   function renderPaymentReceiverDetails() {
     if (!needsPaymentReceiver) return null;
 
@@ -2310,8 +2275,8 @@ export default function SubmitRequestPage() {
           )}
 
           {instituteName && !isOtherInstitute && (
-            <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-3 flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-teal-700">
+            <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-3 flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-green-700">
                 ✓ {instituteName} <span className="text-[10px]">(1Bill listed)</span>
               </p>
               <button
@@ -2513,7 +2478,7 @@ export default function SubmitRequestPage() {
       />
       {uploadingDoc === key && <p className="text-xs text-amber-600">⏳ Uploading... please wait</p>}
       {catDocUrls[key] && uploadingDoc !== key && (
-        <p className="text-xs text-teal-600 flex items-center gap-1">
+        <p className="text-xs text-green-600 flex items-center gap-1">
           <CheckCircle2 className="h-3.5 w-3.5" /> {catDocNames[key] || "Document"} — Uploaded ✓
         </p>
       )}
@@ -2616,13 +2581,13 @@ export default function SubmitRequestPage() {
               </p>
               <div className="flex justify-between items-center bg-primary/5 rounded-lg p-3">
                 <span className="text-sm">Your Balance:</span>
-                <span className={`font-bold text-lg ${canUnlock ? "text-teal-600" : "text-red-600"}`}>
+                <span className={`font-bold text-lg ${canUnlock ? "text-green-600" : "text-red-600"}`}>
                   {balance} credits
                 </span>
               </div>
               {canUnlock ? (
                 <Button
-                  className="w-full h-12 font-semibold bg-teal-600 hover:bg-teal-700"
+                  className="w-full h-12 font-semibold bg-green-600 hover:bg-green-700"
                   onClick={handleUnlockAccount}
                   disabled={unlocking}
                 >
@@ -2644,7 +2609,6 @@ export default function SubmitRequestPage() {
               <p>⚠️ Important:</p>
               <ul className="list-disc list-inside space-y-1 mt-1">
                 <li>After unlocking, your rejection count will reset to 0</li>
-                <li>Your free case quota will be reset (you get 2 free cases again)</li>
                 <li>
                   If you get {MAX_REJECTIONS_BEFORE_SUSPENSION} rejections again, your account will be suspended again
                 </li>
@@ -2670,7 +2634,7 @@ export default function SubmitRequestPage() {
         <h1 className="text-3xl font-bold mb-2">Submit a Help Request</h1>
         <p className="text-muted-foreground mb-3">Your first case is FREE. After that, a 1 credit listing fee applies.</p>
 
-        {/* User Stats Banner - Updated with Free Cases Used X/2 and Rejections X/5 */}
+        {/* User Stats Banner */}
         {!loadingUserStats && user && (
           <div className="mb-4 rounded-xl border bg-card p-4 text-sm">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
@@ -2680,29 +2644,24 @@ export default function SubmitRequestPage() {
               </div>
               <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-2">
                 <p className="text-xs text-muted-foreground">Rejected</p>
-                <p className="font-bold text-lg text-red-600">
-                  {userRejectionCount}/{MAX_REJECTIONS_BEFORE_SUSPENSION}
-                </p>
-                {userRejectionCount >= 3 && userRejectionCount < MAX_REJECTIONS_BEFORE_SUSPENSION && (
-                  <p className="text-[10px] text-amber-600">⚠️ Near suspension</p>
-                )}
+                <p className="font-bold text-lg text-red-600">{userRejectionCount}</p>
               </div>
-              <div className="bg-teal-50 dark:bg-teal-950/20 rounded-lg p-2">
+              <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2">
                 <p className="text-xs text-muted-foreground">Free Cases Used</p>
-                <p className="font-bold text-lg text-teal-600">
+                <p className="font-bold text-lg text-green-600">
                   {userFreeCasesUsed}/{MAX_FREE_CASES}
                 </p>
               </div>
               <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2">
                 <p className="text-xs text-muted-foreground">Status</p>
-                <p className={`font-bold text-lg ${isFreeDisabled ? "text-red-600" : "text-teal-600"}`}>
+                <p className={`font-bold text-lg ${isFreeDisabled ? "text-red-600" : "text-green-600"}`}>
                   {isFreeDisabled ? "🔒 Free Disabled" : "✅ Free Active"}
                 </p>
               </div>
             </div>
             {isFreeDisabled && !isSuspended && (
               <div className="mt-2 text-xs text-center text-red-600 bg-red-50 dark:bg-red-950/20 rounded-lg p-2">
-                ⚠️ Your free case access has been used ({userFreeCasesUsed}/{MAX_FREE_CASES} free cases). You can still submit cases using credits.
+                ⚠️ Your free case access has been disabled. You can still submit cases using credits.
               </div>
             )}
             {userRejectionCount >= 3 && userRejectionCount < MAX_REJECTIONS_BEFORE_SUSPENSION && (
@@ -2727,11 +2686,11 @@ export default function SubmitRequestPage() {
         </div>
 
         {willBeFree && !isFreeDisabled && (
-          <div className="mb-6 rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-4 flex items-start gap-2">
-            <Gift className="h-5 w-5 text-teal-600 shrink-0 mt-0.5" />
+          <div className="mb-6 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-4 flex items-start gap-2">
+            <Gift className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-teal-700">🎉 This Case is FREE!</p>
-              <p className="text-sm text-teal-700">
+              <p className="font-bold text-green-700">🎉 This Case is FREE!</p>
+              <p className="text-sm text-green-700">
                 {isFirstCaseFree ? "Your first case is FREE!" : "This category has a FREE offer!"}
                 {userFreeCasesUsed > 0 && ` (You've used ${userFreeCasesUsed}/${MAX_FREE_CASES} free cases)`}
               </p>
@@ -2815,7 +2774,7 @@ export default function SubmitRequestPage() {
                 </SelectContent>
               </Select>
               {willBeFree && !isFreeDisabled && (
-                <p className="text-xs text-teal-600 font-medium flex items-center gap-1">
+                <p className="text-xs text-green-600 font-medium flex items-center gap-1">
                   <Gift className="h-3 w-3" /> {isFirstCaseFree ? "Your first case is FREE!" : "This category has a FREE offer!"}
                 </p>
               )}
@@ -2826,7 +2785,7 @@ export default function SubmitRequestPage() {
                     📋 {CATEGORY_LIMITS[category]?.label || "Verified Need"}
                   </p>
                   {isFixedAmount(category) && (
-                    <p className="text-teal-600 font-bold">
+                    <p className="text-green-600 font-bold">
                       💰 Fixed Amount: Rs {getFixedAmountValue(category)?.toLocaleString()}
                     </p>
                   )}
@@ -2858,20 +2817,17 @@ export default function SubmitRequestPage() {
                 placeholder="One line summary"
               />
             </div>
-            {/* ============================================================
-                COUNTRY & CITY - FIXED: More spacing (gap-6)
-                ============================================================ */}
-            <div className="grid grid-cols-2 gap-6" style={{ columnGap: "24px" }}>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Country *</Label>
                 <Select value={country} onValueChange={setCountry}>
-                  <SelectTrigger className={!country ? "border-red-400" : ""}>
+                  <SelectTrigger>
                     <SelectValue placeholder="Select your country" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {COUNTRIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
+                  <SelectContent className="max-h-72">
+                    {COUNTRIES.map((option) => (
+                      <SelectItem key={option.code} value={option.name}>
+                        {option.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -2879,11 +2835,7 @@ export default function SubmitRequestPage() {
               </div>
               <div className="space-y-2">
                 <Label>City *</Label>
-                <Input
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="e.g. Karachi"
-                />
+                <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Karachi" />
               </div>
             </div>
             {!easy && category && category !== "Disability Support" && !isEducationCategory && (
@@ -2935,7 +2887,7 @@ export default function SubmitRequestPage() {
           </div>
         )}
 
-        {/* STEP 2 - باقی کوڈ ویسے کا ویسے ہے، صرف یہاں تک درست ہے */}
+        {/* STEP 2 */}
         {step === 2 && (
           <div className="rounded-2xl border bg-card p-6 space-y-5">
             <h2 className="font-bold text-lg">🗂 {category || "Category"} — Details</h2>
@@ -2959,8 +2911,8 @@ export default function SubmitRequestPage() {
               </div>
               {jobStatus === "Yes" && (
                 <div className="pt-2 space-y-2">
-                  <div className="rounded-xl border border-teal-300 bg-teal-50 dark:bg-teal-950/20 p-3 space-y-2">
-                    <p className="text-xs font-medium text-teal-700">📎 Required Documents (Job)</p>
+                  <div className="rounded-xl border border-green-300 bg-green-50 dark:bg-green-950/20 p-3 space-y-2">
+                    <p className="text-xs font-medium text-green-700">📎 Required Documents (Job)</p>
                     {docBox("salary_slip", "Last 6 Months Salary Slip", true)}
                     {docBox("statement", "Last 6 Months Bank Statement", true, "Bank, EasyPaisa or JazzCash", ".pdf,image/*")}
                   </div>
@@ -3195,8 +3147,8 @@ export default function SubmitRequestPage() {
                   </div>
                 )}
                 {instituteName && !isOtherInstitute && (
-                  <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-3 flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-teal-700">
+                  <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-3 flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-green-700">
                       ✓ {instituteName} <span className="text-[10px]">(1Bill listed)</span>
                     </p>
                     <button
@@ -3379,7 +3331,7 @@ export default function SubmitRequestPage() {
 
                 {disabilityMode === "product" && (
                   <div className="space-y-3 rounded-xl border border-border p-3 bg-card">
-                    <p className="text-sm font-semibold text-teal-700">🛒 Product — Shop Details</p>
+                    <p className="text-sm font-semibold text-green-700">🛒 Product — Shop Details</p>
                     <p className="text-xs text-muted-foreground">Enter the shop where you'll buy the equipment.</p>
                     <div className="space-y-2">
                       <Label>Shop Name *</Label>
@@ -3403,7 +3355,7 @@ export default function SubmitRequestPage() {
 
                 {disabilityMode === "treatment" && (
                   <div className="space-y-3 rounded-xl border border-border p-3 bg-card">
-                    <p className="text-sm font-semibold text-teal-700">🏥 Treatment — Select Hospital</p>
+                    <p className="text-sm font-semibold text-green-700">🏥 Treatment — Select Hospital</p>
                     {!disabilityHospitalOther && !disabilityHospital && (
                       <div className="space-y-2">
                         <Label>Search & Select Hospital *</Label>
@@ -3447,8 +3399,8 @@ export default function SubmitRequestPage() {
                       </div>
                     )}
                     {disabilityHospital && !disabilityHospitalOther && (
-                      <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-3 flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-teal-700">✓ {disabilityHospital}</p>
+                      <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-3 flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-green-700">✓ {disabilityHospital}</p>
                         <button
                           type="button"
                           onClick={() => setDisabilityHospital("")}
@@ -3505,7 +3457,7 @@ export default function SubmitRequestPage() {
                                 ? "text-red-600"
                                 : treatmentAutoUrgency === "Medium"
                                 ? "text-orange-600"
-                                : "text-teal-600"
+                                : "text-green-600"
                             }
                           >
                             {treatmentAutoUrgency}
@@ -3526,7 +3478,7 @@ export default function SubmitRequestPage() {
 
                 {disabilityMode === "stipend" && (
                   <div className="space-y-3 rounded-xl border border-border p-3 bg-card">
-                    <p className="text-sm font-semibold text-teal-700">💰 Monthly Stipend — Rs {DISABILITY_STIPEND_AMOUNT}</p>
+                    <p className="text-sm font-semibold text-green-700">💰 Monthly Stipend — Rs {DISABILITY_STIPEND_AMOUNT}</p>
                     <p className="text-xs text-muted-foreground">This amount will be sent directly to your own account.</p>
                     <div className="space-y-2">
                       <Label>Account Title *</Label>
@@ -3643,9 +3595,9 @@ export default function SubmitRequestPage() {
 
               {/* ===== AMOUNT FIELD - Conditional ===== */}
               {isFixedAmount(category) ? (
-                <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-4">
-                  <p className="text-sm font-semibold text-teal-700">💰 Fixed Amount</p>
-                  <p className="text-lg font-bold text-teal-700">
+                <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-4">
+                  <p className="text-sm font-semibold text-green-700">💰 Fixed Amount</p>
+                  <p className="text-lg font-bold text-green-700">
                     Rs {getFixedAmountValue(category)?.toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">This amount is fixed for this category. You cannot change it.</p>
@@ -3778,7 +3730,7 @@ export default function SubmitRequestPage() {
                           ? "text-red-600"
                           : autoUrgency === "Medium"
                           ? "text-orange-600"
-                          : "text-teal-600"
+                          : "text-green-600"
                       }
                     >
                       {autoUrgency}
@@ -3888,7 +3840,7 @@ export default function SubmitRequestPage() {
                   <img src={selfiePreview} alt="Selfie" className="w-full rounded-xl border max-h-48 object-cover" />
                   {uploadingSelfie && <p className="text-xs text-amber-600">⏳ Uploading selfie...</p>}
                   {selfieUrl && !uploadingSelfie && (
-                    <p className="text-xs text-teal-600 flex items-center gap-1">
+                    <p className="text-xs text-green-600 flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Selfie ready ✓
                     </p>
                   )}
@@ -3914,7 +3866,7 @@ export default function SubmitRequestPage() {
                 <li>What do you hope to achieve with this support?</li>
               </ul>
               <p className="text-xs text-amber-600 mt-1">
-                ⚠️ <strong>The video must be up to 60 seconds (1 minute) to keep file size under 50 MB.</strong>
+                ⚠️ <strong>The video must be up to 90 seconds to keep file size under 50 MB.</strong>
               </p>
 
               {!videoPreview ? (
@@ -3939,7 +3891,7 @@ export default function SubmitRequestPage() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-red-500">
-                          ● Recording... {videoTimer}s / 60s
+                          ● Recording... {videoTimer}s / 90s
                         </span>
                         <Button size="sm" variant="destructive" onClick={stopVideoRecording}>
                           Stop
@@ -3948,11 +3900,11 @@ export default function SubmitRequestPage() {
                       <div className="w-full bg-muted rounded-full h-2">
                         <div
                           className="bg-red-500 h-2 rounded-full transition-all"
-                          style={{ width: `${(videoTimer / 60) * 100}%` }}
+                          style={{ width: `${(videoTimer / 90) * 100}%` }}
                         />
                       </div>
-                      <p className="text-xs text-amber-600">⏳ Max 60 seconds to keep file under 50MB</p>
-                      {videoTimer >= 50 && <p className="text-xs text-red-600 font-bold">⚠️ Will auto-stop at 60 seconds!</p>}
+                      <p className="text-xs text-amber-600">⏳ Max 90 seconds to keep file under 50MB</p>
+                      {videoTimer >= 80 && <p className="text-xs text-red-600 font-bold">⚠️ Will auto-stop at 90 seconds!</p>}
                     </div>
                   )}
                 </div>
@@ -3961,7 +3913,7 @@ export default function SubmitRequestPage() {
                   <video src={videoPreview} controls className="w-full rounded-xl border max-h-48" />
                   {uploadingVideo && <p className="text-xs text-amber-600">⏳ Uploading video...</p>}
                   {videoUrl && !uploadingVideo && (
-                    <p className="text-xs text-teal-600 flex items-center gap-1">
+                    <p className="text-xs text-green-600 flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Video ready ✓
                     </p>
                   )}
@@ -4006,7 +3958,7 @@ export default function SubmitRequestPage() {
                     return;
                   }
                   if (!videoUrl) {
-                    toast.error("Please record a video appeal (60 seconds)");
+                    toast.error("Please record a video appeal (up to 90 seconds)");
                     return;
                   }
                   if (!confirmed) {
@@ -4061,7 +4013,7 @@ export default function SubmitRequestPage() {
               {isFixedAmount(category) ? (
                 <div className="flex justify-between border-b pb-2">
                   <span className="text-muted-foreground">Amount (Fixed)</span>
-                  <span className="font-medium text-teal-600">
+                  <span className="font-medium text-green-600">
                     Rs {getFixedAmountValue(category)?.toLocaleString()}
                   </span>
                 </div>
@@ -4343,11 +4295,11 @@ export default function SubmitRequestPage() {
                 <>
                   <div className="flex justify-between border-b pb-2">
                     <span className="text-muted-foreground">Rental Agreement</span>
-                    <span className="font-medium text-teal-600">{catDocUrls["rental_agreement"] ? "✓" : "✗"}</span>
+                    <span className="font-medium text-green-600">{catDocUrls["rental_agreement"] ? "✓" : "✗"}</span>
                   </div>
                   <div className="flex justify-between border-b pb-2">
                     <span className="text-muted-foreground">Landlord's CNIC</span>
-                    <span className="font-medium text-teal-600">{catDocUrls["landlord_cnic"] ? "✓" : "✗"}</span>
+                    <span className="font-medium text-green-600">{catDocUrls["landlord_cnic"] ? "✓" : "✗"}</span>
                   </div>
                 </>
               )}
@@ -4357,16 +4309,16 @@ export default function SubmitRequestPage() {
               </div>
               <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Selfie</span>
-                <span className="font-medium text-teal-600">{selfieUrl ? "✓ Done" : "—"}</span>
+                <span className="font-medium text-green-600">{selfieUrl ? "✓ Done" : "—"}</span>
               </div>
               <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Video</span>
-                <span className="font-medium text-teal-600">{videoUrl ? "✓ Done" : "—"}</span>
+                <span className="font-medium text-green-600">{videoUrl ? "✓ Done" : "—"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Listing Fee</span>
                 {willBeFree ? (
-                  <span className="font-bold text-teal-600">
+                  <span className="font-bold text-green-600">
                     FREE 🎉 {isFirstCaseFree ? "(First Case)" : `(${offer?.label || "Offer"})`}
                   </span>
                 ) : (
