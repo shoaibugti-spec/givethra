@@ -1310,6 +1310,8 @@ export default function HomePage() {
           </div>
         </section>
 
+                <HeroesWall />
+        <FeedbackWall />
         <section className="mx-auto max-w-3xl px-4 pt-8">
           <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:flex-row">
             <div className="text-center sm:text-left">
@@ -1330,8 +1332,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        <FeedbackWall />
-        <HeroesWall />
 
         <section className="bg-background px-4 py-10">
           <div className="mx-auto max-w-4xl space-y-6">

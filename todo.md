@@ -1208,3 +1208,9 @@
 - [x] Mask CNIC to first 4 digits and bank/account identifiers to last 3–4 digits while preserving required payment context.
 - [x] Add regression tests for affidavit content/privacy and mobile-safe layout classes.
 - [x] Run tests/build, synchronize the repair, and document the safe deployment refresh.
+
+## Urgent Homepage Walls and Admin Restoration
+- [x] Restore Heroes Wall and Social Wall immediately below Built on Trust & Verification and above Download App.
+- [x] Ensure completed Hero help cards, aggregate impact, likes/comments, and Social Wall content render in that homepage section.
+- [x] Restore Admin KYC, Cases, Contributions, Direct Payments, Pay & Close, and Deposits tabs with their existing records and explicit Approve/Reject controls.
+- [x] Add focused regression coverage, run tests/build, and synchronize the repair without changing D1/R2 data.

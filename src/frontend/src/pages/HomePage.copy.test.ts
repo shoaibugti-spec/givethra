@@ -30,10 +30,12 @@ describe("public Community composer placement", () => {
 
 
 describe("homepage Heroes Wall", () => {
-  it("renders Heroes Wall beside the existing Social Wall without replacing it", () => {
+  it("renders Heroes Wall and Social Wall immediately before Download App", () => {
     expect(homePageSource).toContain('import HeroesWall from "@/components/HeroesWall";');
     expect(homePageSource).toContain("<FeedbackWall />");
     expect(homePageSource).toContain("<HeroesWall />");
+    expect(homePageSource.indexOf("<HeroesWall />")).toBeLessThan(homePageSource.indexOf("Download App"));
+    expect(homePageSource.indexOf("<FeedbackWall />")).toBeLessThan(homePageSource.indexOf("Download App"));
   });
 
   it("keeps completed-case data and impact metrics privacy-safe", () => {
