@@ -18,7 +18,8 @@ describe("legacy authentication recovery", () => {
     expect(cleanup).toContain("caches.keys()");
     expect(cleanup).toContain("getRegistrations()");
     expect(cleanup).toContain("CURRENT_SERVICE_WORKER_CACHE");
-    expect(serviceWorker).toContain('const CACHE_NAME = "givethra-v2"');
+    expect(serviceWorker).toContain('const CACHE_NAME = "givethra-v3"');
+    expect(cleanup).toContain('const CURRENT_SERVICE_WORKER_CACHE = "givethra-v3"');
     expect(auth).toContain("clearLegacyBrowserState();");
     expect(bootstrap).toContain('import { clearLegacyBrowserState } from "./lib/legacySessionCleanup";');
     expect(bootstrap).toContain("clearLegacyBrowserState();");

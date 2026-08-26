@@ -1,5 +1,5 @@
 const CURRENT_KEYS = new Set(["auth_token", "user_email", "givethra_role", "givethra_guest_id", "givethra:community-posts:v1"]);
-const CURRENT_SERVICE_WORKER_CACHE = "givethra-v2";
+const CURRENT_SERVICE_WORKER_CACHE = "givethra-v3";
 
 function isLegacyKey(key: string): boolean {
   const normalized = key.toLowerCase();
