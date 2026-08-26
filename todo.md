@@ -980,10 +980,16 @@
 - [x] Add/update regression coverage and run full tests, strict TypeScript, and production build; deployment remains user-controlled.
 
 ## User-Reported End-to-End Help Lifecycle
-- [x] Audit historical files and current code for Help history, Contribution, Direct Help, review, totals, notifications, completion, and affidavit behavior; the source audit found no existing affidavit generator/UI route.
+- [x] Audit historical files and current code for Help history, Contribution, Direct Help, review, totals, notifications, completion, and affidavit behavior; the existing Case Detail source includes `generateAffidavit` and `Download Affidavit` for completed help records.
 - [x] Ensure user Help history shows pending, confirmed, and completed contributions/direct helps with case context and amounts by loading resolution records alongside unlocked cases.
 - [x] Ensure Contribution supports amount, Givethra payment channel, receipt upload, transaction ID, pending review, repeat contributions after one unlock, and collection totals through the existing UI and schema-aligned Worker persistence.
 - [x] Ensure Direct Help always requires one credit, reveals receiver details, accepts receipt and transaction ID, and follows pending → Admin confirmation → completed through the existing UI and schema-aligned Worker persistence.
 - [x] Ensure Admin confirmation updates the correct resolution, collection totals, notifications, and case completion without duplicate counting through the existing Admin callbacks and schema-aligned Worker update route.
-- [ ] Restore or implement the existing affidavit PDF download for helper and seeker with non-sensitive case/payment context only.
+- [x] Verify the existing affidavit PDF download for helper and seeker with non-sensitive case/payment context only.
 - [x] Add/update regression coverage and run full tests, strict TypeScript, production build, and responsive UI checks; deployment remains user-controlled.
+
+## User Correction: Lock Direct Payment and Add Affidavit PDFs
+- [x] Keep Direct Full Payment fully locked until the user successfully unlocks that mode with exactly 1 credit; no free direct payment.
+- [x] Keep existing Contribution unlocks visible in My Cases → Helping with contribution history and current status.
+- [x] Verify the existing affidavit PDF downloads for completed help records for both helper and seeker using non-sensitive case/payment context.
+- [x] Add regression coverage and run full tests, strict TypeScript, production build, and responsive checks; deployment remains user-controlled.

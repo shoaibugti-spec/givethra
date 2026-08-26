@@ -20,4 +20,10 @@ describe("My Cases help history", () => {
     expect(source).toContain("Amount:");
     expect(source).toContain("Txn:");
   });
+
+  it("keeps completed-help certificate access in the existing case-detail flow", () => {
+    const caseDetailSource = fs.readFileSync(path.resolve(__dirname, "CaseDetailPage.tsx"), "utf8");
+    expect(caseDetailSource).toContain("generateAffidavit");
+    expect(caseDetailSource).toContain("Download Affidavit");
+  });
 });
