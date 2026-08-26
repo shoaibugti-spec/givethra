@@ -70,16 +70,18 @@ function copyToClipboard(text: string, label: string) {
 }
 
 function generateAffidavit(caseData: any, resolution: any, seekerKyc: any, heroName: string) {
-  const caseId = (caseData.id ?? "").slice(0, 8).toUpperCase();
+  const caseId = String(caseData.id || resolution?.case_id || "").slice(0, 8).toUpperCase();
   const today = new Date().toLocaleDateString();
-  const seekerName = seekerKyc?.full_name || caseData.full_name || "Verified Help Seeker";
-  const seekerCnic = maskCnic(seekerKyc?.cnic_number);
+  const seekerName = resolution?.seeker_name || seekerKyc?.full_name || caseData.full_name || "Verified Help Seeker";
+  const seekerCnic = maskCnic(resolution?.seeker_cnic_number || seekerKyc?.cnic_number);
+  const resolvedHeroName = resolution?.hero_name || heroName || "Verified Hero";
   const heroCnic = maskCnic(resolution?.hero_cnic_number);
-  const location = [caseData.city, caseData.country].filter(Boolean).join(", ") || "—";
-  const accountReference = caseData.account_number || caseData.account_iban || caseData.reference_number;
+  const country = caseData.country || resolution?.case_country || "—";
+  const location = [caseData.city || resolution?.case_city, country].filter(Boolean).join(", ") || "—";
+  const accountReference = caseData.account_number || caseData.account_iban || caseData.reference_number || resolution?.case_account_number || resolution?.case_account_iban || resolution?.case_reference_number;
   const completedDate = resolution?.completed_at ? new Date(resolution.completed_at).toLocaleDateString() : today;
-  const verifyCode = `GVT-${caseId}-${Date.now().toString(36).toUpperCase()}`;
-  const cur = caseData.currency || "USD";
+  const verifyCode = `GVT-${caseId || "CASE"}-${Date.now().toString(36).toUpperCase()}`;
+  const cur = caseData.currency || resolution?.currency || "USD";
   const sym = CURRENCY_SYMBOLS[cur] ?? cur;
   const paidAmount = resolution?.seeker_confirmed_amount ?? resolution?.amount_paid;
   const isFundraising = resolution?.paid_to === "givethra";
@@ -129,22 +131,22 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
   <h2>Help Seeker (Beneficiary)</h2>
   <div class="row"><span class="label">Full Name</span><span class="value">${seekerName}</span></div>
   <div class="row"><span class="label">CNIC (partially masked)</span><span class="value">${seekerCnic}</span></div>
-  <div class="row"><span class="label">Country</span><span class="value">${caseData.country || "—"}</span></div>
+  <div class="row"><span class="label">Country</span><span class="value">${country}</span></div>
   <div class="note">Note: Only the first 4 CNIC digits are shown. Remaining digits and contact details are kept private.</div>
 </div>
 
 <div class="section">
   <h2>${isFundraising ? "Contribution Details" : "Institute / Provider Paid"}</h2>
-  <div class="row"><span class="label">Institute / Provider</span><span class="value">${caseData.institute_name || "—"}</span></div>
-  <div class="row"><span class="label">Payment Method</span><span class="value">${caseData.payment_method || (isFundraising ? "Givethra Fundraising" : "—")}</span></div>
+  <div class="row"><span class="label">Institute / Provider</span><span class="value">${caseData.institute_name || resolution?.case_institute_name || "—"}</span></div>
+  <div class="row"><span class="label">Payment Method</span><span class="value">${caseData.payment_method || resolution?.case_payment_method || (isFundraising ? "Givethra Fundraising" : "—")}</span></div>
   <div class="row"><span class="label">Account / Reference (masked)</span><span class="value">${maskAccount(accountReference)}</span></div>
 </div>
 
 <div class="section">
   <h2>Resolution Details</h2>
-  <div class="row"><span class="label">Helped By (Hero)</span><span class="value">${heroName || resolution?.hero_name || "Verified Hero"}</span></div>
+  <div class="row"><span class="label">Helped By (Hero)</span><span class="value">${resolvedHeroName}</span></div>
   <div class="row"><span class="label">Hero CNIC (partially masked)</span><span class="value">${heroCnic}</span></div>
-  <div class="row"><span class="label">Type / Category</span><span class="value">${resolution?.resolution_type || caseData.category || "—"}</span></div>
+  <div class="row"><span class="label">Type / Category</span><span class="value">${resolution?.resolution_type || caseData.category || resolution?.case_category || "—"}</span></div>
   <div class="row"><span class="label">Amount Provided</span><span class="value">${paidAmount ? sym + " " + paidAmount + " " + cur : "—"}</span></div>
   <div class="row"><span class="label">Completion Date</span><span class="value">${completedDate}</span></div>
 </div>
@@ -152,13 +154,13 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
 <div class="section">
   <h2>Declarations</h2>
   <div class="declaration"><strong>Help Seeker — ${seekerName}:</strong> "I confirm that I have received the assistance described above through the Givethra platform, and that all information I provided was true and accurate."</div>
-  <div class="declaration"><strong>Hero (Helper):</strong> "I, ${heroName || "the helper"}, confirm that I provided the assistance described above ${isFundraising ? "through Givethra's fundraising for this case" : "directly to the institute"}, willingly and in good faith."</div>
+  <div class="declaration"><strong>Hero (Helper):</strong> "I, ${resolvedHeroName}, confirm that I provided the assistance described above ${isFundraising ? "through Givethra's fundraising for this case" : "directly to the institute"}, willingly and in good faith."</div>
   <div class="note">By accepting this resolution, both parties agree this matter is fully and finally settled. Neither party shall contact or solicit the other outside Givethra. Disputes must be raised through Givethra's official audit process.</div>
 </div>
 
 <div class="signatures">
   <div class="sig-box"><div class="sig-line">${seekerName}</div><div style="font-size:11px;color:#666;">Help Seeker · Digitally Confirmed</div></div>
-  <div class="sig-box"><div class="sig-line">${heroName || "Hero (Helper)"}</div><div style="font-size:11px;color:#666;">Digitally Confirmed</div></div>
+  <div class="sig-box"><div class="sig-line">${resolvedHeroName}</div><div style="font-size:11px;color:#666;">Digitally Confirmed</div></div>
 </div>
 
 <div class="verify">Verification Code: ${verifyCode}<br>Issued by Givethra · givethra.org</div>

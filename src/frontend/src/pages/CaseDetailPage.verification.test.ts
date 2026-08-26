@@ -144,15 +144,18 @@ describe("public case verification presentation", () => {
   it("includes complete participant details while masking private identifiers", () => {
     expect(caseDetailSource).toContain('return `${digits.slice(0, 4)}${"*".repeat');
     expect(caseDetailSource).toContain("Only the first 4 CNIC digits are shown");
+    expect(caseDetailSource).toContain("const seekerName = resolution?.seeker_name || seekerKyc?.full_name");
     expect(caseDetailSource).toContain("const heroCnic = maskCnic(resolution?.hero_cnic_number);");
+    expect(caseDetailSource).toContain("const resolvedHeroName = resolution?.hero_name || heroName");
     expect(caseDetailSource).toContain("Help Seeker — ${seekerName}");
     expect(caseDetailSource).toContain("${seekerName}</div>");
-    expect(caseDetailSource).toContain("const location = [caseData.city, caseData.country].filter(Boolean).join");
-    expect(caseDetailSource).toContain("const accountReference = caseData.account_number || caseData.account_iban || caseData.reference_number;");
+    expect(caseDetailSource).toContain("const location = [caseData.city || resolution?.case_city, country].filter(Boolean).join");
+    expect(caseDetailSource).toContain("resolution?.case_account_number");
     expect(caseDetailSource).toContain("Type / Category");
     const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
     expect(workerSource).toContain("COALESCE(p.full_name, u.full_name) AS hero_name");
-    expect(workerSource).toContain("hero_cnic_number");
+    expect(workerSource).toContain("COALESCE(sp.full_name, su.full_name) AS seeker_name");
+    expect(workerSource).toContain("seeker_cnic_number");
   });
 
   it("keeps the Direct Payment lookup isolated from Contribution unlocks", () => {

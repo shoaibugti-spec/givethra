@@ -1242,3 +1242,10 @@
 - [x] Repair Heroes Wall authentication/data loading so an Admin-approved completed case appears with solved count and total help delivered.
 - [x] Ensure approved seeker feedback video/caption automatically appears in Kindness Wall with slider, likes, and comments.
 - [x] Add regression coverage, validate, synchronize, and document matched Worker/assets deployment.
+
+## Affidavit Symmetry and Required Details
+- [x] Audit why seeker fields fall back to Verified Help Seeker or blank while Hero fields are populated.
+- [x] Populate both seeker and helper sections with source-backed names, case ID, category, title, location, country, provider, payment method, amount, dates, and role-specific declarations.
+- [x] Keep CNIC limited to first 4 digits and bank/account identifiers limited to last 3–4 digits, masking all remaining sensitive data.
+- [x] Add regression coverage for symmetric participant content, non-sensitive field presence, and privacy masking.
+- [x] Validate, synchronize, and document the deployment/cache refresh requirement.
