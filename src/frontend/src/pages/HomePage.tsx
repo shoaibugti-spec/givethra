@@ -1,6 +1,7 @@
 import InstallButton from "@/components/InstallButton";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
 import FeedbackWall from "@/components/FeedbackWall";
+import HeroesWall from "@/components/HeroesWall";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1330,6 +1331,7 @@ export default function HomePage() {
         </section>
 
         <FeedbackWall />
+        <HeroesWall />
 
         <section className="bg-background px-4 py-10">
           <div className="mx-auto max-w-4xl space-y-6">

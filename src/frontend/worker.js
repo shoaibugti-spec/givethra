@@ -493,6 +493,40 @@ async function handleCases(request, env, user, url, parts, origin) {
 }
 
 // ============================================================
+//  HEROES WALL HANDLER
+// ============================================================
+async function handleHeroesWall(request, env, origin) {
+  if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
+  const url = new URL(request.url);
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 100);
+  const rows = await env.DB.prepare(
+    `SELECT id, user_id, title, category, currency, amount_needed, amount_collected, updated_at
+     FROM case_submissions
+     WHERE lower(COALESCE(status, '')) = 'completed'
+     ORDER BY updated_at DESC
+     LIMIT ?`
+  ).bind(limit).all();
+  const completedCases = rows.results || [];
+  if (!completedCases.length) return json({ cases: [], metrics: { solved_cases: 0, total_amount: 0, currency: "PKR" } }, 200, origin);
+  await env.DB.batch(completedCases.map((caseRow) => env.DB.prepare(
+    `INSERT OR IGNORE INTO community_posts (id, user_id, display_name, message, created_at)
+     VALUES (?, ?, 'Givethra Heroes', ?, ?)`
+  ).bind(`hero-${caseRow.id}`, caseRow.user_id || null, `Heroes helped complete: ${caseRow.title || "A Givethra case"}`, caseRow.updated_at || now())));
+  const wallCases = [];
+  for (const caseRow of completedCases) {
+    const postId = `hero-${caseRow.id}`;
+    const [post, likes, comments] = await Promise.all([
+      env.DB.prepare("SELECT id, message, created_at FROM community_posts WHERE id = ?").bind(postId).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM community_post_likes WHERE post_id = ?").bind(postId).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM community_post_comments WHERE post_id = ?").bind(postId).first(),
+    ]);
+    wallCases.push({ ...caseRow, post_id: postId, post_message: post?.message || `Heroes helped complete: ${caseRow.title || "A Givethra case"}`, post_created_at: post?.created_at || caseRow.updated_at, likes_count: Number(likes?.count || 0), comments_count: Number(comments?.count || 0) });
+  }
+  const totalAmount = completedCases.reduce((sum, caseRow) => sum + Math.max(Number(caseRow.amount_collected || caseRow.amount_needed || 0), 0), 0);
+  return json({ cases: wallCases, metrics: { solved_cases: completedCases.length, total_amount: totalAmount, currency: completedCases[0]?.currency || "PKR" } }, 200, origin);
+}
+
+// ============================================================
 //  COMMUNITY POSTS HANDLER
 // ============================================================
 function guestIdentity(request, body = null) {
@@ -843,6 +877,10 @@ async function handleRequest(request, env, ctx) {
   // ============================================================
   //  PUBLIC: Community Posts (no auth required for reading)
   // ============================================================
+  if (parts[0] === "api" && parts[1] === "heroes-wall") {
+    return handleHeroesWall(request, env, origin);
+  }
+
   if (parts[0] === "api" && parts[1] === "community") {
     const user = await authenticate(request, env, googleClientId(env));
     if (parts[2] === "mark-read" && request.method === "PUT") {

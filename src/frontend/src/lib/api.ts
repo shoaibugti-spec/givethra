@@ -121,6 +121,13 @@ export async function getApprovedCases() {
   return res.json();
 }
 
+export async function getHeroesWall() {
+  const res = await fetch(`${WORKER_URL}/api/heroes-wall`, { headers: headers(), cache: "no-store" });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Failed to load Heroes Wall (${res.status})`);
+  return result;
+}
+
 export async function getCasesByUser(userId: string) {
   const res = await fetch(`${WORKER_URL}/api/cases?user_id=${userId}`, { headers: headers() });
   return res.json();

@@ -1168,3 +1168,10 @@
 - [x] Repair the exact failing request or mutation while preserving payment proof data.
 - [x] Add regression coverage for successful approval and rejection payloads and queue refresh behavior.
 - [x] Run tests/build and synchronize the verified repair.
+
+## New Public Heroes Wall Feature
+- [x] Audit completed-case records, verified collection totals, and existing public Social Wall like/comment APIs.
+- [x] Define a privacy-safe completed-case card contract with total impact metrics and public interaction support.
+- [x] Add a mobile-first Heroes Wall slider to the homepage without removing or altering the existing Social Wall.
+- [x] Add regression coverage for completed-case filtering, aggregate metrics, likes/comments, and responsive slider behavior.
+- [ ] Verify the feature, save a checkpoint, and provide the updated project version.

@@ -29,6 +29,36 @@ describe("public Community composer placement", () => {
 });
 
 
+describe("homepage Heroes Wall", () => {
+  it("renders Heroes Wall beside the existing Social Wall without replacing it", () => {
+    expect(homePageSource).toContain('import HeroesWall from "@/components/HeroesWall";');
+    expect(homePageSource).toContain("<FeedbackWall />");
+    expect(homePageSource).toContain("<HeroesWall />");
+  });
+
+  it("keeps completed-case data and impact metrics privacy-safe", () => {
+    const heroesWallSource = readFileSync(new URL("../components/HeroesWall.tsx", import.meta.url), "utf8");
+    const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
+    const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
+    expect(apiSource).toContain("/api/heroes-wall");
+    expect(workerSource).toContain("lower(COALESCE(status, '')) = 'completed'");
+    expect(workerSource).toContain("solved_cases");
+    expect(heroesWallSource).toContain("Heroes Wall");
+    expect(heroesWallSource).toContain("Cases solved");
+    expect(heroesWallSource).toContain("Total help delivered");
+    expect(heroesWallSource).toContain('aria-label="Previous completed case"');
+    expect(heroesWallSource).toContain('aria-label="Next completed case"');
+  });
+
+  it("uses public community interactions for each completed-case card", () => {
+    const heroesWallSource = readFileSync(new URL("../components/HeroesWall.tsx", import.meta.url), "utf8");
+    expect(heroesWallSource).toContain("toggleLike(current.post_id)");
+    expect(heroesWallSource).toContain("getPostComments(current.post_id)");
+    expect(heroesWallSource).toContain("addComment(current.post_id");
+    expect(heroesWallSource).toContain('aria-label="Comment on completed case"');
+  });
+});
+
 describe("homepage help slider", () => {
   it("keeps the hand hero as the first slide and includes every supported category", () => {
     expect(homePageSource).toContain('key: "hero"');
