@@ -969,3 +969,12 @@
 - [x] Give Contribution / Fundraising Help three free uses per user, preserving the existing contribution payment-details flow.
 - [x] Update labels and regression coverage so the two modes cannot be confused.
 - [x] Run the full test suite, strict TypeScript check, and production build; deployment remains user-controlled.
+
+## User-Reported Complete Help Workflow Restoration
+- [x] Trace contribution amount entry, Givethra payment channels, receipt upload, pending status, admin review, and case totals.
+- [x] Trace direct full-payment unlock, receiver payment details, receipt proof, seeker confirmation, and credit enforcement.
+- [x] Ensure one contribution unlock permits repeat contributions on the same case without repeated unlock charges.
+- [x] Align Worker persistence with the verified production D1 schema so unlocks use `unlocked_at` and resolutions retain receipt, amount, destination, status, and review fields.
+- [x] Verify existing Admin callbacks update resolution status, case collection totals, notifications, and both parties' case history; no new destructive change was needed.
+- [ ] Restore or verify completed-case affidavit PDF generation for hero and seeker; the current canonical source contains the notifications but no matching affidavit generator/UI route.
+- [x] Add/update regression coverage and run full tests, strict TypeScript, and production build; deployment remains user-controlled.

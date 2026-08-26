@@ -1377,24 +1377,52 @@ async function handleRequest(request, env, ctx) {
       }
     }
 
-    // Case unlocks
+    // Case unlocks: Contribution gets three free uses per user; Direct Help always costs one credit.
     if (parts[1] === "case-unlocks") {
+      if (parts[2] === "count" && request.method === "GET") {
+        const heroId = String(url.searchParams.get("hero_id") || "").trim();
+        if (!heroId) return json({ count: 0 }, 200, origin);
+        const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM case_unlocks WHERE hero_id = ? AND payment_type = 'partial'").bind(heroId).first();
+        return json({ count: Number(row?.count || 0) }, 200, origin);
+      }
       if (request.method === "GET") {
         const caseId = url.searchParams.get("case_id");
         const heroId = url.searchParams.get("hero_id");
-        const sql = caseId && heroId ? "SELECT * FROM case_unlocks WHERE case_id = ? AND hero_id = ?" : "SELECT * FROM case_unlocks";
-        const bind = caseId && heroId ? [caseId, heroId] : [];
+        const sql = caseId && heroId ? "SELECT * FROM case_unlocks WHERE case_id = ? AND hero_id = ?" : heroId ? "SELECT * FROM case_unlocks WHERE hero_id = ?" : "SELECT * FROM case_unlocks";
+        const bind = caseId && heroId ? [caseId, heroId] : heroId ? [heroId] : [];
         const rows = await env.DB.prepare(sql).bind(...bind).all();
         return json(rows.results || [], 200, origin);
       }
       if (request.method === "POST") {
         const body = await readJson(request);
+        const caseId = String(body?.case_id || "").trim();
+        const heroId = String(body?.hero_id || "").trim();
+        const paymentType = body?.payment_type === "full" ? "full" : "partial";
+        if (!user || !caseId || !heroId || user.user_id !== heroId) return json({ error: "Unauthorized unlock request" }, 403, origin);
+        const existing = await env.DB.prepare("SELECT * FROM case_unlocks WHERE case_id = ? AND hero_id = ? AND payment_type = ? ORDER BY unlocked_at DESC LIMIT 1").bind(caseId, heroId, paymentType).first();
+        if (existing) return json(existing, 200, origin);
+        const prior = await env.DB.prepare("SELECT COUNT(*) AS count FROM case_unlocks WHERE hero_id = ? AND payment_type = 'partial'").bind(heroId).first();
+        const isFreeContribution = paymentType === "partial" && Number(prior?.count || 0) < 3;
+        const creditsCharged = isFreeContribution ? 0 : 1;
+        const wallet = await env.DB.prepare("SELECT balance FROM wallets WHERE user_id = ?").bind(heroId).first();
+        const balance = Number(wallet?.balance || 0);
+        if (creditsCharged > 0 && balance < creditsCharged) return json({ error: "Insufficient credits", required: creditsCharged, balance }, 402, origin);
+        if (creditsCharged > 0) {
+          const deducted = await env.DB.prepare("UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?").bind(creditsCharged, now(), heroId, creditsCharged).run();
+          if (!Number(deducted?.meta?.changes || 0)) return json({ error: "Insufficient credits", required: creditsCharged, balance }, 402, origin);
+        }
         const unlockId = body?.id || id();
-        await env.DB.prepare(
-          `INSERT INTO case_unlocks (id, case_id, hero_id, status, created_at)
-           VALUES (?, ?, ?, ?, ?)`
-        ).bind(unlockId, body.case_id, body.hero_id, body.status || "pending", now()).run();
-        return json({ id: unlockId, ...body, created_at: now() }, 201, origin);
+        try {
+          await env.DB.prepare(
+            `INSERT INTO case_unlocks (id, case_id, hero_id, pledged_amount, credits_charged, payment_type, unlocked_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(unlockId, caseId, heroId, body.pledged_amount ?? null, creditsCharged, paymentType, now()).run();
+        } catch (error) {
+          if (creditsCharged > 0) await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(creditsCharged, now(), heroId).run();
+          throw error;
+        }
+        const saved = await env.DB.prepare("SELECT * FROM case_unlocks WHERE id = ?").bind(unlockId).first();
+        return json(saved || { id: unlockId, case_id: caseId, hero_id: heroId, pledged_amount: body.pledged_amount ?? null, credits_charged: creditsCharged, payment_type: paymentType, unlocked_at: now() }, 201, origin);
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }
@@ -1412,19 +1440,29 @@ async function handleRequest(request, env, ctx) {
       if (request.method === "POST") {
         const body = await readJson(request);
         const resolutionId = body?.id || id();
+        const caseId = String(body?.case_id || "").trim();
+        const heroId = String(body?.hero_id || "").trim();
+        if (!user || !caseId || !heroId || user.user_id !== heroId) return json({ error: "Unauthorized help submission" }, 403, origin);
         await env.DB.prepare(
-          `INSERT INTO case_resolutions (id, case_id, hero_id, amount, currency, status, notes, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(resolutionId, body.case_id, body.hero_id, body.amount, body.currency || "USD", body.status || "pending", body.notes || null, now()).run();
-        return json({ id: resolutionId, ...body, created_at: now() }, 201, origin);
+          `INSERT INTO case_resolutions
+            (id, case_id, hero_id, seeker_id, resolution_type, amount_paid, transaction_id, receipt_url, notes, status, paid_to, submitted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          resolutionId, caseId, heroId, body.seeker_id || null, body.resolution_type || null,
+          body.amount_paid ?? body.amount ?? null, body.transaction_id || null, body.receipt_url || null,
+          body.notes || null, body.status || "pending_confirmation", body.paid_to === "givethra" ? "givethra" : "institute", now()
+        ).run();
+        const saved = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(resolutionId).first();
+        return json(saved || { id: resolutionId, ...body, status: body.status || "pending_confirmation", submitted_at: now() }, 201, origin);
       }
       if (request.method === "PUT" && parts[2]) {
         const body = await readJson(request);
-        const allowed = ["status", "amount", "notes"];
+        const allowed = ["status", "amount_paid", "seeker_confirmed_amount", "transaction_id", "receipt_url", "paid_to", "notes", "hero_confirmed", "seeker_confirmed", "completed_at", "admin_confirmed", "admin_confirmed_at"];
         const values = pick(body, allowed);
-        const params = allowed.filter((field) => values[field] !== undefined).map((field) => values[field]);
-        if (params.length) {
-          await env.DB.prepare(`UPDATE case_resolutions SET ${allowed.map((f) => `${f} = ?`).join(", ")} WHERE id = ?`).bind(...params, parts[2]).run();
+        const fields = allowed.filter((field) => values[field] !== undefined);
+        if (fields.length) {
+          const params = fields.map((field) => values[field]);
+          await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((f) => `${f} = ?`).join(", ")} WHERE id = ?`).bind(...params, parts[2]).run();
           const updated = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(parts[2]).first();
           return json(updated, 200, origin);
         }
