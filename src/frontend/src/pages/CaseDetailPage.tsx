@@ -416,9 +416,10 @@ export default function CaseDetailPage() {
     }
     setUnlocking(true);
     try {
-      // First 3 unlocks are FREE, then 1 credit per unlock
-      const isFree = userUnlockCount < 3;
-      const charge = isFree ? 0 : 1;
+      // Only the first three Contribution/Fundraising helps are free.
+      // Direct Help / Full Payment always requires one credit.
+      const isFreeContribution = mode === "partial" && userUnlockCount < 3;
+      const charge = isFreeContribution ? 0 : 1;
 
       await insertCaseUnlock({
         case_id: id,
@@ -433,7 +434,7 @@ export default function CaseDetailPage() {
 
       setUnlocked(true);
       setPayMode(mode);
-      toast.success(isFree ? "🎉 Case unlocked FREE! This is your #" + (userUnlockCount + 1) + " free help." : `Case unlocked! 1 credit deducted.`);
+      toast.success(isFreeContribution ? "🎉 Contribution unlocked FREE! This is your #" + (userUnlockCount + 1) + " free contribution help." : mode === "full" ? "Direct Help unlocked! 1 credit deducted." : "Contribution unlocked! 1 credit deducted.");
       loadCase();
     } catch (err: any) {
       toast.error("Failed to unlock case: " + err.message);
@@ -728,7 +729,7 @@ export default function CaseDetailPage() {
 
         {/* === FREE UNLOCK ANNOUNCEMENT - TOP OF PAGE === */}
         <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border-2 border-teal-400 p-4 text-sm text-teal-700 dark:text-teal-300 text-center font-medium">
-          🎉 Your first <strong>3 helps are FREE</strong>! After that, 1 credit per help.
+          🎉 Your first <strong>3 contribution helps are FREE</strong>! Direct Help always costs 1 credit.
         </div>
 
         <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
@@ -886,8 +887,8 @@ export default function CaseDetailPage() {
                   <h3 className="font-bold text-foreground">Choose how you want to help</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     {isFirstThreeUnlocks
-                      ? `🎉 This is your #${userUnlockCount + 1} unlock — it's FREE! (${3 - userUnlockCount} free remaining)`
-                      : `Unlock this case (1 credit) and help.`}
+                      ? `🎉 This is your #${userUnlockCount + 1} contribution help — it's FREE! (${3 - userUnlockCount} contribution helps remaining)`
+                      : `Contribution helps after the first 3 require 1 credit.`}
                   </p>
                 </div>
                 {!isAuthenticated ? (
@@ -904,7 +905,7 @@ export default function CaseDetailPage() {
                       <p className="text-xs text-muted-foreground">You'll get the institute's payment details and pay the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} directly. Best if you can cover it all at once.</p>
                       <Button onClick={() => handleUnlock("full")} disabled={unlocking} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
                         <Unlock className="h-4 w-4" />
-                        {isFirstThreeUnlocks ? `Help Now — FREE (${3 - userUnlockCount} left)` : "Help Now — Pay Full"}
+                        Help Now — Direct Payment (1 credit)
                       </Button>
                     </div>
 

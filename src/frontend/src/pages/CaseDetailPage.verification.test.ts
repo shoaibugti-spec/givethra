@@ -42,5 +42,9 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("GIVETHRA_NAYAPAY_IBAN");
     expect(caseDetailSource).toContain("const paidTo = contributionOpen || myUnlock?.payment_type === \"partial\" ? \"givethra\" : \"institute\";");
     expect(caseDetailSource).toContain("contributionOpen ? pledgeNum");
+    expect(caseDetailSource).toContain('const isFreeContribution = mode === "partial" && userUnlockCount < 3;');
+    expect(caseDetailSource).toContain("Help Now — Direct Payment (1 credit)");
+    expect(caseDetailSource).toContain("3 contribution helps are FREE");
+    expect(caseDetailSource).toContain("Contribution helps after the first 3 require 1 credit.");
   });
 });

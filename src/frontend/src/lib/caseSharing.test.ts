@@ -25,7 +25,7 @@ describe("case sharing", () => {
   it("keeps the published-case actions clear and compact", () => {
     expect(casesPageSource).toContain('<span className="text-[10px] font-semibold">Share</span>');
     expect(detailPageSource).toContain("Case Story (What You Need Help With)");
-    expect(detailPageSource).toContain("Help Now — Pay Full");
+    expect(detailPageSource).toContain("Help Now — Direct Payment (1 credit)");
     expect(detailPageSource).toContain("Help Now — Contribute");
     expect(detailPageSource).toContain("Only ${daysLeft} days left to help");
   });

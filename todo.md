@@ -963,3 +963,9 @@
 ## Contribution Flow Completion
 - [x] Allow the immediately opened contribution path to submit contribution proof as fundraising without requiring the full-payment unlock or misclassifying it as institute payment.
 - [x] Preserve full-payment credit gating and add regression coverage for contribution-mode proof submission.
+
+## User Correction: Mode-Specific Help Credits
+- [x] Make Direct Help / Full Payment always charge exactly 1 credit, including during a user's first three free contribution helps.
+- [x] Give Contribution / Fundraising Help three free uses per user, preserving the existing contribution payment-details flow.
+- [x] Update labels and regression coverage so the two modes cannot be confused.
+- [x] Run the full test suite, strict TypeScript check, and production build; deployment remains user-controlled.
