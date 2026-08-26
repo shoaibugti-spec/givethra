@@ -46,5 +46,14 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("Help Now — Direct Payment (1 credit)");
     expect(caseDetailSource).toContain("3 contribution helps are FREE");
     expect(caseDetailSource).toContain("Contribution helps after the first 3 require 1 credit.");
+    expect(caseDetailSource).toContain("{myUnlock && (");
+  });
+
+  it("keeps the Direct Payment lookup isolated from Contribution unlocks", () => {
+    const apiSource = readFileSync(new URL("../lib/api.ts", import.meta.url), "utf8");
+    const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
+    expect(apiSource).toContain("paymentType: \"full\" | \"partial\" = \"full\"");
+    expect(apiSource).toContain("payment_type=${paymentType}");
+    expect(workerSource).toContain('filters.push("payment_type = ?")');
   });
 });

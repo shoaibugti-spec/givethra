@@ -962,7 +962,7 @@ export default function CaseDetailPage() {
 
                 <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
                   <h2 className="font-semibold">🎥 Verification Media</h2>
-                  {(myUnlock?.credits_charged ?? 0) > 0 && (
+                  {myUnlock && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {caseData.selfie_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Live Selfie</p><img src={caseData.selfie_url} alt="Selfie" className="w-full rounded-lg border max-h-40 object-cover" /></div>}
                       {caseData.video_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Video Appeal</p><video src={caseData.video_url} controls className="w-full rounded-lg border max-h-40" /></div>}

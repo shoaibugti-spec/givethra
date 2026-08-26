@@ -1388,8 +1388,14 @@ async function handleRequest(request, env, ctx) {
       if (request.method === "GET") {
         const caseId = url.searchParams.get("case_id");
         const heroId = url.searchParams.get("hero_id");
-        const sql = caseId && heroId ? "SELECT * FROM case_unlocks WHERE case_id = ? AND hero_id = ?" : heroId ? "SELECT * FROM case_unlocks WHERE hero_id = ?" : "SELECT * FROM case_unlocks";
-        const bind = caseId && heroId ? [caseId, heroId] : heroId ? [heroId] : [];
+        const requestedType = url.searchParams.get("payment_type");
+        const paymentType = requestedType === "full" || requestedType === "partial" ? requestedType : null;
+        const filters = [];
+        const bind = [];
+        if (caseId) { filters.push("case_id = ?"); bind.push(caseId); }
+        if (heroId) { filters.push("hero_id = ?"); bind.push(heroId); }
+        if (paymentType) { filters.push("payment_type = ?"); bind.push(paymentType); }
+        const sql = `SELECT * FROM case_unlocks${filters.length ? ` WHERE ${filters.join(" AND ")}` : ""} ORDER BY unlocked_at DESC`;
         const rows = await env.DB.prepare(sql).bind(...bind).all();
         return json(rows.results || [], 200, origin);
       }
