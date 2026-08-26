@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const adminSource = readFileSync(new URL("./AdminDashboard.tsx", import.meta.url), "utf8");
 const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
 const communitySource = readFileSync(new URL("./CommunityPage.tsx", import.meta.url), "utf8");
+const homeSource = readFileSync(new URL("./HomePage.tsx", import.meta.url), "utf8");
 
 describe("community-only Public Posts", () => {
   it("does not render an Admin Posts tab or public-post moderation card", () => {
@@ -16,9 +17,9 @@ describe("community-only Public Posts", () => {
     expect(workerSource).toContain("const displayName = user");
   });
 
-  it("keeps the composer and wall inside Community Posts", () => {
+  it("keeps the composer in Community Posts and the feedback wall on HomePage", () => {
     expect(communitySource).toContain("<PublicPostComposer />");
-    expect(communitySource).toContain("<FeedbackWall />");
+    expect(homeSource).toContain("<FeedbackWall />");
   });
 
   it("keeps separate Direct Payments and Contributions admin queues", () => {
@@ -32,6 +33,7 @@ describe("community-only Public Posts", () => {
   });
 
   it("keeps approved seeker feedback in the Kindness Wall path", () => {
-    expect(communitySource).toContain("<FeedbackWall />");
+    expect(homeSource).toContain("<KindnessWall />");
+    expect(homeSource).toContain("<FeedbackWall />");
   });
 });

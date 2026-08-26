@@ -18,6 +18,24 @@ function getAuthToken(): string | null {
   }
 }
 
+// Stable anonymous identity for public feedback interactions. It contains no
+// personal information and only keeps a guest's like/comment state consistent.
+export function getGuestId(): string {
+  const key = "givethra_guest_id";
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const randomId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const guestId = `guest:${randomId}`;
+    localStorage.setItem(key, guestId);
+    return guestId;
+  } catch {
+    return `guest:${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+}
+
 // Helper to build request headers with authorization
 function headers(): HeadersInit {
   const token = getAuthToken();
@@ -577,10 +595,30 @@ export async function adminSendSupportReply(data: Record<string, unknown>) {
   if (!res.ok) throw new Error(result?.error || "Failed to send support reply");
   return result;
 }
+export async function adminMarkSupportMessagesAsRead(userId: string) {
+  const res = await fetch(`${WORKER_URL}/api/admin/support/mark-read`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify({ user_id: userId }),
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || "Failed to mark support messages as read");
+  return result;
+}
 
 export async function adminGetAllFeedbacks() {
   const res = await fetch(`${WORKER_URL}/api/admin/feedbacks`, { headers: headers() });
   return res.json();
+}
+export async function adminBroadcastNotification(data: Record<string, unknown>) {
+  const res = await fetch(`${WORKER_URL}/api/admin/notifications/broadcast`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || "Failed to broadcast notification");
+  return result;
 }
 
 export async function adminGetAllOffers() {

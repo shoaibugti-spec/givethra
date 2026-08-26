@@ -24,12 +24,10 @@ import {
   uploadFileToStorage,
 } from "@/lib/api";
 import { sendNotification } from "@/lib/notify";
-import { shareCase } from "@/lib/caseSharing";
-import { getApprovedCaseItems } from "@/lib/caseVerification";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   ChevronLeft, Lock, Unlock, MapPin, CheckCircle2,
-  Heart, FileText, ExternalLink, Copy, Share2, Building2, Clock, HandCoins, Star, Video, AlertCircle, XCircle, RefreshCw, Eye, CalendarClock,
+  Heart, FileText, ExternalLink, Copy, Building2, Clock, HandCoins, Star, Video, AlertCircle, XCircle, RefreshCw, Eye, CalendarClock,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -49,8 +47,10 @@ const GIVETHRA_USDT_TRC20 = "TNjaCQjQ5Yzm5tiVF8s121rUv5BH7y6hAC";
 function maskCnic(cnic?: string): string {
   if (!cnic) return "—";
   const digits = cnic.replace(/\D/g, "");
-  if (digits.length <= 4) return digits || "—";
-  return `${digits.slice(0, 4)}${"*".repeat(Math.max(digits.length - 4, 4))}`;
+  if (digits.length < 6) return cnic;
+  const shown = digits.slice(0, 6);
+  const masked = "*".repeat(Math.max(digits.length - 6, 4));
+  return `${shown.slice(0, 5)}-${shown.slice(5)}${masked}`;
 }
 
 function maskAccount(acc?: string): string {
@@ -70,18 +70,13 @@ function copyToClipboard(text: string, label: string) {
 }
 
 function generateAffidavit(caseData: any, resolution: any, seekerKyc: any, heroName: string) {
-  const caseId = String(caseData.id || resolution?.case_id || "").slice(0, 8).toUpperCase();
+  const caseId = (caseData.id ?? "").slice(0, 8).toUpperCase();
   const today = new Date().toLocaleDateString();
-  const seekerName = resolution?.seeker_name || seekerKyc?.full_name || caseData.full_name || "Verified Help Seeker";
-  const seekerCnic = maskCnic(resolution?.seeker_cnic_number || seekerKyc?.cnic_number);
-  const resolvedHeroName = resolution?.hero_name || heroName || "Verified Hero";
-  const heroCnic = maskCnic(resolution?.hero_cnic_number);
-  const country = caseData.country || resolution?.case_country || "—";
-  const location = [caseData.city || resolution?.case_city, country].filter(Boolean).join(", ") || "—";
-  const accountReference = caseData.account_number || caseData.account_iban || caseData.reference_number || resolution?.case_account_number || resolution?.case_account_iban || resolution?.case_reference_number;
+  const seekerName = seekerKyc?.full_name || caseData.full_name || "Verified Help Seeker";
+  const seekerCnic = maskCnic(seekerKyc?.cnic_number);
   const completedDate = resolution?.completed_at ? new Date(resolution.completed_at).toLocaleDateString() : today;
-  const verifyCode = `GVT-${caseId || "CASE"}-${Date.now().toString(36).toUpperCase()}`;
-  const cur = caseData.currency || resolution?.currency || "USD";
+  const verifyCode = `GVT-${caseId}-${Date.now().toString(36).toUpperCase()}`;
+  const cur = caseData.currency || "USD";
   const sym = CURRENCY_SYMBOLS[cur] ?? cur;
   const paidAmount = resolution?.seeker_confirmed_amount ?? resolution?.amount_paid;
   const isFundraising = resolution?.paid_to === "givethra";
@@ -123,7 +118,7 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
   <div class="row"><span class="label">Case ID</span><span class="value">GVT-${caseId}</span></div>
   <div class="row"><span class="label">Category</span><span class="value">${caseData.category || "—"}</span></div>
   <div class="row"><span class="label">Title</span><span class="value">${caseData.title || "—"}</span></div>
-  <div class="row"><span class="label">Location</span><span class="value">${location}</span></div>
+  <div class="row"><span class="label">Location</span><span class="value">${caseData.city || ""}, ${caseData.country || ""}</span></div>
   <div class="row"><span class="label">Date Issued</span><span class="value">${today}</span></div>
 </div>
 
@@ -131,36 +126,38 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
   <h2>Help Seeker (Beneficiary)</h2>
   <div class="row"><span class="label">Full Name</span><span class="value">${seekerName}</span></div>
   <div class="row"><span class="label">CNIC (partially masked)</span><span class="value">${seekerCnic}</span></div>
-  <div class="row"><span class="label">Country</span><span class="value">${country}</span></div>
-  <div class="note">Note: Only the first 4 CNIC digits are shown. Remaining digits and contact details are kept private.</div>
+  <div class="row"><span class="label">Country</span><span class="value">${caseData.country || "—"}</span></div>
+  <div class="note">Note: Only the first 6 digits of the CNIC are shown. Remaining digits and contact details are kept private.</div>
 </div>
 
 <div class="section">
   <h2>${isFundraising ? "Contribution Details" : "Institute / Provider Paid"}</h2>
-  <div class="row"><span class="label">Institute / Provider</span><span class="value">${caseData.institute_name || resolution?.case_institute_name || "—"}</span></div>
-  <div class="row"><span class="label">Payment Method</span><span class="value">${caseData.payment_method || resolution?.case_payment_method || (isFundraising ? "Givethra Fundraising" : "—")}</span></div>
-  <div class="row"><span class="label">Account / Reference (masked)</span><span class="value">${maskAccount(accountReference)}</span></div>
+  ${isFundraising
+    ? `<div class="row"><span class="label">Contributed Via</span><span class="value">Givethra Fundraising</span></div>
+       <div class="row"><span class="label">For Institute</span><span class="value">${caseData.institute_name || "—"}</span></div>`
+    : `<div class="row"><span class="label">Institute / Provider</span><span class="value">${caseData.institute_name || "—"}</span></div>
+       <div class="row"><span class="label">Payment Method</span><span class="value">${caseData.payment_method || "—"}</span></div>
+       <div class="row"><span class="label">Account / Reference (masked)</span><span class="value">${maskAccount(caseData.account_number)}</span></div>`}
 </div>
 
 <div class="section">
   <h2>Resolution Details</h2>
-  <div class="row"><span class="label">Helped By (Hero)</span><span class="value">${resolvedHeroName}</span></div>
-  <div class="row"><span class="label">Hero CNIC (partially masked)</span><span class="value">${heroCnic}</span></div>
-  <div class="row"><span class="label">Type / Category</span><span class="value">${resolution?.resolution_type || caseData.category || resolution?.case_category || "—"}</span></div>
+  <div class="row"><span class="label">Helped By (Hero)</span><span class="value">${heroName || "Verified Hero"}</span></div>
+  <div class="row"><span class="label">Type</span><span class="value">${resolution?.resolution_type || "—"}</span></div>
   <div class="row"><span class="label">Amount Provided</span><span class="value">${paidAmount ? sym + " " + paidAmount + " " + cur : "—"}</span></div>
   <div class="row"><span class="label">Completion Date</span><span class="value">${completedDate}</span></div>
 </div>
 
 <div class="section">
   <h2>Declarations</h2>
-  <div class="declaration"><strong>Help Seeker — ${seekerName}:</strong> "I confirm that I have received the assistance described above through the Givethra platform, and that all information I provided was true and accurate."</div>
-  <div class="declaration"><strong>Hero (Helper):</strong> "I, ${resolvedHeroName}, confirm that I provided the assistance described above ${isFundraising ? "through Givethra's fundraising for this case" : "directly to the institute"}, willingly and in good faith."</div>
+  <div class="declaration"><strong>Help Seeker:</strong> "I confirm that I have received the assistance described above through the Givethra platform, and that all information I provided was true and accurate."</div>
+  <div class="declaration"><strong>Hero (Helper):</strong> "I, ${heroName || "the helper"}, confirm that I provided the assistance described above ${isFundraising ? "through Givethra's fundraising for this case" : "directly to the institute"}, willingly and in good faith."</div>
   <div class="note">By accepting this resolution, both parties agree this matter is fully and finally settled. Neither party shall contact or solicit the other outside Givethra. Disputes must be raised through Givethra's official audit process.</div>
 </div>
 
 <div class="signatures">
-  <div class="sig-box"><div class="sig-line">${seekerName}</div><div style="font-size:11px;color:#666;">Help Seeker · Digitally Confirmed</div></div>
-  <div class="sig-box"><div class="sig-line">${resolvedHeroName}</div><div style="font-size:11px;color:#666;">Digitally Confirmed</div></div>
+  <div class="sig-box"><div class="sig-line">Help Seeker</div><div style="font-size:11px;color:#666;">Digitally Confirmed</div></div>
+  <div class="sig-box"><div class="sig-line">${heroName || "Hero (Helper)"}</div><div style="font-size:11px;color:#666;">Digitally Confirmed</div></div>
 </div>
 
 <div class="verify">Verification Code: ${verifyCode}<br>Issued by Givethra · givethra.org</div>
@@ -180,10 +177,10 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
 function CopyRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
   if (!value) return null;
   return (
-    <div className="flex min-w-0 items-start justify-between gap-2 py-2 border-b border-border last:border-0">
-      <div className="min-w-0 flex-1">
+    <div className="flex items-center justify-between gap-2 py-2 border-b border-border last:border-0">
+      <div className="min-w-0">
         <p className="text-[11px] text-muted-foreground">{label}</p>
-        <p className={`break-words whitespace-normal text-sm font-medium text-foreground ${mono ? "font-mono" : ""}`}>{value}</p>
+        <p className={`text-sm font-medium text-foreground truncate ${mono ? "font-mono" : ""}`}>{value}</p>
       </div>
       <button type="button" onClick={() => copyToClipboard(value, label)}
         className="shrink-0 h-8 w-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary transition-colors"
@@ -206,13 +203,10 @@ export default function CaseDetailPage() {
   const [showResolution, setShowResolution] = useState(false);
   const [myResolutions, setMyResolutions] = useState<any[]>([]);
   const [myUnlock, setMyUnlock] = useState<any>(null);
-  const [mediaUnlocked, setMediaUnlocked] = useState(false);
-  const [mediaUnlocking, setMediaUnlocking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [heroName, setHeroName] = useState("Verified Hero");
 
   const [payMode, setPayMode] = useState<"choose" | "full" | "partial">("choose");
-  const [contributionOpen, setContributionOpen] = useState(false);
   const [pledgeAmount, setPledgeAmount] = useState("");
 
   const [resType, setResType] = useState("");
@@ -240,8 +234,6 @@ export default function CaseDetailPage() {
 
   // Get user's total unlock count (across all cases) for free unlock logic
   const [userUnlockCount, setUserUnlockCount] = useState(0);
-  const [walletBalance, setWalletBalance] = useState(0);
-  const [walletLoading, setWalletLoading] = useState(true);
   const isFirstThreeUnlocks = userUnlockCount < 3;
 
   // ===== MAIN LOAD EFFECT =====
@@ -274,13 +266,6 @@ export default function CaseDetailPage() {
     }
   }
 
-  async function handleCaseShare() {
-    if (!caseData) return;
-    const result = await shareCase(caseData);
-    if (result === "shared") toast.success("Case shared!");
-    else if (result === "copied") toast.success("Case message and link copied!");
-  }
-
   async function loadCase() {
     setLoading(true);
     try {
@@ -289,39 +274,23 @@ export default function CaseDetailPage() {
 
       if (user && data) {
         const owner = data.user_id === user.id;
-        const [fullUnlock, contributionUnlock, mediaUnlock, count, res, kyc, prof] = await Promise.all([
-          getCaseUnlock(id, user.id, "full"),
-          getCaseUnlock(id, user.id, "partial"),
-          getCaseUnlock(id, user.id, "media"),
-          getUserUnlockCount(user.id),
-          getCaseResolutions(id, owner ? undefined : user.id),
-          getKycSubmission(data.user_id),
-          getProfile(user.id),
-        ]);
-        const activeUnlock = fullUnlock || contributionUnlock || null;
-        setMyUnlock(activeUnlock);
-        setUnlocked(!!activeUnlock || owner);
-        setContributionOpen(!!contributionUnlock);
-        setPayMode(contributionUnlock ? "partial" : fullUnlock ? "full" : "choose");
-        // A paid Direct Payment unlock includes the verification context;
-        // Contribution remains separately gated behind its own media credit.
-        setMediaUnlocked(!!mediaUnlock || !!fullUnlock || owner);
+        const unlock = await getCaseUnlock(id, user.id);
+        setMyUnlock(unlock);
+        setUnlocked(!!unlock || owner);
+
+        // Get total unlocks count for this user (across all cases)
+        const count = await getUserUnlockCount(user.id);
         setUserUnlockCount(count ?? 0);
-        const loadedResolutions = (res ?? []).slice().reverse();
-        setMyResolutions(loadedResolutions);
-        setShowResolution(Boolean(activeUnlock && loadedResolutions.length === 0));
+
+        const res = await getCaseResolutions(id, user.id);
+        setMyResolutions((res ?? []).slice().reverse());
+
+        const kyc = await getKycSubmission(data.user_id);
         setSeekerKyc(kyc);
+
+        const prof = await getProfile(user.id);
         const nm = (prof?.full_name || "").split(" ")[0];
         if (nm) setHeroName(nm);
-        setWalletLoading(true);
-        try {
-          const wallet = await getWallet(user.id);
-          setWalletBalance(Number(wallet?.balance ?? 0));
-        } catch {
-          setWalletBalance(0);
-        } finally {
-          setWalletLoading(false);
-        }
 
         // ✅ Feedback check moved to separate useEffect above
       }
@@ -347,13 +316,7 @@ export default function CaseDetailPage() {
           height: { ideal: 720 },
           frameRate: { ideal: 30 },
         },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          channelCount: { ideal: 1 },
-          sampleRate: { ideal: 48000 },
-        },
+        audio: true,
       });
       setStream(s);
       setRecording(true);
@@ -364,22 +327,16 @@ export default function CaseDetailPage() {
       setFbVideoName("");
       setTimeout(() => { if (liveVideoRef.current) liveVideoRef.current.srcObject = s; }, 100);
 
-      const preferredMimeType = "video/webm;codecs=vp8,opus";
-      const mimeType = typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(preferredMimeType)
-        ? preferredMimeType
-        : "video/webm";
       const recorder = new MediaRecorder(s, {
-        mimeType,
+        mimeType: "video/webm;codecs=vp8",
         videoBitsPerSecond: 1500000,
-        audioBitsPerSecond: 128000,
       });
       mediaRecorderRef.current = recorder;
       videoChunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) videoChunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        const recordedType = recorder.mimeType || mimeType;
-        const blob = new Blob(videoChunksRef.current, { type: recordedType });
-        setFbVideoFile(new File([blob], "feedback.webm", { type: recordedType }));
+        const blob = new Blob(videoChunksRef.current, { type: "video/webm" });
+        setFbVideoFile(new File([blob], "feedback.webm", { type: "video/webm" }));
         setFbVideoBlob(URL.createObjectURL(blob));
         setFbVideoName("feedback.webm");
         s.getTracks().forEach(t => t.stop());
@@ -423,52 +380,26 @@ export default function CaseDetailPage() {
   const percentDone = amountNeeded > 0 ? Math.min(Math.round((amountCollected / amountNeeded) * 100), 100) : 0;
   const fundraisingStarted = amountCollected > 0;
   const pledgeNum = parseFloat(pledgeAmount) || 0;
-  const freeContributionRemaining = Math.max(3 - userUnlockCount, 0);
-  const hasUnlockCredit = walletBalance >= 1;
 
   const isRejected = caseData?.status === "rejected";
   const isExpired = caseData?.status === "expired";
   const isOwner = user?.id === caseData?.user_id;
   const isCompleted = caseData?.status === "completed";
-  const categoryDetails = caseData?.category_details && typeof caseData.category_details === "object" ? caseData.category_details : {};
-  const directPaymentRows = [
-    { label: "Receiver Name", value: caseData?.receiver_name || categoryDetails.receiver_name },
-    { label: "Receiver Contact", value: caseData?.receiver_contact || categoryDetails.receiver_contact, mono: true },
-    { label: "Receiver Bank", value: caseData?.receiver_bank || categoryDetails.receiver_bank },
-    { label: "Receiver Account Number", value: caseData?.receiver_account || categoryDetails.receiver_account, mono: true },
-    { label: "Receiver Address", value: caseData?.receiver_address || categoryDetails.receiver_address },
-    { label: "Receiver Shop / Business", value: caseData?.receiver_shop_name || categoryDetails.receiver_shop_name },
-    { label: "Provider / Institute", value: caseData?.institute_name || categoryDetails.provider },
-    { label: "Consumer / Reference Number", value: caseData?.consumer_no || categoryDetails.consumer_no || categoryDetails.consumer_number || categoryDetails.reference_no, mono: true },
-    { label: "Payment Method", value: caseData?.payment_method || categoryDetails.payment_method },
-    { label: "Account Title / Reference", value: caseData?.account_title || categoryDetails.account_title },
-    { label: "Account / Bill Number", value: caseData?.account_number || categoryDetails.account_number, mono: true },
-    { label: "IBAN", value: caseData?.account_iban || categoryDetails.account_iban, mono: true },
-    { label: "Institute Contact", value: caseData?.institute_contact || categoryDetails.institute_contact, mono: true },
-    { label: "Institute Address", value: caseData?.institute_address || categoryDetails.institute_address },
-  ].filter((row) => Boolean(row.value));
+  const hasPaymentDetails = caseData?.institute_name || caseData?.account_number || caseData?.account_title || caseData?.account_iban;
   const unlockMode = myUnlock?.payment_type || payMode;
-  const canHelpAgain = (unlocked || contributionOpen) && !isOwner && !isCompleted && !isRejected && !isExpired;
+  const canHelpAgain = unlocked && !isOwner && !isCompleted && !isRejected && !isExpired;
 
   async function handleUnlock(mode: "full" | "partial") {
     if (!user) { navigate({ to: "/sign-in" }); return; }
-    if (mode === "full" && !walletLoading && !hasUnlockCredit) {
-      toast.error("You have no credits. Please add credits in your Wallet before unlocking Direct Help.");
-      return;
-    }
     if (mode === "partial") {
-      if (remaining <= 0) { toast.error("This case has already reached its fundraising goal."); return; }
-      if (freeContributionRemaining === 0 && !walletLoading && !hasUnlockCredit) {
-        toast.error("Your 3 free Contributions are complete. Please add 1 credit in your Wallet to continue.");
-        return;
-      }
+      if (!pledgeNum || pledgeNum <= 0) { toast.error("Please enter how much you want to help with."); return; }
+      if (amountNeeded > 0 && pledgeNum > remaining) { toast.error(`Only ${sym} ${remaining} ${cur} is remaining for this case.`); return; }
     }
     setUnlocking(true);
     try {
-      // Only the first three Contribution/Fundraising helps are free.
-      // Direct Help / Full Payment always requires one credit.
-      const isFreeContribution = mode === "partial" && userUnlockCount < 3;
-      const charge = isFreeContribution ? 0 : 1;
+      // First 3 unlocks are FREE, then 1 credit per unlock
+      const isFree = userUnlockCount < 3;
+      const charge = isFree ? 0 : 1;
 
       await insertCaseUnlock({
         case_id: id,
@@ -478,15 +409,12 @@ export default function CaseDetailPage() {
         payment_type: mode,
       });
 
-            if (mode === "partial") {
-        setContributionOpen(true);
-        if (pledgeNum > 0) setAmountPaid(String(pledgeNum));
-      } else if (amountNeeded > 0) setAmountPaid(String(remaining));
+      if (mode === "partial") setAmountPaid(String(pledgeNum));
+      else if (amountNeeded > 0) setAmountPaid(String(remaining));
+
       setUnlocked(true);
-      setShowResolution(true);
-      setWalletBalance(prev => Math.max(prev - charge, 0));
       setPayMode(mode);
-      toast.success(isFreeContribution ? "🎉 Contribution unlocked FREE! This is your #" + (userUnlockCount + 1) + " free contribution help." : mode === "full" ? "Direct Help unlocked! 1 credit deducted." : "Contribution unlocked! 1 credit deducted.");
+      toast.success(isFree ? "🎉 Case unlocked FREE! This is your #" + (userUnlockCount + 1) + " free help." : `Case unlocked! 1 credit deducted.`);
       loadCase();
     } catch (err: any) {
       toast.error("Failed to unlock case: " + err.message);
@@ -494,46 +422,22 @@ export default function CaseDetailPage() {
     finally { setUnlocking(false); }
   }
 
-  async function handleUnlockMedia() {
-    if (!user) { navigate({ to: "/sign-in" }); return; }
-    if (walletLoading) return;
-    if (walletBalance < 1) {
-      toast.error("You have no credits. Please add 1 credit in your Wallet to view verification media.");
-      return;
-    }
-    setMediaUnlocking(true);
-    try {
-      await insertCaseUnlock({ case_id: id, hero_id: user.id, pledged_amount: null, credits_charged: 1, payment_type: "media" });
-      setMediaUnlocked(true);
-      setWalletBalance(prev => Math.max(prev - 1, 0));
-      toast.success("Verification Media unlocked. 1 credit deducted.");
-    } catch (err: any) {
-      toast.error("Failed to unlock Verification Media: " + (err?.message || "Please try again."));
-    } finally {
-      setMediaUnlocking(false);
-    }
-  }
-
   async function handleSubmitResolution() {
-    const submittedResType = unlockMode === "full" ? String(caseData?.category || "Direct Payment") : resType;
-    if (!submittedResType) { toast.error("Please select what you did"); return; }
-    if (!txId.trim()) { toast.error("Please enter transaction ID / payment reference"); return; }
-    const paidNum = amountPaid ? parseFloat(amountPaid) : (contributionOpen ? pledgeNum : (myUnlock?.pledged_amount ?? null));
-    if (!paidNum || paidNum <= 0) { toast.error("Please enter the total amount you paid."); return; }
-    if (unlockMode === "full" && amountNeeded > 0 && paidNum < amountNeeded) { toast.error(`Direct Help requires the full amount: ${sym} ${amountNeeded} ${cur}.`); return; }
-    if (unlockMode === "partial" && paidNum < 100) { toast.error(`The minimum Contribution is ${sym} 100.`); return; }
-    if (unlockMode === "partial" && paidNum > remaining) { toast.error(`The maximum Contribution is ${sym} ${remaining} ${cur} still needed.`); return; }
-    if (!receiptFile) { toast.error("Please attach your payment receipt before submitting proof."); return; }
+    if (!resType) { toast.error("Please select what you did"); return; }
+    if (!txId) { toast.error("Please enter transaction ID"); return; }
     setSubmitting(true);
     try {
-      const receiptUrl = await uploadFile(receiptFile, `resolutions/${id}/${Date.now()}_receipt`);
-      const paidTo = contributionOpen || myUnlock?.payment_type === "partial" ? "givethra" : "institute";
+      let receiptUrl = "";
+      if (receiptFile) receiptUrl = await uploadFile(receiptFile, `resolutions/${id}/${Date.now()}_receipt`);
+
+      const paidNum = amountPaid ? parseFloat(amountPaid) : (myUnlock?.pledged_amount ?? null);
+      const paidTo = myUnlock?.payment_type === "partial" ? "givethra" : "institute";
 
       await insertCaseResolution({
         case_id: id,
         hero_id: user?.id,
         seeker_id: caseData.user_id,
-        resolution_type: submittedResType,
+        resolution_type: resType,
         amount_paid: paidNum,
         transaction_id: txId,
         receipt_url: receiptUrl,
@@ -604,11 +508,11 @@ export default function CaseDetailPage() {
         case_id: id,
         user_id: user?.id,
         first_name: firstName,
-        comment: fbText.trim() || null,
+        text_message: fbText.trim() || null,
         video_url: fbVideoUrl || null,
         status: "pending_review",
       });
-      toast.success("Thank you! Your feedback is now shared on the Givethra community wall.");
+      toast.success("Thank you! Your feedback is submitted for Givethra's review. Once approved, it will appear on the wall and you can submit a new case.");
       setFbText(""); setFbVideoFile(null); setFbVideoName(""); setFbVideoBlob(null);
       // Refresh feedback state
       await checkExistingFeedback();
@@ -662,16 +566,16 @@ export default function CaseDetailPage() {
             </div>
 
             {/* Refund/Free Status */}
-            <div className={`rounded-xl border p-4 ${caseData.was_free ? "bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:border-teal-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
+            <div className={`rounded-xl border p-4 ${caseData.was_free ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
               <div className="flex items-start gap-3">
-                <RefreshCw className={`h-5 w-5 mt-0.5 shrink-0 ${caseData.was_free ? "text-teal-600 dark:text-teal-400" : "text-blue-600 dark:text-blue-400"}`} />
+                <RefreshCw className={`h-5 w-5 mt-0.5 shrink-0 ${caseData.was_free ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`} />
                 <div>
-                  <p className={`text-sm font-semibold ${caseData.was_free ? "text-teal-800 dark:text-teal-300" : "text-blue-800 dark:text-blue-300"}`}>
+                  <p className={`text-sm font-semibold ${caseData.was_free ? "text-green-800 dark:text-green-300" : "text-blue-800 dark:text-blue-300"}`}>
                     {caseData.was_free 
                       ? "🎁 Your free submission has been returned!" 
                       : "💳 1 credit has been refunded to your account!"}
                   </p>
-                  <p className={`text-xs mt-0.5 ${caseData.was_free ? "text-teal-700 dark:text-teal-400" : "text-blue-700 dark:text-blue-400"}`}>
+                  <p className={`text-xs mt-0.5 ${caseData.was_free ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
                     {caseData.was_free 
                       ? "You can submit a new case for FREE again. Your free case allowance is restored." 
                       : "You can re-submit this case using your refunded credit. No extra cost."}
@@ -798,50 +702,48 @@ export default function CaseDetailPage() {
   // ============================================================
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto px-4 py-6 pb-24 md:pb-6 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         <button type="button" onClick={() => navigate({ to: "/cases" })} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-4 w-4" /> Back to cases
         </button>
 
         {/* === FREE UNLOCK ANNOUNCEMENT - TOP OF PAGE === */}
-        <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border-2 border-teal-400 p-4 text-sm text-teal-700 dark:text-teal-300 text-center font-medium">
-          🎉 Your first <strong>3 contribution helps are FREE</strong>! Direct Help always costs 1 credit.
+        <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border-2 border-green-400 p-4 text-sm text-green-700 dark:text-green-300 text-center font-medium">
+          🎉 Your first <strong>3 helps are FREE</strong>! After that, 1 credit per help.
         </div>
 
         <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-          <div className="flex flex-wrap items-start gap-4">
-            <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${caseData.status === "approved" ? "bg-teal-100 text-teal-700" : caseData.status === "completed" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>{caseData.status?.toUpperCase()}</span>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${caseData.status === "approved" ? "bg-green-100 text-green-700" : caseData.status === "completed" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>{caseData.status?.toUpperCase()}</span>
                 <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">{caseData.category}</span>
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${caseData.urgency === "Emergency" ? "bg-red-100 text-red-700" : caseData.urgency === "High" ? "bg-orange-100 text-orange-700" : "bg-muted text-muted-foreground"}`}>{caseData.urgency}</span>
               </div>
-              <h1 className="text-2xl font-bold text-foreground break-words">{caseData.title}</h1>
-              <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4 shrink-0" /> <span className="break-words">{caseData.city}, {caseData.country}</span></div>
+              <h1 className="text-2xl font-bold text-foreground">{caseData.title}</h1>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" /> {caseData.city}, {caseData.country}</div>
             </div>
-            <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-              <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5 border-primary/25 text-primary hover:bg-primary/10" onClick={handleCaseShare} aria-label={`Share ${caseData.title}`}>
-                <Share2 className="h-4 w-4" /> Share
-              </Button>
-              {caseData.deadline && (() => {
-              const daysLeft = Math.ceil((new Date(caseData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              if (daysLeft < 0) return null;
-              return (
-                <div className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 sm:flex-none ${daysLeft <= 3 ? "bg-red-50 dark:bg-red-950/20 border border-red-300" : "bg-amber-50 dark:bg-amber-950/20 border border-amber-300"}`}>
-                  <span className="shrink-0 text-lg">⏳</span>
-                  <p className={`whitespace-nowrap text-xs font-bold ${daysLeft <= 3 ? "text-red-700" : "text-amber-700"}`}>
-                    {daysLeft === 0 ? "Expires TODAY — Help Now" : daysLeft === 1 ? "Only 1 day left — Help Now" : `Only ${daysLeft} days left to help`}
+            {caseData.deadline && (() => {
+            const daysLeft = Math.ceil((new Date(caseData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            if (daysLeft < 0) return null;
+            return (
+              <div className={`rounded-xl p-3 flex items-center gap-2 ${daysLeft <= 3 ? "bg-red-50 dark:bg-red-950/20 border border-red-300" : "bg-amber-50 dark:bg-amber-950/20 border border-amber-300"}`}>
+                <span className="text-2xl">⏳</span>
+                <div>
+                  <p className={`text-sm font-bold ${daysLeft <= 3 ? "text-red-700" : "text-amber-700"}`}>
+                    {daysLeft === 0 ? "Expires TODAY!" : daysLeft === 1 ? "Only 1 day left to help!" : `Only ${daysLeft} days left to help!`}
                   </p>
+                  <p className="text-xs text-muted-foreground">If no one helps in time, this case will expire and this person will have to wait again. Be their Hero today.</p>
                 </div>
-              );
-            })()}
-            </div>
+              </div>
+            );
+          })()}
           </div>
 
           {amountNeeded > 0 && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs font-medium">
-                <span className="text-teal-600">{sym} {amountCollected} collected</span>
+                <span className="text-green-600">{sym} {amountCollected} collected</span>
                 <span className="text-muted-foreground">{percentDone}% · {sym} {remaining} left</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
@@ -850,74 +752,34 @@ export default function CaseDetailPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-2 flex-wrap rounded-xl bg-teal-50/70 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 px-3 py-2.5">
-            <span className="inline-flex items-center gap-1 text-xs text-teal-700 dark:text-teal-300 font-medium"><CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Identity Verified</span>
-            <span className="inline-flex items-center gap-1 text-xs text-teal-700 dark:text-teal-300 font-medium"><CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> KYC Approved</span>
-            <span className="inline-flex items-center gap-1 text-xs text-teal-700 dark:text-teal-300 font-medium"><CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Givethra Verified</span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Identity Verified</span>
+            <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> KYC Approved</span>
+            <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Givethra Verified</span>
           </div>
-
-          {(() => {
-            const approvedItems = getApprovedCaseItems(caseData);
-            const documentItems = approvedItems.filter((item) => item.source === "document");
-            const isPublishedCase = ["approved", "published", "active"].includes(String(caseData.status || "").toLowerCase());
-            if (!isPublishedCase && approvedItems.length === 0) return null;
-            const cur2 = caseData.currency || "USD";
-            const sym2 = CURRENCY_SYMBOLS[cur2] ?? cur2;
-            return (
-              <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border border-teal-300 p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-teal-600 shrink-0" />
-                  <h2 className="text-sm font-semibold text-teal-700">Case Verification Documents</h2>
-                </div>
-                {documentItems.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {documentItems.map(({ label }) => (
-                      <span key={label} className="text-xs font-medium bg-white dark:bg-teal-900/30 text-teal-700 border border-teal-300 rounded-full px-2.5 py-1">✅ {label}</span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-teal-600">No additional case-specific documents are recorded in this case.</p>
-                )}
-                <p className="text-[11px] leading-relaxed text-teal-600">Only the reviewed document names are shown publicly; document contents remain private.</p>
-              </div>
-            );
-          })()}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-5">
             <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
-              <h2 className="font-semibold text-foreground">Case Story (What You Need Help With)</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                {[caseData.description, caseData.why_help]
-                  .filter((text, index, values) => Boolean(text?.trim()) && values.findIndex((value) => value?.trim() === text.trim()) === index)
-                  .join("\n\n")}
-              </p>
+              <h2 className="font-semibold text-foreground">Case Story</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{caseData.description}</p>
+              {caseData.why_help && <div className="mt-3 pt-3 border-t border-border"><p className="text-xs font-medium text-foreground mb-1">Why they need help:</p><p className="text-sm text-muted-foreground whitespace-pre-line">{caseData.why_help}</p></div>}
             </div>
 
             {isOwner && isCompleted && (
-              <div className="rounded-2xl bg-teal-50 dark:bg-teal-950/20 border-2 border-teal-200 p-5 space-y-4">
+              <div className="rounded-2xl bg-green-50 dark:bg-green-950/20 border-2 border-green-200 p-5 space-y-4">
                 <div className="text-center space-y-2">
                   <div className="text-4xl">🎉🤲</div>
-                  <h2 className="font-bold text-lg text-teal-700">Your case is complete!</h2>
-                  <p className="text-sm text-teal-700">
+                  <h2 className="font-bold text-lg text-green-700">Your case is complete!</h2>
+                  <p className="text-sm text-green-700">
                     {caseData.closed_by_admin ? "Many kind people came together and Givethra paid your bill. May Allah bless everyone who helped." : "A kind Hero helped you directly. May Allah bless them."}
                   </p>
                 </div>
                 {caseData.paid_receipt_url && (
-                  <a href={caseData.paid_receipt_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg bg-card border border-teal-300 p-3 text-sm text-teal-700 font-medium">
+                  <a href={caseData.paid_receipt_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg bg-card border border-green-300 p-3 text-sm text-green-700 font-medium">
                     <FileText className="h-4 w-4" /> View Payment Receipt
                   </a>
-                )}
-                {isOwner && myResolutions.some((resolution) => resolution.status === "completed") && (
-                  <div className="space-y-2 rounded-xl border border-teal-200 bg-card p-4">
-                    <p className="text-sm font-semibold text-teal-700">Your verified help affidavits</p>
-                    {myResolutions.filter((resolution) => resolution.status === "completed").map((resolution) => (
-                      <Button key={resolution.id} type="button" size="sm" variant="outline" className="w-full gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, resolution, seekerKyc, resolution.hero_name || "Verified Hero")}>
-                        <FileText className="h-3.5 w-3.5" /> Download Affidavit · {sym} {resolution.seeker_confirmed_amount ?? resolution.amount_paid}
-                      </Button>
-                    ))}
-                  </div>
                 )}
                 {existingFeedback ? (
                   <div className="rounded-xl bg-card border border-border p-4 text-center space-y-1">
@@ -943,20 +805,20 @@ export default function CaseDetailPage() {
                         <div className="space-y-2">
                           <video ref={liveVideoRef} autoPlay playsInline muted className="w-full rounded-lg border" />
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-red-500">{paused ? "⏸ Paused" : "● Recording"} {recTimer}s / 60s</span>
+                            <span className="text-sm font-medium text-red-500">{paused ? "⏸ Paused" : "● Recording"} {recTimer}s / 90s</span>
                           </div>
-                          <div className="w-full bg-muted rounded-full h-2"><div className="bg-red-500 h-2 rounded-full transition-all" style={{ width: `${(recTimer / 60) * 100}%` }} /></div>
+                          <div className="w-full bg-muted rounded-full h-2"><div className="bg-red-500 h-2 rounded-full transition-all" style={{ width: `${(recTimer / 90) * 100}%` }} /></div>
                           <div className="flex gap-2">
                             {!paused ? <Button type="button" variant="outline" className="flex-1" onClick={pauseRecording}>⏸ Pause</Button> : <Button type="button" variant="outline" className="flex-1" onClick={resumeRecording}>▶ Resume</Button>}
-                            <Button type="button" className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={stopRecording}>✓ Done</Button>
+                            <Button type="button" className="flex-1 bg-green-600 hover:bg-green-700" onClick={stopRecording}>✓ Done</Button>
                           </div>
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <Button type="button" variant="outline" className="w-full gap-2" onClick={startRecording}><Video className="h-4 w-4" /> Record a Video (up to 60s)</Button>
+                          <Button type="button" variant="outline" className="w-full gap-2" onClick={startRecording}><Video className="h-4 w-4" /> Record a Video (up to 90s)</Button>
                           <p className="text-[11px] text-muted-foreground text-center">Or upload a video file</p>
                           <Input type="file" accept="video/*" onChange={e => { const f = e.target.files?.[0] ?? null; setFbVideoFile(f); setFbVideoName(f?.name ?? ""); setFbVideoBlob(f ? URL.createObjectURL(f) : null); }} />
-                          {fbVideoName && !fbVideoBlob && <p className="text-xs text-teal-600">✓ {fbVideoName}</p>}
+                          {fbVideoName && !fbVideoBlob && <p className="text-xs text-green-600">✓ {fbVideoName}</p>}
                         </div>
                       )}
                     </div>
@@ -966,40 +828,28 @@ export default function CaseDetailPage() {
               </div>
             )}
 
-            {!unlocked && !isOwner && !contributionOpen ? (
+            {!unlocked && !isOwner ? (
               <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 p-6 flex flex-col items-center text-center gap-4">
                 <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center"><Lock className="h-6 w-6 text-muted-foreground" /></div>
                 <div>
                   <h3 className="font-bold text-foreground">Choose how you want to help</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     {isFirstThreeUnlocks
-                      ? `🎉 This is your #${userUnlockCount + 1} contribution help — it's FREE! (${3 - userUnlockCount} contribution helps remaining)`
-                      : `Contribution helps after the first 3 require 1 credit.`}
+                      ? `🎉 This is your #${userUnlockCount + 1} unlock — it's FREE! (${3 - userUnlockCount} free remaining)`
+                      : `Unlock this case (1 credit) and help.`}
                   </p>
                 </div>
                 {!isAuthenticated ? (
                   <Button onClick={() => navigate({ to: "/sign-in" })} className="px-8">Sign in to help</Button>
                 ) : (
                   <div className="w-full space-y-3">
-                    <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2"><Heart className="h-5 w-5 text-primary" /><h4 className="font-bold text-sm">Help Now</h4></div>
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">Choose one</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">You can help this case directly or contribute any amount.</p>
+                    {/* DIRECT HELP - always visible */}
+                    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
                       <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h4 className="font-bold text-sm">Pay the full bill directly</h4></div>
                       <p className="text-xs text-muted-foreground">You'll get the institute's payment details and pay the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} directly. Best if you can cover it all at once.</p>
-                      {!walletLoading && !hasUnlockCredit && (
-                        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-2">
-                          <p><strong>You have 0 credits.</strong> Direct Help requires 1 credit to unlock.</p>
-                          <Button type="button" variant="outline" size="sm" onClick={() => navigate({ to: "/wallet" })} className="w-full gap-2 border-amber-400 text-amber-800 dark:text-amber-300">
-                            Add Credits in Wallet <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      )}
-                      <Button onClick={() => handleUnlock("full")} disabled={unlocking || walletLoading} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
+                      <Button onClick={() => handleUnlock("full")} disabled={unlocking} className="w-full gap-2 mt-1">
                         <Unlock className="h-4 w-4" />
-                        Help Now — Direct Payment (1 credit)
+                        {isFirstThreeUnlocks ? `FREE (${3 - userUnlockCount} left)` : "Pay Full — Unlock"}
                       </Button>
                     </div>
 
@@ -1007,49 +857,44 @@ export default function CaseDetailPage() {
                     <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
                       <div className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" /><h4 className="font-bold text-sm">Contribute any amount (Fundraising)</h4></div>
                       <p className="text-xs text-muted-foreground">Contribute any amount to Givethra's fundraising. When the goal is reached, Givethra pays the institute. Many help together 🤝</p>
-                      <div className="rounded-lg border border-teal-300 bg-teal-50 dark:bg-teal-950/20 p-2.5 text-xs text-teal-800 dark:text-teal-300">
-                        {freeContributionRemaining > 0 ? <><strong>{freeContributionRemaining} of 3 free Contribution unlocks remaining.</strong> Your next Contribution unlock is free.</> : <><strong>Your 3 free Contribution unlocks are complete.</strong> This Contribution unlock requires 1 credit.</>}
-                      </div>
-                      {freeContributionRemaining === 0 && !walletLoading && !hasUnlockCredit && (
-                        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-2">
-                          <p><strong>You have 0 credits.</strong> Add 1 credit in your Wallet to unlock another Contribution.</p>
-                          <Button type="button" variant="outline" size="sm" onClick={() => navigate({ to: "/wallet" })} className="w-full gap-2 border-amber-400 text-amber-800 dark:text-amber-300">
-                            Add Credits in Wallet <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
+                      {amountNeeded > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <Label className="text-xs">How much will you contribute? ({cur}) — {sym} {remaining} still needed</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">{sym}</span>
+                            <Input type="number" value={pledgeAmount} onChange={e => setPledgeAmount(e.target.value)} placeholder={`Up to ${remaining}`} className="pl-12 bg-card" max={remaining} />
+                          </div>
                         </div>
                       )}
-                      <p className="text-xs text-muted-foreground">Unlock this Contribution first. The amount field and Givethra payment details will open after the unlock.</p>
-                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking || walletLoading || remaining < 100} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
-
-                        <HandCoins className="h-4 w-4" />
-                        Help Now — Contribute
+                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking} className="w-full gap-2 mt-1">
+                        <Unlock className="h-4 w-4" />
+                        {isFirstThreeUnlocks ? `FREE (${3 - userUnlockCount} left)` : "Contribute — Unlock"}
                       </Button>
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex min-w-0 flex-col gap-4">
-                {!isOwner && unlockMode === "full" && (
-                  <div className="order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20 p-4 sm:p-5 space-y-2">
-                    <div className="flex min-w-0 items-center gap-2"><Building2 className="h-5 w-5 shrink-0 text-primary" /><h2 className="min-w-0 break-words font-semibold">Direct Payment Receiver Details</h2></div>
-                    <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} to the verified receiver below. For bills, use the listed provider and consumer/reference number.</div>
-                    {directPaymentRows.length > 0 ? directPaymentRows.map((row) => <CopyRow key={row.label} label={row.label} value={String(row.value)} mono={row.mono} />) : <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-700">Receiver payment details are not available yet. Please contact Givethra before sending money.</p>}
-                    <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-700 dark:text-amber-400 mt-2">Pay only to the receiver details shown above. Keep the payment receipt and transaction/reference number, then submit both below for Givethra review.</div>
+              <div className="space-y-4">
+                {!isOwner && unlockMode === "full" && hasPaymentDetails && (
+                  <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
+                    <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h2 className="font-semibold">Institute Payment Details</h2></div>
+                    <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Pay the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} directly to the institute below.</div>
+                    <CopyRow label="Institute / Provider" value={caseData.institute_name} />
+                    <CopyRow label="Payment Method" value={caseData.payment_method} />
+                    <CopyRow label="Account Title / Reference" value={caseData.account_title} />
+                    <CopyRow label="Account / Bill Number" value={caseData.account_number} mono />
+                    <CopyRow label="IBAN" value={caseData.account_iban} mono />
+                    <CopyRow label="Institute Contact" value={caseData.institute_contact} mono />
+                    <CopyRow label="Institute Address" value={caseData.institute_address} />
+                    <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-700 dark:text-amber-400 mt-2">⚠️ Pay the institute directly. Keep your receipt — submit it below.</div>
                   </div>
                 )}
 
                 {!isOwner && unlockMode === "partial" && (
-                  <div className="order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20 p-4 sm:p-5 space-y-2">
+                  <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
                     <div className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" /><h2 className="font-semibold">Contribute to Givethra Fundraising</h2></div>
                     <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send your contribution to Givethra. We collect all contributions and pay the institute once the goal is reached. You can contribute as many times as you like until the case is complete.</div>
-                    <div className="space-y-1.5 pt-1">
-                      <Label className="text-xs">How much will you contribute? ({cur}) — minimum {sym} 100, maximum {sym} {remaining} still needed</Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">{sym}</span>
-                        <Input type="number" min={100} max={remaining} value={pledgeAmount} onChange={e => { setPledgeAmount(e.target.value); setAmountPaid(e.target.value); }} placeholder={`100–${remaining}`} className="pl-12" />
-                      </div>
-                    </div>
                     <CopyRow label="NayaPay Title" value={GIVETHRA_NAYAPAY_TITLE} />
                     <CopyRow label="NayaPay Account / IBAN" value={GIVETHRA_NAYAPAY_IBAN} mono />
                     <CopyRow label="Binance USDT (TRC20) — International" value={GIVETHRA_USDT_TRC20} mono />
@@ -1057,36 +902,57 @@ export default function CaseDetailPage() {
                   </div>
                 )}
 
+                {(caseData.photo_urls?.length > 0) && (() => {
+                  const catDocs = caseData.category_details?._documents && typeof caseData.category_details._documents === "object" ? caseData.category_details._documents : {};
+                  const docNames = Object.keys(catDocs).map(k => k.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "));
+                  const cur2 = caseData.currency || "USD";
+                  const sym2 = CURRENCY_SYMBOLS[cur2] ?? cur2;
+                  return (
+                    <div className="rounded-2xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-5 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        <h2 className="font-semibold text-green-700">Givethra Verification Summary</h2>
+                      </div>
+                      <p className="text-sm text-green-700 leading-relaxed">
+                        This case was submitted by a KYC-verified user for <strong>{caseData.category}</strong> ({sym2} {caseData.amount_needed} {cur2} needed{caseData.institute_name ? `, via ${caseData.institute_name}` : ""}). Givethra reviewed the bill/reference, income proof, live selfie, and video statement before approving this case for Heroes.
+                      </p>
+                      {docNames.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {docNames.map(n => (
+                            <span key={n} className="text-xs font-medium bg-white dark:bg-green-900/30 text-green-700 border border-green-300 rounded-full px-2.5 py-1">✅ {n}</span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs text-green-600">
+                        For the beneficiary's privacy, the content of these documents is not shown publicly — only reviewed and verified by Givethra's team.
+                      </p>
+                    </div>
+                  );
+                })()}
 
-
-                <div className="order-1 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-4 sm:p-5 space-y-3">
-                  <div className="flex min-w-0 items-center justify-between gap-2"><h2 className="min-w-0 break-words font-semibold">🎥 Verification Media</h2>{mediaUnlocked && <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600">Unlocked</span>}</div>
-                  {mediaUnlocked ? (
+                <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
+                  <h2 className="font-semibold">🎥 Verification Media</h2>
+                  {(myUnlock?.credits_charged ?? 0) > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {caseData.selfie_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Live Selfie</p><img src={caseData.selfie_url} alt="Selfie" className="w-full rounded-lg border max-h-40 object-cover" /></div>}
-                      {caseData.video_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Verification Appeal Video (View Only)</p><video src={caseData.video_url} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline onContextMenu={e => e.preventDefault()} className="w-full rounded-lg border max-h-40" /></div>}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-2 text-sm text-amber-800 dark:text-amber-300">
-                      <p><strong>Verification Media is locked.</strong> Unlock it with 1 credit to view the approved selfie and appeal video.</p>
-                      {isAuthenticated && !walletLoading && walletBalance < 1 ? <Button type="button" variant="outline" onClick={() => navigate({ to: "/wallet" })} className="w-full gap-2 border-amber-400 text-amber-800 dark:text-amber-300">Add 1 Credit in Wallet <ExternalLink className="h-3.5 w-3.5" /></Button> : <Button type="button" onClick={handleUnlockMedia} disabled={!isAuthenticated || mediaUnlocking || walletLoading} className="w-full gap-2">{mediaUnlocking ? "Unlocking..." : "Unlock Verification Media (1 credit)"}</Button>}
+                      {caseData.video_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Video Appeal</p><video src={caseData.video_url} controls className="w-full rounded-lg border max-h-40" /></div>}
                     </div>
                   )}
                 </div>
 
                 {!isOwner && myResolutions.length > 0 && (
-                  <div className="order-4 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-4 sm:p-5 space-y-3">
+                  <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
                     <h2 className="font-semibold flex items-center gap-2"><Heart className="h-4 w-4 text-primary" /> My Help on this case ({myResolutions.length})</h2>
                     {myResolutions.map((r: any) => (
                       <div key={r.id} className="rounded-xl border border-border p-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === "completed" ? "bg-teal-100 text-teal-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === "completed" ? "bg-green-100 text-green-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>
                             {r.status === "completed" ? "VERIFIED ✓" : r.status === "seeker_confirmed" ? "UNDER VERIFICATION" : r.status === "disputed" ? "DISPUTED" : "PENDING"}
                           </span>
                           <span className="text-sm font-bold text-primary">{sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</span>
                         </div>
                         {r.status === "completed" ? (
-                          <Button size="sm" variant="outline" className="w-full gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, heroName)}><FileText className="h-3.5 w-3.5" /> Download Affidavit</Button>
+                          <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, heroName)}><FileText className="h-3.5 w-3.5" /> Download Affidavit</Button>
                         ) : (
                           <p className="text-xs text-muted-foreground">{r.status === "seeker_confirmed" ? "Givethra is verifying this contribution." : r.status === "disputed" ? "This was disputed — Givethra will investigate." : "Waiting for confirmation."}</p>
                         )}
@@ -1096,37 +962,32 @@ export default function CaseDetailPage() {
                 )}
 
                 {canHelpAgain && (
-                  <div className="order-3 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-4 sm:p-5 space-y-4">
+                  <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
                     <h2 className="font-semibold">🤝 {myResolutions.length > 0 ? "Help Again" : (unlockMode === "partial" ? "Submit Your Contribution Proof" : "Resolve This Case")}</h2>
                     {myResolutions.length > 0 && <p className="text-xs text-muted-foreground">You can help this case as many times as you like until it's complete. {sym} {remaining} still needed.</p>}
-                    {(!showResolution && myResolutions.length > 0) ? (
-                      <Button onClick={() => setShowResolution(true)} className="w-full gap-2"><Heart className="h-4 w-4" /> Add More Help</Button>
+                    {!showResolution ? (
+                      <Button onClick={() => setShowResolution(true)} className="w-full gap-2"><Heart className="h-4 w-4" /> {myResolutions.length > 0 ? "Add More Help" : (unlockMode === "partial" ? "I Contributed — Submit Proof" : "I Helped — Submit Proof")}</Button>
                     ) : (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label>{unlockMode === "partial" ? "Contribution Type *" : "Payment Category *"}</Label>
-                          {unlockMode === "full" ? (
-                            <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 text-sm font-semibold text-primary">{caseData?.category || "Direct Payment"}</div>
-                          ) : (
-                            <div className="grid grid-cols-2 gap-2">
-                              {["Contribution", "Partial Help", "Other"].map(t => (
-                                <button key={t} type="button" onClick={() => setResType(t)} className={`px-3 py-2 rounded-lg border text-xs font-medium text-left ${resType === t ? "bg-primary text-white border-primary" : "border-border"}`}>{t}</button>
-                              ))}
-                            </div>
-                          )}
+                          <Label>{unlockMode === "partial" ? "Contribution Type *" : "Resolution Type *"}</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(unlockMode === "partial" ? ["Contribution", "Partial Help", "Other"] : ["Bill Paid", "School Fee Paid", "Hospital Paid", "Bank Transfer", "Food Delivered", "Other"]).map(t => (
+                              <button key={t} type="button" onClick={() => setResType(t)} className={`px-3 py-2 rounded-lg border text-xs font-medium text-left ${resType === t ? "bg-primary text-white border-primary" : "border-border"}`}>{t}</button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="space-y-2"><Label>Amount Paid ({cur}) *</Label><Input type="number" min="1" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} placeholder={`e.g. ${remaining || amountNeeded || 500}`} /></div>
-                        <div className="space-y-2"><Label>Transaction ID / Payment Reference *</Label><Input value={txId} onChange={e => setTxId(e.target.value)} placeholder="TXN123456789" /></div>
+                        <div className="space-y-2"><Label>Amount ({cur})</Label><Input type="number" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} placeholder={`e.g. ${remaining || 500}`} /></div>
+                        <div className="space-y-2"><Label>Transaction ID *</Label><Input value={txId} onChange={e => setTxId(e.target.value)} placeholder="TXN123456789" /></div>
                         <div className="space-y-2">
-                          <Label>Attach Payment Receipt *</Label>
-                          <p className="text-xs text-muted-foreground">Upload the receipt or payment slip so Givethra can verify the amount and reference with the receiver.</p>
-                          <input type="file" accept="image/*,.pdf" onChange={e => { const f = e.target.files?.[0] ?? null; setReceiptFile(f); setReceiptName(f?.name ?? ""); }} className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white file:text-sm" />
-                          {receiptName && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {receiptName} (will upload when you submit)</p>}
+                          <Label>Upload Receipt</Label>
+                          <input type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0] ?? null; setReceiptFile(f); setReceiptName(f?.name ?? ""); }} className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white file:text-sm" />
+                          {receiptName && <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {receiptName} (will upload when you submit)</p>}
                         </div>
                         <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Any details..." /></div>
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <Button className="w-full sm:flex-1" onClick={handleSubmitResolution} disabled={submitting}>{submitting ? "Submitting..." : unlockMode === "full" ? "Submit Direct Payment Proof" : "Submit Contribution Proof"}</Button>
-                          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setShowResolution(false)}>Cancel</Button>
+                        <div className="flex gap-2">
+                          <Button className="flex-1" onClick={handleSubmitResolution} disabled={submitting}>{submitting ? "Submitting..." : "Submit"}</Button>
+                          <Button variant="outline" onClick={() => setShowResolution(false)}>Cancel</Button>
                         </div>
                       </div>
                     )}
@@ -1134,15 +995,15 @@ export default function CaseDetailPage() {
                 )}
 
                 {!isOwner && isCompleted && myResolutions.length > 0 && (
-                  <div className="order-5 min-w-0 overflow-hidden rounded-2xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 p-5 text-center space-y-2">
+                  <div className="rounded-2xl bg-green-50 dark:bg-green-950/20 border border-green-200 p-5 text-center space-y-2">
                     <div className="text-3xl">🤲</div>
-                    <h2 className="font-bold text-teal-700">This case is complete!</h2>
-                    <p className="text-sm text-teal-700">Thank you for your help. May Allah reward you. Your affidavits are above.</p>
+                    <h2 className="font-bold text-green-700">This case is complete!</h2>
+                    <p className="text-sm text-green-700">Thank you for your help. May Allah reward you. Your affidavits are above.</p>
                   </div>
                 )}
 
                 {isOwner && !isCompleted && (
-                  <div className="order-5 min-w-0"><OwnerResolutions caseId={id} caseData={caseData} seekerKyc={seekerKyc} onConfirm={handleSeekerConfirm} onDispute={handleSeekerDispute} sym={sym} cur={cur} /></div>
+                  <OwnerResolutions caseId={id} caseData={caseData} seekerKyc={seekerKyc} onConfirm={handleSeekerConfirm} onDispute={handleSeekerDispute} sym={sym} cur={cur} />
                 )}
               </div>
             )}
@@ -1157,7 +1018,7 @@ export default function CaseDetailPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="font-medium capitalize">{caseData.status}</span></div>
                 {caseData.deadline && <div className="flex justify-between"><span className="text-muted-foreground">Deadline</span><span className="font-medium">{new Date(caseData.deadline).toLocaleDateString()}</span></div>}
                 {amountNeeded > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Amount</span><span className="font-bold text-primary">{sym} {amountNeeded} {cur}</span></div>}
-                {amountNeeded > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Collected</span><span className="font-bold text-teal-600">{sym} {amountCollected} ({percentDone}%)</span></div>}
+                {amountNeeded > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Collected</span><span className="font-bold text-green-600">{sym} {amountCollected} ({percentDone}%)</span></div>}
               </div>
             </div>
           </div>
@@ -1208,13 +1069,13 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
                     <p className="text-[11px] text-muted-foreground">Enter the amount you truly received. Givethra will verify this.</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={() => { const amt = parseFloat(confirmAmount); if (!amt || amt <= 0) { toast.error("Please enter the amount you received."); return; } onConfirm(amt, res); }}><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm this amount</Button>
+                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { const amt = parseFloat(confirmAmount); if (!amt || amt <= 0) { toast.error("Please enter the amount you received."); return; } onConfirm(amt, res); }}><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm this amount</Button>
                     <Button variant="outline" onClick={() => setConfirmingId(null)}>Cancel</Button>
                   </div>
                 </div>
               ) : (
                 <div className="flex gap-3">
-                  <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={() => { setConfirmingId(res.id); setConfirmAmount(String(res.amount_paid ?? "")); }}><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm Help</Button>
+                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setConfirmingId(res.id); setConfirmAmount(String(res.amount_paid ?? "")); }}><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm Help</Button>
                   <Button variant="outline" className="flex-1 text-red-600 border-red-300" onClick={() => onDispute(res)}>Dispute</Button>
                 </div>
               )}
@@ -1226,7 +1087,7 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
             </div>
           ) : res.status === "completed" ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-teal-700"><CheckCircle2 className="h-5 w-5" /><h2 className="font-bold">Help Confirmed</h2></div>
+              <div className="flex items-center gap-2 text-green-700"><CheckCircle2 className="h-5 w-5" /><h2 className="font-bold">Help Confirmed</h2></div>
               <p className="text-sm text-muted-foreground">{sym} {res.seeker_confirmed_amount ?? res.amount_paid} {cur} — {res.resolution_type}</p>
             </div>
           ) : res.status === "disputed" ? (

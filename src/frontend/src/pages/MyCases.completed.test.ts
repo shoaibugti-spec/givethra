@@ -26,6 +26,13 @@ describe("completed help visibility", () => {
     expect(myCasesSource).toContain("View Affidavit & Completed Help");
   });
 
+  it("keeps seeker feedback video recording at the requested 90 seconds", () => {
+    const caseDetailSource = readFileSync(new URL("./CaseDetailPage.tsx", import.meta.url), "utf8");
+    expect(caseDetailSource).toContain("recTimer}s / 90s");
+    expect(caseDetailSource).toContain("(recTimer / 90) * 100");
+    expect(caseDetailSource).toContain("Record a Video (up to 90s)");
+  });
+
   it("publishes completed cases from either case or approved resolution state", () => {
     expect(workerSource).toContain("lower(COALESCE(r.status, '')) IN ('approved', 'completed')");
     expect(workerSource).toContain("verified_amount");
