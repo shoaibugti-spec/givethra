@@ -209,6 +209,7 @@ export default function CaseDetailPage() {
   const [heroName, setHeroName] = useState("Verified Hero");
 
   const [payMode, setPayMode] = useState<"choose" | "full" | "partial">("choose");
+  const [contributionOpen, setContributionOpen] = useState(false);
   const [pledgeAmount, setPledgeAmount] = useState("");
 
   const [resType, setResType] = useState("");
@@ -878,7 +879,7 @@ export default function CaseDetailPage() {
               </div>
             )}
 
-            {!unlocked && !isOwner ? (
+            {!unlocked && !isOwner && !contributionOpen ? (
               <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 p-6 flex flex-col items-center text-center gap-4">
                 <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center"><Lock className="h-6 w-6 text-muted-foreground" /></div>
                 <div>
@@ -920,9 +921,9 @@ export default function CaseDetailPage() {
                           </div>
                         </div>
                       )}
-                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
-                        <Unlock className="h-4 w-4" />
-                        {isFirstThreeUnlocks ? `Help Now — FREE (${3 - userUnlockCount} left)` : "Help Now — Contribute"}
+                      <Button onClick={() => { setContributionOpen(true); setPayMode("partial"); }} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
+                        <HandCoins className="h-4 w-4" />
+                        Help Now — Contribute
                       </Button>
                     </div>
                   </div>

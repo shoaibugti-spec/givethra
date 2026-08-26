@@ -32,4 +32,13 @@ describe("public case verification presentation", () => {
     expect(caseDetailSource).toContain("whitespace-nowrap text-xs font-bold");
     expect(caseDetailSource).toContain("flex min-w-0 flex-1 items-center justify-center gap-2");
   });
+
+  it("opens contribution instructions without consuming an unlock while full payment stays credit-gated", () => {
+    expect(caseDetailSource).toContain("const [contributionOpen, setContributionOpen] = useState(false);");
+    expect(caseDetailSource).toContain("!unlocked && !isOwner && !contributionOpen");
+    expect(caseDetailSource).toContain("setContributionOpen(true); setPayMode(\"partial\")");
+    expect(caseDetailSource).toContain("onClick={() => handleUnlock(\"full\")}");
+    expect(caseDetailSource).toContain("Contribute to Givethra Fundraising");
+    expect(caseDetailSource).toContain("GIVETHRA_NAYAPAY_IBAN");
+  });
 });

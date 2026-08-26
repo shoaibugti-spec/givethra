@@ -953,3 +953,9 @@
 - [x] Remove the deleted/obsolete hard-coded Google Client ID fallback from frontend and Worker auth paths.
 - [x] Fail clearly when the deployed Client ID is not configured, while continuing to accept the configured current Client ID.
 - [x] Update regression coverage and re-run all authentication and build checks.
+
+## User-Reported Contribution Access Issue
+- [x] Ensure published cases expose the Contribution/Fundraising path immediately with amount entry and clear payment destination/details.
+- [x] Keep Full Payment separately credit-gated and unlock it only after the required credit is consumed.
+- [x] Preserve existing help limits, payment safety, case data, and all unrelated flows.
+- [x] Add regression coverage and run contribution/payment tests, strict TypeScript, and production build; deployment remains user-controlled.
