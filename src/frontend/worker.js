@@ -1345,7 +1345,7 @@ async function handleRequest(request, env, ctx) {
         }
         if (parts[2] === "resolutions" && recordId) {
           const body = await readJson(request);
-          const allowed = ["status", "admin_confirmed", "admin_confirmed_at", "completed_at"];
+          const allowed = ["status", "admin_confirmed", "admin_confirmed_at", "completed_at", "notes"];
           const values = pick(body, allowed);
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No resolution fields to update" }, 400, origin);

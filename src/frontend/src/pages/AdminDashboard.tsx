@@ -460,45 +460,64 @@ export default function AdminPage() {
     }
   }
 
-  async function confirmResolution(res: any) {
+    async function confirmResolution(res: any) {
     const c = caseList.find((cs) => cs.id === res.case_id);
     if (!c) { toast.error("Case not found"); return; }
     const confirmedAmt = Number(res.seeker_confirmed_amount ?? res.amount_paid ?? 0);
+    if (!Number.isFinite(confirmedAmt) || confirmedAmt < 0) { toast.error("This proof has an invalid amount."); return; }
     const amountNeeded = Number(c.amount_needed ?? 0);
     const prevCollected = Number(c.amount_collected ?? 0);
     const newCollected = prevCollected + confirmedAmt;
     const isFundraising = res.paid_to === "givethra";
-
-    await adminUpdateResolution(res.id, { status: "completed", admin_confirmed: true, admin_confirmed_at: new Date().toISOString(), completed_at: new Date().toISOString() });
-    const updates: any = { amount_collected: newCollected };
-    const goalReached = amountNeeded > 0 && newCollected >= amountNeeded;
-    if (!isFundraising && (goalReached || amountNeeded === 0)) { updates.status = "completed"; }
-    await adminUpdateCase(c.id, updates);
-
-    if (res.hero_id) {
-      await sendNotification(res.hero_id, "case_completed", "Help verified! 🎉", `Givethra verified your help of ${sym(c.currency)} ${confirmedAmt} on "${c.title}". ${!isFundraising ? "You can now download your affidavit." : "Thank you for contributing!"}`, `/cases/${res.case_id}`);
-    }
-    if (res.seeker_id) {
-      if (isFundraising) {
-        const stillLeft = Math.max(amountNeeded - newCollected, 0);
-        await sendNotification(res.seeker_id, "system", goalReached ? "Goal reached! 🎉" : "More help received! 🤝", goalReached ? `Great news! People have together raised the full amount for your case "${c.title}". Givethra will now pay the institute and close your case.` : `Your case "${c.title}" received ${sym(c.currency)} ${confirmedAmt} more. Total raised: ${sym(c.currency)} ${newCollected} of ${sym(c.currency)} ${amountNeeded}. ${sym(c.currency)} ${stillLeft} still needed.`, `/cases/${res.case_id}`);
-      } else {
-        const stillOpen = amountNeeded > 0 && newCollected < amountNeeded;
-        await sendNotification(res.seeker_id, "system", stillOpen ? "Partial help verified ✅" : "Your case is complete! 🎉", stillOpen ? `${sym(c.currency)} ${confirmedAmt} verified. ${sym(c.currency)} ${amountNeeded - newCollected} still remaining — your case stays open for more Heroes.` : `Your case "${c.title}" is now fully helped. Thank you for using Givethra.`, `/cases/${res.case_id}`);
+    try {
+      await adminUpdateResolution(res.id, { status: "completed", admin_confirmed: true, admin_confirmed_at: new Date().toISOString(), completed_at: new Date().toISOString() });
+      const updates: any = { amount_collected: newCollected };
+      const goalReached = amountNeeded > 0 && newCollected >= amountNeeded;
+      if (!isFundraising && (goalReached || amountNeeded === 0)) { updates.status = "completed"; }
+      await adminUpdateCase(c.id, updates);
+      const notificationJobs: Promise<unknown>[] = [];
+      if (res.hero_id) notificationJobs.push(sendNotification(res.hero_id, "case_completed", "Help verified! 🎉", `Givethra verified your help of ${sym(c.currency)} ${confirmedAmt} on "${c.title}". ${!isFundraising ? "You can now download your affidavit." : "Thank you for contributing!"}`, `/cases/${res.case_id}`));
+      if (res.seeker_id) {
+        if (isFundraising) {
+          const stillLeft = Math.max(amountNeeded - newCollected, 0);
+          notificationJobs.push(sendNotification(res.seeker_id, "system", goalReached ? "Goal reached! 🎉" : "More help received! 🤝", goalReached ? `Great news! People have together raised the full amount for your case "${c.title}". Givethra will now pay the institute and close your case.` : `Your case "${c.title}" received ${sym(c.currency)} ${confirmedAmt} more. Total raised: ${sym(c.currency)} ${newCollected} of ${sym(c.currency)} ${amountNeeded}. ${sym(c.currency)} ${stillLeft} still needed.`, `/cases/${res.case_id}`));
+        } else {
+          const stillOpen = amountNeeded > 0 && newCollected < amountNeeded;
+          notificationJobs.push(sendNotification(res.seeker_id, "system", stillOpen ? "Partial help verified ✅" : "Your case is complete! 🎉", stillOpen ? `${sym(c.currency)} ${confirmedAmt} verified. ${sym(c.currency)} ${amountNeeded - newCollected} still remaining — your case stays open for more Heroes.` : `Your case "${c.title}" is now fully helped. Thank you for using Givethra.`, `/cases/${res.case_id}`));
+        }
       }
+      const notificationResults = await Promise.allSettled(notificationJobs);
+      const notificationFailed = notificationResults.some((result) => result.status === "rejected");
+      if (notificationFailed) console.error("Help verification notification failure", notificationResults);
+      toast.success(`Verified! ${sym(c.currency)} ${confirmedAmt} added.${isFundraising && goalReached ? " Goal reached — now Mark as Paid to close." : ""}`);
+      if (notificationFailed) toast.error("Help was verified, but one or more notifications could not be sent.");
+      await loadData();
+    } catch (error: any) {
+      console.error("Help verification failed:", error);
+      toast.error(`Failed to verify payment proof: ${error?.message || "Please try again."}`);
     }
-    toast.success(`Verified! ${sym(c.currency)} ${confirmedAmt} added.${isFundraising && goalReached ? " Goal reached — now Mark as Paid to close." : ""}`);
-    loadData();
   }
-
   async function rejectResolution(res: any, reason: string) {
     const trimmedReason = String(reason || "").trim();
     if (!trimmedReason) { toast.error("Please provide a rejection reason."); return; }
-    await adminUpdateResolution(res.id, { status: "disputed", admin_confirmed: false, notes: trimmedReason });
-    if (res.hero_id) await sendNotification(res.hero_id, "help_rejected", "Help proof needs correction", `Givethra could not verify your payment proof. Reason: ${trimmedReason}`, `/cases/${res.case_id}`);
-    toast.success("Resolution rejected with reason.");
-    loadData();
+    try {
+      await adminUpdateResolution(res.id, { status: "disputed", admin_confirmed: false, notes: trimmedReason });
+      if (res.hero_id) {
+        try {
+          await sendNotification(res.hero_id, "help_rejected", "Help proof needs correction", `Givethra could not verify your payment proof. Reason: ${trimmedReason}`, `/cases/${res.case_id}`);
+        } catch (notificationError) {
+          console.error("Help rejection notification failed:", notificationError);
+          toast.error("Proof was rejected, but the helper notification could not be sent.");
+        }
+      }
+      toast.success("Resolution rejected with reason.");
+      await loadData();
+    } catch (error: any) {
+      console.error("Help rejection failed:", error);
+      toast.error(`Failed to reject payment proof: ${error?.message || "Please try again."}`);
+    }
   }
+
 
   async function markAsPaidAndClose(c: any, receiptUrl: string) {
     await adminCloseCase(c.id, { status: "completed", closed_by_admin: true, paid_receipt_url: receiptUrl || null });

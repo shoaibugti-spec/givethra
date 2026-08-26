@@ -1156,3 +1156,9 @@
 - [x] Normalize the Admin response so all pending Contribution and Direct records are counted and rendered.
 - [x] Preserve receipt, amount, Txn ID, case summary, and review controls for every record.
 - [x] Add all-record regression tests and validate before the final synchronization.
+
+## User-Reported Admin Proof Action Failure
+- [x] Trace the Reject Proof and Verify & Add button handlers, API payloads, and Worker update routes.
+- [x] Repair both actions so they persist the correct status and rejection reason, then refresh the Admin queue.
+- [x] Surface API/Worker errors clearly and preserve all receipt, amount, Txn ID, and payment records.
+- [x] Add regression coverage and validate the action paths before synchronization.

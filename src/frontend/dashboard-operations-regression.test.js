@@ -45,6 +45,16 @@ describe("dashboard operations repair", () => {
     expect(workerSource).not.toContain('resolutions: { table: "case_resolutions", order: "created_at" }');
   });
 
+  it("keeps Admin proof actions wired to persisted status and rejection-note updates", () => {
+    expect(adminSource).toContain('onClick={() => onConfirm(r)}');
+    expect(adminSource).toContain('onClick={() => onReject(r, rejectionReason)}');
+    expect(adminSource).toContain('status: "completed", admin_confirmed: true');
+    expect(adminSource).toContain('status: "disputed", admin_confirmed: false, notes: trimmedReason');
+    expect(workerSource).toContain('const allowed = ["status", "admin_confirmed", "admin_confirmed_at", "completed_at", "notes"];');
+    expect(adminSource).toContain('try {\n      await adminUpdateResolution');
+    expect(adminSource).toContain('await loadData();');
+  });
+
   it("shows submitted Contributions in Verify Help with proof details and reason-gated rejection", () => {
     expect(adminSource).toContain('const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"])');
     expect(adminSource).toContain("const pendingResolutions = resolutions.filter");
