@@ -158,8 +158,8 @@ const FILTER_CATEGORIES = [
 const HELP_NOW_CATEGORY_SLIDES = FILTER_CATEGORIES.map((category) => ({
   key: `category_${category}`,
   category,
-  to: "/need-help",
-  style: CATEGORY_SLIDE_STYLE[category],
+  to: "/submit-request",
+  style: CATEGORY_SLIDE_STYLE[category] || CATEGORY_SLIDE_STYLE.Other,
 }));
 
 const CATEGORY_APPEAL: Record<string, string> = {
