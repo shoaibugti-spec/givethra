@@ -2572,6 +2572,8 @@ export default function SubmitRequestPage() {
               <p className="text-sm">
                 Total rejected cases: <strong>{userRejectionCount}</strong>
               </p>
+              <p className="text-sm font-medium">Case submission and helping other cases are disabled while this account is suspended.</p>
+              <p className="text-xs">You can still view your dashboard, profile, wallet, posts, likes, comments, notifications, and existing case records.</p>
             </div>
 
             <div className="bg-card rounded-xl border p-4 space-y-3">

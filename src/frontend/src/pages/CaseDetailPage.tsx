@@ -20,6 +20,7 @@ import {
   insertFeedback,
   getFeedbackForCase,
   getWallet,
+  getUserSuspension,
   updateWalletBalance,
   uploadFileToStorage,
 } from "@/lib/api";
@@ -218,6 +219,7 @@ export default function CaseDetailPage() {
   const [myUnlock, setMyUnlock] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [heroName, setHeroName] = useState("Verified Hero");
+  const [isSuspended, setIsSuspended] = useState(false);
 
   const [payMode, setPayMode] = useState<"choose" | "full" | "partial">("choose");
   const [pledgeAmount, setPledgeAmount] = useState("");
@@ -290,6 +292,8 @@ export default function CaseDetailPage() {
 
       if (user && data) {
         const owner = data.user_id === user.id;
+        const suspension = await getUserSuspension(user.id);
+        setIsSuspended(Boolean(suspension?.is_active));
         const unlock = await getCaseUnlock(id, user.id);
         setMyUnlock(unlock);
 
@@ -413,6 +417,7 @@ export default function CaseDetailPage() {
 
   async function handleUnlock(mode: "full" | "partial") {
     if (!user) { navigate({ to: "/sign-in" }); return; }
+    if (isSuspended) { toast.error("Your account is suspended. You can view this case, but you cannot provide help until you reactivate it with 5 credits."); return; }
     if (mode === "partial") {
       if (!pledgeNum || pledgeNum <= 0) { toast.error("Please enter how much you want to help with."); return; }
       if (amountNeeded > 0 && pledgeNum > remaining) { toast.error(`Only ${sym} ${remaining} ${cur} is remaining for this case.`); return; }
@@ -445,6 +450,7 @@ export default function CaseDetailPage() {
   }
 
   async function handleSubmitResolution() {
+    if (isSuspended) { toast.error("Your account is suspended. You can view this case, but you cannot submit help until you reactivate it with 5 credits."); return; }
     if (!resType) { toast.error("Please select what you did"); return; }
     if (!txId) { toast.error("Please enter transaction ID"); return; }
     setSubmitting(true);
@@ -909,11 +915,17 @@ export default function CaseDetailPage() {
                   <Button onClick={() => navigate({ to: "/sign-in" })} className="px-8">Sign in to help</Button>
                 ) : (
                   <div className="w-full space-y-3">
+                    {isSuspended && (
+                      <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/20 dark:text-red-300">
+                        <p className="font-semibold">Account suspended</p>
+                        <p className="mt-1">You can view this case, but helping is disabled. Reactivate your account with 5 credits from the Submit page.</p>
+                      </div>
+                    )}
                     {/* DIRECT HELP - always visible */}
                     <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
                       <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h4 className="font-bold text-sm">Pay the full bill directly</h4></div>
                       <p className="text-xs text-muted-foreground">You'll get the institute's payment details and pay the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} directly. Best if you can cover it all at once.</p>
-                      <Button onClick={() => handleUnlock("full")} disabled={unlocking} className="w-full gap-2 mt-1">
+                      <Button onClick={() => handleUnlock("full")} disabled={unlocking || isSuspended} className="w-full gap-2 mt-1">
                         <Unlock className="h-4 w-4" />
                         {isFirstThreeUnlocks ? `FREE (${3 - userUnlockCount} left)` : "Pay Full — Unlock"}
                       </Button>
@@ -928,11 +940,11 @@ export default function CaseDetailPage() {
                           <Label className="text-xs">How much will you contribute? ({cur}) — {sym} {remaining} still needed</Label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">{sym}</span>
-                            <Input type="number" value={pledgeAmount} onChange={e => setPledgeAmount(e.target.value)} placeholder={`Up to ${remaining}`} className="pl-12 bg-card" max={remaining} />
+                            <Input type="number" value={pledgeAmount} onChange={e => setPledgeAmount(e.target.value)} placeholder={`Up to ${remaining}`} className="pl-12 bg-card" max={remaining} disabled={isSuspended} />
                           </div>
                         </div>
                       )}
-                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking} className="w-full gap-2 mt-1">
+                      <Button onClick={() => handleUnlock("partial")} disabled={unlocking || isSuspended} className="w-full gap-2 mt-1">
                         <Unlock className="h-4 w-4" />
                         {isFirstThreeUnlocks ? `FREE (${3 - userUnlockCount} left)` : "Contribute — Unlock"}
                       </Button>
@@ -942,6 +954,12 @@ export default function CaseDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
+                {isSuspended && !isOwner && !isCompleted && (
+                  <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/20 dark:text-red-300">
+                    <p className="font-semibold">Account suspended</p>
+                    <p className="mt-1">You may view this case and its records, but help proof submission is disabled until you reactivate with 5 credits.</p>
+                  </div>
+                )}
                 {!isOwner && !isCompleted && unlockMode === "full" && hasPaymentDetails && (
                   <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
                     <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h2 className="font-semibold">Institute Payment Details</h2></div>

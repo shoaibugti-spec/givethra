@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import {
   getWallet,
   getDeposits,
+  getUserSuspension,
   insertDeposit,
   uploadFileToStorage,
 } from "@/lib/api";
@@ -47,10 +48,12 @@ const PAYMENT_METHODS = {
 };
 
 const QUICK_AMOUNTS = [1, 2, 3, 5, 10, 20];
+const SUSPENSION_UNLOCK_CREDITS = 5;
 
 export default function WalletPage() {
   const { user, isAuthenticated } = useAuth();
   const [balance, setBalance] = useState(0);
+  const [isSuspended, setIsSuspended] = useState(false);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState<"nayapay" | "binance">("nayapay");
@@ -94,6 +97,8 @@ export default function WalletPage() {
     try {
       const wallet = await getWallet(user!.id);
       setBalance(wallet?.balance ?? 0);
+      const suspension = await getUserSuspension(user!.id);
+      setIsSuspended(Boolean(suspension?.is_active));
       const deps = await getDeposits(user!.id);
       setDeposits(deps ?? []);
     } catch (err) {
@@ -184,6 +189,13 @@ export default function WalletPage() {
             ≈ ${balance.toLocaleString()} USD · 1 Credit = $1
           </div>
         </div>
+
+        {isSuspended && (
+          <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/20 dark:text-red-300">
+            <p className="font-semibold">Account suspended</p>
+            <p className="mt-1">You can still view your wallet and add credits, but submitting a case or helping a case is disabled. Add at least <strong>{SUSPENSION_UNLOCK_CREDITS} credits</strong>, then open the Submit page to reactivate your account.</p>
+          </div>
+        )}
 
         <div className="rounded-xl bg-muted/40 border p-4 text-xs text-muted-foreground space-y-1">
           <p>• Submitting a help request costs <strong>1 Credit</strong></p>

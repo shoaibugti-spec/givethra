@@ -257,6 +257,30 @@ function canAccessUser(user, userId) {
   return isAdmin(user) || !userId || user.user_id === userId;
 }
 
+async function getActiveSuspension(env, userId) {
+  if (!env.DB || !userId) return null;
+  const row = await env.DB.prepare(
+    `SELECT u.user_id, s.is_active, s.suspension_count, s.suspended_at,
+            s.rejection_count_at_suspension, s.credits_used_to_unlock,
+            p.is_suspended AS profile_is_suspended, p.suspended_reason
+     FROM users u
+     LEFT JOIN user_suspensions s ON s.user_id = u.user_id
+     LEFT JOIN profiles p ON p.user_id = u.user_id
+     WHERE u.user_id = ? LIMIT 1`
+  ).bind(userId).first();
+  const active = [1, "1", true, "true"].includes(row?.is_active) || [1, "1", true, "true"].includes(row?.profile_is_suspended);
+  return active ? row : null;
+}
+
+function suspendedActionResponse(origin, suspension) {
+  return json({
+    error: "Your account is suspended. You cannot submit a case or provide help until the account is reactivated.",
+    code: "ACCOUNT_SUSPENDED",
+    required_credits: 5,
+    suspension,
+  }, 403, origin);
+}
+
 async function readJson(request) {
   try {
     return await request.json();
@@ -495,6 +519,11 @@ async function handleCases(request, env, user, url, parts, origin) {
     return json((rows.results || []).map(decodeCaseRow), 200, origin);
   }
   if (request.method === "POST" && !parts[2]) {
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    if (!isAdmin(user)) {
+      const suspension = await getActiveSuspension(env, user.user_id);
+      if (suspension) return suspendedActionResponse(origin, suspension);
+    }
     const body = await readJson(request);
     const record = pick(body, ["category", "title", "short_description", "country", "city", "urgency", "description", "amount_needed", "currency", "why_help", "deadline", "institute_name", "institute_contact", "institute_address", "payment_method", "account_title", "account_number", "account_iban", "photo_urls", "selfie_url", "video_url", "category_details", "was_free"]);
     const caseId = body?.id || id();
@@ -1619,6 +1648,10 @@ async function handleRequest(request, env, ctx) {
         const heroId = String(body?.hero_id || "").trim();
         const paymentType = body?.payment_type === "full" ? "full" : body?.payment_type === "media" ? "media" : "partial";
         if (!user || !caseId || !heroId || user.user_id !== heroId) return json({ error: "Unauthorized unlock request" }, 403, origin);
+        if (!isAdmin(user)) {
+          const suspension = await getActiveSuspension(env, user.user_id);
+          if (suspension) return suspendedActionResponse(origin, suspension);
+        }
         const existing = await env.DB.prepare("SELECT * FROM case_unlocks WHERE case_id = ? AND hero_id = ? AND payment_type = ? ORDER BY unlocked_at DESC LIMIT 1").bind(caseId, heroId, paymentType).first();
         if (existing) return json(existing, 200, origin);
         const prior = await env.DB.prepare("SELECT COUNT(*) AS count FROM case_unlocks WHERE hero_id = ? AND payment_type = 'partial'").bind(heroId).first();
@@ -1668,6 +1701,10 @@ async function handleRequest(request, env, ctx) {
         const caseId = String(body?.case_id || "").trim();
         const heroId = String(body?.hero_id || "").trim();
         if (!user || !caseId || !heroId || user.user_id !== heroId) return json({ error: "Unauthorized help submission" }, 403, origin);
+        if (!isAdmin(user)) {
+          const suspension = await getActiveSuspension(env, user.user_id);
+          if (suspension) return suspendedActionResponse(origin, suspension);
+        }
         await env.DB.prepare(
           `INSERT INTO case_resolutions
             (id, case_id, hero_id, seeker_id, resolution_type, amount_paid, transaction_id, receipt_url, notes, status, paid_to, submitted_at)
@@ -1748,20 +1785,36 @@ async function handleRequest(request, env, ctx) {
       if (request.method === "POST") {
         const body = await readJson(request);
         const userId = parts[2];
+        if (!user || (!isAdmin(user) && user.user_id !== userId)) return json({ error: "Forbidden" }, 403, origin);
         const existing = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(userId).first();
 
         if (body.is_active === false) {
-          if (!existing?.is_active) return json(existing || { user_id: userId, is_active: false }, 200, origin);
+          if (!existing?.is_active) {
+            await env.DB.prepare("UPDATE profiles SET is_suspended = 0, suspended_reason = NULL, suspended_at = NULL WHERE user_id = ?").bind(userId).run();
+            return json(existing || { user_id: userId, is_active: false }, 200, origin);
+          }
+          const unlockCost = 5;
           const wallet = await env.DB.prepare("SELECT balance FROM wallets WHERE user_id = ?").bind(userId).first();
           const balance = Number(wallet?.balance || 0);
-          const unlockCost = 5;
           if (balance < unlockCost) {
             return json({ error: `Insufficient credits. ${unlockCost} credits are required to unlock this account.`, required: unlockCost, balance }, 402, origin);
           }
-          await env.DB.batch([
-            env.DB.prepare("UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?").bind(unlockCost, now(), userId, unlockCost),
-            env.DB.prepare("UPDATE user_suspensions SET is_active = 0, unlocked_at = ?, credits_used_to_unlock = COALESCE(credits_used_to_unlock, 0) + ? WHERE user_id = ? AND is_active = 1").bind(now(), unlockCost, userId),
-          ]);
+          const charged = await env.DB.prepare(
+            "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?"
+          ).bind(unlockCost, now(), userId, unlockCost).run();
+          if (!Number(charged?.meta?.changes || 0)) {
+            return json({ error: `Insufficient credits. ${unlockCost} credits are required to unlock this account.`, required: unlockCost, balance }, 402, origin);
+          }
+          try {
+            const unlocked = await env.DB.prepare(
+              "UPDATE user_suspensions SET is_active = 0, unlocked_at = ?, credits_used_to_unlock = COALESCE(credits_used_to_unlock, 0) + ? WHERE user_id = ? AND is_active = 1"
+            ).bind(now(), unlockCost, userId).run();
+            if (!Number(unlocked?.meta?.changes || 0)) throw new Error("Suspension could not be updated");
+            await env.DB.prepare("UPDATE profiles SET is_suspended = 0, suspended_reason = NULL, suspended_at = NULL WHERE user_id = ?").bind(userId).run();
+          } catch (error) {
+            await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(unlockCost, now(), userId).run();
+            throw error;
+          }
         } else {
           await env.DB.prepare(
             "INSERT INTO user_suspensions (user_id, is_active, suspension_count, suspended_at, rejection_count_at_suspension, unlocked_at, credits_used_to_unlock) VALUES (?, 1, ?, ?, ?, NULL, 0) ON CONFLICT(user_id) DO UPDATE SET is_active = 1, suspension_count = excluded.suspension_count, suspended_at = excluded.suspended_at, rejection_count_at_suspension = excluded.rejection_count_at_suspension"

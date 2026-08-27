@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { adminMarkSupportMessagesAsRead, adminSendSupportReply, getCaseById } from "./api";
+import { adminMarkSupportMessagesAsRead, adminSendSupportReply, getCaseById, upsertUserSuspension } from "./api";
 
 describe("adminSendSupportReply", () => {
   const fetchMock = vi.fn();
 
   beforeEach(() => {
+    fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("localStorage", {
       getItem: vi.fn((key: string) => (key === "auth_token" ? "verified-token" : null)),
@@ -70,6 +71,36 @@ describe("adminSendSupportReply", () => {
     await expect(getCaseById("case-1")).resolves.toMatchObject({ id: "case-1", status: "approved" });
     expect(fetchMock).toHaveBeenNthCalledWith(1, "https://givethra.org/api/cases/case-1", expect.any(Object));
     expect(fetchMock).toHaveBeenNthCalledWith(2, "https://givethra.org/api/cases/approved", expect.any(Object));
+  });
+
+  it("calls the authenticated user-specific route for five-credit self-reactivation", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ user_id: "seeker-1", is_active: false }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(upsertUserSuspension({ user_id: "seeker-1", is_active: false })).resolves.toMatchObject({ is_active: false });
+    expect(fetchMock).toHaveBeenCalledWith("https://givethra.org/api/user-suspension/seeker-1", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer verified-token",
+      },
+      body: JSON.stringify({ user_id: "seeker-1", is_active: false }),
+    });
+  });
+
+  it("surfaces insufficient-credit errors instead of reporting a false unlock", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ error: "Insufficient credits. 5 credits are required to unlock this account." }), {
+        status: 402,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(upsertUserSuspension({ user_id: "seeker-1", is_active: false })).rejects.toThrow("5 credits are required");
   });
 
   it("surfaces a Worker error instead of accepting a failed reply request", async () => {

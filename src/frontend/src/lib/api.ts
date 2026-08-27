@@ -87,7 +87,7 @@ export async function insertCaseSubmission(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function getCaseCounts(userId: string) {
@@ -134,12 +134,16 @@ export async function getUserSuspension(userId: string) {
 }
 
 export async function upsertUserSuspension(data: Record<string, unknown>) {
-  const res = await fetch(`${WORKER_URL}/api/user-suspension`, {
+  const userId = String(data.user_id || "").trim();
+  if (!userId) throw new Error("A user ID is required to update suspension status");
+  const res = await fetch(`${WORKER_URL}/api/user-suspension/${encodeURIComponent(userId)}`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Suspension update failed (${res.status})`);
+  return result;
 }
 
 export async function getCategoryOffer(category: string) {
@@ -192,7 +196,7 @@ export async function insertCaseUnlock(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 // ---------- CASE RESOLUTIONS ----------
@@ -214,7 +218,7 @@ export async function insertCaseResolution(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function updateCaseResolution(id: string, data: any) {
