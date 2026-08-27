@@ -192,6 +192,17 @@ function asRows<T = any>(value: unknown): T[] {
   return [];
 }
 
+function isContributionResolution(resolution: any): boolean {
+  const marker = String(
+    resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? "",
+  ).trim().toLowerCase();
+  return ["givethra", "contribution", "partial", "fundraising"].includes(marker);
+}
+
+function normalizedResolutionStatus(resolution: any): string {
+  return String(resolution?.status ?? "").trim().toLowerCase();
+}
+
 async function deleteStorageFiles(urls: (string | null | undefined)[]): Promise<{ ok: number; failed: number }> {
   const validUrls = urls.filter((u): u is string => !!u && u.startsWith("http"));
   if (validUrls.length === 0) return { ok: 0, failed: 0 };
@@ -609,15 +620,15 @@ export default function AdminPage() {
 
   const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"]);
   const pendingResolutions = resolutions.filter((r) => pendingResolutionStatuses.has(String(r.status || "").toLowerCase()));
-  const pendingContributions = pendingResolutions.filter((r) => r.paid_to === "givethra");
-  const pendingDirectResolutions = pendingResolutions.filter((r) => r.paid_to !== "givethra");
+  const pendingContributions = pendingResolutions.filter(isContributionResolution);
+  const pendingDirectResolutions = pendingResolutions.filter((r) => !isContributionResolution(r));
   const pendingContributionCount = pendingContributions.length;
   const pendingDirectCount = pendingDirectResolutions.length;
-  const rejectedContributions = resolutions.filter((r) => ["rejected", "disputed"].includes(String(r.status || "").toLowerCase()) && r.paid_to === "givethra");
-  const rejectedDirectResolutions = resolutions.filter((r) => ["rejected", "disputed"].includes(String(r.status || "").toLowerCase()) && r.paid_to !== "givethra");
-  const completedContributions = resolutions.filter((r) => ["approved", "completed"].includes(String(r.status || "").toLowerCase()) && r.paid_to === "givethra");
-  const completedDirectResolutions = resolutions.filter((r) => ["approved", "completed"].includes(String(r.status || "").toLowerCase()) && r.paid_to !== "givethra");
-  const completedResolutionsCount = resolutions.filter((r) => ["approved", "completed"].includes(String(r.status || "").toLowerCase())).length;
+  const rejectedContributions = resolutions.filter((r) => ["rejected", "disputed"].includes(normalizedResolutionStatus(r)) && isContributionResolution(r));
+  const rejectedDirectResolutions = resolutions.filter((r) => ["rejected", "disputed"].includes(normalizedResolutionStatus(r)) && !isContributionResolution(r));
+  const completedContributions = resolutions.filter((r) => ["approved", "completed"].includes(normalizedResolutionStatus(r)) && isContributionResolution(r));
+  const completedDirectResolutions = resolutions.filter((r) => ["approved", "completed"].includes(normalizedResolutionStatus(r)) && !isContributionResolution(r));
+  const completedResolutionsCount = resolutions.filter((r) => ["approved", "completed"].includes(normalizedResolutionStatus(r))).length;
   const visibleDirectResolutions = resolutionView === "pending" ? pendingDirectResolutions : resolutionView === "rejected" ? rejectedDirectResolutions : completedDirectResolutions;
   const visibleContributionResolutions = resolutionView === "pending" ? pendingContributions : resolutionView === "rejected" ? rejectedContributions : completedContributions;
 
