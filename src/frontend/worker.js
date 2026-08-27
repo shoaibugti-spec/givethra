@@ -1550,7 +1550,11 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No resolution fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
-          return json(await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first(), 200, origin);
+          const updated = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first();
+          if (updated && String(updated.status || "").toLowerCase() === "completed" && [1, "1", true, "true"].includes(updated.admin_confirmed)) {
+            await synchronizeCompletedCase(env, recordId);
+          }
+          return json(updated, 200, origin);
         }
       }
 
