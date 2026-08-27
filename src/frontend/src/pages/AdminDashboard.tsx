@@ -677,6 +677,8 @@ export default function AdminPage() {
 
   const profileMap: Record<string, any> = {};
   for (const p of profiles) profileMap[p.user_id] = p;
+  const cnicByUser: Record<string, string> = {};
+  for (const k of kycList) if (k.user_id && k.cnic_number) cnicByUser[k.user_id] = k.cnic_number;
   for (const k of kycList) { if (!profileMap[k.user_id]?.full_name) profileMap[k.user_id] = { ...profileMap[k.user_id], full_name: k.full_name }; }
 
   const activeOffers = offers.filter((o) => o.is_active).length;
@@ -811,11 +813,11 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="kyc" className="space-y-4 mt-4">
-              <KycSearchBox kycList={kycList} onUpdate={updateKyc} cnicCounts={cnicCounts} />
+              <KycSearchBox kycList={kycList} onUpdate={updateKyc} cnicCounts={cnicCounts} profileMap={profileMap} />
             </TabsContent>
 
             <TabsContent value="cases" className="space-y-4 mt-4">
-              <CaseSearchBox caseList={caseList} onUpdate={updateCase} resolutions={resByCaseId} profileMap={profileMap} />
+              <CaseSearchBox caseList={caseList} onUpdate={updateCase} resolutions={resByCaseId} profileMap={profileMap} cnicByUser={cnicByUser} />
             </TabsContent>
 
             <TabsContent value="verify" className="space-y-4 mt-4">
@@ -946,23 +948,35 @@ function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
 // ============================================================
 //  SEARCH BOXES
 // ============================================================
-function KycSearchBox({ kycList, onUpdate, cnicCounts }: any) {
+function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const sortedKyc = [...kycList].sort((a: any, b: any) => {
     const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
     return (order[a.status] ?? 3) - (order[b.status] ?? 3);
   });
-  const filtered = search.trim()
-    ? sortedKyc.filter((k: any) =>
-        k.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-        k.cnic_number?.replace(/\D/g, "").includes(search.replace(/\D/g, "")) ||
-        k.user_id?.toLowerCase().includes(search.toLowerCase()))
-    : sortedKyc;
+  const query = search.trim().toLowerCase();
+  const digits = search.replace(/\D/g, "");
+  const filtered = sortedKyc.filter((k: any) => {
+    const statusMatches = statusFilter === "all" || String(k.status || "").toLowerCase() === statusFilter;
+    if (!statusMatches) return false;
+    if (!query) return true;
+    const email = profileMap?.[k.user_id]?.email || k.email || "";
+    return [k.full_name, k.user_id, email].some((value) => String(value || "").toLowerCase().includes(query))
+      || (!!digits && String(k.cnic_number || "").replace(/\D/g, "").includes(digits));
+  });
   return (
     <div className="space-y-3">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search KYC by name, CNIC, or user ID..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
+        <Input placeholder="Search KYC by name, CNIC, or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
+      </div>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="KYC status filters">
+        {["all", "pending", "approved", "rejected"].map((status) => (
+          <button key={status} type="button" onClick={() => setStatusFilter(status as typeof statusFilter)} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${statusFilter === status ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted"}`}>
+            {status === "all" ? "All KYC" : status === "pending" ? "Pending" : status === "approved" ? "Approved" : "Rejected"}
+          </button>
+        ))}
       </div>
       {filtered.length === 0 ? <Empty text="No matching KYC submissions" /> :
         filtered.map((kyc: any) => {
@@ -975,21 +989,21 @@ function KycSearchBox({ kycList, onUpdate, cnicCounts }: any) {
   );
 }
 
-function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap }: any) {
+function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser }: any) {
   const [search, setSearch] = useState("");
   const sortedCases = [...caseList].sort((a, b) => {
     const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2, completed: 3 };
     return (order[a.status] ?? 4) - (order[b.status] ?? 4);
   });
-  const filtered = search.trim()
-    ? sortedCases.filter((c: any) =>
-        c.title?.toLowerCase().includes(search.toLowerCase()) ||
-        c.category?.toLowerCase().includes(search.toLowerCase()) ||
-        c.user_id?.toLowerCase().includes(search.toLowerCase()) ||
-        c.cnic_number?.replace(/\D/g, "").includes(search.replace(/\D/g, "")) ||
-        profileMap[c.user_id]?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-        profileMap[c.user_id]?.email?.toLowerCase().includes(search.toLowerCase()))
-    : sortedCases;
+  const query = search.trim().toLowerCase();
+  const digits = search.replace(/\D/g, "");
+  const filtered = sortedCases.filter((c: any) => {
+    if (!query) return true;
+    return [c.title, c.category, c.user_id, profileMap[c.user_id]?.full_name, profileMap[c.user_id]?.email]
+      .some((value) => String(value || "").toLowerCase().includes(query))
+      || (!!digits && [c.cnic_number, cnicByUser?.[c.user_id]]
+        .some((value) => String(value || "").replace(/\D/g, "").includes(digits)));
+  });
   return (
     <div className="space-y-3">
       <div className="relative">
@@ -1029,13 +1043,13 @@ function DepositSearchBox({ deposits, onApprove, onReject }: any) {
 
 function UserSearchBox({ usersList, onSuspendChange, onManualUnlock }: any) {
   const [search, setSearch] = useState("");
-  const filtered = search.trim()
-    ? usersList.filter((u: any) =>
-        u.email?.toLowerCase().includes(search.toLowerCase()) ||
-        u.cnic?.replace(/\D/g, "").includes(search.replace(/\D/g, "")) ||
-        u.name?.toLowerCase().includes(search.toLowerCase()) ||
-        u.user_id?.toLowerCase().includes(search.toLowerCase()))
-    : usersList;
+  const query = search.trim().toLowerCase();
+  const digits = search.replace(/\D/g, "");
+  const filtered = usersList.filter((u: any) => {
+    if (!query) return true;
+    return [u.email, u.name, u.user_id].some((value) => String(value || "").toLowerCase().includes(query))
+      || (!!digits && String(u.cnic || "").replace(/\D/g, "").includes(digits));
+  });
   return (
     <div className="space-y-3">
       <div className="relative">
