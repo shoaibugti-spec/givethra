@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import { Heart, MessageCircle, Send, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
+import ProtectedVideoPlayer from "@/components/ProtectedVideoPlayer";
 import { toast } from "sonner";
 
 function timeAgo(dateStr: string): string {
@@ -209,13 +210,7 @@ function FeedbackPost({
           {feedbackText}
         </p>
       )}
-      {fb.video_url && (
-        <video
-          src={fb.video_url}
-          controls
-          className="w-full rounded-xl border border-border max-h-72 bg-black"
-        />
-      )}
+      {fb.video_url && <ProtectedVideoPlayer src={fb.video_url} className="max-h-72" />}
 
       {/* Actions */}
       <div className="flex items-center gap-4 pt-1 border-t border-border">

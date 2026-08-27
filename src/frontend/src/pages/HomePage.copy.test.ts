@@ -35,10 +35,10 @@ describe("homepage Heroes Wall", () => {
     expect(homePageSource).toContain('import HeroesWall from "@/components/HeroesWall";');
     expect(homePageSource).toContain('import KindnessWall from "@/components/KindnessWall";');
     expect(homePageSource).toContain("<KindnessWall />");
-    expect(homePageSource).toContain("<FeedbackWall />");
+    expect(homePageSource).not.toContain("<FeedbackWall />");
     expect(homePageSource).toContain("<HeroesWall />");
     expect(homePageSource.indexOf("<HeroesWall />")).toBeLessThan(homePageSource.indexOf("Download App"));
-    expect(homePageSource.indexOf("<FeedbackWall />")).toBeLessThan(homePageSource.indexOf("Download App"));
+    expect(homePageSource.indexOf("<KindnessWall />")).toBeLessThan(homePageSource.indexOf("Download App"));
   });
 
   it("keeps completed-case data and impact metrics privacy-safe", () => {
@@ -96,7 +96,7 @@ describe("homepage help slider", () => {
   it("keeps the hand hero as the first slide and includes every supported category", () => {
     expect(homePageSource).toContain('key: "hero"');
     expect(homePageSource).toContain('image: "/assets/generated/hero-givethra.dim_1200x500.jpg"');
-    expect(homePageSource).toContain("...HELP_NOW_CATEGORY_SLIDES.map");
+    expect(homePageSource).toContain("FILTER_CATEGORIES.map");
     expect(homePageSource).toContain('key: `category_${category}`');
     expect(homePageSource).toContain('to: "/submit-request"');
   });
@@ -116,8 +116,6 @@ describe("homepage help slider", () => {
     expect(homePageSource).not.toContain("slideIndex + 1");
     expect(homePageSource).toContain('className="relative h-52 w-full');
     expect(homePageSource).toContain("text-primary-foreground");
-    expect(homePageSource).toContain('aria-label="Previous slide"');
-    expect(homePageSource).toContain('aria-label="Next slide"');
   });
 });
 
@@ -141,7 +139,7 @@ describe("homepage slider refinement", () => {
     expect(homePageSource).toContain("ShoppingCart");
     expect(homePageSource).toContain('navigate({ to: "/submit-request" })');
     expect(homePageSource).toContain('type: "category" as const');
-    expect(homePageSource).toContain("currentSlide.to");
+    expect(homePageSource).toContain('currentSlide.to');
   });
 
   it("speeds the automatic rotation moderately and removes the visible counter", () => {
@@ -150,14 +148,28 @@ describe("homepage slider refinement", () => {
     expect(homePageSource).not.toContain('aria-label="Slider navigation"');
     expect(homePageSource).toContain('className="relative h-52 w-full');
     expect(homePageSource).toContain('className="h-full w-full object-cover"');
+    expect(homePageSource).toContain("handleSliderTouchStart");
+    expect(homePageSource).toContain("handleSliderTouchEnd");
+    expect(homePageSource).toContain("currentSlide.to");
+    expect(homePageSource).not.toContain('aria-label="Previous slide"');
+    expect(homePageSource).not.toContain('aria-label="Next slide"');
+    expect(homePageSource).not.toContain("Slide ${i + 1}");
   });
 
-  it("adds share controls to both public wall posts", () => {
+  it("adds share actions to both public wall posts", () => {
     const heroesWallSource = readFileSync(new URL("../components/HeroesWall.tsx", import.meta.url), "utf8");
     const kindnessWallSource = readFileSync(new URL("../components/KindnessWall.tsx", import.meta.url), "utf8");
+    const feedbackWallSource = readFileSync(new URL("../components/FeedbackWall.tsx", import.meta.url), "utf8");
+    const protectedPlayerSource = readFileSync(new URL("../components/ProtectedVideoPlayer.tsx", import.meta.url), "utf8");
     expect(heroesWallSource).toContain('aria-label="Share completed case"');
     expect(heroesWallSource).toContain("navigator.share");
     expect(kindnessWallSource).toContain('aria-label="Share kindness story"');
-    expect(kindnessWallSource).toContain("navigator.share");
+    expect(kindnessWallSource).toContain("ProtectedVideoPlayer");
+    expect(feedbackWallSource).toContain("ProtectedVideoPlayer");
+    expect(protectedPlayerSource).toContain('aria-label={playing ? "Pause video" : "Play video"}');
+    expect(protectedPlayerSource).toContain('aria-label="Video timeline"');
+    expect(protectedPlayerSource).toContain("onContextMenu={(event) => event.preventDefault()}");
+    expect(protectedPlayerSource).not.toContain("controlsList");
+    expect(protectedPlayerSource).not.toContain("<video\n        controls");
   });
 });

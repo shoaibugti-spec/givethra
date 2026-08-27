@@ -553,8 +553,14 @@ export default function HomePage() {
     }
     if (currentSlide.type === "category") {
       return (
-        <button type="button" onClick={() => navigate({ to: currentSlide.to })} className="w-full h-52 md:h-72 bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors">
-          <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg || "bg-primary/10"} flex items-center justify-center`}><currentSlide.icon className={`h-8 w-8 ${currentSlide.color || "text-primary"}`} /></div>
+        <button
+          type="button"
+          onClick={() => navigate({ to: currentSlide.to })}
+          className="w-full h-52 md:h-72 bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
+        >
+          <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg || "bg-primary/10"} flex items-center justify-center`}>
+            <currentSlide.icon className={`h-8 w-8 ${currentSlide.color || "text-primary"}`} />
+          </div>
           <h3 className="font-display text-xl font-bold text-foreground">{currentSlide.title}</h3>
           <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{currentSlide.desc}</p>
           <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">{currentSlide.cta} <ChevronRight className="h-4 w-4" /></span>
@@ -639,6 +645,14 @@ export default function HomePage() {
             transition={{ duration: 0.55 }}
             className="flex-1 space-y-4 text-center md:text-left"
           >
+            <div className="flex items-center justify-between md:justify-start gap-3">
+              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 border border-primary/20 px-3 py-1">
+                <BadgeCheck className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-semibold text-primary tracking-wide uppercase">
+                  GIVETHRA
+                </span>
+              </div>
+            </div>
             <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
               Verified Help.<br />
               <span className="text-primary">Real Impact.</span>
@@ -678,30 +692,7 @@ export default function HomePage() {
               <div id="givethra-help-slider" className="relative h-52 w-full rounded-2xl overflow-hidden shadow-xl touch-pan-y" onTouchStart={handleSliderTouchStart} onTouchEnd={handleSliderTouchEnd}>
               {renderSlideContent()}
 
-              {guideSlides.length > 1 && (
-                <>
-                  <button type="button" aria-label="Previous slide" onClick={() => setSlideIndex((prev) => (prev + guideSlides.length - 1) % guideSlides.length)} className="absolute left-2 top-1/2 z-10 -translate-y-1/2 h-9 w-9 rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/55">‹</button>
-                  <button type="button" aria-label="Next slide" onClick={() => setSlideIndex((prev) => (prev + 1) % guideSlides.length)} className="absolute right-2 top-1/2 z-10 -translate-y-1/2 h-9 w-9 rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/55">›</button>
-                </>
-              )}
 
-              {guideSlides.length > 1 && (
-                <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 flex items-center gap-1.5">
-                  {guideSlides.map((s, i) => (
-                    <button
-                      key={s.key}
-                      type="button"
-                      onClick={() => setSlideIndex(i)}
-                      className={`h-2 rounded-full transition-all ${
-                        i === slideIndex
-                          ? "w-6 bg-primary"
-                          : "w-2 bg-white/70 border border-border"
-                      }`}
-                      aria-label={`Slide ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
           </motion.div>
         </div>
