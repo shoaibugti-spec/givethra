@@ -532,7 +532,7 @@ export default function CaseDetailPage() {
       if (fbVideoFile) fbVideoUrl = await uploadFile(fbVideoFile, `feedbacks/${id}/${Date.now()}_video`);
       const prof = await getProfile(user.id);
       const firstName = (prof?.full_name || seekerKyc?.full_name || "A grateful person").split(" ")[0];
-      await insertFeedback({
+      const savedFeedback = await insertFeedback({
         case_id: id,
         user_id: user?.id,
         first_name: firstName,
@@ -540,11 +540,20 @@ export default function CaseDetailPage() {
         video_url: fbVideoUrl || null,
         status: "pending_review",
       });
+      if (savedFeedback?.error) throw new Error(savedFeedback.error);
+      // Move immediately to the waiting state from the successful POST response.
+      // Do not follow it with a second GET that can transiently return an empty row
+      // and make the form appear again on mobile.
+      setExistingFeedback({
+        ...(savedFeedback || {}),
+        case_id: id,
+        user_id: user.id,
+        text_message: fbText.trim(),
+        video_url: fbVideoUrl,
+        status: "pending_review",
+      });
       toast.success("Thank you! Your feedback is submitted for Givethra's review. Once approved, it will appear on the wall and you can submit a new case.");
       setFbText(""); setFbVideoFile(null); setFbVideoName(""); setFbVideoBlob(null);
-      // Refresh feedback state
-      await checkExistingFeedback();
-      loadCase();
     } catch (err) { toast.error(`Error: ${err instanceof Error ? err.message : "Unknown"}`); }
     finally { setFbSubmitting(false); }
   }
@@ -894,7 +903,7 @@ export default function CaseDetailPage() {
                         </div>
                       )}
                     </div>
-                    <Button className="w-full" onClick={submitFeedback} disabled={fbSubmitting || recording}>{fbSubmitting ? "Posting..." : "Post Feedback to Community Wall 🤲"}</Button>
+                    <Button type="button" className="w-full min-h-12 touch-manipulation select-none" onClick={submitFeedback} disabled={fbSubmitting || recording} aria-busy={fbSubmitting}>{fbSubmitting ? "Posting..." : "Post Feedback to Community Wall 🤲"}</Button>
                   </div>
                 )}
               </div>

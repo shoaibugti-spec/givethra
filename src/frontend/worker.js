@@ -1193,19 +1193,31 @@ async function handleRequest(request, env, ctx) {
       }
       if (request.method === "POST") {
         const body = await readJson(request);
+        const feedbackUserId = String(user?.user_id || body?.user_id || "").trim();
+        if (!user || !feedbackUserId) return json({ error: "Authentication required" }, 401, origin);
         const caseRow = await env.DB.prepare(
           "SELECT id, user_id, status FROM case_submissions WHERE id = ?"
         ).bind(body?.case_id).first();
-        if (!caseRow || caseRow.user_id !== body?.user_id || String(caseRow.status).toLowerCase() !== "completed") {
+        const verifiedCompletion = caseRow
+          ? await env.DB.prepare(
+              `SELECT id FROM case_resolutions
+               WHERE case_id = ?
+                 AND lower(COALESCE(status, '')) IN ('approved', 'completed')
+                 AND COALESCE(admin_confirmed, 0) IN (1, '1', 'true')
+               LIMIT 1`
+            ).bind(body?.case_id).first()
+          : null;
+        const caseIsCompleted = String(caseRow?.status || "").toLowerCase() === "completed" || Boolean(verifiedCompletion?.id);
+        if (!caseRow || String(caseRow.user_id) !== feedbackUserId || !caseIsCompleted) {
           return json({ error: "Feedback is available only for your completed case" }, 400, origin);
         }
         const fbId = body?.id || id();
         await env.DB.prepare(
           `INSERT INTO feedbacks (id, case_id, user_id, rating, text_message, video_url, status, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(fbId, body.case_id, body.user_id, body.rating || null, body.text_message ?? body.comment ?? null, body.video_url || null, "pending_review", now()).run();
+        ).bind(fbId, body.case_id, feedbackUserId, body.rating || null, body.text_message ?? body.comment ?? null, body.video_url || null, "pending_review", now()).run();
         const created = await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(fbId).first();
-        return json(created || { id: fbId, ...body, created_at: now() }, 201, origin);
+        return json(created || { id: fbId, ...body, user_id: feedbackUserId, created_at: now() }, 201, origin);
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }

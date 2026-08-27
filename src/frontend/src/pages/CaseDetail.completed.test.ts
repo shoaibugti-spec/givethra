@@ -59,5 +59,9 @@ describe("completed helper detail flow", () => {
   it("keeps seeker feedback required and pending review", () => {
     expect(pageSource).toContain("Please write a message AND record a 90-second video");
     expect(pageSource).toContain('status: "pending_review"');
+    expect(pageSource).toContain('const savedFeedback = await insertFeedback({');
+    expect(pageSource).toContain('setExistingFeedback({');
+    expect(pageSource).toContain('type="button" className="w-full min-h-12 touch-manipulation select-none"');
+    expect(apiSource).toContain('if (!res.ok) throw new Error(result?.error || `Feedback submission failed (${res.status})`);');
   });
 });

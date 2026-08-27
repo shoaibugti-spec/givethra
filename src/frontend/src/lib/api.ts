@@ -436,7 +436,9 @@ export async function insertFeedback(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  const result = await res.json();
+  if (!res.ok) throw new Error(result?.error || `Feedback submission failed (${res.status})`);
+  return result;
 }
 
 // ---------- NOTIFICATIONS ----------
