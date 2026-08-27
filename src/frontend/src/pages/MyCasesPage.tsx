@@ -27,6 +27,12 @@ function sym(cur?: string) {
   return CURRENCY_SYMBOLS[cur || "USD"] ?? (cur || "$");
 }
 
+function isApprovedCompletedResolution(resolution: any): boolean {
+  const status = String(resolution?.status || "").trim().toLowerCase();
+  const adminConfirmed = resolution?.admin_confirmed === 1 || resolution?.admin_confirmed === true || resolution?.admin_confirmed === "1" || String(resolution?.admin_confirmed || "").toLowerCase() === "true";
+  return adminConfirmed && ["approved", "completed"].includes(status);
+}
+
 export default function MyCasesPage() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -51,9 +57,13 @@ export default function MyCasesPage() {
     if (!user) return;
     setLoading(true);
     try {
-      // 1. Load the user's own requests.
+      // 1. Load the user's own requests. Keep rejected submissions visible and
+      // normalize status casing so every moderation tab receives its records.
       const cases = await getCasesByUser(user.id);
-      setMyCases(cases ?? []);
+      setMyCases((Array.isArray(cases) ? cases : []).map((caseRecord: any) => ({
+        ...caseRecord,
+        status: String(caseRecord?.status || "pending").toLowerCase(),
+      })));
 
       // 2. Load both active unlocks and resolution history. Completed help is
       // deliberately retained in case_resolutions after the case leaves the
@@ -78,11 +88,26 @@ export default function MyCasesPage() {
             resolutionByCase.set(key, resolution);
           }
         });
-        const merged = (Array.isArray(unlockedData) ? unlockedData : []).map((caseRecord: any) => {
+        const recordsById = new Map<string, any>((Array.isArray(unlockedData) ? unlockedData : []).map((record: any) => [String(record?.id || ""), record]));
+        resolutions.forEach((resolution: any) => {
+          const caseId = String(resolution?.case_id || "");
+          if (caseId && !recordsById.has(caseId)) {
+            recordsById.set(caseId, {
+              id: caseId,
+              title: resolution.case_title || "Completed help",
+              category: resolution.case_category || "Help",
+              country: resolution.case_country || "",
+              city: resolution.case_city || "",
+              currency: resolution.currency || "PKR",
+              amount_needed: resolution.amount_paid || 0,
+              amount_collected: resolution.amount_paid || 0,
+              status: "completed",
+            });
+          }
+        });
+        const merged = Array.from(recordsById.values()).map((caseRecord: any) => {
           const resolution = resolutionByCase.get(String(caseRecord.id));
-          const resolutionStatus = String(resolution?.status || "").toLowerCase();
-          const adminConfirmed = resolution?.admin_confirmed === true || resolution?.admin_confirmed === 1 || String(resolution?.admin_confirmed || "").toLowerCase() === "true" || String(resolution?.admin_confirmed || "") === "1";
-          const isCompleted = resolutionStatus === "completed" || (adminConfirmed && resolutionStatus === "approved");
+          const isCompleted = isApprovedCompletedResolution(resolution);
           return resolution && isCompleted ? {
             ...caseRecord,
             status: "completed",
@@ -92,7 +117,10 @@ export default function MyCasesPage() {
             affidavit_available: true,
           } : caseRecord;
         });
-        setUnlockedCases(merged);
+        setUnlockedCases(merged.map((caseRecord: any) => ({
+          ...caseRecord,
+          status: String(caseRecord?.status || "pending").toLowerCase(),
+        })));
       } else {
         setUnlockedCases([]);
       }
@@ -326,7 +354,7 @@ export default function MyCasesPage() {
         {!isRejected && (
           <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}>
             {isHelping ? <Heart className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            {isHelping && c.status === "completed" ? "View Affidavit & Completed Help" : isHelping ? "Continue Helping" : "View Details"}
+            {isHelping && c.status === "completed" && c.affidavit_available ? "View Affidavit & Completed Help" : isHelping && c.status === "completed" ? "View Completed Case" : isHelping ? "Continue Helping" : "View Details"}
           </Button>
         )}
       </div>

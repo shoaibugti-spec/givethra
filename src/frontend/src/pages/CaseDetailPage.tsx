@@ -69,6 +69,12 @@ function copyToClipboard(text: string, label: string) {
   );
 }
 
+function isApprovedCompletedResolution(resolution: any): boolean {
+  const status = String(resolution?.status || "").trim().toLowerCase();
+  const adminConfirmed = resolution?.admin_confirmed === 1 || resolution?.admin_confirmed === true || resolution?.admin_confirmed === "1" || String(resolution?.admin_confirmed || "").toLowerCase() === "true";
+  return adminConfirmed && ["approved", "completed"].includes(status);
+}
+
 function generateAffidavit(caseData: any, resolution: any, seekerKyc: any, heroName: string) {
   const caseId = (caseData.id ?? "").slice(0, 8).toUpperCase();
   const today = new Date().toLocaleDateString();
@@ -395,6 +401,7 @@ export default function CaseDetailPage() {
   const isExpired = normalizedStatus === "expired";
   const isOwner = user?.id === caseData?.user_id;
   const isCompleted = normalizedStatus === "completed";
+  const verifiedResolutions = myResolutions.filter(isApprovedCompletedResolution);
   const hasPaymentDetails = caseData?.institute_name || caseData?.account_number || caseData?.account_title || caseData?.account_iban;
   const unlockMode = myUnlock?.payment_type || payMode;
   const canHelpAgain = unlocked && !isOwner && !isCompleted && !isRejected && !isExpired;
@@ -724,7 +731,7 @@ export default function CaseDetailPage() {
               <div className="text-4xl">🤲</div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Verified completed help</p>
               <h1 className="text-2xl font-bold text-green-800 dark:text-green-200">Thank you for helping this case.</h1>
-              <p className="text-sm text-green-700 dark:text-green-300">The case is complete. Your payment and contribution actions are now closed. Your verified affidavit remains available below.</p>
+              <p className="text-sm text-green-700 dark:text-green-300">The case is complete. Your payment and contribution actions are now closed. Your verified affidavit is available below only if your help was approved.</p>
             </div>
             <div className="rounded-xl bg-card border border-green-200 p-4 space-y-2">
               <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Case</span><span className="font-semibold text-right">{caseData.title || "Verified case"}</span></div>
@@ -732,24 +739,18 @@ export default function CaseDetailPage() {
               <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Verified help delivered</span><span className="font-bold text-primary">{sym} {amountCollected || myResolutions.reduce((sum, r) => sum + Number(r.seeker_confirmed_amount ?? r.amount_paid ?? 0), 0)} {cur}</span></div>
               <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Status</span><span className="font-semibold text-green-700">Completed ✓</span></div>
             </div>
-            <div className="space-y-3">
+            {verifiedResolutions.length > 0 && <div className="space-y-3">
               <h2 className="font-semibold text-green-800 dark:text-green-200">Your affidavit</h2>
-              {myResolutions.length > 0 ? myResolutions.map((r: any) => {
-                const resolutionStatus = String(r.status || "").toLowerCase();
-                const isVerified = resolutionStatus === "completed" || ((r.admin_confirmed === 1 || r.admin_confirmed === true || r.admin_confirmed === "1" || r.admin_confirmed === "true") && ["approved", "completed"].includes(resolutionStatus));
-                return (
-                  <div key={r.id} className="rounded-xl bg-card border border-green-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">{sym} {r.seeker_confirmed_amount ?? r.amount_paid ?? 0} {cur}</p>
-                      <p className="text-xs text-muted-foreground">{r.resolution_type || "Verified assistance"} · {isVerified ? "Admin verified" : "Recorded"}</p>
-                    </div>
-                    {isVerified && <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, r.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> Download Affidavit</Button>}
+              {verifiedResolutions.map((r: any) => (
+                <div key={r.id} className="rounded-xl bg-card border border-green-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{sym} {r.seeker_confirmed_amount ?? r.amount_paid ?? 0} {cur}</p>
+                    <p className="text-xs text-muted-foreground">{r.resolution_type || "Verified assistance"} · Admin verified</p>
                   </div>
-                );
-              }) : (
-                <p className="rounded-xl bg-card border border-green-200 p-4 text-sm text-muted-foreground">Your verified resolution is still being prepared. Please refresh shortly or contact support.</p>
-              )}
-            </div>
+                  <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, r.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> View & Download Affidavit</Button>
+                </div>
+              ))}
+            </div>}
           </section>
         </main>
       </Layout>
@@ -1003,21 +1004,25 @@ export default function CaseDetailPage() {
                 {!isOwner && myResolutions.length > 0 && (
                   <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
                     <h2 className="font-semibold flex items-center gap-2"><Heart className="h-4 w-4 text-primary" /> My Help on this case ({myResolutions.length})</h2>
-                    {myResolutions.map((r: any) => (
-                      <div key={r.id} className="rounded-xl border border-border p-3 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === "completed" ? "bg-green-100 text-green-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>
-                            {r.status === "completed" ? "VERIFIED ✓" : r.status === "seeker_confirmed" ? "UNDER VERIFICATION" : r.status === "disputed" ? "DISPUTED" : "PENDING"}
-                          </span>
-                          <span className="text-sm font-bold text-primary">{sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</span>
+                    {myResolutions.map((r: any) => {
+                      const resolutionStatus = String(r.status || "").trim().toLowerCase();
+                      const isVerified = isApprovedCompletedResolution(r);
+                      return (
+                        <div key={r.id} className="rounded-xl border border-border p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isVerified ? "bg-green-100 text-green-700" : resolutionStatus === "disputed" ? "bg-red-100 text-red-700" : resolutionStatus === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>
+                              {isVerified ? "VERIFIED ✓" : resolutionStatus === "seeker_confirmed" ? "UNDER VERIFICATION" : resolutionStatus === "disputed" ? "DISPUTED" : "PENDING"}
+                            </span>
+                            <span className="text-sm font-bold text-primary">{sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</span>
+                          </div>
+                          {isVerified ? (
+                            <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, r.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> View & Download Affidavit</Button>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">{resolutionStatus === "seeker_confirmed" ? "Givethra is verifying this contribution." : resolutionStatus === "disputed" ? "This was disputed — no affidavit is available." : "Waiting for confirmation."}</p>
+                          )}
                         </div>
-                        {r.status === "completed" ? (
-                          <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, r.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> Download Affidavit</Button>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">{r.status === "seeker_confirmed" ? "Givethra is verifying this contribution." : r.status === "disputed" ? "This was disputed — Givethra will investigate." : "Waiting for confirmation."}</p>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
@@ -1145,7 +1150,7 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
               <div className="flex items-center gap-2 text-amber-600"><Clock className="h-5 w-5" /><h2 className="font-bold">Confirmed — Under Verification</h2></div>
               <p className="text-sm text-muted-foreground">You confirmed receiving {sym} {res.seeker_confirmed_amount ?? res.amount_paid} {cur}. Givethra is verifying this help.</p>
             </div>
-          ) : res.status === "completed" ? (
+          ) : isApprovedCompletedResolution(res) ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-green-700"><CheckCircle2 className="h-5 w-5" /><h2 className="font-bold">Help Confirmed</h2></div>
               <p className="text-sm text-muted-foreground">{sym} {res.seeker_confirmed_amount ?? res.amount_paid} {cur} — {res.resolution_type}</p>
