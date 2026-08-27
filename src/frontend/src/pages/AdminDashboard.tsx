@@ -833,7 +833,7 @@ export default function AdminPage() {
                   const c = caseList.find((cs) => cs.id === r.case_id);
                   return resolutionView === "pending"
                     ? <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />
-                    : <div key={r.id} className="rounded-xl border bg-card p-4"><div className="flex items-center justify-between gap-3"><strong>{c?.title || "Direct payment"}</strong><span className="rounded-full bg-teal-100 px-2 py-1 text-xs font-semibold text-teal-700">APPROVED / COMPLETED</span></div><p className="mt-2 text-sm text-muted-foreground">Case: {r.case_id} · Amount: {sym(c?.currency)} {Number(r.amount_paid ?? r.amount ?? 0).toLocaleString()} · TXN: {r.transaction_id || "—"}</p><p className="mt-1 text-xs text-muted-foreground">Approved proof and receipt remain available in the case resolution history.</p></div>;
+                    : <ResolutionHistoryCard key={r.id} r={r} c={c} profileMap={profileMap} />;
                 })}
             </TabsContent>
             <TabsContent value="contributions" className="space-y-4 mt-4">
@@ -848,7 +848,7 @@ export default function AdminPage() {
                   const c = caseList.find((cs) => cs.id === r.case_id);
                   return resolutionView === "pending"
                     ? <VerifyCard key={r.id} r={r} c={c} profileMap={profileMap} onConfirm={confirmResolution} onReject={rejectResolution} />
-                    : <div key={r.id} className="rounded-xl border bg-card p-4"><div className="flex items-center justify-between gap-3"><strong>{c?.title || "Contribution"}</strong><span className="rounded-full bg-teal-100 px-2 py-1 text-xs font-semibold text-teal-700">APPROVED / COMPLETED</span></div><p className="mt-2 text-sm text-muted-foreground">Case: {r.case_id} · Amount: {sym(c?.currency)} {Number(r.amount_paid ?? r.amount ?? 0).toLocaleString()} · TXN: {r.transaction_id || "—"}</p><p className="mt-1 text-xs text-muted-foreground">Approved contribution and receipt remain available in the case resolution history.</p></div>;
+                    : <ResolutionHistoryCard key={r.id} r={r} c={c} profileMap={profileMap} />;
                 })}
             </TabsContent>
             <TabsContent value="pay" className="space-y-4 mt-4">
@@ -1218,6 +1218,41 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
         </Button>
         <p className="text-[11px] text-muted-foreground">Pay the institute, upload the receipt, then close. The seeker sees the receipt and gets a thank-you notification.</p>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+//  RESOLUTION HISTORY CARD
+// ============================================================
+function ResolutionHistoryCard({ r, c, profileMap }: any) {
+  const status = normalizedResolutionStatus(r);
+  const isRejected = status === "rejected" || status === "disputed";
+  const isContribution = isContributionResolution(r);
+  const cur = c?.currency || r.currency || "USD";
+  const amount = Number(r.seeker_confirmed_amount ?? r.amount_paid ?? r.amount ?? 0);
+  const helper = profileMap[r.hero_id];
+  const seeker = profileMap[r.seeker_id];
+  const label = isRejected ? "REJECTED" : "APPROVED / COMPLETED";
+  const labelClass = isRejected ? "bg-red-100 text-red-700" : "bg-teal-100 text-teal-700";
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <strong>{c?.title || (isContribution ? "Contribution" : "Direct payment")}</strong>
+        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${labelClass}`}>{label}</span>
+      </div>
+      <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+        <p><span className="font-medium text-foreground">Case ID:</span> {r.case_id || "—"}</p>
+        <p><span className="font-medium text-foreground">Category:</span> {c?.category || r.case_category || "—"}</p>
+        <p><span className="font-medium text-foreground">Helper:</span> {helper?.full_name || r.hero_name || r.hero_id || "—"}</p>
+        <p><span className="font-medium text-foreground">Seeker:</span> {seeker?.full_name || r.seeker_name || r.seeker_id || "—"}</p>
+        <p><span className="font-medium text-foreground">Payment type:</span> {isContribution ? "Contribution to Givethra" : "Direct Help to provider"}</p>
+        <p><span className="font-medium text-foreground">Amount:</span> {sym(cur)} {amount.toLocaleString()} {cur}</p>
+        <p><span className="font-medium text-foreground">Transaction ID:</span> {r.transaction_id || "—"}</p>
+        <p><span className="font-medium text-foreground">Completed:</span> {r.completed_at || r.admin_confirmed_at ? new Date(r.completed_at || r.admin_confirmed_at).toLocaleDateString() : "—"}</p>
+      </div>
+      {isRejected && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">Rejection reason: {r.rejection_reason || r.notes || "Not provided"}</p>}
+      {r.receipt_url && <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-sm font-medium"><ExternalLink className="h-4 w-4" /> View payment receipt</a>}
     </div>
   );
 }

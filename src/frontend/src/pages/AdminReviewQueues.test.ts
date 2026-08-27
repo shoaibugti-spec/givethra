@@ -25,6 +25,20 @@ describe("Admin payment review queues", () => {
     expect(source).toContain("pendingResolutions.filter(isContributionResolution)");
   });
 
+  it("renders status-aware completed and rejected resolution summaries", () => {
+    expect(source).toContain("function ResolutionHistoryCard({ r, c, profileMap }: any)");
+    expect(source).toContain('const label = isRejected ? "REJECTED" : "APPROVED / COMPLETED"');
+    expect(source).toContain('Case ID:</span> {r.case_id || "—"}');
+    expect(source).toContain('Payment type:</span> {isContribution ? "Contribution to Givethra" : "Direct Help to provider"}');
+    expect(source).toContain("Rejection reason: {r.rejection_reason || r.notes || \"Not provided\"}");
+  });
+
+  it("limits Pay & Close to approved fully funded cases that are not already closed", () => {
+    expect(source).toContain("const readyToClose = caseList.filter((c) => {");
+    expect(source).toContain('if (c.status !== "approved") return false;');
+    expect(source).toContain("needed > 0 && collected >= needed && !c.closed_by_admin");
+  });
+
   it("keeps existing approval and rejection actions on pending cards", () => {
     expect(source).toContain("onConfirm={confirmResolution}");
     expect(source).toContain("onReject={rejectResolution}");
