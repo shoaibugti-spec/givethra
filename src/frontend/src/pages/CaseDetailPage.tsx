@@ -56,9 +56,9 @@ function maskCnic(cnic?: string): string {
 function maskAccount(acc?: string): string {
   if (!acc) return "—";
   const d = acc.replace(/\s/g, "");
-  if (d.length <= 4) return acc;
-  const last = d.slice(-4);
-  return `${"*".repeat(Math.max(d.length - 4, 4))}${last}`;
+  if (d.length <= 3) return d;
+  const last = d.slice(-3);
+  return `${"*".repeat(Math.max(d.length - 3, 1))}${last}`;
 }
 
 function copyToClipboard(text: string, label: string) {
@@ -75,6 +75,11 @@ function isApprovedCompletedResolution(resolution: any): boolean {
   return adminConfirmed && ["approved", "completed"].includes(status);
 }
 
+function isContributionResolution(resolution: any): boolean {
+  const marker = String(resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? "").trim().toLowerCase();
+  return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
+}
+
 function generateAffidavit(caseData: any, resolution: any, seekerKyc: any, heroName: string) {
   const caseId = (caseData.id ?? "").slice(0, 8).toUpperCase();
   const today = new Date().toLocaleDateString();
@@ -86,7 +91,7 @@ function generateAffidavit(caseData: any, resolution: any, seekerKyc: any, heroN
   const cur = caseData.currency || "USD";
   const sym = CURRENCY_SYMBOLS[cur] ?? cur;
   const paidAmount = resolution?.seeker_confirmed_amount ?? resolution?.amount_paid;
-  const isFundraising = resolution?.paid_to === "givethra";
+  const isFundraising = isContributionResolution(resolution);
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Givethra Affidavit - ${caseId}</title>
 <style>
@@ -134,7 +139,7 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
   <div class="row"><span class="label">Full Name</span><span class="value">${seekerName}</span></div>
   <div class="row"><span class="label">CNIC (partially masked)</span><span class="value">${seekerCnic}</span></div>
   <div class="row"><span class="label">Country</span><span class="value">${caseData.country || "—"}</span></div>
-  <div class="note">Note: Only the first 4 digits of each CNIC are shown. Remaining digits and contact details are kept private.</div>
+  <div class="note">Note: Only the first 4 digits of each CNIC and the last 3 digits of an account/reference are shown. Remaining digits and contact details are kept private.</div>
 </div>
 
 <div class="section">
@@ -1105,7 +1110,7 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
     }).catch(() => {});
   }, [caseId]);
 
-  const visible = resolutions.filter(r => r.paid_to !== "givethra");
+  const visible = resolutions.filter(r => !isContributionResolution(r));
   if (visible.length === 0) return null;
 
   return (

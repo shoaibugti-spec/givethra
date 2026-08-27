@@ -30,6 +30,16 @@ describe("completed helper detail flow", () => {
     expect(myCasesSource).toContain('c.affidavit_available ? "View Affidavit & Completed Help" :');
   });
 
+  it("keeps each approved Contribution resolution eligible for its own affidavit details", () => {
+    expect(pageSource).toContain("function isContributionResolution(resolution: any): boolean");
+    expect(pageSource).toContain('["givethra", "contribution", "fundraising", "partial"]');
+    expect(pageSource).toContain("verifiedResolutions.map");
+    expect(pageSource).toContain("View & Download Affidavit");
+    expect(pageSource).toContain("const last = d.slice(-3);");
+    expect(pageSource).toContain("last 3 digits of an account/reference");
+    expect(pageSource).toContain("const visible = resolutions.filter(r => !isContributionResolution(r));");
+  });
+
   it("does not pass a 404 case payload into the detail renderer", () => {
     expect(apiSource).toContain('if (!res.ok) throw new Error(data?.error || "Failed to load case details")');
     expect(pageSource).toContain('if (!data || data.error || !data.id)');
