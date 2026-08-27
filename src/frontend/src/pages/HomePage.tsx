@@ -158,8 +158,8 @@ const FILTER_CATEGORIES = [
 const HELP_NOW_CATEGORY_SLIDES = FILTER_CATEGORIES.map((category) => ({
   key: `category_${category}`,
   category,
-  to: "/submit-request",
-  style: CATEGORY_SLIDE_STYLE[category] || CATEGORY_SLIDE_STYLE.Other,
+  to: "/need-help",
+  style: CATEGORY_SLIDE_STYLE[category],
 }));
 
 const CATEGORY_APPEAL: Record<string, string> = {
@@ -645,14 +645,6 @@ export default function HomePage() {
             transition={{ duration: 0.55 }}
             className="flex-1 space-y-4 text-center md:text-left"
           >
-            <div className="flex items-center justify-between md:justify-start gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 border border-primary/20 px-3 py-1">
-                <BadgeCheck className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-semibold text-primary tracking-wide uppercase">
-                  GIVETHRA
-                </span>
-              </div>
-            </div>
             <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
               Verified Help.<br />
               <span className="text-primary">Real Impact.</span>
