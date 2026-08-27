@@ -158,8 +158,8 @@ const FILTER_CATEGORIES = [
 const HELP_NOW_CATEGORY_SLIDES = FILTER_CATEGORIES.map((category) => ({
   key: `category_${category}`,
   category,
-  to: "/need-help",
-  style: CATEGORY_SLIDE_STYLE[category],
+  to: "/submit-request",
+  style: CATEGORY_SLIDE_STYLE[category] || CATEGORY_SLIDE_STYLE.Other,
 }));
 
 const CATEGORY_APPEAL: Record<string, string> = {
@@ -417,6 +417,20 @@ export default function HomePage() {
     }
   }
 
+  // Restore every category as a first-class Help Now slide while keeping guide slides intact.
+  guideSlides.push(...HELP_NOW_CATEGORY_SLIDES.map((slide) => ({
+    key: slide.key,
+    type: "category" as const,
+    category: slide.category,
+    icon: slide.style.icon,
+    title: slide.category,
+    desc: CATEGORY_APPEAL[slide.category] || `Submit a verified ${slide.category} case.`,
+    cta: "Submit this case",
+    to: slide.to,
+    color: slide.style.color,
+    bg: slide.style.bg,
+  })));
+
   // Touch controls keep the Help Now slider usable on phones.
   const sliderTouchStart = useRef<number | null>(null);
   function handleSliderTouchStart(event: React.TouchEvent<HTMLDivElement>) {
@@ -537,6 +551,16 @@ export default function HomePage() {
         </button>
       );
     }
+    if (currentSlide.type === "category") {
+      return (
+        <button type="button" onClick={() => navigate({ to: currentSlide.to })} className="w-full h-52 md:h-72 bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors">
+          <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg || "bg-primary/10"} flex items-center justify-center`}><currentSlide.icon className={`h-8 w-8 ${currentSlide.color || "text-primary"}`} /></div>
+          <h3 className="font-display text-xl font-bold text-foreground">{currentSlide.title}</h3>
+          <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{currentSlide.desc}</p>
+          <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">{currentSlide.cta} <ChevronRight className="h-4 w-4" /></span>
+        </button>
+      );
+    }
     if (currentSlide.type === "action") {
       return (
         <button
@@ -651,11 +675,18 @@ export default function HomePage() {
             transition={{ duration: 0.65, delay: 0.15 }}
             className="flex-1 w-full space-y-4"
           >
-              <div className="relative h-52 w-full rounded-2xl overflow-hidden shadow-xl" onTouchStart={handleSliderTouchStart} onTouchEnd={handleSliderTouchEnd}>
+              <div id="givethra-help-slider" className="relative h-52 w-full rounded-2xl overflow-hidden shadow-xl touch-pan-y" onTouchStart={handleSliderTouchStart} onTouchEnd={handleSliderTouchEnd}>
               {renderSlideContent()}
 
               {guideSlides.length > 1 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+                <>
+                  <button type="button" aria-label="Previous slide" onClick={() => setSlideIndex((prev) => (prev + guideSlides.length - 1) % guideSlides.length)} className="absolute left-2 top-1/2 z-10 -translate-y-1/2 h-9 w-9 rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/55">‹</button>
+                  <button type="button" aria-label="Next slide" onClick={() => setSlideIndex((prev) => (prev + 1) % guideSlides.length)} className="absolute right-2 top-1/2 z-10 -translate-y-1/2 h-9 w-9 rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/55">›</button>
+                </>
+              )}
+
+              {guideSlides.length > 1 && (
+                <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 flex items-center gap-1.5">
                   {guideSlides.map((s, i) => (
                     <button
                       key={s.key}

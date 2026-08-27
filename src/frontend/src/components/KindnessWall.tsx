@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Heart, MessageCircle, Send, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, MessageCircle, Send, Share2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { createComment, getComments, getFeedbacks, getGuestId, getLikes, getProfile, toggleFeedbackLike } from "@/lib/api";
@@ -52,6 +52,16 @@ export default function KindnessWall() {
   const actorId = isAuthenticated && user ? user.id : getGuestId();
   const liked = currentLikes.some((like) => like.user_id === actorId);
 
+  async function handleShare() {
+    if (!current) return;
+    const url = new URL(`/kindness-wall#${encodeURIComponent(current.id)}`, window.location.origin).toString();
+    try {
+      if (navigator.share) { await navigator.share({ title: current.case_title || "Givethra Kindness Wall", text: current.comment || "A verified Givethra feedback story", url }); return; }
+    } catch (error: any) { if (error?.name === "AbortError") return; }
+    try { await navigator.clipboard.writeText(url); toast.success("Link copied. Share it with your community."); }
+    catch { toast.error("Sharing is unavailable in this browser."); }
+  }
+
   async function handleLike() {
     if (!current) return;
     try {
@@ -96,7 +106,7 @@ export default function KindnessWall() {
             <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-primary">Story {index + 1} of {ordered.length}</p><h3 className="mt-1 truncate text-lg font-bold">{current.case_title || "A completed Givethra case"}</h3><p className="mt-1 text-xs text-muted-foreground">{current.user_name || "A grateful seeker"} · {timeAgo(current.created_at)}</p></div><span className="shrink-0 rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-700">Verified feedback</span></div>
             {current.comment && <p className="mt-5 whitespace-pre-line rounded-xl bg-muted/40 p-4 text-sm leading-relaxed">{current.comment}</p>}
             {current.video_url && <video src={current.video_url} controls playsInline className="mt-4 max-h-80 w-full rounded-xl border border-border bg-black" />}
-            <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-border pt-3"><button type="button" onClick={handleLike} className={`flex items-center gap-1.5 text-sm font-medium ${liked ? "text-rose-500" : "text-muted-foreground hover:text-rose-500"}`}><Heart className="h-4 w-4" fill={liked ? "currentColor" : "none"} /> Like <span>({currentLikes.length})</span></button><button type="button" onClick={() => setOpenComments((value) => !value)} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary"><MessageCircle className="h-4 w-4" /> Comment <span>({currentComments.length})</span></button><div className="ml-auto flex gap-1"><button type="button" aria-label="Previous kindness story" disabled={index === 0} onClick={() => { setIndex((value) => Math.max(0, value - 1)); setOpenComments(false); }} className="h-8 w-8 rounded-full border border-border disabled:opacity-40"><ChevronLeft className="mx-auto h-4 w-4" /></button><button type="button" aria-label="Next kindness story" disabled={index === ordered.length - 1} onClick={() => { setIndex((value) => Math.min(ordered.length - 1, value + 1)); setOpenComments(false); }} className="h-8 w-8 rounded-full border border-border disabled:opacity-40"><ChevronRight className="mx-auto h-4 w-4" /></button></div></div>
+            <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-border pt-3"><button type="button" onClick={handleLike} className={`flex items-center gap-1.5 text-sm font-medium ${liked ? "text-rose-500" : "text-muted-foreground hover:text-rose-500"}`}><Heart className="h-4 w-4" fill={liked ? "currentColor" : "none"} /> Like <span>({currentLikes.length})</span></button><button type="button" onClick={() => setOpenComments((value) => !value)} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary"><MessageCircle className="h-4 w-4" /> Comment <span>({currentComments.length})</span></button><button type="button" onClick={handleShare} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary" aria-label="Share kindness story"><Share2 className="h-4 w-4" /> Share</button><div className="ml-auto flex gap-1"><button type="button" aria-label="Previous kindness story" disabled={index === 0} onClick={() => { setIndex((value) => Math.max(0, value - 1)); setOpenComments(false); }} className="h-8 w-8 rounded-full border border-border disabled:opacity-40"><ChevronLeft className="mx-auto h-4 w-4" /></button><button type="button" aria-label="Next kindness story" disabled={index === ordered.length - 1} onClick={() => { setIndex((value) => Math.min(ordered.length - 1, value + 1)); setOpenComments(false); }} className="h-8 w-8 rounded-full border border-border disabled:opacity-40"><ChevronRight className="mx-auto h-4 w-4" /></button></div></div>
             {openComments && <div className="mt-4 space-y-3"><div className="max-h-48 space-y-2 overflow-y-auto">{currentComments.map((comment) => <div key={comment.id} className="rounded-xl bg-muted/40 px-3 py-2"><p className="text-xs font-semibold">{comment.first_name || comment.user_name || "A Givethra member"}</p><p className="break-words text-sm">{comment.comment}</p></div>)}</div><div className="flex items-end gap-2"><textarea aria-label="Comment on kindness story" value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Write a kind comment..." rows={2} className="min-h-10 min-w-0 flex-1 resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm" /><button type="button" aria-label="Post kindness comment" disabled={posting || !commentText.trim()} onClick={handleComment} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-50"><Send className="h-4 w-4" /></button></div></div>}
           </article>
         )}

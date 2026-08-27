@@ -96,9 +96,9 @@ describe("homepage help slider", () => {
   it("keeps the hand hero as the first slide and includes every supported category", () => {
     expect(homePageSource).toContain('key: "hero"');
     expect(homePageSource).toContain('image: "/assets/generated/hero-givethra.dim_1200x500.jpg"');
-    expect(homePageSource).toContain("...FILTER_CATEGORIES.map");
+    expect(homePageSource).toContain("...HELP_NOW_CATEGORY_SLIDES.map");
     expect(homePageSource).toContain('key: `category_${category}`');
-    expect(homePageSource).toContain('to: "/need-help"');
+    expect(homePageSource).toContain('to: "/submit-request"');
   });
 
   it("hides completed free-case prompts and shows credits after the allowance is used", () => {
@@ -116,6 +116,8 @@ describe("homepage help slider", () => {
     expect(homePageSource).not.toContain("slideIndex + 1");
     expect(homePageSource).toContain('className="relative h-52 w-full');
     expect(homePageSource).toContain("text-primary-foreground");
+    expect(homePageSource).toContain('aria-label="Previous slide"');
+    expect(homePageSource).toContain('aria-label="Next slide"');
   });
 });
 
@@ -138,7 +140,8 @@ describe("homepage slider refinement", () => {
     expect(homePageSource).toContain("Stethoscope");
     expect(homePageSource).toContain("ShoppingCart");
     expect(homePageSource).toContain('navigate({ to: "/submit-request" })');
-    expect(homePageSource).not.toContain("selectCategory(slide.category)");
+    expect(homePageSource).toContain('type: "category" as const');
+    expect(homePageSource).toContain("currentSlide.to");
   });
 
   it("speeds the automatic rotation moderately and removes the visible counter", () => {
@@ -147,5 +150,14 @@ describe("homepage slider refinement", () => {
     expect(homePageSource).not.toContain('aria-label="Slider navigation"');
     expect(homePageSource).toContain('className="relative h-52 w-full');
     expect(homePageSource).toContain('className="h-full w-full object-cover"');
+  });
+
+  it("adds share controls to both public wall posts", () => {
+    const heroesWallSource = readFileSync(new URL("../components/HeroesWall.tsx", import.meta.url), "utf8");
+    const kindnessWallSource = readFileSync(new URL("../components/KindnessWall.tsx", import.meta.url), "utf8");
+    expect(heroesWallSource).toContain('aria-label="Share completed case"');
+    expect(heroesWallSource).toContain("navigator.share");
+    expect(kindnessWallSource).toContain('aria-label="Share kindness story"');
+    expect(kindnessWallSource).toContain("navigator.share");
   });
 });

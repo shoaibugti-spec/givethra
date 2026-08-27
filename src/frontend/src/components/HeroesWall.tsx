@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Heart, MessageCircle, Send, Trophy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, MessageCircle, Send, Share2, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { addComment, getHeroesWall, getPostComments, toggleLike } from "@/lib/api";
@@ -24,6 +24,15 @@ type HeroMetrics = { solved_cases: number; total_amount: number; currency?: stri
 function money(currency: string | undefined, amount: number) {
   const symbol = currency === "PKR" ? "Rs" : currency || "PKR";
   return `${symbol} ${amount.toLocaleString()}`;
+}
+
+async function shareWallPost(title: string, text: string, path: string) {
+  const url = new URL(path, window.location.origin).toString();
+  try {
+    if (navigator.share) { await navigator.share({ title, text, url }); return; }
+  } catch (error: any) { if (error?.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(url); toast.success("Link copied. Share it with your community."); }
+  catch { toast.error("Sharing is unavailable in this browser."); }
 }
 
 export default function HeroesWall() {
@@ -70,6 +79,11 @@ export default function HeroesWall() {
     const collected = Number(current.amount_collected || needed || 0);
     return needed > 0 ? Math.min(100, Math.round((collected / needed) * 100)) : 100;
   }, [current]);
+
+  async function handleShare() {
+    if (!current) return;
+    await shareWallPost(current.title || "Givethra Heroes Wall", current.post_message || "A completed case on Givethra", `/heroes-wall#${encodeURIComponent(current.post_id)}`);
+  }
 
   async function handleLike() {
     if (!current) return;
@@ -135,7 +149,7 @@ export default function HeroesWall() {
             </div>
             <p className="mt-5 rounded-xl bg-muted/40 p-4 text-sm leading-relaxed text-foreground">{current.post_message || "A Givethra case was completed through verified help from Heroes."}</p>
             <div className="mt-5"><div className="mb-2 flex justify-between text-sm"><span className="font-semibold">Verified impact</span><span className="font-bold text-teal-600">{money(current.currency, Number(current.amount_collected || current.amount_needed || 0))}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-teal-500" style={{ width: `${progress}%` }} /></div></div>
-            <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-border pt-3"><button type="button" onClick={handleLike} className={`flex items-center gap-1.5 text-sm font-medium ${currentLike ? "text-rose-500" : "text-muted-foreground hover:text-rose-500"}`}><Heart className="h-4 w-4" fill={currentLike ? "currentColor" : "none"} /> Like <span>({Number(current.likes_count || 0)})</span></button><button type="button" onClick={toggleComments} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary"><MessageCircle className="h-4 w-4" /> Comment <span>({Number(current.comments_count || 0)})</span></button><div className="ml-auto flex gap-1"><Button type="button" variant="outline" size="icon" aria-label="Previous completed case" disabled={index === 0} onClick={() => setIndex((value) => Math.max(0, value - 1))}><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="icon" aria-label="Next completed case" disabled={index === items.length - 1} onClick={() => setIndex((value) => Math.min(items.length - 1, value + 1))}><ChevronRight className="h-4 w-4" /></Button></div></div>
+            <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-border pt-3"><button type="button" onClick={handleLike} className={`flex items-center gap-1.5 text-sm font-medium ${currentLike ? "text-rose-500" : "text-muted-foreground hover:text-rose-500"}`}><Heart className="h-4 w-4" fill={currentLike ? "currentColor" : "none"} /> Like <span>({Number(current.likes_count || 0)})</span></button><button type="button" onClick={toggleComments} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary"><MessageCircle className="h-4 w-4" /> Comment <span>({Number(current.comments_count || 0)})</span></button><button type="button" onClick={handleShare} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary" aria-label="Share completed case"><Share2 className="h-4 w-4" /> Share</button><div className="ml-auto flex gap-1"><Button type="button" variant="outline" size="icon" aria-label="Previous completed case" disabled={index === 0} onClick={() => setIndex((value) => Math.max(0, value - 1))}><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="icon" aria-label="Next completed case" disabled={index === items.length - 1} onClick={() => setIndex((value) => Math.min(items.length - 1, value + 1))}><ChevronRight className="h-4 w-4" /></Button></div></div>
             {openComments[current.post_id] && <div className="mt-4 space-y-3"><div className="max-h-48 space-y-2 overflow-y-auto">{currentComments.length ? currentComments.map((comment) => <div key={comment.id} className="rounded-xl bg-muted/40 px-3 py-2"><p className="text-xs font-semibold">{comment.user_name || "A Givethra member"}</p><p className="text-sm break-words">{comment.comment}</p></div>) : <p className="text-sm text-muted-foreground">No comments yet.</p>}</div><div className="flex items-end gap-2"><textarea aria-label="Comment on completed case" value={currentCommentText} onChange={(event) => setCommentText((prev) => ({ ...prev, [current.post_id]: event.target.value }))} placeholder="Write a kind comment..." rows={2} className="min-h-10 flex-1 resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm" /><Button type="button" size="icon" aria-label="Post comment" disabled={posting || !currentCommentText.trim()} onClick={handleComment}><Send className="h-4 w-4" /></Button></div></div>}
           </article>}
         </div>
