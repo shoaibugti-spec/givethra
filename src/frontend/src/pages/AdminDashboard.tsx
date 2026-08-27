@@ -484,7 +484,7 @@ export default function AdminPage() {
     const amountNeeded = Number(c.amount_needed ?? 0);
     const prevCollected = Number(c.amount_collected ?? 0);
     const newCollected = prevCollected + confirmedAmt;
-    const isFundraising = res.paid_to === "givethra";
+    const isFundraising = isContributionResolution(res);
     try {
       await adminUpdateResolution(res.id, { status: "completed", admin_confirmed: true, admin_confirmed_at: new Date().toISOString(), completed_at: new Date().toISOString() });
       const updates: any = { amount_collected: newCollected };

@@ -18,6 +18,11 @@ describe("Admin payment review queues", () => {
     expect(source).toContain('Completed ({completedContributions.length})');
   });
 
+  it("uses the legacy-safe Contribution classifier during approval transitions", () => {
+    expect(source).toContain("const isFundraising = isContributionResolution(res);");
+    expect(source).not.toContain('const isFundraising = res.paid_to === "givethra";');
+  });
+
   it("recognizes legacy Contribution markers before queue classification", () => {
     expect(source).toContain("function isContributionResolution(resolution: any): boolean");
     expect(source).toContain('"contribution", "partial", "fundraising"');
