@@ -79,14 +79,6 @@ const CATEGORY_SLIDE_STYLE: Record<string, { icon: typeof Battery; color: string
   "Other": { icon: Gift, color: "text-teal-600", bg: "bg-teal-600" },
 };
 
-// Canonical Help Now category contract; categories remain available through the case filters.
-const HELP_NOW_CATEGORY_SLIDES = [...FILTER_CATEGORIES.map((category) => ({
-  key: `category_${category}`,
-  category,
-  to: "/need-help",
-  style: CATEGORY_SLIDE_STYLE[category],
-}))];
-
 // Verified case action remains a direct route: navigate({ to: "/submit-request" }).
 // Category labels use uppercase tracking-wide treatment; urgent states retain border-orange-300 and border-red-300.
 // Legacy allowance state is intentionally derived from the authenticated case history.
@@ -161,6 +153,14 @@ const FILTER_CATEGORIES = [
   "Emergency Help",
   "Other",
 ];
+
+// Canonical Help Now category contract; categories remain available through the case filters.
+const HELP_NOW_CATEGORY_SLIDES = FILTER_CATEGORIES.map((category) => ({
+  key: `category_${category}`,
+  category,
+  to: "/need-help",
+  style: CATEGORY_SLIDE_STYLE[category],
+}));
 
 const CATEGORY_APPEAL: Record<string, string> = {
   "Electricity Bill": "Help bring light back to a home 💡",
