@@ -683,10 +683,33 @@ export default function HomePage() {
           >
               <div id="givethra-help-slider" className="relative h-52 w-full rounded-2xl overflow-hidden shadow-xl touch-pan-y" onTouchStart={handleSliderTouchStart} onTouchEnd={handleSliderTouchEnd}>
               {renderSlideContent()}
-
-
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* ===== NEW ROW: WhatsApp Channel & 24/7 Customer Support ===== */}
+      <section className="py-4 px-4 bg-background border-b border-border">
+        <div className="max-w-7xl mx-auto flex items-center justify-center gap-6 flex-wrap">
+          <a
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-green-600 transition-colors"
+          >
+            <MessageCircle className="h-6 w-6 text-green-600" />
+            <span>WhatsApp Channel</span>
+          </a>
+          <span className="text-muted-foreground text-lg select-none">|</span>
+          <a
+            href="https://wa.me/message/42CJXLUYEI2KM1?src=qr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
+          >
+            <MessageCircle className="h-6 w-6 text-primary" />
+            <span>24/7 Customer Support</span>
+          </a>
         </div>
       </section>
 
