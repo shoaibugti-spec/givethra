@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "@tanstack/react-router";
-import { FileText, Clock, CheckCircle2, XCircle, Eye, Heart, Plus, AlertTriangle, RefreshCw, ArrowRight, CalendarClock, AlertCircle, HandCoins, Building2 } from "lucide-react";
+import { FileText, Clock, CheckCircle2, XCircle, Eye, Heart, Plus, RefreshCw, ArrowRight, CalendarClock, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
   getCasesByUser,
@@ -31,11 +31,6 @@ function isApprovedCompletedResolution(resolution: any): boolean {
   const status = String(resolution?.status || "").trim().toLowerCase();
   const adminConfirmed = resolution?.admin_confirmed === 1 || resolution?.admin_confirmed === true || resolution?.admin_confirmed === "1" || String(resolution?.admin_confirmed || "").toLowerCase() === "true";
   return adminConfirmed && ["approved", "completed"].includes(status);
-}
-
-function isContributionResolution(resolution: any): boolean {
-  const marker = String(resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? "").trim().toLowerCase();
-  return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
 }
 
 export default function MyCasesPage() {
@@ -116,9 +111,6 @@ export default function MyCasesPage() {
           } else {
             helpStatus = "pending";
           }
-          // Determine help type: contribution or direct
-          const isContribution = resolution ? isContributionResolution(resolution) : false;
-          const helpType = isContribution ? "contribution" : "direct";
           return {
             ...caseRecord,
             status: String(caseRecord?.status || "pending").toLowerCase(),
@@ -127,7 +119,6 @@ export default function MyCasesPage() {
             resolution_id: resolution?.id,
             affidavit_available: isCompleted && resolution?.id ? true : false,
             helpStatus,
-            helpType,
             resolution,
           };
         });
@@ -152,8 +143,9 @@ export default function MyCasesPage() {
 
   const helpStatusConfig: any = {
     pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Pending", color: "bg-orange-100 text-orange-700" },
-    completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Completed", color: "bg-blue-100 text-blue-700" },
+    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Approved", color: "bg-green-100 text-green-700" },
     rejected: { icon: <XCircle className="h-3.5 w-3.5" />, label: "Rejected", color: "bg-red-100 text-red-700" },
+    completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Completed", color: "bg-blue-100 text-blue-700" },
   };
 
   function CaseRow({ c, isHelping = false }: { c: any; isHelping?: boolean }) {
@@ -176,11 +168,6 @@ export default function MyCasesPage() {
                 {cfg.icon} {cfg.label}
               </span>
               <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
-              {isHelping && (
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${c.helpType === "contribution" ? "bg-purple-100 text-purple-700" : "bg-cyan-100 text-cyan-700"}`}>
-                  {c.helpType === "contribution" ? "🤝 Contribution" : "🦸 Direct Help"}
-                </span>
-              )}
             </div>
             <p className="font-semibold">{c.title}</p>
             <p className="text-xs text-muted-foreground">📍 {c.city}, {c.country} {needed > 0 && `· ${s} ${needed} ${cur}`}</p>
@@ -210,7 +197,7 @@ export default function MyCasesPage() {
           </div>
         )}
 
-        {/* Expired (only for My Requests) */}
+        {/* Expired (only for My Cases) */}
         {isExpired && (
           <div className="space-y-3">
             <div className="rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/20 p-4 space-y-3 shadow-sm">
@@ -300,17 +287,11 @@ export default function MyCasesPage() {
   const myRejected = myCases.filter(c => c.status === "rejected");
   const myExpired = myCases.filter(c => c.status === "expired");
 
-  // Group unlocked cases by helpType and then by helpStatus
-  const contributionCases = unlockedCases.filter(c => c.helpType === "contribution");
-  const directHelpCases = unlockedCases.filter(c => c.helpType === "direct");
-
-  const contributionPending = contributionCases.filter(c => c.helpStatus === "pending");
-  const contributionCompleted = contributionCases.filter(c => c.helpStatus === "completed");
-  const contributionRejected = contributionCases.filter(c => c.helpStatus === "rejected");
-
-  const directPending = directHelpCases.filter(c => c.helpStatus === "pending");
-  const directCompleted = directHelpCases.filter(c => c.helpStatus === "completed");
-  const directRejected = directHelpCases.filter(c => c.helpStatus === "rejected");
+  // Group unlocked cases by helpStatus only (no Contribution/Direct split)
+  const helpPending = unlockedCases.filter(c => c.helpStatus === "pending");
+  const helpApproved = unlockedCases.filter(c => c.helpStatus === "approved");
+  const helpRejected = unlockedCases.filter(c => c.helpStatus === "rejected");
+  const helpCompleted = unlockedCases.filter(c => c.helpStatus === "completed");
 
   return (
     <Layout>
@@ -326,13 +307,13 @@ export default function MyCasesPage() {
         </div>
 
         {loading ? <div className="text-center py-20 text-muted-foreground">Loading...</div> : (
-          <Tabs defaultValue="requests">
+          <Tabs defaultValue="mycases">
             <TabsList className="w-full">
-              <TabsTrigger value="requests" className="flex-1">My Requests ({myCases.length})</TabsTrigger>
-              <TabsTrigger value="helping" className="flex-1">Helping ({unlockedCases.length})</TabsTrigger>
+              <TabsTrigger value="mycases" className="flex-1">My Cases ({myCases.length})</TabsTrigger>
+              <TabsTrigger value="myhelp" className="flex-1">My Help ({unlockedCases.length})</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="requests" className="space-y-5 mt-4">
+            <TabsContent value="mycases" className="space-y-5 mt-4">
               {myCases.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FileText className="h-10 w-10 mx-auto opacity-30 mb-2" />
@@ -379,7 +360,7 @@ export default function MyCasesPage() {
               )}
             </TabsContent>
 
-            <TabsContent value="helping" className="space-y-5 mt-4">
+            <TabsContent value="myhelp" className="space-y-5 mt-4">
               {unlockedCases.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Heart className="h-10 w-10 mx-auto opacity-30 mb-2" />
@@ -388,61 +369,30 @@ export default function MyCasesPage() {
                 </div>
               ) : (
                 <>
-                  {/* ===== CONTRIBUTIONS SECTION ===== */}
-                  {(contributionPending.length > 0 || contributionCompleted.length > 0 || contributionRejected.length > 0) && (
-                    <div className="space-y-4">
-                      <h2 className="text-md font-bold text-purple-700 flex items-center gap-2 border-b border-purple-200 pb-2">
-                        <HandCoins className="h-5 w-5" /> Contributions ({contributionCases.length})
-                      </h2>
-                      {contributionRejected.length > 0 && (
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
-                            <XCircle className="h-4 w-4" /> Rejected ({contributionRejected.length})
-                          </h3>
-                          {contributionRejected.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                        </div>
-                      )}
-                      {contributionPending.length > 0 && (
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-semibold text-muted-foreground">⏳ Pending ({contributionPending.length})</h3>
-                          {contributionPending.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                        </div>
-                      )}
-                      {contributionCompleted.length > 0 && (
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-semibold text-blue-600">✅ Completed ({contributionCompleted.length})</h3>
-                          {contributionCompleted.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                        </div>
-                      )}
+                  {helpRejected.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
+                        <XCircle className="h-4 w-4" /> Rejected ({helpRejected.length})
+                      </h3>
+                      {helpRejected.map(c => <CaseRow key={c.id} c={c} isHelping />)}
                     </div>
                   )}
-
-                  {/* ===== DIRECT HELP SECTION ===== */}
-                  {(directPending.length > 0 || directCompleted.length > 0 || directRejected.length > 0) && (
-                    <div className="space-y-4">
-                      <h2 className="text-md font-bold text-cyan-700 flex items-center gap-2 border-b border-cyan-200 pb-2">
-                        <Building2 className="h-5 w-5" /> Direct Help ({directHelpCases.length})
-                      </h2>
-                      {directRejected.length > 0 && (
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
-                            <XCircle className="h-4 w-4" /> Rejected ({directRejected.length})
-                          </h3>
-                          {directRejected.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                        </div>
-                      )}
-                      {directPending.length > 0 && (
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-semibold text-muted-foreground">⏳ Pending ({directPending.length})</h3>
-                          {directPending.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                        </div>
-                      )}
-                      {directCompleted.length > 0 && (
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-semibold text-blue-600">✅ Completed ({directCompleted.length})</h3>
-                          {directCompleted.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                        </div>
-                      )}
+                  {helpPending.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-muted-foreground">⏳ Pending ({helpPending.length})</h3>
+                      {helpPending.map(c => <CaseRow key={c.id} c={c} isHelping />)}
+                    </div>
+                  )}
+                  {helpApproved.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-green-600">✅ Approved ({helpApproved.length})</h3>
+                      {helpApproved.map(c => <CaseRow key={c.id} c={c} isHelping />)}
+                    </div>
+                  )}
+                  {helpCompleted.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-blue-600">🎉 Completed ({helpCompleted.length})</h3>
+                      {helpCompleted.map(c => <CaseRow key={c.id} c={c} isHelping />)}
                     </div>
                   )}
                 </>
