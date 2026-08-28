@@ -1699,7 +1699,16 @@ async function handleRequest(request, env, ctx) {
         const heroId = String(url.searchParams.get("hero_id") || "").trim();
         const filters = [];
         const bind = [];
-        if (caseId) { filters.push("r.case_id = ?"); bind.push(caseId); }
+        if (caseId) {
+          filters.push("r.case_id = ?");
+          bind.push(caseId);
+          if (!heroId && user) {
+            // Case-only reads are still private: return the case owner's rows or the
+            // authenticated helper's rows by durable ID/email for legacy-account recovery.
+            filters.push("(r.hero_id = ? OR lower(u.email) = lower(?) OR c.user_id = ?)");
+            bind.push(user.user_id, String(user.email || ""), user.user_id);
+          }
+        }
         if (heroId) {
           // Legacy Google users can retain an older hero_id while their verified email
           // is unchanged. If IDs differ, return only rows owned by that authenticated email.

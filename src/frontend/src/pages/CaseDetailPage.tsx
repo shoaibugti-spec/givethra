@@ -321,7 +321,9 @@ export default function CaseDetailPage() {
         const count = await getUserUnlockCount(durableUserId);
         setUserUnlockCount(Number(count ?? 0));
 
-        const res = await getCaseResolutions(id, owner ? undefined : durableUserId);
+        // Ask the worker for the case-scoped private set; it matches the current helper
+        // by durable ID or verified email and the seeker by case ownership.
+        const res = await getCaseResolutions(id);
         const resolutions = Array.isArray(res) ? res : [];
         setMyResolutions(resolutions.slice().reverse());
         const completed = String(data.status || "").toLowerCase() === "completed";

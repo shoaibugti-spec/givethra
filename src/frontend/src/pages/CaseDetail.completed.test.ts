@@ -40,6 +40,8 @@ describe("completed helper detail flow", () => {
     expect(pageSource).toContain("const verifiedResolutions = getEligibleAffidavitResolutions(myResolutions);");
     expect(workerSource).toContain("If IDs differ, return only rows owned by that authenticated email");
     expect(workerSource).toContain('filters.push("lower(u.email) = lower(?)")');
+    expect(workerSource).toContain('filters.push("(r.hero_id = ? OR lower(u.email) = lower(?) OR c.user_id = ?)")');
+    expect(pageSource).toContain("const res = await getCaseResolutions(id);");
     expect(workerSource).toContain("A helper may read only their own resolution rows");
     expect(pageSource).toContain("This was disputed — no affidavit is available.");
     expect(myCasesSource).toContain('c.affidavit_available ? "View Affidavit & Completed Help" :');
