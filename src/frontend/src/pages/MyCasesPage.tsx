@@ -33,12 +33,25 @@ function isApprovedCompletedResolution(resolution: any): boolean {
   return adminConfirmed && ["approved", "completed"].includes(status);
 }
 
+function isContributionResolution(resolution: any): boolean {
+  if (!resolution) return false;
+  const marker = String(resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? "").trim().toLowerCase();
+  return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
+}
+
 export default function MyCasesPage() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [myCases, setMyCases] = useState<any[]>([]);
   const [unlockedCases, setUnlockedCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter states for My Cases
+  const [myCaseStatusFilter, setMyCaseStatusFilter] = useState<string>("pending");
+
+  // Filter states for My Help
+  const [helpTypeFilter, setHelpTypeFilter] = useState<string>("contribution");
+  const [helpStatusFilter, setHelpStatusFilter] = useState<string>("pending");
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -111,6 +124,8 @@ export default function MyCasesPage() {
           } else {
             helpStatus = "pending";
           }
+          const isContribution = resolution ? isContributionResolution(resolution) : false;
+          const helpType = isContribution ? "contribution" : "direct";
           return {
             ...caseRecord,
             status: String(caseRecord?.status || "pending").toLowerCase(),
@@ -119,6 +134,7 @@ export default function MyCasesPage() {
             resolution_id: resolution?.id,
             affidavit_available: isCompleted && resolution?.id ? true : false,
             helpStatus,
+            helpType,
             resolution,
           };
         });
@@ -134,22 +150,15 @@ export default function MyCasesPage() {
   }
 
   const statusConfig: any = {
-    pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Under Review", color: "bg-orange-100 text-orange-700" },
-    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Published", color: "bg-green-100 text-green-700" },
+    pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Pending", color: "bg-orange-100 text-orange-700" },
     rejected: { icon: <XCircle className="h-3.5 w-3.5" />, label: "Rejected", color: "bg-red-100 text-red-700" },
+    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Approved", color: "bg-green-100 text-green-700" },
     completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Completed", color: "bg-blue-100 text-blue-700" },
     expired: { icon: <CalendarClock className="h-3.5 w-3.5" />, label: "Expired", color: "bg-amber-100 text-amber-700" },
   };
 
-  const helpStatusConfig: any = {
-    pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Pending", color: "bg-orange-100 text-orange-700" },
-    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Approved", color: "bg-green-100 text-green-700" },
-    rejected: { icon: <XCircle className="h-3.5 w-3.5" />, label: "Rejected", color: "bg-red-100 text-red-700" },
-    completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Completed", color: "bg-blue-100 text-blue-700" },
-  };
-
   function CaseRow({ c, isHelping = false }: { c: any; isHelping?: boolean }) {
-    const cfg = isHelping ? helpStatusConfig[c.helpStatus || "pending"] : statusConfig[c.status] ?? statusConfig.pending;
+    const cfg = isHelping ? statusConfig[c.helpStatus || "pending"] : statusConfig[c.status] ?? statusConfig.pending;
     const cur = c.currency || "USD";
     const s = sym(cur);
     const needed = Number(c.amount_needed ?? 0);
@@ -168,6 +177,11 @@ export default function MyCasesPage() {
                 {cfg.icon} {cfg.label}
               </span>
               <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
+              {isHelping && (
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${c.helpType === "contribution" ? "bg-purple-100 text-purple-700" : "bg-cyan-100 text-cyan-700"}`}>
+                  {c.helpType === "contribution" ? "🤝 Contribution" : "🦸 Direct Help"}
+                </span>
+              )}
             </div>
             <p className="font-semibold">{c.title}</p>
             <p className="text-xs text-muted-foreground">📍 {c.city}, {c.country} {needed > 0 && `· ${s} ${needed} ${cur}`}</p>
@@ -186,7 +200,6 @@ export default function MyCasesPage() {
           </div>
         )}
 
-        {/* Rejected Help message (for helping tab) */}
         {isHelping && isRejected && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -197,7 +210,6 @@ export default function MyCasesPage() {
           </div>
         )}
 
-        {/* Expired (only for My Cases) */}
         {isExpired && (
           <div className="space-y-3">
             <div className="rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/20 p-4 space-y-3 shadow-sm">
@@ -272,7 +284,6 @@ export default function MyCasesPage() {
           </div>
         )}
 
-        {/* ===== VIEW DETAILS BUTTON ===== */}
         <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}>
           {isHelping ? <Heart className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           {isHelping && c.helpStatus === "completed" && c.affidavit_available ? "View Affidavit & Completed Help" : isHelping && c.helpStatus === "completed" ? "View Completed Case" : isHelping ? "Continue Helping" : "View Details"}
@@ -281,17 +292,13 @@ export default function MyCasesPage() {
     );
   }
 
-  const myPending = myCases.filter(c => c.status === "pending");
-  const myActive = myCases.filter(c => c.status === "approved");
-  const myCompleted = myCases.filter(c => c.status === "completed");
-  const myRejected = myCases.filter(c => c.status === "rejected");
-  const myExpired = myCases.filter(c => c.status === "expired");
+  // Helper to filter cases by status for My Cases
+  const filteredMyCases = myCases.filter(c => c.status === myCaseStatusFilter);
 
-  // Group unlocked cases by helpStatus only (no Contribution/Direct split)
-  const helpPending = unlockedCases.filter(c => c.helpStatus === "pending");
-  const helpApproved = unlockedCases.filter(c => c.helpStatus === "approved");
-  const helpRejected = unlockedCases.filter(c => c.helpStatus === "rejected");
-  const helpCompleted = unlockedCases.filter(c => c.helpStatus === "completed");
+  // Helper to filter unlocked cases by type and status for My Help
+  const filteredHelpCases = unlockedCases.filter(c => 
+    c.helpType === helpTypeFilter && c.helpStatus === helpStatusFilter
+  );
 
   return (
     <Layout>
@@ -307,95 +314,63 @@ export default function MyCasesPage() {
         </div>
 
         {loading ? <div className="text-center py-20 text-muted-foreground">Loading...</div> : (
-          <Tabs defaultValue="mycases">
+          <Tabs defaultValue="mycases" className="w-full">
             <TabsList className="w-full">
               <TabsTrigger value="mycases" className="flex-1">My Cases ({myCases.length})</TabsTrigger>
               <TabsTrigger value="myhelp" className="flex-1">My Help ({unlockedCases.length})</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="mycases" className="space-y-5 mt-4">
-              {myCases.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="h-10 w-10 mx-auto opacity-30 mb-2" />
-                  <p>No cases submitted yet.</p>
-                  <Button size="sm" className="mt-3" onClick={() => navigate({ to: "/submit-request" })}>Submit Your First Case</Button>
+            {/* ===== MY CASES TAB ===== */}
+            <TabsContent value="mycases" className="space-y-4 mt-4">
+              {/* Status filter tabs */}
+              <Tabs value={myCaseStatusFilter} onValueChange={setMyCaseStatusFilter} className="w-full">
+                <TabsList className="grid grid-cols-4 w-full">
+                  <TabsTrigger value="pending">Pending</TabsTrigger>
+                  <TabsTrigger value="rejected">Rejected</TabsTrigger>
+                  <TabsTrigger value="approved">Approved</TabsTrigger>
+                  <TabsTrigger value="completed">Completed</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {filteredMyCases.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No {myCaseStatusFilter} cases.</p>
                 </div>
               ) : (
-                <>
-                  {myExpired.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-amber-600 flex items-center gap-1.5">
-                        <CalendarClock className="h-4 w-4" /> Expired ({myExpired.length})
-                      </h3>
-                      {myExpired.map(c => <CaseRow key={c.id} c={c} />)}
-                    </div>
-                  )}
-                  {myRejected.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
-                        <XCircle className="h-4 w-4" /> Rejected ({myRejected.length})
-                      </h3>
-                      {myRejected.map(c => <CaseRow key={c.id} c={c} />)}
-                    </div>
-                  )}
-                  {myPending.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-muted-foreground">⏳ Under Review ({myPending.length})</h3>
-                      {myPending.map(c => <CaseRow key={c.id} c={c} />)}
-                    </div>
-                  )}
-                  {myActive.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-muted-foreground">✅ Published ({myActive.length})</h3>
-                      {myActive.map(c => <CaseRow key={c.id} c={c} />)}
-                    </div>
-                  )}
-                  {myCompleted.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-muted-foreground">🎉 Completed ({myCompleted.length})</h3>
-                      {myCompleted.map(c => <CaseRow key={c.id} c={c} />)}
-                    </div>
-                  )}
-                </>
+                <div className="space-y-3">
+                  {filteredMyCases.map(c => <CaseRow key={c.id} c={c} />)}
+                </div>
               )}
             </TabsContent>
 
-            <TabsContent value="myhelp" className="space-y-5 mt-4">
-              {unlockedCases.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Heart className="h-10 w-10 mx-auto opacity-30 mb-2" />
-                  <p>You haven't unlocked any cases yet.</p>
-                  <Button size="sm" className="mt-3" onClick={() => navigate({ to: "/cases" })}>Browse Cases</Button>
+            {/* ===== MY HELP TAB ===== */}
+            <TabsContent value="myhelp" className="space-y-4 mt-4">
+              {/* Help type filter tabs */}
+              <Tabs value={helpTypeFilter} onValueChange={(val) => { setHelpTypeFilter(val); setHelpStatusFilter("pending"); }} className="w-full">
+                <TabsList className="grid grid-cols-2 w-full">
+                  <TabsTrigger value="contribution">🤝 Contribution</TabsTrigger>
+                  <TabsTrigger value="direct">🦸 Direct Help</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {/* Status filter tabs (nested) */}
+              <Tabs value={helpStatusFilter} onValueChange={setHelpStatusFilter} className="w-full">
+                <TabsList className="grid grid-cols-4 w-full">
+                  <TabsTrigger value="pending">Pending</TabsTrigger>
+                  <TabsTrigger value="rejected">Rejected</TabsTrigger>
+                  <TabsTrigger value="approved">Approved</TabsTrigger>
+                  <TabsTrigger value="completed">Completed</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {filteredHelpCases.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No {helpStatusFilter} {helpTypeFilter === "contribution" ? "contributions" : "direct helps"}.</p>
                 </div>
               ) : (
-                <>
-                  {helpRejected.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
-                        <XCircle className="h-4 w-4" /> Rejected ({helpRejected.length})
-                      </h3>
-                      {helpRejected.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                    </div>
-                  )}
-                  {helpPending.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-muted-foreground">⏳ Pending ({helpPending.length})</h3>
-                      {helpPending.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                    </div>
-                  )}
-                  {helpApproved.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-green-600">✅ Approved ({helpApproved.length})</h3>
-                      {helpApproved.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                    </div>
-                  )}
-                  {helpCompleted.length > 0 && (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-blue-600">🎉 Completed ({helpCompleted.length})</h3>
-                      {helpCompleted.map(c => <CaseRow key={c.id} c={c} isHelping />)}
-                    </div>
-                  )}
-                </>
+                <div className="space-y-3">
+                  {filteredHelpCases.map(c => <CaseRow key={c.id} c={c} isHelping />)}
+                </div>
               )}
             </TabsContent>
           </Tabs>
