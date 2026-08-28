@@ -32,7 +32,9 @@ describe("completed helper detail flow", () => {
     expect(pageSource).toContain('const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "pending_confirmation", "dispatched"].includes(status);');
     expect(pageSource).toContain("resolution?.admin_confirmed_at");
     expect(pageSource).toContain("return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence);");
-    expect(pageSource).toContain("const verifiedResolutions = myResolutions.filter(isApprovedCompletedResolution);");
+    expect(pageSource).toContain("function getEligibleAffidavitResolutions(resolutions: any[]): any[]");
+    expect(pageSource).toContain("const verifiedResolutions = getEligibleAffidavitResolutions(myResolutions);");
+    expect(workerSource).toContain("A helper may read only their own resolution rows");
     expect(pageSource).toContain("This was disputed — no affidavit is available.");
     expect(myCasesSource).toContain('c.affidavit_available ? "View Affidavit & Completed Help" :');
   });

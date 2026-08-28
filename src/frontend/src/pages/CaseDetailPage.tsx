@@ -91,6 +91,14 @@ function isContributionResolution(resolution: any): boolean {
   return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
 }
 
+/**
+ * Affidavit gate: an unlock is not help. Only an approved/completed resolution
+ * with admin confirmation or approval evidence can reach the download actions.
+ */
+function getEligibleAffidavitResolutions(resolutions: any[]): any[] {
+  return resolutions.filter(isApprovedCompletedResolution);
+}
+
 function generateAffidavit(caseData: any, resolution: any, seekerKyc: any, heroName: string) {
   const caseId = (caseData.id ?? "").slice(0, 8).toUpperCase();
   const today = new Date().toLocaleDateString();
@@ -421,7 +429,9 @@ export default function CaseDetailPage() {
   const isExpired = normalizedStatus === "expired";
   const isOwner = user?.id === caseData?.user_id;
   const isCompleted = normalizedStatus === "completed";
-  const verifiedResolutions = myResolutions.filter(isApprovedCompletedResolution);
+  // Keep all resolution statuses for messaging, but expose download actions only
+  // for the approved helper/contribution resolutions returned for this viewer.
+  const verifiedResolutions = getEligibleAffidavitResolutions(myResolutions);
   const verifiedDirectResolutions = verifiedResolutions.filter(r => !isContributionResolution(r));
   const verifiedContributionResolutions = verifiedResolutions.filter(isContributionResolution);
   const pendingResolutions = myResolutions.filter(r => !isApprovedCompletedResolution(r));
