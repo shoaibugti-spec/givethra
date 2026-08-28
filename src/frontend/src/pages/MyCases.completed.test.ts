@@ -18,11 +18,11 @@ describe("completed help visibility", () => {
   it("reclassifies an admin-confirmed resolution as completed history", () => {
     expect(myCasesSource).toContain('status: "completed"');
     expect(myCasesSource).toContain("adminConfirmed");
-    expect(myCasesSource).toContain("amount_collected: Number(resolution.amount_paid");
+    expect(myCasesSource).toContain("amount_collected: Number(resolution?.amount_paid");
   });
 
   it("keeps completed history linked to the affidavit entry point", () => {
-    expect(myCasesSource).toContain("affidavit_available: true");
+    expect(myCasesSource).toContain("affidavit_available: isCompleted && resolution?.id ? true : false");
     expect(myCasesSource).toContain("View Affidavit & Completed Help");
   });
 

@@ -8,19 +8,18 @@ describe("My Cases help history", () => {
   it("loads resolutions alongside unlocked cases", () => {
     expect(source).toContain("getCaseResolutions");
     expect(source).toContain("getCaseResolutionsByHero");
-    expect(source).toContain("resolutionRows.map");
-    expect(source).toContain("Promise.all(ids.map(async (caseId)");
-    expect(source).toContain("setHelpByCase");
+    expect(source).toContain("Promise.all([");
+    expect(source).toContain("setUnlockedCases");
+    expect(source).toContain("setMyCases");
   });
 
-  it("shows contribution and direct-help records with review status and amount", () => {
-    expect(source).toContain("Your Help on this case");
-    expect(source).toContain("Contribution / Fundraising");
-    expect(source).toContain("Direct Help");
-    expect(source).toContain("Pending Givethra Review");
-    expect(source).toContain("Confirmed — Under Verification");
-    expect(source).toContain("Amount:");
-    expect(source).toContain("Txn:");
+  it("shows contribution and direct-help filters with completed-help access", () => {
+    expect(source).toContain('TabsTrigger value="contribution"');
+    expect(source).toContain('TabsTrigger value="direct"');
+    expect(source).toContain('TabsTrigger value="completed"');
+    expect(source).toContain("filteredHelpCases");
+    expect(source).toContain("Continue Helping");
+    expect(source).toContain("View Completed Case");
   });
 
   it("keeps completed-help certificate access in the existing case-detail flow", () => {
