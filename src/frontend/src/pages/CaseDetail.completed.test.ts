@@ -38,8 +38,8 @@ describe("completed helper detail flow", () => {
     expect(pageSource).toContain('["givethra", "contribution", "fundraising", "partial"]');
     expect(pageSource).toContain("verifiedResolutions.map");
     expect(pageSource).toContain("View & Download Affidavit");
-    expect(pageSource).toContain("const last = d.slice(-3);");
-    expect(pageSource).toContain("last 3 digits of an account/reference");
+    expect(pageSource).toContain("const last = d.slice(-4);");
+    expect(pageSource).toContain("last 4 digits of an account/reference");
     expect(pageSource).toContain("const visible = resolutions.filter(r => !isContributionResolution(r));");
   });
 

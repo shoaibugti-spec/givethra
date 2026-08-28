@@ -57,9 +57,9 @@ function maskCnic(cnic?: string): string {
 function maskAccount(acc?: string): string {
   if (!acc) return "—";
   const d = acc.replace(/\s/g, "");
-  if (d.length <= 3) return d;
-  const last = d.slice(-3);
-  return `${"*".repeat(Math.max(d.length - 3, 1))}${last}`;
+  if (d.length <= 4) return d;
+  const last = d.slice(-4);
+  return `${"*".repeat(Math.max(d.length - 4, 1))}${last}`;
 }
 
 function copyToClipboard(text: string, label: string) {
@@ -148,7 +148,7 @@ h1{color:#03707B;font-size:24px;margin:12px 0 4px;letter-spacing:1px}
   <div class="row"><span class="label">Full Name</span><span class="value">${seekerName}</span></div>
   <div class="row"><span class="label">CNIC (partially masked)</span><span class="value">${seekerCnic}</span></div>
   <div class="row"><span class="label">Country</span><span class="value">${caseData.country || "—"}</span></div>
-  <div class="note">Note: Only the first 4 digits of each CNIC and the last 3 digits of an account/reference are shown. Remaining digits and contact details are kept private.</div>
+  <div class="note">Note: Only the first 4 digits of each CNIC and the last 4 digits of an account/reference are shown. Remaining digits and contact details are kept private.</div>
 </div>
 
 <div class="section">
