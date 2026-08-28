@@ -71,6 +71,7 @@ function copyToClipboard(text: string, label: string) {
 }
 
 function isApprovedCompletedResolution(resolution: any): boolean {
+  if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
   const adminConfirmed = [1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed);
   const hasApprovalEvidence = Boolean(
@@ -86,10 +87,15 @@ function isApprovedCompletedResolution(resolution: any): boolean {
 }
 
 function isContributionResolution(resolution: any): boolean {
+  if (!resolution) return false;
   const marker = String(resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? "").trim().toLowerCase();
   return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
 }
 
+/**
+ * Get all help records for the current user in this case.
+ * Each record has an isApproved flag to control affidavit visibility.
+ */
 function getHelpRecords(caseData: any, myUnlock: any, myResolutions: any[]): Array<{
   id: string;
   type: "direct" | "contribution";
@@ -103,13 +109,14 @@ function getHelpRecords(caseData: any, myUnlock: any, myResolutions: any[]): Arr
   isApproved: boolean;
 }> {
   const records: any[] = [];
+  const isCompleted = String(caseData?.status || "").toLowerCase() === "completed";
 
-  // 1. Process resolutions
+  // 1. Process resolutions - each resolution is a help record
   myResolutions.forEach((res) => {
     const isDirect = !isContributionResolution(res);
     const status = String(res.status || "").toLowerCase();
     const isApproved = isApprovedCompletedResolution(res);
-    // Include even pending if case is completed, but mark approved status
+    
     records.push({
       id: res.id,
       type: isDirect ? "direct" : "contribution",
@@ -125,20 +132,23 @@ function getHelpRecords(caseData: any, myUnlock: any, myResolutions: any[]): Arr
   });
 
   // 2. If there is an unlock without a resolution, include it (only if case is completed)
+  // This ensures users who only unlocked (without resolution) still see the case
   if (myUnlock && !myResolutions.some((r) => r.unlock_id === myUnlock.id)) {
-    const isPartial = myUnlock.payment_type === "partial";
-    records.push({
-      id: myUnlock.id,
-      type: isPartial ? "contribution" : "direct",
-      amount: Number(myUnlock.pledged_amount ?? 0),
-      transactionId: "N/A",
-      receiptUrl: null,
-      status: "unlocked_only",
-      completedAt: myUnlock.unlocked_at,
-      resolution: null,
-      unlock: myUnlock,
-      isApproved: false, // Unlock alone is never approved help
-    });
+    if (isCompleted) {
+      const isPartial = myUnlock.payment_type === "partial";
+      records.push({
+        id: myUnlock.id,
+        type: isPartial ? "contribution" : "direct",
+        amount: Number(myUnlock.pledged_amount ?? 0),
+        transactionId: "N/A",
+        receiptUrl: null,
+        status: "unlocked_only",
+        completedAt: myUnlock.unlocked_at,
+        resolution: null,
+        unlock: myUnlock,
+        isApproved: false, // Unlock alone is never approved help
+      });
+    }
   }
 
   return records;
@@ -473,7 +483,7 @@ export default function CaseDetailPage() {
   
   // Compute help records dynamically
   const helpRecords = getHelpRecords(caseData, myUnlock, myResolutions);
-  const approvedRecords = helpRecords.filter(r => r.isApproved);
+  const approvedRecords = helpRecords.filter(r => r.isApproved === true);
   const hasApprovedDirect = approvedRecords.some(r => r.type === "direct");
   const hasApprovedContribution = approvedRecords.some(r => r.type === "contribution");
   const hasAnyApproved = approvedRecords.length > 0;
@@ -753,7 +763,7 @@ export default function CaseDetailPage() {
   }
 
   // ============================================================
-  //  COMPLETED HELP VIEW (helper only) - UPDATED WITH 3 MESSAGE TYPES
+  //  COMPLETED HELP VIEW (helper only) - WITH AFFIDAVIT
   // ============================================================
   if (isCompleted && !isOwner) {
     const totalDirectAmount = approvedRecords.filter(r => r.type === "direct").reduce((sum, r) => sum + r.amount, 0);
@@ -768,9 +778,8 @@ export default function CaseDetailPage() {
           </button>
           <section className="rounded-2xl border-2 border-green-200 bg-green-50 dark:bg-green-950/20 p-6 space-y-5">
 
-            {/* ===== CONDITIONAL MESSAGES BASED ON USER'S APPROVED HELP ===== */}
+            {/* ===== CONDITIONAL MESSAGES ===== */}
             {hasApprovedDirect ? (
-              // ===== CASE 3: DIRECT HELP (FULL) =====
               <div className="text-center space-y-3">
                 <div className="text-5xl">🦸‍♂️</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Direct Help Completed</p>
@@ -785,7 +794,6 @@ export default function CaseDetailPage() {
                 </Button>
               </div>
             ) : hasApprovedContribution ? (
-              // ===== CASE 2: CONTRIBUTION (PARTIAL) =====
               <div className="text-center space-y-3">
                 <div className="text-5xl">🌟</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Contribution Completed</p>
@@ -800,7 +808,6 @@ export default function CaseDetailPage() {
                 </Button>
               </div>
             ) : isOnlyUnlockOrRejected ? (
-              // ===== CASE 1: UNLOCKED BUT REJECTED / NO HELP =====
               <div className="text-center space-y-3">
                 <div className="text-5xl">💪</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Encouragement for Heroes</p>
@@ -815,7 +822,6 @@ export default function CaseDetailPage() {
                 </Button>
               </div>
             ) : (
-              // ===== FALLBACK (should not happen) =====
               <div className="text-center space-y-2">
                 <div className="text-4xl">🤲</div>
                 <h1 className="text-2xl font-bold text-green-800">Thank you for engaging with this case.</h1>
@@ -1136,20 +1142,22 @@ export default function CaseDetailPage() {
                   <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
                     <h2 className="font-semibold flex items-center gap-2"><Heart className="h-4 w-4 text-primary" /> My Help on this case ({myResolutions.length})</h2>
                     {myResolutions.map((r: any) => {
-                      const resolutionStatus = String(r.status || "").trim().toLowerCase();
                       const isVerified = isApprovedCompletedResolution(r);
                       return (
                         <div key={r.id} className="rounded-xl border border-border p-3 space-y-2">
                           <div className="flex items-center justify-between gap-2">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isVerified ? "bg-green-100 text-green-700" : resolutionStatus === "disputed" ? "bg-red-100 text-red-700" : resolutionStatus === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>
-                              {isVerified ? "VERIFIED ✓" : resolutionStatus === "seeker_confirmed" ? "UNDER VERIFICATION" : resolutionStatus === "disputed" ? "DISPUTED" : "PENDING"}
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isVerified ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
+                              {isVerified ? "VERIFIED ✓" : "PENDING / REJECTED"}
                             </span>
                             <span className="text-sm font-bold text-primary">{sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</span>
                           </div>
                           {isVerified ? (
-                            <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => generateAffidavitFromRecord(caseData, { type: isContributionResolution(r) ? "contribution" : "direct", amount: r.seeker_confirmed_amount ?? r.amount_paid, transactionId: r.transaction_id, receiptUrl: r.receipt_url, resolution: r, isApproved: true }, seekerKyc, r.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> View & Download Affidavit</Button>
+                            <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => {
+                              const record = { type: isContributionResolution(r) ? "contribution" : "direct", amount: r.seeker_confirmed_amount ?? r.amount_paid, transactionId: r.transaction_id, receiptUrl: r.receipt_url, resolution: r, isApproved: true };
+                              generateAffidavitFromRecord(caseData, record, seekerKyc, r.hero_name || heroName);
+                            }}><FileText className="h-3.5 w-3.5" /> View & Download Affidavit</Button>
                           ) : (
-                            <p className="text-xs text-muted-foreground">{resolutionStatus === "seeker_confirmed" ? "Givethra is verifying this contribution." : resolutionStatus === "disputed" ? "This was disputed — no affidavit is available." : "Waiting for confirmation."}</p>
+                            <p className="text-xs text-muted-foreground">This help is pending verification or was rejected. No affidavit is available yet.</p>
                           )}
                         </div>
                       );
@@ -1284,7 +1292,10 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-green-700"><CheckCircle2 className="h-5 w-5" /><h2 className="font-bold">Help Confirmed</h2></div>
               <p className="text-sm text-muted-foreground">{sym} {res.seeker_confirmed_amount ?? res.amount_paid} {cur} — {res.resolution_type}</p>
-              <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => generateAffidavitFromRecord(caseData, { type: "direct", amount: res.seeker_confirmed_amount ?? res.amount_paid, transactionId: res.transaction_id, receiptUrl: res.receipt_url, resolution: res, isApproved: true }, seekerKyc, res.hero_name || "Verified Hero")}><FileText className="h-3.5 w-3.5" /> Download Seeker Affidavit</Button>
+              <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => {
+                const record = { type: "direct", amount: res.seeker_confirmed_amount ?? res.amount_paid, transactionId: res.transaction_id, receiptUrl: res.receipt_url, resolution: res, isApproved: true };
+                generateAffidavitFromRecord(caseData, record, seekerKyc, res.hero_name || "Verified Hero");
+              }}><FileText className="h-3.5 w-3.5" /> Download Seeker Affidavit</Button>
             </div>
           ) : res.status === "disputed" ? (
             <div className="space-y-2">
