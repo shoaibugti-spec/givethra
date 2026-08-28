@@ -29,7 +29,8 @@ describe("completed helper detail flow", () => {
   it("requires explicit Admin confirmation and hides affidavit links for rejected or unconfirmed help", () => {
     expect(pageSource).toContain("function isApprovedCompletedResolution(resolution: any): boolean");
     expect(pageSource).toContain('const approvedStatus = ["approved", "completed", "verified", "confirmed"].includes(status);');
-    expect(pageSource).toContain('const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "dispatched"].includes(status);');
+    expect(pageSource).toContain('const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "pending_confirmation", "dispatched"].includes(status);');
+    expect(pageSource).toContain("resolution?.admin_confirmed_at");
     expect(pageSource).toContain("return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence);");
     expect(pageSource).toContain("const verifiedResolutions = myResolutions.filter(isApprovedCompletedResolution);");
     expect(pageSource).toContain("This was disputed — no affidavit is available.");

@@ -77,10 +77,12 @@ function isApprovedCompletedResolution(resolution: any): boolean {
     resolution?.admin_approved_at ||
     resolution?.approved_at ||
     resolution?.verified_at ||
-    resolution?.completed_at
+    resolution?.completed_at ||
+    resolution?.admin_confirmed_at
   );
   const approvedStatus = ["approved", "completed", "verified", "confirmed"].includes(status);
-  const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "dispatched"].includes(status);
+  const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "pending_confirmation", "dispatched"].includes(status);
+  // Admin-confirmed approved/completed rows are the source of truth for helper affidavits.
   return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence);
 }
 
