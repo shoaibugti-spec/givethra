@@ -420,6 +420,9 @@ export default function CaseDetailPage() {
   const isOwner = user?.id === caseData?.user_id;
   const isCompleted = normalizedStatus === "completed";
   const verifiedResolutions = myResolutions.filter(isApprovedCompletedResolution);
+  const verifiedDirectResolutions = verifiedResolutions.filter(r => !isContributionResolution(r));
+  const verifiedContributionResolutions = verifiedResolutions.filter(isContributionResolution);
+  const pendingResolutions = myResolutions.filter(r => !isApprovedCompletedResolution(r));
   const hasPaymentDetails = caseData?.institute_name || caseData?.account_number || caseData?.account_title || caseData?.account_iban;
   const unlockMode = myUnlock?.payment_type || payMode;
   const canHelpAgain = unlocked && !isOwner && !isCompleted && !isRejected && !isExpired;
@@ -760,7 +763,7 @@ export default function CaseDetailPage() {
               <div className="text-4xl">🤲</div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Verified completed help</p>
               <h1 className="text-2xl font-bold text-green-800 dark:text-green-200">Thank you for helping this case.</h1>
-              <p className="text-sm text-green-700 dark:text-green-300">The case is complete. Your payment and contribution actions are now closed. Your verified affidavit is available below only if your help was approved.</p>
+              <p className="text-sm text-green-700 dark:text-green-300">{verifiedDirectResolutions.length > 0 ? "You completed direct help for this case. Your case details, verified amount, and affidavit are shown below." : verifiedContributionResolutions.length > 0 ? "You made an approved contribution to this case. Your contribution amount, case details, and separate affidavit are shown below." : pendingResolutions.length > 0 ? "Thank you for trying to help. Your payment or contribution is still under verification, so no affidavit is available until Givethra confirms it." : "You unlocked this case, but no completed help was recorded from you. You can see the completed case status, but an affidavit is issued only to a confirmed helper."}</p>
             </div>
             <div className="rounded-xl bg-card border border-green-200 p-4 space-y-2">
               <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Case</span><span className="font-semibold text-right">{caseData.title || "Verified case"}</span></div>
@@ -774,7 +777,7 @@ export default function CaseDetailPage() {
               <div className="mt-3 space-y-2">{verifiedResolutions.map((resolution: any) => <Button key={resolution.id} size="sm" className="w-full gap-2 bg-green-600 hover:bg-green-700" onClick={() => generateAffidavit(caseData, resolution, seekerKyc, resolution.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> View &amp; Download Affidavit</Button>)}</div>
             </div>}
             {verifiedResolutions.length > 0 && <div className="space-y-3">
-              <h2 className="font-semibold text-green-800 dark:text-green-200">Your affidavit</h2>
+              <h2 className="font-semibold text-green-800 dark:text-green-200">Your affidavit(s) for this case</h2>
               {verifiedResolutions.map((r: any) => (
                 <div key={r.id} className="rounded-xl bg-card border border-green-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
@@ -875,6 +878,11 @@ export default function CaseDetailPage() {
                     <FileText className="h-4 w-4" /> View Payment Receipt
                   </a>
                 )}
+                {verifiedResolutions.length > 0 && <div className="rounded-xl border-2 border-green-300 bg-white p-4 text-center shadow-sm">
+                  <p className="text-sm font-bold text-green-800">Affidavit Download</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Your completed case record is ready. Each approved direct-help or contribution resolution has its own affidavit and verified amount.</p>
+                  <div className="mt-3 space-y-2">{verifiedResolutions.map((resolution: any) => <Button key={resolution.id} size="sm" className="w-full gap-2 bg-green-600 hover:bg-green-700" onClick={() => generateAffidavit(caseData, resolution, seekerKyc, resolution.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> View &amp; Download Affidavit</Button>)}</div>
+                </div>}
                 {existingFeedback && existingFeedback.status !== "rejected" ? (
                   <div className="rounded-xl bg-card border border-border p-4 text-center space-y-1">
                     <Star className="h-6 w-6 text-amber-400 mx-auto" fill="currentColor" />

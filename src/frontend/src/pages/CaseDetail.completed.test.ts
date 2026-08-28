@@ -18,7 +18,10 @@ describe("completed helper detail flow", () => {
     expect(pageSource).toContain("verifiedResolutions.length > 0");
     expect(pageSource).toContain("Affidavit Download");
     expect(pageSource).toContain("View & Download Affidavit");
-    expect(pageSource).toContain("Your payment and contribution actions are now closed");
+    expect(pageSource).toContain("You completed direct help for this case");
+    expect(pageSource).toContain("You unlocked this case, but no completed help was recorded from you");
+    expect(pageSource).toContain("Thank you for trying to help. Your payment or contribution is still under verification");
+    expect(pageSource).toContain("You made an approved contribution to this case");
     expect(pageSource).toContain("!isOwner && !isCompleted && unlockMode");
     expect(pageSource).toContain("!isCompleted && <div className=\"rounded-2xl bg-card border border-border p-5 space-y-3\">");
   });
@@ -37,6 +40,7 @@ describe("completed helper detail flow", () => {
     expect(pageSource).toContain("function isContributionResolution(resolution: any): boolean");
     expect(pageSource).toContain('["givethra", "contribution", "fundraising", "partial"]');
     expect(pageSource).toContain("verifiedResolutions.map");
+    expect(pageSource).toContain("Your completed case record is ready. Each approved direct-help or contribution resolution has its own affidavit and verified amount.");
     expect(pageSource).toContain("View & Download Affidavit");
     expect(pageSource).toContain("const last = d.slice(-4);");
     expect(pageSource).toContain("last 4 digits of an account/reference");
