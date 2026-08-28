@@ -792,9 +792,11 @@ export default function CaseDetailPage() {
               <h2 className="font-semibold text-green-800 dark:text-green-200">Your affidavit(s) for this case</h2>
               {verifiedResolutions.map((r: any) => (
                 <div key={r.id} className="rounded-xl bg-card border border-green-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
+                  <div className="space-y-1">
                     <p className="text-sm font-semibold">{sym} {r.seeker_confirmed_amount ?? r.amount_paid ?? 0} {cur}</p>
-                    <p className="text-xs text-muted-foreground">{r.resolution_type || "Verified assistance"} · Admin verified</p>
+                    <p className="text-xs text-muted-foreground">Case: {caseData.title || "Verified case"} · {caseData.category || "—"}</p>
+                    <p className="text-xs text-muted-foreground">Help: {r.resolution_type || (isContributionResolution(r) ? "Contribution" : "Direct help")} · Admin verified</p>
+                    <p className="text-xs font-medium text-green-700">{isContributionResolution(r) ? `Thank you for contributing ${sym} ${r.seeker_confirmed_amount ?? r.amount_paid ?? 0} ${cur}. Together, helpers completed this case.` : `Thank you for completing direct help of ${sym} ${r.seeker_confirmed_amount ?? r.amount_paid ?? 0} ${cur} for this case.`}</p>
                   </div>
                   <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, r.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> View & Download Affidavit</Button>
                 </div>

@@ -22,6 +22,10 @@ describe("completed helper detail flow", () => {
     expect(pageSource).toContain("You unlocked this case, but no completed help was recorded from you");
     expect(pageSource).toContain("Thank you for trying to help. Your payment or contribution is still under verification");
     expect(pageSource).toContain("You made an approved contribution to this case");
+    expect(pageSource).toContain("Thank you for contributing");
+    expect(pageSource).toContain("Thank you for completing direct help of");
+    expect(pageSource).toContain("Case: {caseData.title || \"Verified case\"}");
+    expect(pageSource).toContain("Help: {r.resolution_type || (isContributionResolution(r) ? \"Contribution\" : \"Direct help\")}");
     expect(pageSource).toContain("!isOwner && !isCompleted && unlockMode");
     expect(pageSource).toContain("!isCompleted && <div className=\"rounded-2xl bg-card border border-border p-5 space-y-3\">");
   });
