@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "@tanstack/react-router";
-import { FileText, Clock, CheckCircle2, XCircle, Eye, Heart, Plus, AlertTriangle, RefreshCw, ArrowRight, CalendarClock, AlertCircle } from "lucide-react";
+import { FileText, Clock, CheckCircle2, XCircle, Eye, Heart, Plus, AlertTriangle, RefreshCw, ArrowRight, CalendarClock, AlertCircle, HandCoins, Building2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
   getCasesByUser,
@@ -33,6 +33,11 @@ function isApprovedCompletedResolution(resolution: any): boolean {
   return adminConfirmed && ["approved", "completed"].includes(status);
 }
 
+function isContributionResolution(resolution: any): boolean {
+  const marker = String(resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? "").trim().toLowerCase();
+  return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
+}
+
 export default function MyCasesPage() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -47,7 +52,6 @@ export default function MyCasesPage() {
     }
     loadData();
 
-    // Reload when user returns to tab
     const onFocus = () => loadData();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -57,17 +61,12 @@ export default function MyCasesPage() {
     if (!user) return;
     setLoading(true);
     try {
-      // 1. Load the user's own requests. Keep rejected submissions visible and
-      // normalize status casing so every moderation tab receives its records.
       const cases = await getCasesByUser(user.id);
       setMyCases((Array.isArray(cases) ? cases : []).map((caseRecord: any) => ({
         ...caseRecord,
         status: String(caseRecord?.status || "pending").toLowerCase(),
       })));
 
-      // 2. Load both active unlocks and resolution history. Completed help is
-      // deliberately retained in case_resolutions after the case leaves the
-      // active unlock list, so it must be merged back into this history view.
       const [unlocksResult, resolutionsResult] = await Promise.all([
         getCaseUnlocksByHero(user.id),
         getCaseResolutionsByHero(user.id),
@@ -108,25 +107,36 @@ export default function MyCasesPage() {
         const merged = Array.from(recordsById.values()).map((caseRecord: any) => {
           const resolution = resolutionByCase.get(String(caseRecord.id));
           const isCompleted = isApprovedCompletedResolution(resolution);
-          return resolution && isCompleted ? {
+          let helpStatus = "pending";
+          if (resolution) {
+            const resStatus = String(resolution.status || "").toLowerCase();
+            if (isCompleted) helpStatus = "completed";
+            else if (resStatus === "rejected" || resStatus === "disputed") helpStatus = "rejected";
+            else helpStatus = "pending";
+          } else {
+            helpStatus = "pending";
+          }
+          // Determine help type: contribution or direct
+          const isContribution = resolution ? isContributionResolution(resolution) : false;
+          const helpType = isContribution ? "contribution" : "direct";
+          return {
             ...caseRecord,
-            status: "completed",
-            amount_collected: Number(resolution.amount_paid ?? resolution.seeker_confirmed_amount ?? caseRecord.amount_collected ?? 0),
-            completed_at: resolution.completed_at || resolution.admin_confirmed_at || caseRecord.updated_at,
-            resolution_id: resolution.id,
-            affidavit_available: true,
-          } : caseRecord;
+            status: String(caseRecord?.status || "pending").toLowerCase(),
+            amount_collected: Number(resolution?.amount_paid ?? resolution?.seeker_confirmed_amount ?? caseRecord.amount_collected ?? 0),
+            completed_at: resolution?.completed_at || resolution?.admin_confirmed_at || caseRecord.updated_at,
+            resolution_id: resolution?.id,
+            affidavit_available: isCompleted && resolution?.id ? true : false,
+            helpStatus,
+            helpType,
+            resolution,
+          };
         });
-        setUnlockedCases(merged.map((caseRecord: any) => ({
-          ...caseRecord,
-          status: String(caseRecord?.status || "pending").toLowerCase(),
-        })));
+        setUnlockedCases(merged);
       } else {
         setUnlockedCases([]);
       }
     } catch (err) {
       console.error("Failed to load cases:", err);
-      // keep existing state
     } finally {
       setLoading(false);
     }
@@ -140,15 +150,21 @@ export default function MyCasesPage() {
     expired: { icon: <CalendarClock className="h-3.5 w-3.5" />, label: "Expired", color: "bg-amber-100 text-amber-700" },
   };
 
+  const helpStatusConfig: any = {
+    pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Pending", color: "bg-orange-100 text-orange-700" },
+    completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Completed", color: "bg-blue-100 text-blue-700" },
+    rejected: { icon: <XCircle className="h-3.5 w-3.5" />, label: "Rejected", color: "bg-red-100 text-red-700" },
+  };
+
   function CaseRow({ c, isHelping = false }: { c: any; isHelping?: boolean }) {
-    const cfg = statusConfig[c.status] ?? statusConfig.pending;
+    const cfg = isHelping ? helpStatusConfig[c.helpStatus || "pending"] : statusConfig[c.status] ?? statusConfig.pending;
     const cur = c.currency || "USD";
     const s = sym(cur);
     const needed = Number(c.amount_needed ?? 0);
     const collected = Number(c.amount_collected ?? 0);
     const pct = needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
-    const isRejected = c.status === "rejected";
-    const isExpired = c.status === "expired";
+    const isRejected = isHelping ? c.helpStatus === "rejected" : c.status === "rejected";
+    const isExpired = !isHelping && c.status === "expired";
     const isFree = c.was_free === true || c.submission_type === "free";
 
     return (
@@ -160,6 +176,11 @@ export default function MyCasesPage() {
                 {cfg.icon} {cfg.label}
               </span>
               <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
+              {isHelping && (
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${c.helpType === "contribution" ? "bg-purple-100 text-purple-700" : "bg-cyan-100 text-cyan-700"}`}>
+                  {c.helpType === "contribution" ? "🤝 Contribution" : "🦸 Direct Help"}
+                </span>
+              )}
             </div>
             <p className="font-semibold">{c.title}</p>
             <p className="text-xs text-muted-foreground">📍 {c.city}, {c.country} {needed > 0 && `· ${s} ${needed} ${cur}`}</p>
@@ -178,96 +199,18 @@ export default function MyCasesPage() {
           </div>
         )}
 
-        {/* ============================================================
-            REJECTED CASE - FULL DETAILED NOTICE BOARD
-            ============================================================ */}
-        {isRejected && (
-          <div className="space-y-3">
-            {/* Main Rejection Banner */}
-            <div className="rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/20 p-4 space-y-3 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="bg-red-100 dark:bg-red-900/30 p-2 rounded-full shrink-0">
-                  <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-base font-bold text-red-800 dark:text-red-300">❌ Case Rejected</h4>
-                  <p className="text-xs text-red-600 dark:text-red-400">Your case was reviewed and could not be approved</p>
-                </div>
-              </div>
-
-              {/* Rejection Reason Box */}
-              <div className="bg-white dark:bg-red-950/50 rounded-lg border-2 border-red-200 dark:border-red-800 p-4">
-                <p className="text-[11px] font-semibold text-red-500 dark:text-red-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                  <AlertCircle className="h-4 w-4" /> Rejection Reason
-                </p>
-                <p className="text-sm text-red-900 dark:text-red-200 font-medium leading-relaxed whitespace-pre-line">
-                  {c.rejection_reason || "No specific reason provided. Please contact support for details."}
-                </p>
-                {c.reviewed_at && (
-                  <p className="text-[10px] text-red-400 dark:text-red-500 mt-2">
-                    Reviewed on: {new Date(c.reviewed_at).toLocaleDateString()} at {new Date(c.reviewed_at).toLocaleTimeString()}
-                  </p>
-                )}
-              </div>
-
-              {/* Refund/Free Status */}
-              <div className={`rounded-lg border p-3 ${isFree ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
-                <div className="flex items-start gap-2">
-                  {isFree ? (
-                    <RefreshCw className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
-                  ) : (
-                    <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                  )}
-                  <div>
-                    <p className={`text-sm font-semibold ${isFree ? "text-green-800 dark:text-green-300" : "text-blue-800 dark:text-blue-300"}`}>
-                      {isFree 
-                        ? "🎁 Your free submission has been returned!" 
-                        : "💳 1 credit has been refunded to your account!"}
-                    </p>
-                    <p className={`text-xs mt-0.5 ${isFree ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
-                      {isFree 
-                        ? "You can submit a new case for FREE again. Your free case allowance is restored." 
-                        : "You can re-submit this case using your refunded credit. No extra cost."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                <Button 
-                  size="sm" 
-                  className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white"
-                  onClick={() => navigate({ to: "/submit-request" })}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Edit & Re-submit Case
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="w-full gap-2 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                  onClick={() => navigate({ to: "/support" })}
-                >
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  Contact Support
-                </Button>
-              </div>
-            </div>
-
-            {/* ===== IMPORTANT: HIDE AMOUNT AND OTHER DETAILS FOR REJECTED CASES ===== */}
-            <div className="text-center py-1">
-              <p className="text-[11px] text-red-400 dark:text-red-500">
-                ⚠️ All case details have been hidden. Please re-submit a new case.
-              </p>
+        {/* Rejected Help message (for helping tab) */}
+        {isHelping && isRejected && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold">Your help was not verified</p>
+              <p className="text-xs text-red-600">Don't lose hope! Browse other cases and become a Hero.</p>
             </div>
           </div>
         )}
 
-        {/* ============================================================
-            EXPIRED CASE - NOTICE BOARD
-            ============================================================ */}
+        {/* Expired (only for My Requests) */}
         {isExpired && (
           <div className="space-y-3">
             <div className="rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/20 p-4 space-y-3 shadow-sm">
@@ -342,21 +285,11 @@ export default function MyCasesPage() {
           </div>
         )}
 
-        {/* Fallback for rejected without reason */}
-        {isRejected && !c.rejection_reason && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-            <AlertCircle className="h-4 w-4 inline mr-1.5" />
-            This case was rejected. Please contact support for details.
-          </div>
-        )}
-
-        {/* ===== VIEW DETAILS BUTTON - For non-rejected cases only ===== */}
-        {!isRejected && (
-          <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}>
-            {isHelping ? <Heart className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            {isHelping && c.status === "completed" && c.affidavit_available ? "View Affidavit & Completed Help" : isHelping && c.status === "completed" ? "View Completed Case" : isHelping ? "Continue Helping" : "View Details"}
-          </Button>
-        )}
+        {/* ===== VIEW DETAILS BUTTON ===== */}
+        <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}>
+          {isHelping ? <Heart className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          {isHelping && c.helpStatus === "completed" && c.affidavit_available ? "View Affidavit & Completed Help" : isHelping && c.helpStatus === "completed" ? "View Completed Case" : isHelping ? "Continue Helping" : "View Details"}
+        </Button>
       </div>
     );
   }
@@ -366,6 +299,18 @@ export default function MyCasesPage() {
   const myCompleted = myCases.filter(c => c.status === "completed");
   const myRejected = myCases.filter(c => c.status === "rejected");
   const myExpired = myCases.filter(c => c.status === "expired");
+
+  // Group unlocked cases by helpType and then by helpStatus
+  const contributionCases = unlockedCases.filter(c => c.helpType === "contribution");
+  const directHelpCases = unlockedCases.filter(c => c.helpType === "direct");
+
+  const contributionPending = contributionCases.filter(c => c.helpStatus === "pending");
+  const contributionCompleted = contributionCases.filter(c => c.helpStatus === "completed");
+  const contributionRejected = contributionCases.filter(c => c.helpStatus === "rejected");
+
+  const directPending = directHelpCases.filter(c => c.helpStatus === "pending");
+  const directCompleted = directHelpCases.filter(c => c.helpStatus === "completed");
+  const directRejected = directHelpCases.filter(c => c.helpStatus === "rejected");
 
   return (
     <Layout>
@@ -434,7 +379,7 @@ export default function MyCasesPage() {
               )}
             </TabsContent>
 
-            <TabsContent value="helping" className="space-y-3 mt-4">
+            <TabsContent value="helping" className="space-y-5 mt-4">
               {unlockedCases.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Heart className="h-10 w-10 mx-auto opacity-30 mb-2" />
@@ -442,7 +387,65 @@ export default function MyCasesPage() {
                   <Button size="sm" className="mt-3" onClick={() => navigate({ to: "/cases" })}>Browse Cases</Button>
                 </div>
               ) : (
-                unlockedCases.map(c => <CaseRow key={c.id} c={c} isHelping />)
+                <>
+                  {/* ===== CONTRIBUTIONS SECTION ===== */}
+                  {(contributionPending.length > 0 || contributionCompleted.length > 0 || contributionRejected.length > 0) && (
+                    <div className="space-y-4">
+                      <h2 className="text-md font-bold text-purple-700 flex items-center gap-2 border-b border-purple-200 pb-2">
+                        <HandCoins className="h-5 w-5" /> Contributions ({contributionCases.length})
+                      </h2>
+                      {contributionRejected.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
+                            <XCircle className="h-4 w-4" /> Rejected ({contributionRejected.length})
+                          </h3>
+                          {contributionRejected.map(c => <CaseRow key={c.id} c={c} isHelping />)}
+                        </div>
+                      )}
+                      {contributionPending.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-muted-foreground">⏳ Pending ({contributionPending.length})</h3>
+                          {contributionPending.map(c => <CaseRow key={c.id} c={c} isHelping />)}
+                        </div>
+                      )}
+                      {contributionCompleted.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-blue-600">✅ Completed ({contributionCompleted.length})</h3>
+                          {contributionCompleted.map(c => <CaseRow key={c.id} c={c} isHelping />)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ===== DIRECT HELP SECTION ===== */}
+                  {(directPending.length > 0 || directCompleted.length > 0 || directRejected.length > 0) && (
+                    <div className="space-y-4">
+                      <h2 className="text-md font-bold text-cyan-700 flex items-center gap-2 border-b border-cyan-200 pb-2">
+                        <Building2 className="h-5 w-5" /> Direct Help ({directHelpCases.length})
+                      </h2>
+                      {directRejected.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5">
+                            <XCircle className="h-4 w-4" /> Rejected ({directRejected.length})
+                          </h3>
+                          {directRejected.map(c => <CaseRow key={c.id} c={c} isHelping />)}
+                        </div>
+                      )}
+                      {directPending.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-muted-foreground">⏳ Pending ({directPending.length})</h3>
+                          {directPending.map(c => <CaseRow key={c.id} c={c} isHelping />)}
+                        </div>
+                      )}
+                      {directCompleted.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-blue-600">✅ Completed ({directCompleted.length})</h3>
+                          {directCompleted.map(c => <CaseRow key={c.id} c={c} isHelping />)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </TabsContent>
           </Tabs>
