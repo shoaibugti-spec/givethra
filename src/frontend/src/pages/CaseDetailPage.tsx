@@ -72,8 +72,16 @@ function copyToClipboard(text: string, label: string) {
 
 function isApprovedCompletedResolution(resolution: any): boolean {
   const status = String(resolution?.status || "").trim().toLowerCase();
-  const adminConfirmed = resolution?.admin_confirmed === 1 || resolution?.admin_confirmed === true || resolution?.admin_confirmed === "1" || String(resolution?.admin_confirmed || "").toLowerCase() === "true";
-  return adminConfirmed && ["approved", "completed"].includes(status);
+  const adminConfirmed = [1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed);
+  const hasApprovalEvidence = Boolean(
+    resolution?.admin_approved_at ||
+    resolution?.approved_at ||
+    resolution?.verified_at ||
+    resolution?.completed_at
+  );
+  const approvedStatus = ["approved", "completed", "verified", "confirmed"].includes(status);
+  const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "dispatched"].includes(status);
+  return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence);
 }
 
 function isContributionResolution(resolution: any): boolean {
@@ -208,7 +216,8 @@ function CopyRow({ label, value, mono }: { label: string; value?: string; mono?:
 export default function CaseDetailPage() {
   const { id } = useParams({ from: "/cases/$id" });
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, userId, isAuthenticated } = useAuth();
+  const durableUserId = String(userId || user?.id || "");
   const [caseData, setCaseData] = useState<any>(null);
   const [seekerKyc, setSeekerKyc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -290,19 +299,19 @@ export default function CaseDetailPage() {
       }
       setCaseData(data);
 
-      if (user && data) {
-        const owner = data.user_id === user.id;
-        const suspension = await getUserSuspension(user.id);
+      if (user && data && durableUserId) {
+        const owner = String(data.user_id || "") === durableUserId;
+        const suspension = await getUserSuspension(durableUserId);
         setIsSuspended(Boolean(suspension?.is_active));
-        const unlock = await getCaseUnlock(id, user.id);
+        const unlock = await getCaseUnlock(id, durableUserId);
         setMyUnlock(unlock);
 
         // A completed helper may have a resolution even when the legacy unlock row is missing.
         // Keep that verified history open so the affidavit remains accessible.
-        const count = await getUserUnlockCount(user.id);
+        const count = await getUserUnlockCount(durableUserId);
         setUserUnlockCount(Number(count ?? 0));
 
-        const res = await getCaseResolutions(id, user.id);
+        const res = await getCaseResolutions(id, owner ? undefined : durableUserId);
         const resolutions = Array.isArray(res) ? res : [];
         setMyResolutions(resolutions.slice().reverse());
         const completed = String(data.status || "").toLowerCase() === "completed";
@@ -311,7 +320,7 @@ export default function CaseDetailPage() {
         const kyc = await getKycSubmission(data.user_id);
         setSeekerKyc(kyc);
 
-        const prof = await getProfile(user.id);
+        const prof = await getProfile(durableUserId);
         const nm = (prof?.full_name || "").split(" ")[0];
         if (nm) setHeroName(nm);
 
@@ -759,6 +768,11 @@ export default function CaseDetailPage() {
               <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Verified help delivered</span><span className="font-bold text-primary">{sym} {amountCollected || myResolutions.reduce((sum, r) => sum + Number(r.seeker_confirmed_amount ?? r.amount_paid ?? 0), 0)} {cur}</span></div>
               <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Status</span><span className="font-semibold text-green-700">Completed ✓</span></div>
             </div>
+            {verifiedResolutions.length > 0 && <div className="rounded-xl border-2 border-green-300 bg-white p-4 text-center shadow-sm">
+              <p className="text-sm font-bold text-green-800">Affidavit Download</p>
+              <p className="mt-1 text-xs text-muted-foreground">Your approved help has been verified. Download your complete affidavit below.</p>
+              <div className="mt-3 space-y-2">{verifiedResolutions.map((resolution: any) => <Button key={resolution.id} size="sm" className="w-full gap-2 bg-green-600 hover:bg-green-700" onClick={() => generateAffidavit(caseData, resolution, seekerKyc, resolution.hero_name || heroName)}><FileText className="h-3.5 w-3.5" /> View &amp; Download Affidavit</Button>)}</div>
+            </div>}
             {verifiedResolutions.length > 0 && <div className="space-y-3">
               <h2 className="font-semibold text-green-800 dark:text-green-200">Your affidavit</h2>
               {verifiedResolutions.map((r: any) => (

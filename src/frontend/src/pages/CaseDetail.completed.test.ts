@@ -16,6 +16,7 @@ describe("completed helper detail flow", () => {
   it("renders a read-only completed helper view with an approved-help-only affidavit action", () => {
     expect(pageSource).toContain("COMPLETED HELP VIEW (helper only)");
     expect(pageSource).toContain("verifiedResolutions.length > 0");
+    expect(pageSource).toContain("Affidavit Download");
     expect(pageSource).toContain("View & Download Affidavit");
     expect(pageSource).toContain("Your payment and contribution actions are now closed");
     expect(pageSource).toContain("!isOwner && !isCompleted && unlockMode");
@@ -24,7 +25,9 @@ describe("completed helper detail flow", () => {
 
   it("requires explicit Admin confirmation and hides affidavit links for rejected or unconfirmed help", () => {
     expect(pageSource).toContain("function isApprovedCompletedResolution(resolution: any): boolean");
-    expect(pageSource).toContain('return adminConfirmed && ["approved", "completed"].includes(status);');
+    expect(pageSource).toContain('const approvedStatus = ["approved", "completed", "verified", "confirmed"].includes(status);');
+    expect(pageSource).toContain('const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "dispatched"].includes(status);');
+    expect(pageSource).toContain("return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence);");
     expect(pageSource).toContain("const verifiedResolutions = myResolutions.filter(isApprovedCompletedResolution);");
     expect(pageSource).toContain("This was disputed — no affidavit is available.");
     expect(myCasesSource).toContain('c.affidavit_available ? "View Affidavit & Completed Help" :');
