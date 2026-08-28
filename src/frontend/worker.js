@@ -1700,11 +1700,22 @@ async function handleRequest(request, env, ctx) {
         const filters = [];
         const bind = [];
         if (caseId) { filters.push("r.case_id = ?"); bind.push(caseId); }
-        if (heroId) { filters.push("r.hero_id = ?"); bind.push(heroId); }
+        if (heroId) {
+          // Legacy Google users can retain an older hero_id while their verified email
+          // is unchanged. If IDs differ, return only rows owned by that authenticated email.
+          if (user?.user_id === heroId) {
+            filters.push("r.hero_id = ?");
+            bind.push(heroId);
+          } else if (String(user?.email || "").trim()) {
+            filters.push("lower(u.email) = lower(?)");
+            bind.push(String(user.email).trim());
+          } else {
+            return json({ error: "Forbidden" }, 403, origin);
+          }
+        }
         if (!filters.length) return json({ error: "case_id or hero_id is required" }, 400, origin);
         // A helper may read only their own resolution rows; the case owner may read the case set.
         // The frontend applies the separate approved/completed affidavit gate after this query.
-        if (!user || (heroId && user.user_id !== heroId)) return json({ error: "Forbidden" }, 403, origin);
         const sql = "SELECT r.*, c.title AS case_title, c.category AS case_category, c.city AS case_city, c.country AS case_country, c.institute_name AS case_institute_name, c.payment_method AS case_payment_method, c.account_number AS case_account_number, c.account_iban AS case_account_iban, c.reference_number AS case_reference_number, COALESCE(p.full_name, u.full_name) AS hero_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.hero_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS hero_cnic_number, COALESCE(sp.full_name, su.full_name) AS seeker_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.seeker_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS seeker_cnic_number FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id LEFT JOIN profiles p ON p.user_id = r.hero_id LEFT JOIN users u ON u.user_id = r.hero_id LEFT JOIN profiles sp ON sp.user_id = r.seeker_id LEFT JOIN users su ON su.user_id = r.seeker_id WHERE " + filters.join(" AND ") + " ORDER BY r.submitted_at DESC";
         const rows = await env.DB.prepare(sql).bind(...bind).all();
         return json(rows.results || [], 200, origin);

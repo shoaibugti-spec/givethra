@@ -38,6 +38,8 @@ describe("completed helper detail flow", () => {
     expect(pageSource).toContain("return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence);");
     expect(pageSource).toContain("function getEligibleAffidavitResolutions(resolutions: any[]): any[]");
     expect(pageSource).toContain("const verifiedResolutions = getEligibleAffidavitResolutions(myResolutions);");
+    expect(workerSource).toContain("If IDs differ, return only rows owned by that authenticated email");
+    expect(workerSource).toContain('filters.push("lower(u.email) = lower(?)")');
     expect(workerSource).toContain("A helper may read only their own resolution rows");
     expect(pageSource).toContain("This was disputed — no affidavit is available.");
     expect(myCasesSource).toContain('c.affidavit_available ? "View Affidavit & Completed Help" :');
