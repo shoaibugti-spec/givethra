@@ -1740,14 +1740,24 @@ async function handleRequest(request, env, ctx) {
           if (suspension) return suspendedActionResponse(origin, suspension);
         }
         await env.DB.prepare(
-          `INSERT INTO case_resolutions
-            (id, case_id, hero_id, seeker_id, resolution_type, amount_paid, transaction_id, receipt_url, notes, status, paid_to, submitted_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          resolutionId, caseId, heroId, body.seeker_id || null, body.resolution_type || null,
-          body.amount_paid ?? body.amount ?? null, body.transaction_id || null, body.receipt_url || null,
-          body.notes || null, body.status || "pending_confirmation", body.paid_to === "givethra" ? "givethra" : "institute", now()
-        ).run();
+  `INSERT INTO case_resolutions
+    (id, case_id, hero_id, hero_email, seeker_id, resolution_type, amount_paid, transaction_id, receipt_url, notes, status, paid_to, submitted_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+).bind(
+  resolutionId,
+  caseId,
+  heroId,
+  body.hero_email || null,   // ✅ نئی فیلڈ
+  body.seeker_id || null,
+  body.resolution_type || null,
+  body.amount_paid ?? body.amount ?? null,
+  body.transaction_id || null,
+  body.receipt_url || null,
+  body.notes || null,
+  body.status || "pending_confirmation",
+  body.paid_to === "givethra" ? "givethra" : "institute",
+  now()
+).run();
         const saved = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(resolutionId).first();
         return json(saved || { id: resolutionId, ...body, status: body.status || "pending_confirmation", submitted_at: now() }, 201, origin);
       }
