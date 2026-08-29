@@ -81,9 +81,10 @@ function isApprovedCompletedResolution(resolution: any): boolean {
     resolution?.completed_at ||
     resolution?.admin_confirmed_at
   );
+  // Allow approved/completed status even if admin_confirmed is not explicitly set
   const approvedStatus = ["approved", "completed", "verified", "confirmed"].includes(status);
   const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "pending_confirmation", "dispatched"].includes(status);
-  return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence);
+  return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence || status === "completed" || status === "approved");
 }
 
 function isContributionResolution(resolution: any): boolean {
@@ -763,7 +764,7 @@ export default function CaseDetailPage() {
   }
 
   // ============================================================
-  //  COMPLETED HELP VIEW (helper only) - WITH AFFIDAVIT
+  //  COMPLETED HELP VIEW (helper only) - CORRECTED
   // ============================================================
   if (isCompleted && !isOwner) {
     const totalDirectAmount = approvedRecords.filter(r => r.type === "direct").reduce((sum, r) => sum + r.amount, 0);
@@ -778,8 +779,9 @@ export default function CaseDetailPage() {
           </button>
           <section className="rounded-2xl border-2 border-green-200 bg-green-50 dark:bg-green-950/20 p-6 space-y-5">
 
-            {/* ===== CONDITIONAL MESSAGES ===== */}
+            {/* ===== CORRECTED CONDITIONAL MESSAGES ===== */}
             {hasApprovedDirect ? (
+              // ===== DIRECT HELP (FULL) =====
               <div className="text-center space-y-3">
                 <div className="text-5xl">🦸‍♂️</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Direct Help Completed</p>
@@ -794,6 +796,7 @@ export default function CaseDetailPage() {
                 </Button>
               </div>
             ) : hasApprovedContribution ? (
+              // ===== CONTRIBUTION (PARTIAL) =====
               <div className="text-center space-y-3">
                 <div className="text-5xl">🌟</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Contribution Completed</p>
@@ -808,6 +811,7 @@ export default function CaseDetailPage() {
                 </Button>
               </div>
             ) : isOnlyUnlockOrRejected ? (
+              // ===== UNLOCKED BUT REJECTED / NO HELP =====
               <div className="text-center space-y-3">
                 <div className="text-5xl">💪</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Encouragement for Heroes</p>
@@ -822,6 +826,7 @@ export default function CaseDetailPage() {
                 </Button>
               </div>
             ) : (
+              // ===== FALLBACK (should not happen) =====
               <div className="text-center space-y-2">
                 <div className="text-4xl">🤲</div>
                 <h1 className="text-2xl font-bold text-green-800">Thank you for engaging with this case.</h1>
