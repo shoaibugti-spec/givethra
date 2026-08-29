@@ -28,9 +28,11 @@ function sym(cur?: string) {
 }
 
 function isApprovedCompletedResolution(resolution: any): boolean {
+  if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
   const adminConfirmed = resolution?.admin_confirmed === 1 || resolution?.admin_confirmed === true || resolution?.admin_confirmed === "1" || String(resolution?.admin_confirmed || "").toLowerCase() === "true";
-  return adminConfirmed && ["approved", "completed"].includes(status);
+  // Also consider status as "completed" or "approved"
+  return adminConfirmed && (status === "approved" || status === "completed" || status === "verified" || status === "confirmed");
 }
 
 function isContributionResolution(resolution: any): boolean {
@@ -69,79 +71,127 @@ export default function MyCasesPage() {
     if (!user) return;
     setLoading(true);
     try {
+      // 1. Load user's own cases
       const cases = await getCasesByUser(user.id);
       setMyCases((Array.isArray(cases) ? cases : []).map((caseRecord: any) => ({
         ...caseRecord,
         status: String(caseRecord?.status || "pending").toLowerCase(),
       })));
 
+      // 2. Load unlocks and resolutions for the user (as a hero)
       const [unlocksResult, resolutionsResult] = await Promise.all([
         getCaseUnlocksByHero(user.id),
         getCaseResolutionsByHero(user.id),
       ]);
       const unlocks = Array.isArray(unlocksResult) ? unlocksResult : [];
       const resolutions = Array.isArray(resolutionsResult) ? resolutionsResult : [];
+
+      // Get unique case IDs from unlocks and resolutions
       const caseIds = Array.from(new Set([
         ...unlocks.map((unlock: any) => String(unlock.case_id || "")).filter(Boolean),
         ...resolutions.map((resolution: any) => String(resolution.case_id || "")).filter(Boolean),
       ]));
-      if (caseIds.length > 0) {
-        const unlockedData = await getCasesByIds(caseIds);
-        const resolutionByCase = new Map<string, any>();
-        resolutions.forEach((resolution: any) => {
-          const key = String(resolution.case_id || "");
-          const current = resolutionByCase.get(key);
-          if (!current || new Date(String(resolution.completed_at || resolution.admin_confirmed_at || resolution.submitted_at || 0)).getTime() > new Date(String(current.completed_at || current.admin_confirmed_at || current.submitted_at || 0)).getTime()) {
-            resolutionByCase.set(key, resolution);
-          }
-        });
-        const recordsById = new Map<string, any>((Array.isArray(unlockedData) ? unlockedData : []).map((record: any) => [String(record?.id || ""), record]));
-        resolutions.forEach((resolution: any) => {
-          const caseId = String(resolution?.case_id || "");
-          if (caseId && !recordsById.has(caseId)) {
-            recordsById.set(caseId, {
-              id: caseId,
-              title: resolution.case_title || "Completed help",
-              category: resolution.case_category || "Help",
-              country: resolution.case_country || "",
-              city: resolution.case_city || "",
-              currency: resolution.currency || "PKR",
-              amount_needed: resolution.amount_paid || 0,
-              amount_collected: resolution.amount_paid || 0,
-              status: "completed",
-            });
-          }
-        });
-        const merged = Array.from(recordsById.values()).map((caseRecord: any) => {
-          const resolution = resolutionByCase.get(String(caseRecord.id));
-          const isCompleted = isApprovedCompletedResolution(resolution);
-          let helpStatus = "pending";
-          if (resolution) {
-            const resStatus = String(resolution.status || "").toLowerCase();
-            if (isCompleted) helpStatus = "completed";
-            else if (resStatus === "rejected" || resStatus === "disputed") helpStatus = "rejected";
-            else helpStatus = "pending";
+
+      if (caseIds.length === 0) {
+        setUnlockedCases([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch full case details for these IDs
+      const unlockedData = await getCasesByIds(caseIds);
+      const caseMap = new Map<string, any>();
+      (Array.isArray(unlockedData) ? unlockedData : []).forEach((record: any) => {
+        if (record?.id) caseMap.set(String(record.id), record);
+      });
+
+      // Build a map of the latest resolution per case (if any)
+      const resolutionByCase = new Map<string, any>();
+      resolutions.forEach((resolution: any) => {
+        const key = String(resolution.case_id || "");
+        const current = resolutionByCase.get(key);
+        if (!current || new Date(String(resolution.completed_at || resolution.admin_confirmed_at || resolution.submitted_at || 0)).getTime() > new Date(String(current.completed_at || current.admin_confirmed_at || current.submitted_at || 0)).getTime()) {
+          resolutionByCase.set(key, resolution);
+        }
+      });
+
+      // Also include any case that has a resolution but wasn't in the unlocks list
+      resolutions.forEach((resolution: any) => {
+        const caseId = String(resolution.case_id || "");
+        if (caseId && !caseMap.has(caseId)) {
+          // Create a minimal case record from resolution data
+          caseMap.set(caseId, {
+            id: caseId,
+            title: resolution.case_title || "Completed help",
+            category: resolution.case_category || "Help",
+            country: resolution.case_country || "",
+            city: resolution.case_city || "",
+            currency: resolution.currency || "PKR",
+            amount_needed: resolution.amount_paid || 0,
+            amount_collected: resolution.amount_paid || 0,
+            status: "completed",
+          });
+        }
+      });
+
+      // Now build the final list for "My Help"
+      const merged: any[] = [];
+      for (const [caseId, caseRecord] of caseMap) {
+        const resolution = resolutionByCase.get(caseId);
+        const unlock = unlocks.find((u: any) => String(u.case_id) === caseId);
+
+        // Determine help type: Contribution vs Direct Help
+        let helpType: string = "direct"; // default
+        if (resolution) {
+          // If there is a resolution, use its paid_to field
+          helpType = isContributionResolution(resolution) ? "contribution" : "direct";
+        } else if (unlock) {
+          // If only unlock exists, check payment_type
+          helpType = unlock.payment_type === "partial" ? "contribution" : "direct";
+        }
+
+        // Determine help status
+        let helpStatus: string = "pending";
+        if (resolution) {
+          const isApproved = isApprovedCompletedResolution(resolution);
+          const status = String(resolution.status || "").toLowerCase();
+          if (isApproved) {
+            helpStatus = "completed";
+          } else if (status === "rejected" || status === "disputed") {
+            helpStatus = "rejected";
           } else {
             helpStatus = "pending";
           }
-          const isContribution = resolution ? isContributionResolution(resolution) : false;
-          const helpType = isContribution ? "contribution" : "direct";
-          return {
-            ...caseRecord,
-            status: String(caseRecord?.status || "pending").toLowerCase(),
-            amount_collected: Number(resolution?.amount_paid ?? resolution?.seeker_confirmed_amount ?? caseRecord.amount_collected ?? 0),
-            completed_at: resolution?.completed_at || resolution?.admin_confirmed_at || caseRecord.updated_at,
-            resolution_id: resolution?.id,
-            affidavit_available: isCompleted && resolution?.id ? true : false,
-            helpStatus,
-            helpType,
-            resolution,
-          };
+        } else {
+          // No resolution, just unlock. Status is pending unless case is completed.
+          const caseStatus = String(caseRecord.status || "").toLowerCase();
+          if (caseStatus === "completed") {
+            helpStatus = "completed";
+          } else {
+            helpStatus = "pending";
+          }
+        }
+
+        // Override: If the case itself is completed, mark help as completed regardless of resolution status
+        if (String(caseRecord.status || "").toLowerCase() === "completed") {
+          helpStatus = "completed";
+        }
+
+        merged.push({
+          ...caseRecord,
+          status: String(caseRecord?.status || "pending").toLowerCase(),
+          amount_collected: Number(resolution?.amount_paid ?? resolution?.seeker_confirmed_amount ?? caseRecord.amount_collected ?? 0),
+          completed_at: resolution?.completed_at || resolution?.admin_confirmed_at || caseRecord.updated_at,
+          resolution_id: resolution?.id,
+          affidavit_available: helpStatus === "completed" && resolution?.id ? true : false,
+          helpType,
+          helpStatus,
+          resolution,
+          unlock,
         });
-        setUnlockedCases(merged);
-      } else {
-        setUnlockedCases([]);
       }
+
+      setUnlockedCases(merged);
     } catch (err) {
       console.error("Failed to load cases:", err);
     } finally {
@@ -158,13 +208,15 @@ export default function MyCasesPage() {
   };
 
   function CaseRow({ c, isHelping = false }: { c: any; isHelping?: boolean }) {
-    const cfg = isHelping ? statusConfig[c.helpStatus || "pending"] : statusConfig[c.status] ?? statusConfig.pending;
+    // For helping tab, use helpStatus; for my cases tab, use status
+    const statusKey = isHelping ? c.helpStatus : c.status;
+    const cfg = statusConfig[statusKey] ?? statusConfig.pending;
     const cur = c.currency || "USD";
     const s = sym(cur);
     const needed = Number(c.amount_needed ?? 0);
     const collected = Number(c.amount_collected ?? 0);
     const pct = needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
-    const isRejected = isHelping ? c.helpStatus === "rejected" : c.status === "rejected";
+    const isRejected = statusKey === "rejected";
     const isExpired = !isHelping && c.status === "expired";
     const isFree = c.was_free === true || c.submission_type === "free";
 
@@ -292,13 +344,28 @@ export default function MyCasesPage() {
     );
   }
 
-  // Helper to filter cases by status for My Cases
-  const filteredMyCases = myCases.filter(c => c.status === myCaseStatusFilter);
+  // Helper to filter cases by status for My Cases (case-insensitive)
+  const filteredMyCases = myCases.filter(c => {
+    const status = String(c.status || "").toLowerCase();
+    if (myCaseStatusFilter === "approved") {
+      // Treat "approved" and "published" as the same
+      return status === "approved" || status === "published";
+    }
+    return status === myCaseStatusFilter;
+  });
 
   // Helper to filter unlocked cases by type and status for My Help
-  const filteredHelpCases = unlockedCases.filter(c => 
-    c.helpType === helpTypeFilter && c.helpStatus === helpStatusFilter
-  );
+  const filteredHelpCases = unlockedCases.filter(c => {
+    const typeMatch = c.helpType === helpTypeFilter;
+    let statusMatch = false;
+    const status = String(c.helpStatus || "").toLowerCase();
+    if (helpStatusFilter === "approved") {
+      statusMatch = status === "approved" || status === "published" || status === "completed";
+    } else {
+      statusMatch = status === helpStatusFilter;
+    }
+    return typeMatch && statusMatch;
+  });
 
   return (
     <Layout>
