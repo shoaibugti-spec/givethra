@@ -1012,9 +1012,7 @@ export default function CaseDetailPage() {
                 <div>
                   <h3 className="font-bold text-foreground">Choose how you want to help</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {isFirstThreeUnlocks
-                      ? `🎉 This is your #${userUnlockCount + 1} unlock — it's FREE! (${3 - userUnlockCount} free remaining)`
-                      : `Unlock this case (1 credit) and help.`}
+                    Direct payment always costs 1 credit (protects the seeker's privacy). Contribution: {isFirstThreeUnlocks ? `your first 3 are FREE — ${3 - userUnlockCount} left!` : "1 credit."}
                   </p>
                 </div>
                 {!isAuthenticated ? (
