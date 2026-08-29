@@ -1141,6 +1141,11 @@ export default function CaseDetailPage() {
                             </span>
                             <span className="text-sm font-bold text-primary">{sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</span>
                           </div>
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            <p>Type: {isContributionResolution(r) ? "Contribution" : "Direct Payment"} · Method: {r.resolution_type || "—"}</p>
+                            <p>TXN ID: <span className="font-mono">{r.transaction_id || "—"}</span></p>
+                            {r.receipt_url && <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary"><ExternalLink className="h-3 w-3" /> View Receipt File</a>}
+                          </div>
                           {isVerified ? (
                             <Button size="sm" variant="outline" className="w-full gap-2 border-green-300 text-green-700" onClick={() => {
                               const record = { type: isContributionResolution(r) ? "contribution" : "direct", amount: r.seeker_confirmed_amount ?? r.amount_paid, transactionId: r.transaction_id, receiptUrl: r.receipt_url, resolution: r, isApproved: true };
