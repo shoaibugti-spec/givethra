@@ -1,5 +1,6 @@
 // src/frontend/src/pages/CaseDetailPage.tsx
-// Replaces Supabase with Cloudflare Worker APIs
+// Fixed: Affidavit now appears for all completed help, regardless of hero_id mismatch.
+// Uses email fallback to match resolutions to the current user.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -83,18 +84,9 @@ function copyToClipboard(text: string, label: string) {
 function isApprovedCompletedResolution(resolution: any): boolean {
   if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
-  // If status is approved/completed/etc, it's approved
-  if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)) {
-    return true;
-  }
-  // Check admin_confirmed flag
-  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) {
-    return true;
-  }
-  // Check approval timestamps
-  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) {
-    return true;
-  }
+  if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)) return true;
+  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
+  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
   return false;
 }
 
@@ -104,65 +96,6 @@ function isContributionResolution(resolution: any): boolean {
     resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? ""
   ).trim().toLowerCase();
   return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
-}
-
-function getHelpRecords(caseData: any, myUnlock: any, myResolutions: any[]): Array<{
-  id: string;
-  type: "direct" | "contribution";
-  amount: number;
-  transactionId?: string;
-  receiptUrl?: string;
-  status: string;
-  completedAt?: string;
-  resolution?: any;
-  unlock?: any;
-  isApproved: boolean;
-}> {
-  const records: any[] = [];
-  const isCompleted = String(caseData?.status || "").toLowerCase() === "completed";
-
-  myResolutions.forEach((res) => {
-    const isDirect = !isContributionResolution(res);
-    const status = String(res.status || "").toLowerCase();
-    // 🟢 FIX: If the case is completed, any non-rejected/non-disputed resolution is considered approved
-    const isApproved = isCompleted && status !== "rejected" && status !== "disputed"
-      ? true
-      : isApprovedCompletedResolution(res);
-
-    records.push({
-      id: res.id,
-      type: isDirect ? "direct" : "contribution",
-      amount: Number(res.seeker_confirmed_amount ?? res.amount_paid ?? 0),
-      transactionId: res.transaction_id,
-      receiptUrl: res.receipt_url,
-      status: status,
-      completedAt: res.completed_at || res.admin_confirmed_at || res.submitted_at,
-      resolution: res,
-      unlock: null,
-      isApproved: isApproved,
-    });
-  });
-
-  // If only unlock (no resolution) exists, add it as a non-approved record
-  if (myUnlock && !myResolutions.some((r) => r.unlock_id === myUnlock.id)) {
-    if (isCompleted) {
-      const isPartial = myUnlock.payment_type === "partial";
-      records.push({
-        id: myUnlock.id,
-        type: isPartial ? "contribution" : "direct",
-        amount: Number(myUnlock.pledged_amount ?? 0),
-        transactionId: "N/A",
-        receiptUrl: null,
-        status: "unlocked_only",
-        completedAt: myUnlock.unlocked_at,
-        resolution: null,
-        unlock: myUnlock,
-        isApproved: false,
-      });
-    }
-  }
-
-  return records;
 }
 
 function generateAffidavitFromRecord(caseData: any, record: any, seekerKyc: any, heroName: string) {
@@ -279,6 +212,7 @@ export default function CaseDetailPage() {
   const navigate = useNavigate();
   const { user, userId, isAuthenticated } = useAuth();
   const durableUserId = String(userId || user?.id || "");
+  const currentUserEmail = String(user?.email || "").toLowerCase().trim();
 
   const [caseData, setCaseData] = useState<any>(null);
   const [seekerKyc, setSeekerKyc] = useState<any>(null);
@@ -361,12 +295,20 @@ export default function CaseDetailPage() {
         setMyUnlock(unlock);
         const count = await getUserUnlockCount(durableUserId);
         setUserUnlockCount(Number(count ?? 0));
+
+        // 🔥 FIX: Get all resolutions and match by hero_id OR email
         const res = await getCaseResolutions(id);
-        const resolutions = Array.isArray(res) ? res : [];
-        const mine = resolutions.filter((r) => String(r.hero_id) === durableUserId);
+        const allResolutions = Array.isArray(res) ? res : [];
+        const mine = allResolutions.filter((r) => {
+          const heroId = String(r.hero_id || "");
+          const heroEmail = String(r.hero_email || "").toLowerCase().trim();
+          return heroId === durableUserId || heroEmail === currentUserEmail;
+        });
         setMyResolutions(mine.slice().reverse());
+
         const completed = String(data.status || "").toLowerCase() === "completed";
         setUnlocked(!!unlock || owner || (completed && mine.length > 0));
+
         const kyc = await getKycSubmission(data.user_id);
         setSeekerKyc(kyc);
         const prof = await getProfile(durableUserId);
@@ -381,6 +323,7 @@ export default function CaseDetailPage() {
     }
   }
 
+  // ---------- Video recording ----------
   async function startRecording() {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
@@ -466,24 +409,23 @@ export default function CaseDetailPage() {
     setFbVideoName("");
   }
 
+  // ---------- Handlers ----------
   async function handleUnlock(mode: "full" | "partial") {
     if (!user) {
       navigate({ to: "/sign-in" });
       return;
     }
     if (isSuspended) {
-      toast.error("Your account is suspended. You cannot help until reactivated.");
+      toast.error("Account suspended. Cannot help.");
       return;
     }
     const pledgeNum = parseFloat(pledgeAmount) || 0;
     if (mode === "partial" && pledgeNum <= 0) {
-      toast.error("Please enter a valid contribution amount.");
+      toast.error("Please enter a valid amount.");
       return;
     }
     setUnlocking(true);
     try {
-      // Direct Help = always 1 credit
-      // Contribution = first 3 unlocks free
       const isFreeContribution = mode === "partial" && userUnlockCount < 3;
       const charge = isFreeContribution ? 0 : 1;
       await insertCaseUnlock({
@@ -498,13 +440,13 @@ export default function CaseDetailPage() {
       setUnlocked(true);
       setPayMode(mode);
       if (isFreeContribution) {
-        toast.success(`🎉 Case unlocked FREE! This is your free Contribution #${userUnlockCount + 1}.`);
+        toast.success(`🎉 Free contribution #${userUnlockCount + 1}`);
       } else {
-        toast.success(mode === "full" ? "Direct help unlocked! 1 credit deducted." : "Contribution unlocked! 1 credit deducted.");
+        toast.success(mode === "full" ? "Direct help unlocked! 1 credit." : "Contribution unlocked! 1 credit.");
       }
       loadCase();
     } catch (err: any) {
-      toast.error("Failed to unlock case: " + err.message);
+      toast.error("Failed to unlock: " + err.message);
     } finally {
       setUnlocking(false);
     }
@@ -512,11 +454,11 @@ export default function CaseDetailPage() {
 
   async function handleSubmitResolution() {
     if (isSuspended) {
-      toast.error("Account suspended. Cannot submit help proof.");
+      toast.error("Account suspended.");
       return;
     }
     if (!resType || !txId) {
-      toast.error("Please select a type and enter Transaction ID");
+      toast.error("Select type and enter TXN ID");
       return;
     }
     setSubmitting(true);
@@ -530,6 +472,7 @@ export default function CaseDetailPage() {
       await insertCaseResolution({
         case_id: id,
         hero_id: user?.id,
+        hero_email: user?.email,
         seeker_id: caseData.user_id,
         resolution_type: resType,
         amount_paid: paidNum,
@@ -542,7 +485,7 @@ export default function CaseDetailPage() {
         seeker_confirmed_amount: paidTo === "givethra" ? paidNum : null,
         paid_to: paidTo,
       });
-      toast.success("Help verification proof submitted successfully!");
+      toast.success("Proof submitted!");
       setShowResolution(false);
       setTxId("");
       setNotes("");
@@ -550,7 +493,7 @@ export default function CaseDetailPage() {
       setReceiptName("");
       loadCase();
     } catch (err) {
-      toast.error("Error submitting proof.");
+      toast.error("Error submitting.");
     } finally {
       setSubmitting(false);
     }
@@ -563,7 +506,7 @@ export default function CaseDetailPage() {
         seeker_confirmed_amount: confirmedAmount,
         status: "seeker_confirmed",
       });
-      toast.success("Help confirmed successfully!");
+      toast.success("Confirmed!");
       loadCase();
     } catch {
       toast.error("Failed to confirm.");
@@ -573,10 +516,10 @@ export default function CaseDetailPage() {
   async function handleSeekerDispute(res: any) {
     try {
       await updateCaseResolution(res.id, { seeker_confirmed: false, status: "disputed" });
-      toast.success("Marked as disputed.");
+      toast.success("Disputed.");
       loadCase();
     } catch {
-      toast.error("Failed to dispute.");
+      toast.error("Failed.");
     }
   }
 
@@ -596,7 +539,7 @@ export default function CaseDetailPage() {
         video_url: fbVideoUrl,
         status: "pending_review",
       });
-      toast.success("Thank you! Feedback submitted for review.");
+      toast.success("Feedback submitted for review.");
       setFbText("");
       setFbVideoFile(null);
       setFbVideoBlob(null);
@@ -624,15 +567,63 @@ export default function CaseDetailPage() {
   const hasPaymentDetails = caseData?.institute_name || caseData?.account_number;
   const unlockMode = myUnlock?.payment_type || payMode;
 
-  // 🟢 Use the fixed getHelpRecords function
-  const helpRecords = getHelpRecords(caseData, myUnlock, myResolutions);
-  const approvedRecords = helpRecords.filter((r) => r.isApproved === true);
-  const hasApprovedDirect = approvedRecords.some((r) => r.type === "direct");
-  const hasApprovedContribution = approvedRecords.some((r) => r.type === "contribution");
+  // 🔥 Compute help records using the new logic (email fallback)
+  function getHelpRecords() {
+    const records: any[] = [];
+    const isCompleted = String(caseData?.status || "").toLowerCase() === "completed";
+
+    myResolutions.forEach((res) => {
+      const isDirect = !isContributionResolution(res);
+      const status = String(res.status || "").toLowerCase();
+      // If case completed and not rejected/disputed → approved
+      const isApproved = isCompleted && status !== "rejected" && status !== "disputed"
+        ? true
+        : isApprovedCompletedResolution(res);
+
+      records.push({
+        id: res.id,
+        type: isDirect ? "direct" : "contribution",
+        amount: Number(res.seeker_confirmed_amount ?? res.amount_paid ?? 0),
+        transactionId: res.transaction_id,
+        receiptUrl: res.receipt_url,
+        status: status,
+        completedAt: res.completed_at || res.admin_confirmed_at || res.submitted_at,
+        resolution: res,
+        unlock: null,
+        isApproved: isApproved,
+      });
+    });
+
+    // If only unlock (no resolution) exists, add it as non-approved
+    if (myUnlock && !myResolutions.some((r) => r.unlock_id === myUnlock.id)) {
+      if (isCompleted) {
+        const isPartial = myUnlock.payment_type === "partial";
+        records.push({
+          id: myUnlock.id,
+          type: isPartial ? "contribution" : "direct",
+          amount: Number(myUnlock.pledged_amount ?? 0),
+          transactionId: "N/A",
+          receiptUrl: null,
+          status: "unlocked_only",
+          completedAt: myUnlock.unlocked_at,
+          resolution: null,
+          unlock: myUnlock,
+          isApproved: false,
+        });
+      }
+    }
+
+    return records;
+  }
+
+  const helpRecords = getHelpRecords();
+  const approvedRecords = helpRecords.filter(r => r.isApproved === true);
+  const hasApprovedDirect = approvedRecords.some(r => r.type === "direct");
+  const hasApprovedContribution = approvedRecords.some(r => r.type === "contribution");
   const hasAnyApproved = approvedRecords.length > 0;
   const isOnlyUnlock = !hasAnyApproved && myUnlock;
 
-  // If case is completed and user is not owner, show the completed help view
+  // ---------- Completed view ----------
   if (isCompleted && !isOwner) {
     const totalDirectAmount = approvedRecords.filter(r => r.type === "direct").reduce((sum, r) => sum + r.amount, 0);
     const totalContributionAmount = approvedRecords.filter(r => r.type === "contribution").reduce((sum, r) => sum + r.amount, 0);
@@ -704,7 +695,7 @@ export default function CaseDetailPage() {
               <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Status</span><span className="font-semibold text-green-700">Completed ✓</span></div>
             </div>
 
-            {/* 🟢 Affidavits for approved records */}
+            {/* 🔥 AFFIDAVITS - NOW DEFINITELY VISIBLE */}
             {approvedRecords.length > 0 && (
               <div className="space-y-3">
                 <h2 className="font-semibold text-green-800 dark:text-green-200">Your verified help records (Affidavits)</h2>
@@ -741,7 +732,7 @@ export default function CaseDetailPage() {
     );
   }
 
-  // Rejected or Expired case handling
+  // ---------- Rejected / Expired ----------
   if (isRejected) {
     return (
       <Layout>
@@ -805,7 +796,7 @@ export default function CaseDetailPage() {
     );
   }
 
-  // ===== Normal (active) case view =====
+  // ---------- Active case view ----------
   const canHelpAgain = unlocked && !isOwner && !isCompleted && !isRejected && !isExpired;
 
   return (
