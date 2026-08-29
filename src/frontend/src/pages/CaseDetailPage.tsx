@@ -1030,7 +1030,7 @@ export default function CaseDetailPage() {
                       <p className="text-xs text-muted-foreground">You'll get the institute's payment details and pay the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} directly. Best if you can cover it all at once.</p>
                       <Button onClick={() => handleUnlock("full")} disabled={unlocking || isSuspended} className="w-full gap-2 mt-1">
                         <Unlock className="h-4 w-4" />
-                        {isFirstThreeUnlocks ? `FREE (${3 - userUnlockCount} left)` : "Pay Full — Unlock"}
+                        Pay Full — Unlock (1 Credit)
                       </Button>
                     </div>
 
