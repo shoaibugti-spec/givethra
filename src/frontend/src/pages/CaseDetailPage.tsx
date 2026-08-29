@@ -1,6 +1,6 @@
 // src/frontend/src/pages/CaseDetailPage.tsx
-// Fixed: Affidavit now appears for all completed help, regardless of hero_id mismatch.
-// Uses email fallback to match resolutions to the current user.
+// FIXED: Now uses both hero_id and hero_email for matching resolutions.
+// Affidavit appears for all approved/contributions with receipt and TXN.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -81,12 +81,16 @@ function copyToClipboard(text: string, label: string) {
   );
 }
 
-function isApprovedCompletedResolution(resolution: any): boolean {
+// 🔥 FIX: Now checks both admin_confirmed and status, and treats completed case as approved if not rejected/disputed
+function isApprovedCompletedResolution(resolution: any, caseCompleted: boolean = false): boolean {
   if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
+  // Direct approval checks
   if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)) return true;
   if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
   if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
+  // If case is completed and resolution is not rejected/disputed, consider it approved
+  if (caseCompleted && status !== "rejected" && status !== "disputed") return true;
   return false;
 }
 
@@ -296,11 +300,11 @@ export default function CaseDetailPage() {
         const count = await getUserUnlockCount(durableUserId);
         setUserUnlockCount(Number(count ?? 0));
 
-        // 🔥 FIX: Get all resolutions and match by hero_id OR email
+        // 🔥 Get all resolutions and match by hero_id or hero_email
         const res = await getCaseResolutions(id);
         const allResolutions = Array.isArray(res) ? res : [];
         const mine = allResolutions.filter((r) => {
-          const heroId = String(r.hero_id || "");
+          const heroId = String(r.hero_id || "").trim();
           const heroEmail = String(r.hero_email || "").toLowerCase().trim();
           return heroId === durableUserId || heroEmail === currentUserEmail;
         });
@@ -472,7 +476,7 @@ export default function CaseDetailPage() {
       await insertCaseResolution({
         case_id: id,
         hero_id: user?.id,
-        hero_email: user?.email,
+        hero_email: user?.email,  // ✅ شامل کریں
         seeker_id: caseData.user_id,
         resolution_type: resType,
         amount_paid: paidNum,
@@ -567,18 +571,16 @@ export default function CaseDetailPage() {
   const hasPaymentDetails = caseData?.institute_name || caseData?.account_number;
   const unlockMode = myUnlock?.payment_type || payMode;
 
-  // 🔥 Compute help records using the new logic (email fallback)
+  // 🔥 Compute help records using the new logic (with caseCompleted flag)
   function getHelpRecords() {
     const records: any[] = [];
-    const isCompleted = String(caseData?.status || "").toLowerCase() === "completed";
+    const isCaseCompleted = String(caseData?.status || "").toLowerCase() === "completed";
 
     myResolutions.forEach((res) => {
       const isDirect = !isContributionResolution(res);
       const status = String(res.status || "").toLowerCase();
-      // If case completed and not rejected/disputed → approved
-      const isApproved = isCompleted && status !== "rejected" && status !== "disputed"
-        ? true
-        : isApprovedCompletedResolution(res);
+      // Use caseCompleted flag in approval check
+      const isApproved = isApprovedCompletedResolution(res, isCaseCompleted);
 
       records.push({
         id: res.id,
@@ -596,7 +598,7 @@ export default function CaseDetailPage() {
 
     // If only unlock (no resolution) exists, add it as non-approved
     if (myUnlock && !myResolutions.some((r) => r.unlock_id === myUnlock.id)) {
-      if (isCompleted) {
+      if (isCaseCompleted) {
         const isPartial = myUnlock.payment_type === "partial";
         records.push({
           id: myUnlock.id,
@@ -695,7 +697,7 @@ export default function CaseDetailPage() {
               <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Status</span><span className="font-semibold text-green-700">Completed ✓</span></div>
             </div>
 
-            {/* 🔥 AFFIDAVITS - NOW DEFINITELY VISIBLE */}
+            {/* 🔥 AFFIDAVITS - Now with TXN and Receipt */}
             {approvedRecords.length > 0 && (
               <div className="space-y-3">
                 <h2 className="font-semibold text-green-800 dark:text-green-200">Your verified help records (Affidavits)</h2>
@@ -732,7 +734,7 @@ export default function CaseDetailPage() {
     );
   }
 
-  // ---------- Rejected / Expired ----------
+  // ---------- Rejected / Expired (short) ----------
   if (isRejected) {
     return (
       <Layout>
@@ -795,7 +797,6 @@ export default function CaseDetailPage() {
       </Layout>
     );
   }
-
   // ---------- Active case view ----------
   const canHelpAgain = unlocked && !isOwner && !isCompleted && !isRejected && !isExpired;
 
