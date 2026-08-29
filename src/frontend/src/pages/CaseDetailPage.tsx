@@ -73,6 +73,10 @@ function copyToClipboard(text: string, label: string) {
 function isApprovedCompletedResolution(resolution: any): boolean {
   if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
+  // If status is "completed" or "approved", it's approved regardless of admin_confirmed
+  if (status === "completed" || status === "approved" || status === "verified" || status === "confirmed") {
+    return true;
+  }
   const adminConfirmed = [1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed);
   const hasApprovalEvidence = Boolean(
     resolution?.admin_approved_at ||
@@ -81,10 +85,8 @@ function isApprovedCompletedResolution(resolution: any): boolean {
     resolution?.completed_at ||
     resolution?.admin_confirmed_at
   );
-  // Allow approved/completed status even if admin_confirmed is not explicitly set
-  const approvedStatus = ["approved", "completed", "verified", "confirmed"].includes(status);
   const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "pending_confirmation", "dispatched"].includes(status);
-  return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence || status === "completed" || status === "approved");
+  return adminConfirmed && !excludedStatus;
 }
 
 function isContributionResolution(resolution: any): boolean {
@@ -93,10 +95,6 @@ function isContributionResolution(resolution: any): boolean {
   return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
 }
 
-/**
- * Get all help records for the current user in this case.
- * Each record has an isApproved flag to control affidavit visibility.
- */
 function getHelpRecords(caseData: any, myUnlock: any, myResolutions: any[]): Array<{
   id: string;
   type: "direct" | "contribution";
@@ -112,7 +110,6 @@ function getHelpRecords(caseData: any, myUnlock: any, myResolutions: any[]): Arr
   const records: any[] = [];
   const isCompleted = String(caseData?.status || "").toLowerCase() === "completed";
 
-  // 1. Process resolutions - each resolution is a help record
   myResolutions.forEach((res) => {
     const isDirect = !isContributionResolution(res);
     const status = String(res.status || "").toLowerCase();
@@ -132,8 +129,6 @@ function getHelpRecords(caseData: any, myUnlock: any, myResolutions: any[]): Arr
     });
   });
 
-  // 2. If there is an unlock without a resolution, include it (only if case is completed)
-  // This ensures users who only unlocked (without resolution) still see the case
   if (myUnlock && !myResolutions.some((r) => r.unlock_id === myUnlock.id)) {
     if (isCompleted) {
       const isPartial = myUnlock.payment_type === "partial";
@@ -147,7 +142,7 @@ function getHelpRecords(caseData: any, myUnlock: any, myResolutions: any[]): Arr
         completedAt: myUnlock.unlocked_at,
         resolution: null,
         unlock: myUnlock,
-        isApproved: false, // Unlock alone is never approved help
+        isApproved: false,
       });
     }
   }
@@ -328,12 +323,10 @@ export default function CaseDetailPage() {
   const [userUnlockCount, setUserUnlockCount] = useState(0);
   const isFirstThreeUnlocks = userUnlockCount < 3;
 
-  // ===== MAIN LOAD EFFECT =====
   useEffect(() => { 
     loadCase(); 
   }, [id, user]);
 
-  // ===== FEEDBACK CHECK EFFECT =====
   useEffect(() => {
     if (caseData?.id && user?.id) {
       checkExistingFeedback();
@@ -482,7 +475,6 @@ export default function CaseDetailPage() {
   const isOwner = user?.id === caseData?.user_id;
   const isCompleted = normalizedStatus === "completed";
   
-  // Compute help records dynamically
   const helpRecords = getHelpRecords(caseData, myUnlock, myResolutions);
   const approvedRecords = helpRecords.filter(r => r.isApproved === true);
   const hasApprovedDirect = approvedRecords.some(r => r.type === "direct");
@@ -764,7 +756,7 @@ export default function CaseDetailPage() {
   }
 
   // ============================================================
-  //  COMPLETED HELP VIEW (helper only) - CORRECTED
+  //  COMPLETED HELP VIEW (helper only) - FINAL CORRECT VERSION
   // ============================================================
   if (isCompleted && !isOwner) {
     const totalDirectAmount = approvedRecords.filter(r => r.type === "direct").reduce((sum, r) => sum + r.amount, 0);
@@ -779,9 +771,8 @@ export default function CaseDetailPage() {
           </button>
           <section className="rounded-2xl border-2 border-green-200 bg-green-50 dark:bg-green-950/20 p-6 space-y-5">
 
-            {/* ===== CORRECTED CONDITIONAL MESSAGES ===== */}
+            {/* ===== CONDITIONAL MESSAGES ===== */}
             {hasApprovedDirect ? (
-              // ===== DIRECT HELP (FULL) =====
               <div className="text-center space-y-3">
                 <div className="text-5xl">🦸‍♂️</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Direct Help Completed</p>
@@ -796,7 +787,6 @@ export default function CaseDetailPage() {
                 </Button>
               </div>
             ) : hasApprovedContribution ? (
-              // ===== CONTRIBUTION (PARTIAL) =====
               <div className="text-center space-y-3">
                 <div className="text-5xl">🌟</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Contribution Completed</p>
@@ -811,7 +801,6 @@ export default function CaseDetailPage() {
                 </Button>
               </div>
             ) : isOnlyUnlockOrRejected ? (
-              // ===== UNLOCKED BUT REJECTED / NO HELP =====
               <div className="text-center space-y-3">
                 <div className="text-5xl">💪</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Encouragement for Heroes</p>
@@ -826,7 +815,6 @@ export default function CaseDetailPage() {
                 </Button>
               </div>
             ) : (
-              // ===== FALLBACK (should not happen) =====
               <div className="text-center space-y-2">
                 <div className="text-4xl">🤲</div>
                 <h1 className="text-2xl font-bold text-green-800">Thank you for engaging with this case.</h1>
@@ -868,7 +856,6 @@ export default function CaseDetailPage() {
               </div>
             )}
 
-            {/* ===== SHOW PENDING/RESOLUTIONS THAT WERE NOT APPROVED ===== */}
             {!hasAnyApproved && myResolutions.length > 0 && (
               <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-center">
                 <p className="text-sm text-amber-700">Your submitted help is under review or was rejected. No affidavit is available until Givethra verifies it.</p>
@@ -881,7 +868,7 @@ export default function CaseDetailPage() {
   }
 
   // ============================================================
-  //  NORMAL CASE VIEW (for all non-rejected, non-expired cases)
+  //  NORMAL CASE VIEW
   // ============================================================
   return (
     <Layout>
@@ -890,7 +877,6 @@ export default function CaseDetailPage() {
           <ChevronLeft className="h-4 w-4" /> Back to cases
         </button>
 
-        {/* === FREE UNLOCK ANNOUNCEMENT === */}
         {!isCompleted && <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border-2 border-green-400 p-4 text-sm text-green-700 dark:text-green-300 text-center font-medium">
           🎉 Your first <strong>3 helps are FREE</strong>! After that, 1 credit per help.
         </div>}
