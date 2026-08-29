@@ -496,9 +496,8 @@ export default function CaseDetailPage() {
     }
     setUnlocking(true);
     try {
-      const isFree = userUnlockCount < 3;
+      const isFree = mode === "partial" && userUnlockCount < 3;
       const charge = isFree ? 0 : 1;
-
       await insertCaseUnlock({
         case_id: id,
         hero_id: user.id,
