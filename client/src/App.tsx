@@ -11,6 +11,7 @@ import {
   CasesPage,
   DashboardPage,
   KycPage,
+  HelpPage,
   NotificationsPage,
   ProfilePage,
   SubmitCasePage,
@@ -28,6 +29,8 @@ function Router() {
       <Route path={"/profile"} component={ProfilePage} />
       <Route path={"/kyc"} component={KycPage} />
       <Route path={"/submit-case"} component={SubmitCasePage} />
+      <Route path={"/my-cases"} component={SubmitCasePage} />
+      <Route path={"/my-help"} component={HelpPage} />
       <Route path={"/notifications"} component={NotificationsPage} />
       <Route path={"/support"} component={SupportPage} />
       <Route path={"/admin"} component={AdminPage} />

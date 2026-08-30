@@ -9,10 +9,10 @@ import { Link, useRoute } from "wouter";
 
 const categories = ["Medical", "Education", "Emergency", "Livelihood", "Housing", "Other"] as const;
 type Category = (typeof categories)[number];
-type Status = "pending" | "approved" | "rejected";
+type Status = "pending" | "approved" | "rejected" | "complete" | "expired";
 
 function StatusPill({ status }: { status: Status }) {
-  const styles = { pending: "bg-amber-100 text-amber-800", approved: "bg-emerald-100 text-emerald-800", rejected: "bg-rose-100 text-rose-800" };
+  const styles = { pending: "bg-amber-100 text-amber-800", approved: "bg-emerald-100 text-emerald-800", rejected: "bg-rose-100 text-rose-800", complete: "bg-sky-100 text-sky-800", expired: "bg-slate-200 text-slate-700" };
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${styles[status]}`}>{status}</span>;
 }
 
@@ -160,11 +160,16 @@ export function CasesPage() {
 export function CaseDetailPage() {
   const [, params] = useRoute("/cases/:id");
   const id = Number(params?.id ?? 0);
+  const { user } = useAuth();
+  const assistant = trpc.givethra.account.assistantAccess.useQuery(undefined, { enabled: Boolean(user) });
+  const unlock = trpc.givethra.help.unlock.useMutation();
+  const [notice, setNotice] = useState("");
   const caseQuery = trpc.givethra.public.caseById.useQuery({ id });
+  const startHelp = async (kind: "contribution" | "direct_help") => { setNotice(""); try { const result = await unlock.mutateAsync({ caseId: id, kind }); setNotice(`${kind === "direct_help" ? "Direct help" : "Contribution"} unlocked. Unlock cost: ${result.unlockCost} credit(s).`); } catch (error) { setNotice(error instanceof Error ? error.message : "This help option could not be unlocked."); } };
   if (caseQuery.isLoading) return <div className="grid min-h-screen place-items-center bg-[#f8f8f5]"><Loader2 className="h-7 w-7 animate-spin text-emerald-800" /></div>;
   if (!caseQuery.data) return <div className="grid min-h-screen place-items-center bg-[#f8f8f5] p-6"><div className="rounded-3xl bg-white p-9 text-center shadow-lg"><AlertCircle className="mx-auto h-8 w-8 text-amber-600" /><h1 className="mt-4 font-display text-3xl font-semibold text-emerald-950">Case not found</h1><Link href="/cases" className="mt-5 inline-block text-sm font-semibold text-emerald-800 hover:underline">Return to cases</Link></div></div>;
   const item = caseQuery.data;
-  return <div className="min-h-screen bg-[#f8f8f5]"><header className="container flex h-16 items-center"><Link href="/cases" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:underline"><ChevronLeft className="h-4 w-4" /> Approved cases</Link></header><main className="container max-w-4xl pb-16 pt-8"><span className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold uppercase tracking-[.12em] text-emerald-800">{item.category}</span><h1 className="mt-7 font-display text-5xl font-semibold tracking-[-.04em] text-emerald-950">{item.title}</h1><p className="mt-8 whitespace-pre-wrap text-base leading-8 text-slate-700">{item.description}</p><div className="mt-10 rounded-3xl border border-emerald-100 bg-emerald-50 p-6 text-sm leading-6 text-emerald-950"><HeartHandshake className="mb-3 h-6 w-6 text-emerald-800" />This case has completed Givethra’s review workflow. Personal identity records and private evidence are intentionally not shown here.</div></main></div>;
+  return <div className="min-h-screen bg-[#f8f8f5]"><header className="container flex h-16 items-center"><Link href="/cases" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:underline"><ChevronLeft className="h-4 w-4" /> Approved cases</Link></header><main className="container max-w-4xl pb-16 pt-8"><span className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold uppercase tracking-[.12em] text-emerald-800">{item.category}</span><h1 className="mt-7 font-display text-5xl font-semibold tracking-[-.04em] text-emerald-950">{item.title}</h1><p className="mt-8 whitespace-pre-wrap text-base leading-8 text-slate-700">{item.description}</p><div className="mt-10 rounded-3xl border border-emerald-100 bg-emerald-50 p-6 text-sm leading-6 text-emerald-950"><HeartHandshake className="mb-3 h-6 w-6 text-emerald-800" />This case has completed Givethra’s review workflow. Personal identity records and private evidence are intentionally not shown here.</div>{user ? <div className="mt-6 rounded-3xl border border-stone-200 bg-white p-6"><h2 className="font-display text-2xl font-semibold text-emerald-950">Help this case</h2><p className="mt-2 text-sm text-slate-600">Contribution unlocks are free for the first three eligible cases. Direct Help always requires one credit.</p><div className="mt-4 flex flex-wrap gap-3"><button disabled={unlock.isPending} onClick={() => void startHelp("contribution")} className="rounded-full bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white">Unlock Contribution</button>{assistant.data?.isAssistant ? <button disabled={unlock.isPending} onClick={() => void startHelp("direct_help")} className="rounded-full border border-amber-500 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900">Assistant: Direct Help</button> : null}</div>{notice ? <p className="mt-4 text-sm font-semibold text-emerald-800" role="status">{notice}</p> : null}</div> : null}</main></div>;
 }
 
 export function DashboardPage() {
@@ -200,8 +205,15 @@ export function SubmitCasePage() {
   const mine = trpc.givethra.cases.mine.useQuery();
   const submit = trpc.givethra.cases.submit.useMutation({ onSuccess: () => void mine.refetch() });
   const [title, setTitle] = useState(""); const [category, setCategory] = useState<Category>("Medical"); const [description, setDescription] = useState(""); const [doc1, setDoc1] = useState<File | null>(null); const [doc2, setDoc2] = useState<File | null>(null); const [doc3, setDoc3] = useState<File | null>(null); const [selfie, setSelfie] = useState<File | null>(null); const [video, setVideo] = useState<File | null>(null); const [notice, setNotice] = useState("");
-  const onSubmit = async (event: FormEvent) => { event.preventDefault(); const docs = [doc1, doc2, doc3].filter(Boolean) as File[]; if (!docs.length) { setNotice("Please attach at least one supporting document (e.g. bill or agreement)."); return; } setNotice(""); try { await submit.mutateAsync({ title, category, description, selfie: selfie ? await fileToUploadInput(selfie, "case") : undefined, video: video ? await fileToUploadInput(video, "case") : undefined, documents: await Promise.all(docs.map(file => fileToUploadInput(file, "case"))) }); setNotice("Your case is pending the owner’s review with all attached documents."); setTitle(""); setDescription(""); setDoc1(null); setDoc2(null); setDoc3(null); setSelfie(null); setVideo(null); } catch (error) { setNotice(error instanceof Error ? error.message : "Case submission could not be sent."); } };
-  return <AuthRequired><PageIntro eyebrow="Case submission" title="Share the essential context with care." copy="A clear description and supporting documents help the owner review your case. Your private supporting files are never included in the public case library." /><div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_330px]"><form onSubmit={onSubmit} className="rounded-3xl border border-stone-200 bg-white p-6 sm:p-8"><div className="grid gap-5 md:grid-cols-[1fr_190px]"><label className="grid gap-2 text-sm font-semibold text-slate-700">Case title<input value={title} onChange={e => setTitle(e.target.value)} required minLength={5} className="rounded-xl border border-stone-300 px-3 py-2.5 font-normal outline-none focus:border-emerald-700" placeholder="A concise, respectful title" /></label><label className="grid gap-2 text-sm font-semibold text-slate-700">Category<select value={category} onChange={e => setCategory(e.target.value as Category)} className="rounded-xl border border-stone-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-emerald-700">{categories.map(item => <option key={item}>{item}</option>)}</select></label></div><label className="mt-5 grid gap-2 text-sm font-semibold text-slate-700">Case description<textarea value={description} onChange={e => setDescription(e.target.value)} required minLength={40} className="min-h-48 rounded-xl border border-stone-300 px-3 py-2.5 font-normal leading-6 outline-none focus:border-emerald-700" placeholder="Describe the situation, what support is needed and why. Avoid including sensitive credentials or private contact details." /></label><div className="mt-6 grid gap-4 md:grid-cols-3"><FilePicker label="Document 1 (Bill / Agreement)" helper="Primary bill, invoice or agreement." accept="image/*,.pdf,.doc,.docx" file={doc1} onChange={setDoc1} /><FilePicker label="Document 2 (ID / Proof)" helper="Landlord CNIC or secondary proof." accept="image/*,.pdf,.doc,.docx" file={doc2} onChange={setDoc2} /><FilePicker label="Document 3 (Additional)" helper="Any extra supporting document." accept="image/*,.pdf,.doc,.docx" file={doc3} onChange={setDoc3} /></div><div className="mt-4 grid gap-4 md:grid-cols-2"><FilePicker label="Optional selfie" helper="A current selfie photo." accept="image/*" file={selfie} onChange={setSelfie} /><FilePicker label="Optional video" helper="Short liveness video (max 30MB)." accept="video/*" file={video} onChange={setVideo} /></div>{notice ? <p className={`mt-5 text-sm ${notice.includes("pending") ? "text-emerald-700" : "text-rose-700"}`}>{notice}</p> : null}<button disabled={submit.isPending} className="mt-7 rounded-full bg-emerald-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60">{submit.isPending ? "Submitting securely…" : "Submit for review"}</button></form><aside className="rounded-3xl border border-stone-200 bg-white p-6"><h2 className="font-display text-2xl font-semibold text-emerald-950">My submissions</h2><div className="mt-5 grid gap-3">{mine.data?.length ? mine.data.map(item => <div key={item.id} className="rounded-2xl bg-stone-50 p-4"><div className="flex items-start justify-between gap-3"><p className="font-medium text-slate-800">{item.title}</p><StatusPill status={item.status} /></div><p className="mt-2 text-xs text-slate-500">{item.category}</p>{item.adminNote ? <p className="mt-3 text-xs leading-5 text-slate-600">{item.adminNote}</p> : null}</div>) : <p className="text-sm leading-6 text-slate-600">Your submissions will appear here with their review status.</p>}</div></aside></div></AuthRequired>;
+  const onSubmit = async (event: FormEvent) => { event.preventDefault(); const docs = [doc1, doc2, doc3]; if (docs.some(file => !file) || !selfie || !video) { setNotice("Every case field, all three supporting documents, a selfie and the live video are required."); return; } setNotice(""); try { await submit.mutateAsync({ title, category, description, selfie: await fileToUploadInput(selfie, "case"), video: await fileToUploadInput(video, "case"), documents: await Promise.all(docs.map(file => fileToUploadInput(file as File, "case"))) }); setNotice("Your case is pending the owner’s review with all attached documents."); setTitle(""); setDescription(""); setDoc1(null); setDoc2(null); setDoc3(null); setSelfie(null); setVideo(null); } catch (error) { setNotice(error instanceof Error ? error.message : "Case submission could not be sent."); } };
+  return <AuthRequired><PageIntro eyebrow="Case submission" title="Share the essential context with care." copy="A clear description and supporting documents help the owner review your case. Your private supporting files are never included in the public case library." /><div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_330px]"><form onSubmit={onSubmit} className="rounded-3xl border border-stone-200 bg-white p-6 sm:p-8"><div className="grid gap-5 md:grid-cols-[1fr_190px]"><label className="grid gap-2 text-sm font-semibold text-slate-700">Case title<input value={title} onChange={e => setTitle(e.target.value)} required minLength={5} className="rounded-xl border border-stone-300 px-3 py-2.5 font-normal outline-none focus:border-emerald-700" placeholder="A concise, respectful title" /></label><label className="grid gap-2 text-sm font-semibold text-slate-700">Category<select value={category} onChange={e => setCategory(e.target.value as Category)} className="rounded-xl border border-stone-300 bg-white px-3 py-2.5 font-normal outline-none focus:border-emerald-700">{categories.map(item => <option key={item}>{item}</option>)}</select></label></div><label className="mt-5 grid gap-2 text-sm font-semibold text-slate-700">Case description<textarea value={description} onChange={e => setDescription(e.target.value)} required minLength={40} className="min-h-48 rounded-xl border border-stone-300 px-3 py-2.5 font-normal leading-6 outline-none focus:border-emerald-700" placeholder="Describe the situation, what support is needed and why. Avoid including sensitive credentials or private contact details." /></label><div className="mt-6 grid gap-4 md:grid-cols-3"><FilePicker label="Document 1 (Bill / Agreement) — required" helper="Primary bill, invoice or agreement. This field cannot be skipped." accept="image/*,.pdf,.doc,.docx" file={doc1} onChange={setDoc1} /><FilePicker label="Document 2 (ID / Proof) — required" helper="Landlord CNIC or secondary proof. This field cannot be skipped." accept="image/*,.pdf,.doc,.docx" file={doc2} onChange={setDoc2} /><FilePicker label="Document 3 (Additional) — required" helper="Additional supporting document. This field cannot be skipped." accept="image/*,.pdf,.doc,.docx" file={doc3} onChange={setDoc3} /></div><div className="mt-4 grid gap-4 md:grid-cols-2"><FilePicker label="Selfie photo — required" helper="A current, clear selfie photo. This field cannot be skipped." accept="image/*" file={selfie} onChange={setSelfie} /><FilePicker label="Live video — required" helper="A clear live video, up to 30MB. This field cannot be skipped." accept="video/*" file={video} onChange={setVideo} /></div>{notice ? <p className={`mt-5 text-sm ${notice.includes("pending") ? "text-emerald-700" : "text-rose-700"}`}>{notice}</p> : null}<button disabled={submit.isPending} className="mt-7 rounded-full bg-emerald-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60">{submit.isPending ? "Submitting securely…" : "Submit for review"}</button></form><aside className="rounded-3xl border border-stone-200 bg-white p-6"><h2 className="font-display text-2xl font-semibold text-emerald-950">My submissions</h2><div className="mt-5 grid gap-3">{mine.data?.length ? mine.data.map(item => <div key={item.id} className="rounded-2xl bg-stone-50 p-4"><div className="flex items-start justify-between gap-3"><p className="font-medium text-slate-800">{item.title}</p><StatusPill status={item.status} /></div><p className="mt-2 text-xs text-slate-500">{item.category}</p>{item.adminNote ? <p className="mt-3 text-xs leading-5 text-slate-600">{item.adminNote}</p> : null}</div>) : <p className="text-sm leading-6 text-slate-600">Your submissions will appear here with their review status.</p>}</div></aside></div></AuthRequired>;
+}
+
+export function HelpPage() {
+  const query = trpc.givethra.help.mine.useQuery();
+  const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
+  const records = useMemo(() => (query.data ?? []).filter(item => statusFilter === "all" || item.status === statusFilter), [query.data, statusFilter]);
+  return <AuthRequired><PageIntro eyebrow="My Help" title="Your help history" copy="Every unlock, contribution and direct-help action remains visible with its current review status and hero grade." /><div className="mb-6 flex flex-wrap gap-2">{(["all", "pending", "approved", "rejected", "complete", "expired"] as const).map(item => <button key={item} onClick={() => setStatusFilter(item)} className={`rounded-full px-4 py-2 text-sm font-semibold capitalize ${statusFilter === item ? "bg-emerald-900 text-white" : "border border-stone-300 bg-white text-slate-700"}`}>{item === "all" ? "All help" : item}</button>)}</div><div className="grid gap-4">{records.length ? records.map(item => <article key={item.id} className="rounded-3xl border border-stone-200 bg-white p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-emerald-700">{item.kind.replace("_", " ")}</p><h2 className="mt-2 font-display text-2xl font-semibold text-emerald-950">{item.case.title}</h2><p className="mt-1 text-sm text-slate-500">Case #{item.caseId} · Unlock cost: {item.unlockCost} credit(s)</p></div><StatusPill status={item.status} /></div>{item.amount ? <p className="mt-4 text-sm text-slate-700">Amount: <strong>{item.amount}</strong>{item.txnNumber ? <> · TXN: <strong>{item.txnNumber}</strong></> : null}</p> : null}{item.grade ? <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm font-semibold text-amber-950">{item.grade}</p> : null}{item.adminNote ? <p className="mt-3 text-sm text-slate-600">Admin note: {item.adminNote}</p> : null}</article>) : <div className="rounded-3xl border border-dashed border-stone-300 bg-white p-10 text-center text-sm text-slate-600">No help records match this status.</div>}</div></AuthRequired>;
 }
 
 export function NotificationsPage() {
@@ -217,19 +229,24 @@ export function SupportPage() {
 
 export function AdminPage() {
   const { user } = useAuth();
+  const [adminSearch, setAdminSearch] = useState("");
   const ownerAccess = trpc.givethra.account.ownerAccess.useQuery(undefined, { enabled: Boolean(user) });
   const enabled = ownerAccess.data?.isOwner === true;
   const overview = trpc.givethra.admin.overview.useQuery(undefined, { enabled });
   const kyc = trpc.givethra.admin.kyc.useQuery(undefined, { enabled });
-  const cases = trpc.givethra.admin.cases.useQuery(undefined, { enabled });
+  const cases = trpc.givethra.admin.cases.useQuery({ query: adminSearch }, { enabled });
   const users = trpc.givethra.admin.users.useQuery(undefined, { enabled });
   const support = trpc.givethra.admin.support.useQuery(undefined, { enabled, refetchInterval: 5000 });
   const publicPosts = trpc.givethra.admin.publicPosts.useQuery(undefined, { enabled, refetchInterval: 5000 });
+  const interactions = trpc.givethra.admin.interactions.useQuery({ query: adminSearch }, { enabled, refetchInterval: 5000 });
+  const feedback = trpc.givethra.admin.feedback.useQuery({ query: adminSearch }, { enabled, refetchInterval: 5000 });
 
   const reviewKyc = trpc.givethra.admin.reviewKyc.useMutation({ onSuccess: () => void kyc.refetch() });
   const reviewCase = trpc.givethra.admin.reviewCase.useMutation({ onSuccess: () => void cases.refetch() });
   const reply = trpc.givethra.admin.replySupport.useMutation({ onSuccess: () => void support.refetch() });
   const updatePost = trpc.givethra.admin.updatePublicPost.useMutation({ onSuccess: () => void publicPosts.refetch() });
+  const updateInteraction = trpc.givethra.admin.updateInteraction.useMutation({ onSuccess: () => void interactions.refetch() });
+  const reviewFeedback = trpc.givethra.admin.reviewFeedback.useMutation({ onSuccess: () => void feedback.refetch() });
 
   const [replyBody, setReplyBody] = useState<Record<number, string>>({});
   const [postReplyBody, setPostReplyBody] = useState<Record<number, string>>({});
@@ -242,6 +259,8 @@ export function AdminPage() {
       void cases.refetch();
       void support.refetch();
       void publicPosts.refetch();
+      void interactions.refetch();
+      void feedback.refetch();
     }, 5000);
     return () => clearInterval(interval);
   }, [enabled]);
@@ -265,6 +284,8 @@ export function AdminPage() {
     void cases.refetch();
     void support.refetch();
     void publicPosts.refetch();
+    void interactions.refetch();
+    void feedback.refetch();
   };
 
   const unreadSupportCount = support.data?.filter(item => item.senderRole === "user").length ?? 0;
@@ -294,7 +315,7 @@ export function AdminPage() {
         ))}
       </div>
       <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-6">
-        <h2 className="font-display text-2xl font-semibold text-emerald-950">KYC review queue</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-2xl font-semibold text-emerald-950">KYC review queue</h2><input value={adminSearch} onChange={e => setAdminSearch(e.target.value)} className="w-full max-w-sm rounded-xl border border-stone-300 px-3 py-2 text-sm" placeholder="Search ID, name, email or case…" aria-label="Admin search" /></div>
         <div className="mt-5 grid gap-3">
           {kyc.data?.length ? (
             kyc.data.map((item: any) => (
@@ -310,7 +331,7 @@ export function AdminPage() {
                       <a href={item.videoUrl} target="_blank" rel="noreferrer" className="hover:underline">Video</a>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <StatusPill status={item.status} />
                     {item.status === "pending" ? (
                       <>
@@ -337,7 +358,7 @@ export function AdminPage() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="font-semibold text-slate-800">{item.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">{item.category} · Submitted {new Date(item.submittedAt).toLocaleString()}</p>
+                    <p className="mt-1 text-xs text-slate-500">{item.category} · Submitted {new Date(item.submittedAt).toLocaleString()}</p>{item.owner ? <p className="mt-2 text-xs font-semibold text-emerald-800">Owner: {item.owner.name || "Unnamed"} · User ID: {item.owner.id} · {item.owner.email || "No email"} · CNIC: {item.owner.nationalId || "Not submitted"}</p> : null}
                     <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{item.description}</p>
                     {item.files?.length ? (
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -358,7 +379,7 @@ export function AdminPage() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <StatusPill status={item.status} />
                     {item.status === "pending" ? (
                       <>
@@ -374,7 +395,10 @@ export function AdminPage() {
             <p className="text-sm text-slate-600">No case submissions are available for review.</p>
           )}
         </div>
-      </section><section className="mt-8 rounded-3xl border border-stone-200 bg-white p-6">
+      </section>
+      <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-2xl font-semibold text-emerald-950">Contribution & Direct Help Queue</h2><span className="text-sm text-slate-500">Search above filters case, user and TXN</span></div><div className="mt-5 grid gap-4 md:grid-cols-2">{interactions.data?.length ? interactions.data.map((item: any) => <article key={item.id} className="rounded-2xl bg-stone-50 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold capitalize text-slate-900">{item.kind.replace("_", " ")}</p><p className="mt-1 text-sm text-slate-700">{item.case.title} · Case #{item.caseId}</p><p className="mt-1 text-xs text-slate-500">{item.user.name || "Unnamed user"} · {item.user.email || "No email"} · User #{item.user.id}</p></div><StatusPill status={item.status} /></div>{item.amount ? <p className="mt-3 text-sm">Amount: {item.amount} · TXN: {item.txnNumber || "—"}</p> : null}{item.paymentProofUrl ? <a className="mt-2 inline-block text-xs font-semibold text-emerald-800 hover:underline" href={item.paymentProofUrl} target="_blank" rel="noreferrer">View payment proof</a> : null}<div className="mt-4 flex flex-wrap gap-2">{(["pending", "approved", "rejected", "complete", "expired"] as const).map(next => <button key={next} onClick={() => void updateInteraction.mutateAsync({ id: item.id, status: next })} className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold capitalize text-slate-700 hover:border-emerald-700">{next}</button>)}</div></article>) : <p className="text-sm text-slate-600 md:col-span-2">No contribution or direct-help records match this search.</p>}</div></section>
+      <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-2xl font-semibold text-emerald-950">Case Feedback Review</h2><span className="text-sm text-slate-500">Approval publishes feedback to the case wall.</span></div><div className="mt-5 grid gap-4 md:grid-cols-2">{feedback.data?.length ? feedback.data.map((item: any) => <article key={item.id} className="rounded-2xl bg-stone-50 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold text-slate-900">{item.case.title}</p><p className="mt-1 text-xs text-slate-500">{item.user.name || "Unnamed user"} · {item.user.email || "No email"}</p></div><StatusPill status={item.status} /></div><p className="mt-3 text-sm leading-6 text-slate-700">{item.caption}</p><a className="mt-2 inline-block text-xs font-semibold text-emerald-800 hover:underline" href={item.videoUrl} target="_blank" rel="noreferrer">View feedback video</a><div className="mt-4 flex flex-wrap gap-2"><button onClick={() => void reviewFeedback.mutateAsync({ id: item.id, status: "approved" })} className="rounded-full bg-emerald-900 px-3 py-1.5 text-xs font-semibold text-white">Approve</button><button onClick={() => void reviewFeedback.mutateAsync({ id: item.id, status: "rejected", note: "Please resubmit a clear one-minute feedback video with a caption." })} className="rounded-full border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700">Reject</button></div></article>) : <p className="text-sm text-slate-600 md:col-span-2">No case feedback records match this search.</p>}</div></section>
+      <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="font-display text-2xl font-semibold text-emerald-950">
             Public Posts & Visitor Feedback {unreadPostsCount > 0 ? <span className="ml-2 inline-flex items-center rounded-full bg-rose-500 px-2.5 py-0.5 text-xs text-white">{unreadPostsCount} unread</span> : null}
