@@ -1,5 +1,5 @@
 // src/frontend/src/pages/WalletPage.tsx
-// Enhanced with icons for each transaction type
+// Enhanced with transaction history, icons, expandable details, and action buttons.
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -23,8 +23,9 @@ import {
   HeartHandshake,
   HandCoins,
   Unlock,
-  AlertCircle,
   FileText,
+  Receipt,
+  FileCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -59,41 +60,49 @@ const PAYMENT_METHODS = {
 const QUICK_AMOUNTS = [1, 2, 3, 5, 10, 20];
 const SUSPENSION_UNLOCK_CREDITS = 5;
 
-// Transaction type icons and colors
+// Transaction type configuration
 const TX_CONFIG: Record<
   string,
   { icon: React.ReactNode; label: string; bg: string; text: string }
 > = {
   deposit: {
-    icon: <ArrowUpCircle className="h-4 w-4" />,
+    icon: <ArrowUpCircle className="h-5 w-5" />,
     label: "Deposit",
     bg: "bg-green-100 dark:bg-green-900/30",
     text: "text-green-700 dark:text-green-400",
   },
   case_submission: {
-    icon: <FileText className="h-4 w-4" />,
+    icon: <FileText className="h-5 w-5" />,
     label: "Case Submission",
     bg: "bg-blue-100 dark:bg-blue-900/30",
     text: "text-blue-700 dark:text-blue-400",
   },
   direct_help: {
-    icon: <HeartHandshake className="h-4 w-4" />,
+    icon: <HeartHandshake className="h-5 w-5" />,
     label: "Direct Help",
     bg: "bg-purple-100 dark:bg-purple-900/30",
     text: "text-purple-700 dark:text-purple-400",
   },
   contribution: {
-    icon: <HandCoins className="h-4 w-4" />,
+    icon: <HandCoins className="h-5 w-5" />,
     label: "Contribution",
     bg: "bg-amber-100 dark:bg-amber-900/30",
     text: "text-amber-700 dark:text-amber-400",
   },
   suspension_unlock: {
-    icon: <Unlock className="h-4 w-4" />,
+    icon: <Unlock className="h-5 w-5" />,
     label: "Suspension Unlock",
     bg: "bg-red-100 dark:bg-red-900/30",
     text: "text-red-700 dark:text-red-400",
   },
+};
+
+// Default for unknown types (spend)
+const DEFAULT_SPEND = {
+  icon: <ArrowDownCircle className="h-5 w-5" />,
+  label: "Spend",
+  bg: "bg-gray-100 dark:bg-gray-800",
+  text: "text-gray-700 dark:text-gray-400",
 };
 
 export default function WalletPage() {
@@ -156,6 +165,7 @@ export default function WalletPage() {
   }
 
   function copyText(text: string) {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     toast.success("Copied!");
   }
@@ -239,6 +249,15 @@ export default function WalletPage() {
   const amountNum = parseFloat(amount) || 0;
   const pkrAmount = pkrRate ? Math.round(amountNum * pkrRate) : null;
 
+  // Helper to get config for a transaction
+  function getTxConfig(tx: any) {
+    if (tx.amount > 0) {
+      return TX_CONFIG["deposit"] || { icon: <ArrowUpCircle className="h-5 w-5" />, label: "Deposit", bg: "bg-green-100", text: "text-green-700" };
+    }
+    const type = tx.type || "";
+    return TX_CONFIG[type] || DEFAULT_SPEND;
+  }
+
   return (
     <Layout>
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
@@ -280,7 +299,7 @@ export default function WalletPage() {
           <p>• Credits are for platform fees only — not transferable or withdrawable</p>
         </div>
 
-        {/* Deposit Section */}
+        {/* ===== DEPOSIT SECTION (unchanged) ===== */}
         <div className="rounded-2xl border bg-card p-5 space-y-4">
           <h2 className="font-bold text-lg flex items-center gap-2">
             <Coins className="h-5 w-5 text-primary" /> Deposit Credits
@@ -465,7 +484,7 @@ export default function WalletPage() {
           </div>
         </div>
 
-        {/* ========== TRANSACTION HISTORY ========== */}
+        {/* ===== TRANSACTION HISTORY (NEW, WITH ICONS & DETAILS) ===== */}
         <div className="rounded-2xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" /> Transaction History
@@ -482,29 +501,27 @@ export default function WalletPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {transactions.map((tx) => {
                 const isDeposit = tx.amount > 0;
-                const txType = tx.type || "unknown";
-                const config = TX_CONFIG[txType] || TX_CONFIG["deposit"];
+                const config = getTxConfig(tx);
                 const isOpen = expanded === tx.id;
+                const hasReceipt = !!tx.receipt_url || !!tx.proof_url;
+                const canAffidavit = tx.type === "deposit" || tx.type === "direct_help" || tx.type === "contribution";
 
                 return (
                   <div
                     key={tx.id}
                     className="rounded-xl border border-border overflow-hidden transition-all hover:border-primary/30"
                   >
-                    <button
+                    {/* Header / Summary */}
+                    <div
+                      className="w-full flex items-center justify-between gap-3 p-3 cursor-pointer hover:bg-muted/20 transition-colors"
                       onClick={() => setExpanded(isOpen ? null : tx.id)}
-                      className="w-full flex items-center justify-between gap-3 p-3 hover:bg-muted/20 transition-colors text-left"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`p-2 rounded-full ${config.bg} ${config.text}`}>
-                          {isDeposit ? (
-                            <ArrowUpCircle className="h-4 w-4" />
-                          ) : (
-                            config.icon
-                          )}
+                          {isDeposit ? TX_CONFIG["deposit"].icon : config.icon}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium">
@@ -512,7 +529,7 @@ export default function WalletPage() {
                             {tx.reference_id && ` · #${tx.reference_id.slice(0, 8)}`}
                           </p>
                           <p className="text-[11px] text-muted-foreground truncate">
-                            {tx.description || txType}
+                            {tx.description || tx.type || "Transaction"}
                           </p>
                         </div>
                       </div>
@@ -531,8 +548,9 @@ export default function WalletPage() {
                           }`}
                         />
                       </div>
-                    </button>
+                    </div>
 
+                    {/* Expanded Details */}
                     {isOpen && (
                       <div className="px-3 pb-3 pt-1 space-y-2 text-sm border-t border-border bg-muted/10">
                         <div className="flex justify-between">
@@ -544,7 +562,7 @@ export default function WalletPage() {
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Description</span>
                           <span className="font-medium text-right">
-                            {tx.description || txType}
+                            {tx.description || tx.type || "—"}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -559,11 +577,31 @@ export default function WalletPage() {
                           </span>
                         </div>
                         {tx.reference_id && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Reference</span>
-                            <span className="font-mono text-xs">
-                              {tx.reference_id}
-                            </span>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Reference ID</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs">{tx.reference_id}</span>
+                              <button
+                                onClick={() => copyText(tx.reference_id)}
+                                className="text-muted-foreground hover:text-primary"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {tx.transaction_id && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">TXN ID</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs">{tx.transaction_id}</span>
+                              <button
+                                onClick={() => copyText(tx.transaction_id)}
+                                className="text-muted-foreground hover:text-primary"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </div>
                         )}
                         <div className="flex justify-between">
@@ -573,6 +611,49 @@ export default function WalletPage() {
                               ? new Date(tx.created_at).toLocaleString()
                               : "—"}
                           </span>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                          {hasReceipt && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 text-xs"
+                              onClick={() => window.open(tx.receipt_url || tx.proof_url, "_blank")}
+                            >
+                              <Receipt className="h-3.5 w-3.5" /> View Receipt
+                            </Button>
+                          )}
+                          {tx.transaction_id && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 text-xs"
+                              onClick={() => copyText(tx.transaction_id)}
+                            >
+                              <Copy className="h-3.5 w-3.5" /> Copy TXN
+                            </Button>
+                          )}
+                          {canAffidavit && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 text-xs border-green-300 text-green-700"
+                              // Placeholder: you can implement affidavit generation later
+                              onClick={() => toast.info("Affidavit generation coming soon.")}
+                            >
+                              <FileCheck className="h-3.5 w-3.5" /> Affidavit
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1.5 text-xs ml-auto"
+                            onClick={() => setExpanded(null)}
+                          >
+                            Close
+                          </Button>
                         </div>
                       </div>
                     )}
