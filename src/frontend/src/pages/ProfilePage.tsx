@@ -1,5 +1,6 @@
 // src/frontend/src/pages/ProfilePage.tsx
 // Replaces Supabase with Cloudflare Worker APIs
+// FIX: Help count now uses approved case resolutions instead of unlocks.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -38,13 +39,13 @@ import {
   getKycSubmission,
   getCasesByUser,
   getProfile,
-  getCaseUnlocksByHero,
+  getCaseResolutionsByHero,  // ✅ changed from getCaseUnlocksByHero
 } from "@/lib/api";
 
 export default function ProfilePage() {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation(); // ✅ Added for refresh detection
+  const location = useLocation();
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [caseStats, setCaseStats] = useState({ submitted: 0, approved: 0, completed: 0 });
@@ -62,11 +63,11 @@ export default function ProfilePage() {
   async function loadData() {
     if (!user) return;
     try {
-      const [kyc, cases, prof, unlocks] = await Promise.all([
+      const [kyc, cases, prof, resolutions] = await Promise.all([
         getKycSubmission(user.id),
         getCasesByUser(user.id),
         getProfile(user.id),
-        getCaseUnlocksByHero(user.id),
+        getCaseResolutionsByHero(user.id), // ✅ now fetches resolutions
       ]);
 
       setKycData(kyc);
@@ -79,7 +80,14 @@ export default function ProfilePage() {
           completed: cases.filter((c: any) => c.status === "completed").length,
         });
       }
-      setHelpedCount(unlocks?.length ?? 0);
+
+      // ✅ Count only approved/confirmed resolutions where the user is the hero
+      const approvedResolutions = (resolutions || []).filter(
+        (r: any) =>
+          String(r.status || "").toLowerCase() === "completed" &&
+          (r.admin_confirmed === true || r.admin_confirmed === 1 || r.admin_confirmed === "1")
+      );
+      setHelpedCount(approvedResolutions.length);
     } catch (err) {
       console.error("Failed to load profile data:", err);
     }
