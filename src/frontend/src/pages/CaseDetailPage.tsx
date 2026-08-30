@@ -76,6 +76,17 @@ function isApprovedCompletedResolution(resolution: any, caseCompleted: boolean =
   return false;
 }
 
+async function hasMinimumVideoDuration(file: File, minimumSeconds = 60): Promise<boolean> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.onloadedmetadata = () => { const duration = Number(probe.duration); URL.revokeObjectURL(url); resolve(Number.isFinite(duration) && duration >= minimumSeconds); };
+    probe.onerror = () => { URL.revokeObjectURL(url); resolve(false); };
+    probe.src = url;
+  });
+}
+
 function isContributionResolution(resolution: any): boolean {
   if (!resolution) return false;
   const marker = String(
@@ -236,6 +247,7 @@ export default function CaseDetailPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const videoChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
+  const recSecondsRef = useRef(0);
 
   useEffect(() => {
     loadCase();
@@ -314,25 +326,37 @@ export default function CaseDetailPage() {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true,
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       });
       setStream(s);
       setRecording(true);
       setPaused(false);
       setRecTimer(0);
+      recSecondsRef.current = 0;
       setFbVideoBlob(null);
       setFbVideoFile(null);
       setFbVideoName("");
       setTimeout(() => {
         if (liveVideoRef.current) liveVideoRef.current.srcObject = s;
       }, 100);
-      const recorder = new MediaRecorder(s, { mimeType: "video/webm;codecs=vp8" });
+      const preferredMime = "video/webm;codecs=vp9,opus";
+      const fallbackMime = "video/webm;codecs=vp8,opus";
+      const recorder = new MediaRecorder(s, { mimeType: MediaRecorder.isTypeSupported(preferredMime) ? preferredMime : fallbackMime, videoBitsPerSecond: 2200000, audioBitsPerSecond: 128000 });
       mediaRecorderRef.current = recorder;
       videoChunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) videoChunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
+        if (recSecondsRef.current < 60) {
+          toast.error("Please record at least 60 seconds of feedback.");
+          videoChunksRef.current = [];
+          s.getTracks().forEach((t) => t.stop());
+          setStream(null);
+          setRecording(false);
+          setPaused(false);
+          return;
+        }
         const blob = new Blob(videoChunksRef.current, { type: "video/webm" });
         setFbVideoFile(new File([blob], "feedback.webm", { type: "video/webm" }));
         setFbVideoBlob(URL.createObjectURL(blob));
@@ -346,6 +370,7 @@ export default function CaseDetailPage() {
       recorder.start();
       timerRef.current = setInterval(() => {
         setRecTimer((prev) => {
+          recSecondsRef.current = prev + 1;
           if (prev + 1 >= 90) {
             stopRecording();
             return 90;
@@ -372,6 +397,7 @@ export default function CaseDetailPage() {
       setPaused(false);
       timerRef.current = setInterval(() => {
         setRecTimer((prev) => {
+          recSecondsRef.current = prev + 1;
           if (prev + 1 >= 90) {
             stopRecording();
             return 90;
@@ -511,6 +537,10 @@ export default function CaseDetailPage() {
   async function submitFeedback() {
     if (!fbText.trim() || !fbVideoFile) {
       toast.error("Write a message and record/upload a video.");
+      return;
+    }
+    if (!(await hasMinimumVideoDuration(fbVideoFile))) {
+      toast.error("Feedback video must be at least 60 seconds long.");
       return;
     }
     setFbSubmitting(true);

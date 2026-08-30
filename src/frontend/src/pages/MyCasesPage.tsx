@@ -495,12 +495,12 @@ export default function MyCasesPage() {
             {/* My Cases Tab */}
             <TabsContent value="mycases" className="space-y-4 mt-4">
               <Tabs value={myCaseStatusFilter} onValueChange={setMyCaseStatusFilter} className="w-full">
-                <TabsList className="grid grid-cols-5 w-full">
-                  <TabsTrigger value="pending">Pending</TabsTrigger>
-                  <TabsTrigger value="rejected">Rejected</TabsTrigger>
-                  <TabsTrigger value="approved">Approved</TabsTrigger>
-                  <TabsTrigger value="completed">Completed</TabsTrigger>
-                  <TabsTrigger value="expired">Expired</TabsTrigger>
+                <TabsList className="flex w-full flex-wrap gap-1 h-auto">
+                  <TabsTrigger value="pending" className="min-w-[5.5rem] flex-1">Pending</TabsTrigger>
+                  <TabsTrigger value="rejected" className="min-w-[5.5rem] flex-1">Rejected</TabsTrigger>
+                  <TabsTrigger value="approved" className="min-w-[5.5rem] flex-1">Approved</TabsTrigger>
+                  <TabsTrigger value="completed" className="min-w-[5.5rem] flex-1">Completed</TabsTrigger>
+                  <TabsTrigger value="expired" className="min-w-[5.5rem] flex-1">Expired</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -521,12 +521,12 @@ export default function MyCasesPage() {
               </Tabs>
 
               <Tabs value={helpStatusFilter} onValueChange={setHelpStatusFilter} className="w-full">
-                <TabsList className="grid grid-cols-5 w-full">
-                  <TabsTrigger value="pending">Pending</TabsTrigger>
-                  <TabsTrigger value="rejected">Rejected</TabsTrigger>
-                  <TabsTrigger value="approved">Approved</TabsTrigger>
-                  <TabsTrigger value="completed">Completed</TabsTrigger>
-                  <TabsTrigger value="expired">Expired</TabsTrigger>
+                <TabsList className="flex w-full flex-wrap gap-1 h-auto">
+                  <TabsTrigger value="pending" className="min-w-[5.5rem] flex-1">Pending</TabsTrigger>
+                  <TabsTrigger value="rejected" className="min-w-[5.5rem] flex-1">Rejected</TabsTrigger>
+                  <TabsTrigger value="approved" className="min-w-[5.5rem] flex-1">Approved</TabsTrigger>
+                  <TabsTrigger value="completed" className="min-w-[5.5rem] flex-1">Completed</TabsTrigger>
+                  <TabsTrigger value="expired" className="min-w-[5.5rem] flex-1">Expired</TabsTrigger>
                 </TabsList>
               </Tabs>
 

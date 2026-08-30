@@ -286,6 +286,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [unreadSupport, setUnreadSupport] = useState(0);
   const [resolutionView, setResolutionView] = useState<"pending" | "rejected" | "completed">("pending");
+  const [resolutionSearch, setResolutionSearch] = useState("");
+  const [feedbackSearch, setFeedbackSearch] = useState("");
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -629,8 +631,9 @@ export default function AdminPage() {
   const completedContributions = resolutions.filter((r) => ["approved", "completed"].includes(normalizedResolutionStatus(r)) && isContributionResolution(r));
   const completedDirectResolutions = resolutions.filter((r) => ["approved", "completed"].includes(normalizedResolutionStatus(r)) && !isContributionResolution(r));
   const completedResolutionsCount = resolutions.filter((r) => ["approved", "completed"].includes(normalizedResolutionStatus(r))).length;
-  const visibleDirectResolutions = resolutionView === "pending" ? pendingDirectResolutions : resolutionView === "rejected" ? rejectedDirectResolutions : completedDirectResolutions;
-  const visibleContributionResolutions = resolutionView === "pending" ? pendingContributions : resolutionView === "rejected" ? rejectedContributions : completedContributions;
+  const visibleDirectResolutions = (resolutionView === "pending" ? pendingDirectResolutions : resolutionView === "rejected" ? rejectedDirectResolutions : completedDirectResolutions).filter((r) => { const q = resolutionSearch.trim().toLowerCase(); if (!q) return true; const c = caseList.find((cs) => cs.id === r.case_id); const p = profileMap[r.hero_id] || profileMap[r.seeker_id]; const values = [r.id, r.case_id, r.hero_id, r.seeker_id, r.hero_email, r.transaction_id, c?.title, c?.category, p?.full_name, p?.email]; return values.some((v) => String(v || "").toLowerCase().includes(q)); });
+  const visibleContributionResolutions = (resolutionView === "pending" ? pendingContributions : resolutionView === "rejected" ? rejectedContributions : completedContributions).filter((r) => { const q = resolutionSearch.trim().toLowerCase(); if (!q) return true; const c = caseList.find((cs) => cs.id === r.case_id); const p = profileMap[r.hero_id] || profileMap[r.seeker_id]; const values = [r.id, r.case_id, r.hero_id, r.seeker_id, r.hero_email, r.transaction_id, c?.title, c?.category, p?.full_name, p?.email]; return values.some((v) => String(v || "").toLowerCase().includes(q)); });
+  const visibleFeedbacks = feedbacks.filter((fb) => { const q = feedbackSearch.trim().toLowerCase(); if (!q) return true; const c = caseList.find((cs) => cs.id === fb.case_id); const p = profileMap[fb.user_id]; return [fb.id, fb.case_id, fb.user_id, fb.first_name, fb.text_message, c?.title, p?.full_name, p?.email].some((v) => String(v || "").toLowerCase().includes(q)); });
 
   const approvedCases = caseList.filter((c) => c.status === "approved");
   const completedCases = caseList.filter((c) => c.status === "completed");
@@ -821,6 +824,7 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="verify" className="space-y-4 mt-4">
+              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search direct help by case, hero, email, CNIC, or TXN..." value={resolutionSearch} onChange={(e) => setResolutionSearch(e.target.value)} className="pl-9 h-11" /></div>
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
                 <ShieldIcon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <div className="space-y-2"><p>Review direct-help proofs, check the receipt and amount, then approve or reject each submission. Approved direct payments remain in the completed history.</p><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Pending Direct Payments</span><strong className="block text-lg text-primary">{pendingDirectCount}</strong></div><div className="rounded-lg bg-card border border-border px-3 py-2"><span className="text-muted-foreground">Completed Direct Payments</span><strong className="block text-lg text-teal-600">{completedDirectResolutions.length}</strong></div></div></div>
@@ -839,6 +843,7 @@ export default function AdminPage() {
                 })}
             </TabsContent>
             <TabsContent value="contributions" className="space-y-4 mt-4">
+              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search contributions by case, hero, email, CNIC, or TXN..." value={resolutionSearch} onChange={(e) => setResolutionSearch(e.target.value)} className="pl-9 h-11" /></div>
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Contributions</strong><p className="mt-1">Review every contribution receipt, amount, and transaction ID. Approved contributions remain visible in the completed history.</p></div>
               <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Contribution status filters">
                 <button type="button" role="tab" aria-selected={resolutionView === "pending"} onClick={() => setResolutionView("pending")} className={`rounded-lg px-2 py-2 text-xs font-semibold ${resolutionView === "pending" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>Pending ({pendingContributionCount})</button>
@@ -863,7 +868,7 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="deposits" className="space-y-4 mt-4">
-              <DepositSearchBox deposits={deposits} onApprove={approveDeposit} onReject={rejectDeposit} />
+              <DepositSearchBox deposits={deposits} onApprove={approveDeposit} onReject={rejectDeposit} profileMap={profileMap} cnicByUser={cnicByUser} />
             </TabsContent>
 
             <TabsContent value="notify" className="mt-4">
@@ -879,8 +884,9 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="feedback" className="space-y-4 mt-4">
-              {feedbacks.filter((f) => !!f.case_id).length === 0 ? <Empty text="No seeker feedback submitted yet. A completed case appears here after the seeker sends the required caption and video." /> :
-                feedbacks.filter((f) => !!f.case_id).map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} />)}
+              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search feedback by case, user, email, name, or text..." value={feedbackSearch} onChange={(e) => setFeedbackSearch(e.target.value)} className="pl-9 h-11" /></div>
+              {visibleFeedbacks.filter((f) => !!f.case_id).length === 0 ? <Empty text="No seeker feedback submitted yet. A completed case appears here after the seeker sends the required caption and video." /> :
+                visibleFeedbacks.filter((f) => !!f.case_id).map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} />)}
             </TabsContent>
 
             <TabsContent value="suspensions" className="space-y-4 mt-4">
@@ -1017,16 +1023,18 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
   );
 }
 
-function DepositSearchBox({ deposits, onApprove, onReject }: any) {
+function DepositSearchBox({ deposits, onApprove, onReject, profileMap = {}, cnicByUser = {} }: any) {
   const [search, setSearch] = useState("");
   const sorted = [...deposits].sort((a, b) => {
     const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
     return (order[a.status] ?? 3) - (order[b.status] ?? 3);
   });
   const filtered = search.trim()
-    ? sorted.filter((d: any) =>
-        d.user_id?.toLowerCase().includes(search.toLowerCase()) ||
-        d.transaction_id?.toLowerCase().includes(search.toLowerCase()))
+    ? sorted.filter((d: any) => {
+        const q = search.trim().toLowerCase();
+        const p = profileMap[d.user_id] || {};
+        return [d.id, d.user_id, d.transaction_id, d.amount, d.credits, p.full_name, p.email, cnicByUser[d.user_id]].some((value) => String(value || "").toLowerCase().includes(q));
+      })
     : sorted;
   return (
     <div className="space-y-3">

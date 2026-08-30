@@ -27,6 +27,7 @@ import {
   insertOfferClaim,
   updateCategoryOfferUsage,
   getCaseCounts,
+  getFeedbacks,
   insertCaseSubmission,
   uploadFileToStorage,
   updateWalletBalance,
@@ -1133,13 +1134,17 @@ export default function SubmitRequestPage() {
       const completedCases = cases?.filter((c: any) => c.status === "completed") || [];
 
       if (completedCases.length > 0) {
-        // We need to check feedbacks for these cases
-        // For now, we'll assume no blocking; in real implementation, we'd call a feedback API
-        // Since feedbacks are also migrated, we'll use a placeholder
-        // Actually we can fetch feedbacks from the worker if needed
-        // For simplicity, we'll set blockedByFeedback to null
-        // In a production environment, you'd have a `getFeedbackByCase` API
-        setBlockedByFeedback(null);
+        const feedbackRows = await getFeedbacks(200);
+        const feedbackList = Array.isArray(feedbackRows) ? feedbackRows : (Array.isArray((feedbackRows as any)?.data) ? (feedbackRows as any).data : []);
+        const now = Date.now();
+        const overdue = completedCases.find((completed: any) => {
+          const completedAt = new Date(String(completed.completed_at || completed.updated_at || completed.created_at || "")).getTime();
+          if (!Number.isFinite(completedAt) || now - completedAt < 24 * 60 * 60 * 1000) return false;
+          const caseId = String(completed.id);
+          const submitted = feedbackList.some((feedback: any) => String(feedback.case_id) === caseId && String(feedback.user_id) === String(user.id) && ["pending_review", "approved"].includes(String(feedback.status || "").toLowerCase()));
+          return !submitted;
+        });
+        setBlockedByFeedback(overdue ? { caseId: String(overdue.id), caseTitle: String(overdue.title || "your completed case") } : null);
       } else {
         setBlockedByFeedback(null);
       }
@@ -1327,9 +1332,12 @@ export default function SubmitRequestPage() {
         }
       }, 50);
 
+      const preferredMime = "video/webm;codecs=vp9,opus";
+      const fallbackMime = "video/webm;codecs=vp8,opus";
       const recorder = new MediaRecorder(s, {
-        mimeType: "video/webm;codecs=vp8",
-        videoBitsPerSecond: 1500000,
+        mimeType: MediaRecorder.isTypeSupported(preferredMime) ? preferredMime : fallbackMime,
+        videoBitsPerSecond: 2200000,
+        audioBitsPerSecond: 128000,
       });
 
       mediaRecorderRef.current = recorder;
@@ -1340,6 +1348,14 @@ export default function SubmitRequestPage() {
       };
 
       recorder.onstop = async () => {
+        if (sec < 60) {
+          toast.error("Please record at least 60 seconds so your story can be verified clearly.");
+          setVideoRecording(false);
+          setUploadingVideo(false);
+          s.getTracks().forEach((t) => t.stop());
+          videoChunksRef.current = [];
+          return;
+        }
         const blob = new Blob(videoChunksRef.current, { type: "video/webm" });
         const fileSizeMB = blob.size / (1024 * 1024);
         console.log(`Video size: ${fileSizeMB.toFixed(2)} MB`);
@@ -1386,7 +1402,7 @@ export default function SubmitRequestPage() {
         if (sec >= 90) {
           clearInterval(interval);
           if (recorder.state === "recording") recorder.stop();
-          toast.info("Auto-stopped at 90 seconds to keep file size within the upload limit.");
+          toast.info("Recording stopped at 90 seconds. Your video must be at least 60 seconds.");
         }
       }, 1000);
 
