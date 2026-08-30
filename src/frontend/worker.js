@@ -1,5 +1,5 @@
 // ============================================================
-// FILE: worker.js (COMPLETE - ALL FEATURES + COMMUNITY POSTS, LIKES, COMMENTS, MARK-READ + PROFILE FIXED)
+// FILE: worker.js (COMPLETE - ALL FEATURES + CREDIT TRANSACTIONS)
 // ============================================================
 
 const PUBLIC_ORIGIN = "https://givethra.org";
@@ -329,6 +329,44 @@ function pick(body, fields) {
 }
 
 // ============================================================
+//  CREDIT TRANSACTIONS HELPERS (NEW)
+// ============================================================
+async function getWalletBalance(env, userId) {
+  const row = await env.DB.prepare(
+    "SELECT balance FROM wallets WHERE user_id = ?"
+  ).bind(userId).first();
+  return Number(row?.balance || 0);
+}
+
+async function addTransaction(env, userId, amount, type, description, referenceId = null) {
+  const txId = id();
+  const timestamp = now();
+  await env.DB.prepare(
+    `INSERT INTO credit_transactions (id, user_id, amount, type, description, reference_id, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'completed', ?, ?)`
+  ).bind(txId, userId, amount, type, description, referenceId, timestamp, timestamp).run();
+  return txId;
+}
+
+async function deductCredits(env, userId, amount, type, description, referenceId = null) {
+  const balance = await getWalletBalance(env, userId);
+  if (balance < amount) {
+    throw new Error(`Insufficient credits. Required: ${amount}, Available: ${balance}`);
+  }
+  await env.DB.prepare(
+    "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?"
+  ).bind(amount, now(), userId, amount).run();
+  await addTransaction(env, userId, -amount, type, description, referenceId);
+}
+
+async function addCredits(env, userId, amount, type, description, referenceId = null) {
+  await env.DB.prepare(
+    "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?"
+  ).bind(amount, now(), userId).run();
+  await addTransaction(env, userId, amount, type, description, referenceId);
+}
+
+// ============================================================
 //  PROFILE HANDLER - FIXED
 // ============================================================
 async function handleProfile(request, env, user, parts, origin) {
@@ -564,10 +602,26 @@ async function handleCases(request, env, user, url, parts, origin) {
     const caseId = body?.id || id();
     const photoUrls = Array.isArray(record.photo_urls) || (record.photo_urls && typeof record.photo_urls === "object") ? JSON.stringify(record.photo_urls) : (record.photo_urls || null);
     const categoryDetails = Array.isArray(record.category_details) || (record.category_details && typeof record.category_details === "object") ? JSON.stringify(record.category_details) : (record.category_details || null);
+
+    // ---- NEW: Check credits for non-free case submission ----
+    const isFree = body?.was_free === true;
+    if (!isFree) {
+      const balance = await getWalletBalance(env, user.user_id);
+      if (balance < 1) {
+        return json({ error: "Insufficient credits. You need 1 credit to submit a case." }, 402, origin);
+      }
+    }
+
     await env.DB.prepare(
       "INSERT INTO case_submissions (id, user_id, category, title, short_description, country, city, urgency, description, amount_needed, currency, why_help, deadline, institute_name, institute_contact, institute_address, payment_method, account_title, account_number, account_iban, photo_urls, selfie_url, video_url, category_details, was_free, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
     ).bind(caseId, user.user_id, record.category || null, record.title || null, record.short_description || null, record.country || null, record.city || null, record.urgency || null, record.description || null, record.amount_needed || null, record.currency || "USD", record.why_help || null, record.deadline || null, record.institute_name || null, record.institute_contact || null, record.institute_address || null, record.payment_method || null, record.account_title || null, record.account_number || null, record.account_iban || null, photoUrls, record.selfie_url || null, record.video_url || null, categoryDetails, record.was_free ? 1 : 0, now()).run();
     await env.DB.prepare("UPDATE users SET total_cases = COALESCE(total_cases, 0) + 1, pending_cases = COALESCE(pending_cases, 0) + 1, updated_at = ? WHERE user_id = ?").bind(now(), user.user_id).run();
+
+    // ---- NEW: Deduct credit if not free ----
+    if (!isFree) {
+      await deductCredits(env, user.user_id, 1, 'case_submission', `Case "${record.title || caseId}" submission fee`, caseId);
+    }
+
     return json({ id: caseId, user_id: user.user_id, ...record, status: "pending" }, 201, origin);
   }
   return json({ error: "Method not allowed" }, 405, origin);
@@ -1558,10 +1612,8 @@ async function handleRequest(request, env, ctx) {
           if (requestedStatus === "approved" && current.status !== "approved") {
             const credits = Number(values.credits ?? current.credits ?? current.amount ?? 0);
             if (!Number.isFinite(credits) || credits < 0) return json({ error: "Invalid deposit credits" }, 400, origin);
-            await env.DB.prepare(
-              `INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?)
-               ON CONFLICT(user_id) DO UPDATE SET balance = COALESCE(wallets.balance, 0) + excluded.balance, updated_at = excluded.updated_at`
-            ).bind(current.user_id, credits, now()).run();
+            // ---- NEW: Add transaction log for deposit approval ----
+            await addCredits(env, current.user_id, credits, 'deposit', `Deposit #${recordId} approved`, recordId);
           }
           return json(await env.DB.prepare("SELECT * FROM deposits WHERE id = ?").bind(recordId).first(), 200, origin);
         }
@@ -1678,6 +1730,19 @@ async function handleRequest(request, env, ctx) {
       }
     }
 
+    // ============================================================
+    //  CREDIT TRANSACTIONS ENDPOINT (NEW)
+    // ============================================================
+    if (parts[1] === "transactions" && parts[2]) {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
+      const target = parts[2];
+      if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+      const rows = await env.DB.prepare(
+        "SELECT * FROM credit_transactions WHERE user_id = ? ORDER BY created_at DESC"
+      ).bind(target).all();
+      return json(rows.results || [], 200, origin);
+    }
+
     // Case unlocks: Contribution gets three free uses per user; Direct Help always costs one credit.
     if (parts[1] === "case-unlocks") {
       if (parts[2] === "count" && request.method === "GET") {
@@ -1731,6 +1796,12 @@ async function handleRequest(request, env, ctx) {
         } catch (error) {
           if (creditsCharged > 0) await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(creditsCharged, now(), heroId).run();
           throw error;
+        }
+        // ---- NEW: Log transaction if credits charged ----
+        if (creditsCharged > 0) {
+          const type = paymentType === 'full' ? 'direct_help' : 'contribution';
+          const desc = paymentType === 'full' ? `Direct help for case ${caseId}` : `Contribution to case ${caseId}`;
+          await addTransaction(env, heroId, -creditsCharged, type, desc, unlockId);
         }
         const saved = await env.DB.prepare("SELECT * FROM case_unlocks WHERE id = ?").bind(unlockId).first();
         return json(saved || { id: unlockId, case_id: caseId, hero_id: heroId, pledged_amount: body.pledged_amount ?? null, credits_charged: creditsCharged, payment_type: paymentType, unlocked_at: now() }, 201, origin);
@@ -1786,24 +1857,24 @@ async function handleRequest(request, env, ctx) {
           if (suspension) return suspendedActionResponse(origin, suspension);
         }
         await env.DB.prepare(
-  `INSERT INTO case_resolutions
-    (id, case_id, hero_id, hero_email, seeker_id, resolution_type, amount_paid, transaction_id, receipt_url, notes, status, paid_to, submitted_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-).bind(
-  resolutionId,
-  caseId,
-  heroId,
-  body.hero_email || null,   // ✅ نئی فیلڈ
-  body.seeker_id || null,
-  body.resolution_type || null,
-  body.amount_paid ?? body.amount ?? null,
-  body.transaction_id || null,
-  body.receipt_url || null,
-  body.notes || null,
-  body.status || "pending_confirmation",
-  body.paid_to === "givethra" ? "givethra" : "institute",
-  now()
-).run();
+          `INSERT INTO case_resolutions
+            (id, case_id, hero_id, hero_email, seeker_id, resolution_type, amount_paid, transaction_id, receipt_url, notes, status, paid_to, submitted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          resolutionId,
+          caseId,
+          heroId,
+          body.hero_email || null,
+          body.seeker_id || null,
+          body.resolution_type || null,
+          body.amount_paid ?? body.amount ?? null,
+          body.transaction_id || null,
+          body.receipt_url || null,
+          body.notes || null,
+          body.status || "pending_confirmation",
+          body.paid_to === "givethra" ? "givethra" : "institute",
+          now()
+        ).run();
         const saved = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(resolutionId).first();
         return json(saved || { id: resolutionId, ...body, status: body.status || "pending_confirmation", submitted_at: now() }, 201, origin);
       }
@@ -1895,6 +1966,8 @@ async function handleRequest(request, env, ctx) {
           if (!Number(charged?.meta?.changes || 0)) {
             return json({ error: `Insufficient credits. ${unlockCost} credits are required to unlock this account.`, required: unlockCost, balance }, 402, origin);
           }
+          // ---- NEW: Log transaction for suspension unlock ----
+          await addTransaction(env, userId, -unlockCost, 'suspension_unlock', 'Account suspension unlock (5 credits)', userId);
           try {
             const unlocked = await env.DB.prepare(
               "UPDATE user_suspensions SET is_active = 0, unlocked_at = ?, credits_used_to_unlock = COALESCE(credits_used_to_unlock, 0) + ? WHERE user_id = ? AND is_active = 1"
