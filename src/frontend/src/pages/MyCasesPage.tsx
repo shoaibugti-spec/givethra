@@ -48,6 +48,14 @@ function maskCnic(cnic?: string): string {
   return `${shown}${masked}`;
 }
 
+// Privacy: show first name + middle initial only.
+function maskName(name?: string): string {
+  if (!name) return "—";
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length <= 1) return parts[0] || "—";
+  return `${parts[0]} ${parts[1].charAt(0)}.`;
+}
+
 // Global Affidavit generator for dashboard list
 function generateAffidavitFromDashboard(caseData: any, resolution: any, heroName: string, seekerCnic: string, seekerName: string) {
   const caseId = (caseData.id ?? "").slice(0, 8).toUpperCase();
@@ -97,13 +105,13 @@ function generateAffidavitFromDashboard(caseData: any, resolution: any, heroName
 
       <h2>Help Seeker (Beneficiary)</h2>
       <div class="grid">
-        <div class="field"><div class="label">Full Name</div><div class="value">${seekerName}</div></div>
+        <div class="field"><div class="label">Full Name</div><div class="value">${maskName(seekerName)}</div></div>
         <div class="field"><div class="label">CNIC (Masked)</div><div class="value">${seekerCnic}</div></div>
       </div>
 
       <h2>Assistance & Method Verification</h2>
       <div class="grid">
-        <div class="field"><div class="label">Helper Name (Hero)</div><div class="value">${heroName}</div></div>
+        <div class="field"><div class="label">Helper Name (Hero)</div><div class="value">${maskName(heroName)}</div></div>
         <div class="field"><div class="label">Help Type</div><div class="value">${isFundraising ? "Contribution (Fundraising)" : "Direct Institute Payment"}</div></div>
         <div class="field"><div class="label">Amount Settled</div><div class="value" style="color:#16a34a; font-weight:bold;">${s} ${paidAmount} ${cur}</div></div>
         <div class="field"><div class="label">TXN Number</div><div class="value">${resolution?.transaction_id || "—"}</div></div>
@@ -278,7 +286,8 @@ export default function MyCasesPage() {
           else if (status === "rejected" || status === "disputed") helpStatus = "rejected";
           else helpStatus = "pending";
         } else {
-          helpStatus = isCaseCompleted ? "completed" : "pending";
+          const caseExpired = String(caseRecord?.status || "").toLowerCase() === "expired";
+          helpStatus = caseExpired ? "expired" : (isCaseCompleted ? "completed" : "pending");
         }
 
         merged.push({
@@ -378,6 +387,26 @@ export default function MyCasesPage() {
           </div>
         )}
 
+        {isHelping && statusKey === "expired" && (
+          <div className="space-y-3">
+            <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="bg-amber-100 p-2 rounded-full shrink-0"><CalendarClock className="h-6 w-6 text-amber-600" /></div>
+                <div className="flex-1">
+                  <h4 className="text-base font-bold text-amber-800">⏰ آپ کا انلاک کردہ کیس ایکسپائر ہو گیا</h4>
+                  <p className="text-xs text-amber-600">ایک ضرورت مند نے مدد کے لیے ہیروز کو پکارا، مگر اس بار مدد نہ ہو سکی۔ امید باقی ہے!</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg border-2 border-amber-200 p-4 text-sm text-amber-900">
+                آپ نے کیس انلاک کیا تھا مگر مدد مکمل نہ ہو سکی۔ مایوس نہ ہوں — آپ ایک ہیرو بننے کا پہلا قدم اٹھا چکے ہیں۔ آنے والے کیس کے لیے مدد کریں، آپ کا اگلا موقع آپ کا منتظر ہے۔ 🤲
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button size="sm" className="flex-1 gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => navigate({ to: "/cases" })}><Eye className="h-3.5 w-3.5" /> براؤز کریں — مزید کیسز دیکھیں</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isHelping && statusKey === "completed" && c.affidavit_available && (
           <div className="space-y-2">
             <div className="rounded-xl bg-green-50 border border-green-200 p-3 text-sm text-green-700">
@@ -466,11 +495,12 @@ export default function MyCasesPage() {
             {/* My Cases Tab */}
             <TabsContent value="mycases" className="space-y-4 mt-4">
               <Tabs value={myCaseStatusFilter} onValueChange={setMyCaseStatusFilter} className="w-full">
-                <TabsList className="grid grid-cols-4 w-full">
+                <TabsList className="grid grid-cols-5 w-full">
                   <TabsTrigger value="pending">Pending</TabsTrigger>
                   <TabsTrigger value="rejected">Rejected</TabsTrigger>
                   <TabsTrigger value="approved">Approved</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
+                  <TabsTrigger value="expired">Expired</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -491,11 +521,12 @@ export default function MyCasesPage() {
               </Tabs>
 
               <Tabs value={helpStatusFilter} onValueChange={setHelpStatusFilter} className="w-full">
-                <TabsList className="grid grid-cols-4 w-full">
+                <TabsList className="grid grid-cols-5 w-full">
                   <TabsTrigger value="pending">Pending</TabsTrigger>
                   <TabsTrigger value="rejected">Rejected</TabsTrigger>
                   <TabsTrigger value="approved">Approved</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
+                  <TabsTrigger value="expired">Expired</TabsTrigger>
                 </TabsList>
               </Tabs>
 
