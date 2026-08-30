@@ -234,76 +234,43 @@ export default function MyCasesPage() {
         if (record?.id) caseMap.set(String(record.id), record);
       });
 
-      const resolutionByCase = new Map<string, any>();
-      resolutions.forEach((resolution: any) => {
-        const key = String(resolution.case_id || "");
-        const current = resolutionByCase.get(key);
-        if (
-          !current ||
-          new Date(String(resolution.completed_at || resolution.submitted_at || 0)).getTime() >
-          new Date(String(current.completed_at || current.submitted_at || 0)).getTime()
-        ) {
-          resolutionByCase.set(key, resolution);
-        }
-      });
-
-      // Ensure cases that only have resolutions (no unlock) are included
-      resolutions.forEach((resolution: any) => {
+      // Build one My Help record per hero interaction. Do not collapse multiple
+      // heroes/resolutions for the same case into a single case-level row.
+      const interactionRows: any[] = [];
+      const resolutionKeys = new Set<string>();
+      for (const resolution of resolutions) {
         const caseId = String(resolution.case_id || "");
-        if (caseId && !caseMap.has(caseId)) {
-          caseMap.set(caseId, {
-            id: caseId,
-            title: resolution.case_title || "Completed help",
-            category: resolution.case_category || "Help",
-            country: resolution.case_country || "",
-            city: resolution.case_city || "",
-            currency: resolution.currency || "PKR",
-            amount_needed: resolution.amount_paid || 0,
-            amount_collected: resolution.amount_paid || 0,
-            status: "completed",
-          });
-        }
-      });
-
-      const merged: any[] = [];
-      for (const [caseId, caseRecord] of caseMap) {
-        const resolution = resolutionByCase.get(caseId);
+        if (!caseId) continue;
+        const caseRecord = caseMap.get(caseId) || {
+          id: caseId,
+          title: resolution.case_title || "Completed help",
+          category: resolution.case_category || "Help",
+          country: resolution.case_country || "",
+          city: resolution.case_city || "",
+          currency: resolution.currency || "PKR",
+          amount_needed: resolution.amount_paid || 0,
+          amount_collected: resolution.amount_paid || 0,
+          status: "completed",
+        };
+        caseMap.set(caseId, caseRecord);
         const unlock = unlocks.find((u: any) => String(u.case_id) === caseId);
-
-        let helpType: string = "direct";
-        if (resolution) {
-          helpType = isContributionResolution(resolution) ? "contribution" : "direct";
-        } else if (unlock) {
-          helpType = unlock.payment_type === "partial" ? "contribution" : "direct";
-        }
-
-        let helpStatus: string = "pending";
-        const isCaseCompleted = String(caseRecord.status || "").toLowerCase() === "completed";
-        if (resolution) {
-          const isApproved = isApprovedCompletedResolution(resolution, isCaseCompleted);
-          const status = String(resolution.status || "").toLowerCase();
-          if (isApproved) helpStatus = "completed";
-          else if (status === "rejected" || status === "disputed") helpStatus = "rejected";
-          else helpStatus = "pending";
-        } else {
-          const caseExpired = String(caseRecord?.status || "").toLowerCase() === "expired";
-          helpStatus = caseExpired ? "expired" : (isCaseCompleted ? "completed" : "pending");
-        }
-
-        merged.push({
-          ...caseRecord,
-          status: String(caseRecord?.status || "pending").toLowerCase(),
-          amount_collected: Number(resolution?.amount_paid ?? resolution?.seeker_confirmed_amount ?? caseRecord.amount_collected ?? 0),
-          completed_at: resolution?.completed_at || caseRecord.updated_at,
-          resolution_id: resolution?.id,
-          affidavit_available: helpStatus === "completed" && resolution ? true : false,
-          helpType,
-          helpStatus,
-          resolution,
-          unlock,
-        });
+        const helpType = isContributionResolution(resolution) ? "contribution" : "direct";
+        const status = String(resolution.status || "").toLowerCase();
+        const isApproved = isApprovedCompletedResolution(resolution, String(caseRecord.status || "").toLowerCase() === "completed");
+        const helpStatus = isApproved ? "completed" : (status === "rejected" || status === "disputed" ? "rejected" : "pending");
+        interactionRows.push({ ...caseRecord, status: String(caseRecord.status || "pending").toLowerCase(), amount_collected: Number(resolution.amount_paid ?? resolution.seeker_confirmed_amount ?? caseRecord.amount_collected ?? 0), completed_at: resolution.completed_at || resolution.admin_confirmed_at || resolution.submitted_at, resolution_id: resolution.id, affidavit_available: helpStatus === "completed", helpType, helpStatus, resolution, unlock });
+        resolutionKeys.add(`${caseId}:${String(resolution.hero_id || user.id)}`);
       }
-      setUnlockedCases(merged);
+
+      // Keep unlock-only heroes visible, including rejected/no-proof attempts.
+      for (const unlock of unlocks) {
+        const caseId = String(unlock.case_id || "");
+        if (!caseId || resolutionKeys.has(`${caseId}:${String(unlock.hero_id || user.id)}`)) continue;
+        const caseRecord = caseMap.get(caseId) || { id: caseId, title: "Unlocked case", category: "Help", currency: "PKR", status: "pending" };
+        const caseExpired = String(caseRecord.status || "").toLowerCase() === "expired";
+        interactionRows.push({ ...caseRecord, status: String(caseRecord.status || "pending").toLowerCase(), completed_at: caseRecord.updated_at, resolution_id: undefined, affidavit_available: false, helpType: unlock.payment_type === "partial" ? "contribution" : "direct", helpStatus: caseExpired ? "expired" : (String(caseRecord.status || "").toLowerCase() === "completed" ? "completed" : "pending"), resolution: undefined, unlock });
+      }
+      setUnlockedCases(interactionRows);
     } catch (err) {
       console.error("Failed to load cases dashboard:", err);
     } finally {
