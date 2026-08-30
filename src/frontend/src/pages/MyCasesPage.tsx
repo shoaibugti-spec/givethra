@@ -1,5 +1,6 @@
 // src/frontend/src/pages/MyCasesPage.tsx
-// Full production-ready code with proper status grouping and Affidavit integration
+// FIXED: Proper tabs and sub-tabs for My Cases and My Help.
+// My Help: first Contribution/Direct, then Pending/Rejected/Approved/Completed.
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -14,6 +15,7 @@ import {
   Eye,
   Heart,
   Plus,
+  RefreshCw,
   ArrowRight,
   CalendarClock,
   AlertCircle,
@@ -46,7 +48,7 @@ function maskCnic(cnic?: string): string {
   return `${shown}${masked}`;
 }
 
-// Global Affidavit generator for dashboard (same as in CaseDetailPage)
+// Global Affidavit generator for dashboard list
 function generateAffidavitFromDashboard(caseData: any, resolution: any, heroName: string, seekerCnic: string, seekerName: string) {
   const caseId = (caseData.id ?? "").slice(0, 8).toUpperCase();
   const today = new Date().toLocaleDateString();
@@ -138,18 +140,14 @@ function generateAffidavitFromDashboard(caseData: any, resolution: any, heroName
   }
 }
 
-function isApprovedCompletedResolution(resolution: any): boolean {
+// Same approval check as in CaseDetailPage
+function isApprovedCompletedResolution(resolution: any, caseCompleted: boolean = false): boolean {
   if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
-  if (["approved", "completed", "verified", "confirmed", "seeker_confirmed"].includes(status)) {
-    return true;
-  }
-  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) {
-    return true;
-  }
-  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) {
-    return true;
-  }
+  if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)) return true;
+  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
+  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
+  if (caseCompleted && status !== "rejected" && status !== "disputed") return true;
   return false;
 }
 
@@ -169,6 +167,7 @@ export default function MyCasesPage() {
   const [loading, setLoading] = useState(true);
   const [heroName, setHeroName] = useState("Verified Hero");
 
+  // Filter states
   const [myCaseStatusFilter, setMyCaseStatusFilter] = useState("pending");
   const [helpTypeFilter, setHelpTypeFilter] = useState("contribution");
   const [helpStatusFilter, setHelpStatusFilter] = useState("pending");
@@ -191,6 +190,7 @@ export default function MyCasesPage() {
       const prof = await getProfile(user.id);
       if (prof?.full_name) setHeroName(prof.full_name.split(" ")[0]);
 
+      // My Cases
       const cases = await getCasesByUser(user.id);
       setMyCases(
         (Array.isArray(cases) ? cases : []).map((c: any) => ({
@@ -199,6 +199,7 @@ export default function MyCasesPage() {
         }))
       );
 
+      // My Help: Unlocks + Resolutions
       const [unlocksResult, resolutionsResult] = await Promise.all([
         getCaseUnlocksByHero(user.id),
         getCaseResolutionsByHero(user.id),
@@ -238,6 +239,7 @@ export default function MyCasesPage() {
         }
       });
 
+      // Ensure cases that only have resolutions (no unlock) are included
       resolutions.forEach((resolution: any) => {
         const caseId = String(resolution.case_id || "");
         if (caseId && !caseMap.has(caseId)) {
@@ -268,19 +270,15 @@ export default function MyCasesPage() {
         }
 
         let helpStatus: string = "pending";
+        const isCaseCompleted = String(caseRecord.status || "").toLowerCase() === "completed";
         if (resolution) {
-          const isApproved = isApprovedCompletedResolution(resolution);
+          const isApproved = isApprovedCompletedResolution(resolution, isCaseCompleted);
           const status = String(resolution.status || "").toLowerCase();
           if (isApproved) helpStatus = "completed";
           else if (status === "rejected" || status === "disputed") helpStatus = "rejected";
           else helpStatus = "pending";
         } else {
-          const caseStatus = String(caseRecord.status || "").toLowerCase();
-          helpStatus = caseStatus === "completed" ? "completed" : "pending";
-        }
-        // If the case itself is completed, mark help as completed
-        if (String(caseRecord.status || "").toLowerCase() === "completed") {
-          helpStatus = "completed";
+          helpStatus = isCaseCompleted ? "completed" : "pending";
         }
 
         merged.push({
@@ -423,6 +421,7 @@ export default function MyCasesPage() {
     );
   }
 
+  // Filter My Cases
   const filteredMyCases = myCases.filter((c) => {
     const status = String(c.status || "").toLowerCase();
     if (myCaseStatusFilter === "approved") {
@@ -431,6 +430,7 @@ export default function MyCasesPage() {
     return status === myCaseStatusFilter;
   });
 
+  // Filter My Help
   const filteredHelpCases = unlockedCases.filter((c) => {
     const typeMatch = c.helpType === helpTypeFilter;
     const status = String(c.helpStatus || "").toLowerCase();
