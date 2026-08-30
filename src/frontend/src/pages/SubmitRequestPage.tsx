@@ -1,5 +1,5 @@
 // src/frontend/src/pages/SubmitRequestPage.tsx
-// Replaces Supabase with Cloudflare Worker APIs
+// Fully refactored with enhanced T&C, feedback suspension, and complete validation.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -229,64 +229,64 @@ function getEducationDocs(type: string, subType: string) {
       key: "admission_proof",
       label: "Admission / Selection Proof (Offer Letter / Merit List)",
       required: true,
-      hint: "Admission milne ka saboot — Offer Letter ya Merit List ki clear photo",
+      hint: "Clear photo of offer letter or merit list",
     });
     docs.push({
       key: "fee_challan",
       label: "Fee Challan / Voucher (with amount & due date)",
       required: true,
-      hint: "Challan par amount aur due date saaf nazar aani chahiye",
+      hint: "Challan should clearly show amount and due date",
     });
     docs.push({
       key: "student_id_proof",
       label: "Student B-Form / CNIC / School ID",
       required: true,
-      hint: "Student ki identity ka clear proof",
+      hint: "Clear proof of student identity",
     });
   } else if (type === "fee") {
     docs.push({
       key: "fee_challan",
       label: "Fee Challan / Voucher (with amount & due date)",
       required: true,
-      hint: "Challan par amount aur due date saaf nazar aani chahiye",
+      hint: "Challan should clearly show amount and due date",
     });
     docs.push({
       key: "student_id_proof",
       label: "Student B-Form / CNIC / School ID",
       required: true,
-      hint: "Student ki identity ka clear proof",
+      hint: "Clear proof of student identity",
     });
   } else if (type === "books") {
     docs.push({
       key: "books_quotation",
       label: "Books List / Quotation from Shop",
       required: true,
-      hint: "Kitabon ki list aur price quotation ki clear photo",
+      hint: "Clear photo of book list and price quotation",
     });
     docs.push({
       key: "student_id_proof",
       label: "Student B-Form / School/College ID",
       required: true,
-      hint: "Student ka identity proof",
+      hint: "Student identity proof",
     });
   } else if (type === "uniform") {
     docs.push({
       key: "uniform_quotation",
       label: "Uniform List / Quotation from Shop",
       required: true,
-      hint: "Uniform items ki list aur price quotation ki clear photo",
+      hint: "Clear photo of uniform items and price quotation",
     });
     docs.push({
       key: "student_id_proof",
       label: "Student B-Form / School/College ID",
       required: true,
-      hint: "Student ka identity proof",
+      hint: "Student identity proof",
     });
     docs.push({
       key: "uniform_items",
       label: "Items Needed (List photo or written)",
       required: true,
-      hint: "Uniform, Shoes, Bag, Winter Uniform etc. ki list",
+      hint: "List of uniform items (shoes, bag, winter uniform etc.)",
     });
   }
 
@@ -350,7 +350,7 @@ const LIST_CATS: Record<
   "Education, Books & Admission": {
     list: EDUCATION_INSTITUTES,
     refLabel: "Challan / Reference Number",
-    refHint: "Fee challan ya quotation ka reference number (agar hai to)",
+    refHint: "If available, enter the challan or quotation reference number",
     personFields: [
       { key: "student_name", label: "Student's Name (ONE student)", required: true, placeholder: "Full name of student" },
       { key: "student_class", label: "Class / Grade / Program", required: true, placeholder: "e.g. Grade 8, FA, BS" },
@@ -397,7 +397,7 @@ const LIST_CATS: Record<
         key: "doctor_report",
         label: "Doctor's Report / Prescription",
         required: true,
-        hint: "Doctor ki likhayi hui report ya prescription ki clear photo",
+        hint: "Clear photo of the doctor's written report or prescription",
       },
     ],
   },
@@ -731,7 +731,6 @@ export default function SubmitRequestPage() {
       const cases = await getCasesByUser(user.id);
       const totalCases = cases?.length || 0;
       const rejectedCases = cases?.filter((c: any) => c.status === "rejected").length || 0;
-      // Only count approved/active cases as truly consumed free cases. Rejected cases do not consume free quota.
       const freeCasesUsed = cases?.filter((c: any) => c.was_free === true && c.status !== "rejected").length || 0;
 
       setUserTotalCases(totalCases);
@@ -1292,7 +1291,7 @@ export default function SubmitRequestPage() {
   }
 
   // ============================================================
-  //  VIDEO RECORDING - FIXED (90 seconds max, low quality, live preview)
+  //  VIDEO RECORDING - Enhanced for clarity and reliability
   // ============================================================
   async function startVideoRecording() {
     try {
@@ -1316,6 +1315,7 @@ export default function SubmitRequestPage() {
           noiseSuppression: true,
           autoGainControl: true,
           channelCount: 1,
+          sampleRate: 44100,
         },
       });
 
@@ -1348,7 +1348,7 @@ export default function SubmitRequestPage() {
       };
 
       recorder.onstop = async () => {
-        if (sec < 60) {
+        if (videoTimer < 60) {
           toast.error("Please record at least 60 seconds so your story can be verified clearly.");
           setVideoRecording(false);
           setUploadingVideo(false);
@@ -1684,7 +1684,7 @@ export default function SubmitRequestPage() {
   // ============================================================
   async function handleSubmit() {
     if (!confirmed) {
-      toast.error("Please confirm all information is true");
+      toast.error("You must agree to the Terms & Conditions.");
       return;
     }
     if (!selfieUrl) {
@@ -2100,7 +2100,6 @@ export default function SubmitRequestPage() {
     );
   }
 
-  // ===== FIXED: Removed extra } at line 2090 =====
   function renderPaymentReceiverDetails() {
     if (!needsPaymentReceiver) return null;
 
@@ -2505,12 +2504,58 @@ export default function SubmitRequestPage() {
   );
 
   // ============================================================
+  //  TERMS & CONDITIONS COMPONENT (for Step 4)
+  // ============================================================
+  function TermsAndConditions() {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm font-semibold">📜 Terms & Conditions</p>
+        <div className="max-h-60 overflow-y-auto rounded-xl border border-border bg-muted/30 p-4 text-xs space-y-2.5 leading-relaxed">
+          <p><strong>1. Truthfulness & Accuracy</strong><br />
+          I confirm that all information, documents, and statements provided in my case are completely true and accurate. Any falsehood or fraud will result in permanent account closure.</p>
+
+          <p><strong>2. Video Privacy & Access</strong><br />
+          <strong>a.</strong> My identity documents (CNIC, bills, etc.) and my selfie will <strong>never</strong> be shown to any contributor. They are only for Givethra's verification team.<br />
+          <strong>b.</strong> My verification video (the appeal video I record) <strong>will be shown only to the Hero who unlocks my case</strong> by paying the required credit. No one else can see it.<br />
+          <strong>c.</strong> The video is provided in <strong>stream-only mode</strong> — it cannot be downloaded, shared, or saved by anyone.<br />
+          <strong>d.</strong> Once my case is successfully completed (payment made), the video will be <strong>permanently hidden</strong> from that Hero and will never be shown again.</p>
+
+          <p><strong>3. Feedback Mandate</strong><br />
+          If my case is successfully completed, I must submit a <strong>feedback video (minimum 60 seconds) + a written caption</strong> within <strong>24 hours</strong> of completion. Failure to do so will result in my account being <strong>suspended</strong>. To unsuspend, I must pay <strong>5 credits</strong>.</p>
+
+          <p><strong>4. Public Usage Rights</strong><br />
+          I grant Givethra the right to use my <strong>case description, feedback video, and caption</strong> as public property. Givethra may publish these on social media, the community wall, or other public platforms where viewers can watch, like, and comment.</p>
+
+          <p><strong>5. Listing Fee</strong><br />
+          I understand that if my case is not my first case or part of a free offer, a <strong>1 credit listing fee</strong> will be deducted, which is <strong>non-refundable</strong>.</p>
+
+          <p><strong>6. Consent</strong><br />
+          I have read and fully agree to all the above terms and conditions.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="termsCheck"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <label htmlFor="termsCheck" className="text-sm">
+            I have read all the Terms & Conditions and I agree to them.
+          </label>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
   //  EARLY RETURNS (KYC, Suspended, etc.)
   // ============================================================
   if (kycLoading || loadingUserStats) return <Layout><div className="text-center py-20">Loading...</div></Layout>;
 
   if (checkingFeedback) return <Layout><div className="text-center py-20">Loading...</div></Layout>;
 
+  // ----- Feedback Block (no new case submission until feedback given) -----
   if (blockedByFeedback) {
     return (
       <Layout>
@@ -2569,7 +2614,7 @@ export default function SubmitRequestPage() {
     );
   }
 
-  // ===== SUSPENDED PAGE =====
+  // ===== SUSPENDED PAGE (with 5-credit unlock) =====
   if (isSuspended) {
     const canUnlock = balance >= UNLOCK_CREDITS_REQUIRED;
     return (
@@ -3113,7 +3158,7 @@ export default function SubmitRequestPage() {
                     </div>
                   </>
                 )}
-                {docBox("bill", "Bill Photo (clear & readable)", true, "Bill par consumer/reference number aur amount saaf nazar aana chahiye")}
+                {docBox("bill", "Bill Photo (clear & readable)", true, "Bill should clearly show consumer/reference number and amount")}
               </>
             )}
 
@@ -3258,7 +3303,7 @@ export default function SubmitRequestPage() {
                         "doctor_prescription",
                         "Doctor's Written Prescription / Report",
                         true,
-                        "Doctor ne apne haath se ya letterhead par jo likh kar diya hai — uski clear photo"
+                        "A clear photo of the doctor's handwritten or official report"
                       )}
                   </>
                 )}
@@ -3553,13 +3598,13 @@ export default function SubmitRequestPage() {
                       "rental_agreement",
                       "Rental Agreement / Contract",
                       true,
-                      "Jis ghar mein rehte hain, uska rent agreement ya lease document (clear photo)"
+                      "Clear photo of your rental agreement or lease document"
                     )}
                     {docBox(
                       "landlord_cnic",
                       "Landlord's CNIC (or any proof of landlord ownership)",
                       true,
-                      "Malik ka CNIC ya koi aur dastawez jo yeh sabit kare ke yeh property unki hai"
+                      "CNIC of the landlord or any document proving property ownership"
                     )}
                   </div>
                 )}
@@ -3604,7 +3649,7 @@ export default function SubmitRequestPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={6}
-                  placeholder="Apni poori situation aur majboori yahan likhein — Heroes yehi parh kar madad karte hain. Jitna detail mein likhenge, utna behtar samjhenge aur madad karenge."
+                  placeholder="Describe your situation in detail — Heroes read this to understand your need and decide to help."
                 />
                 <p className="text-[11px] text-muted-foreground">
                   💡 Write in detail so Heroes understand your situation and can help better.
@@ -3945,19 +3990,7 @@ export default function SubmitRequestPage() {
               )}
             </div>
 
-            {/* ===== CONFIRM CHECKBOX ===== */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="confirm"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-                className="h-4 w-4"
-              />
-              <label htmlFor="confirm" className="text-sm">
-                I confirm all information is true and accurate
-              </label>
-            </div>
+            {/* ===== CONFIRM CHECKBOX REMOVED FROM HERE - NOW IN STEP 4 ===== */}
 
             {/* ===== NAVIGATION ===== */}
             <div className="flex gap-3">
@@ -3979,10 +4012,6 @@ export default function SubmitRequestPage() {
                     toast.error("Please record a video appeal (up to 90 seconds)");
                     return;
                   }
-                  if (!confirmed) {
-                    toast.error("Please confirm the information is true");
-                    return;
-                  }
                   setStep(4);
                 }}
               >
@@ -3996,7 +4025,7 @@ export default function SubmitRequestPage() {
                 "Record a 60-second video explaining your situation in detail.",
                 "Tell Heroes what problem you're facing and why you need help.",
                 "Explain your financial situation and how this help will make a difference.",
-                "Wait for 'ready ✓', tick the confirm box, then Continue.",
+                "Wait for 'ready ✓', then Continue.",
               ]}
             />
           </div>
@@ -4347,6 +4376,10 @@ export default function SubmitRequestPage() {
             <Button variant="outline" className="w-full" onClick={() => setStep(1)}>
               Edit
             </Button>
+
+            {/* ===== TERMS & CONDITIONS SECTION ===== */}
+            <TermsAndConditions />
+
             <Button className="w-full h-11 font-semibold" disabled={submitting} onClick={handleSubmit}>
               {submitting ? "Submitting..." : willBeFree ? "Submit Request — FREE 🎉" : "Pay 1 Credit & Submit Request"}
             </Button>
@@ -4357,7 +4390,8 @@ export default function SubmitRequestPage() {
               lines={[
                 "Check all details are correct. Tap Edit to fix anything.",
                 willBeFree ? "Your case is FREE." : "A 1 Credit fee is charged when you submit.",
-                "Tap Submit. Our team will review and approve your case.",
+                "Read and agree to the Terms & Conditions.",
+                "Tap Submit. Our verification team will review and approve your case.",
               ]}
             />
           </div>
