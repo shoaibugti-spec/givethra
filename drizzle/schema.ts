@@ -17,10 +17,6 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  accountStatus: mysqlEnum("accountStatus", ["active", "suspended"]).default("active").notNull(),
-  credits: int("credits").default(0).notNull(),
-  suspendedAt: timestamp("suspendedAt"),
-  suspensionNote: text("suspensionNote"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -85,7 +81,7 @@ export const cases = mysqlTable(
     selfieUrl: varchar("selfieUrl", { length: 1000 }),
     videoKey: varchar("videoKey", { length: 500 }),
     videoUrl: varchar("videoUrl", { length: 1000 }),
-    status: mysqlEnum("status", ["pending", "approved", "rejected", "complete", "expired"]).default("pending").notNull(),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
     adminNote: text("adminNote"),
     reviewedByUserId: int("reviewedByUserId"),
     submittedAt: timestamp("submittedAt").defaultNow().notNull(),
@@ -167,44 +163,3 @@ export const publicPosts = mysqlTable(
 
 export type PublicPost = typeof publicPosts.$inferSelect;
 export type InsertPublicPost = typeof publicPosts.$inferInsert;
-
-export const caseInteractions = mysqlTable(
-  "case_interactions",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    caseId: int("caseId").notNull(),
-    userId: int("userId").notNull(),
-    kind: mysqlEnum("kind", ["unlock", "contribution", "direct_help"]).notNull(),
-    status: mysqlEnum("status", ["pending", "approved", "rejected", "complete", "expired"]).default("pending").notNull(),
-    unlockCost: int("unlockCost").default(0).notNull(),
-    amount: int("amount"),
-    txnNumber: varchar("txnNumber", { length: 180 }),
-    paymentProofKey: varchar("paymentProofKey", { length: 500 }),
-    paymentProofUrl: varchar("paymentProofUrl", { length: 1000 }),
-    adminNote: text("adminNote"),
-    grade: varchar("grade", { length: 500 }),
-    reviewedByUserId: int("reviewedByUserId"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    reviewedAt: timestamp("reviewedAt"),
-    completedAt: timestamp("completedAt"),
-  },
-  table => [index("case_interactions_case_index").on(table.caseId), index("case_interactions_user_status_index").on(table.userId, table.status), index("case_interactions_kind_status_index").on(table.kind, table.status)],
-);
-
-export const caseFeedback = mysqlTable(
-  "case_feedback",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    caseId: int("caseId").notNull(),
-    userId: int("userId").notNull(),
-    videoKey: varchar("videoKey", { length: 500 }).notNull(),
-    videoUrl: varchar("videoUrl", { length: 1000 }).notNull(),
-    caption: text("caption").notNull(),
-    status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
-    adminNote: text("adminNote"),
-    reviewedByUserId: int("reviewedByUserId"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    reviewedAt: timestamp("reviewedAt"),
-  },
-  table => [index("case_feedback_case_index").on(table.caseId), index("case_feedback_status_index").on(table.status)],
-);

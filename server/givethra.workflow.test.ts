@@ -111,7 +111,7 @@ describe("Givethra workflow persistence and notification effects", () => {
 
   it("stores a case and its evidence as pending, then alerts the owner", async () => {
     const caller = appRouter.createCaller(context("user", "applicant@example.com"));
-    const result = await caller.givethra.cases.submit({ title: "Medical support needed after treatment", category: "Medical", description: "This submission describes the applicant’s treatment-related needs and the supporting evidence available for careful platform review.", documents: [caseFile, { ...caseFile, name: "proof-2.jpg" }, { ...caseFile, name: "proof-3.jpg" }], selfie: caseFile, video: { ...caseFile, name: "case-live.webm", mimeType: "video/webm", dataUrl: "data:video/webm;base64,AAAAAA==" } });
+    const result = await caller.givethra.cases.submit({ title: "Medical support needed after treatment", category: "Medical", description: "This submission describes the applicant’s treatment-related needs and the supporting evidence available for careful platform review.", documents: [caseFile], selfie: caseFile });
     await Promise.resolve();
 
     expect(result.status).toBe("pending");

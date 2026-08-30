@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Bell, FilePlus2, FolderHeart, Headphones, LayoutDashboard, LogOut, ShieldCheck, UserRound, HandHeart } from "lucide-react";
+import { Bell, FilePlus2, FolderHeart, Headphones, LayoutDashboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { useState, useEffect, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -9,8 +9,6 @@ const items = [
   { href: "/profile", label: "My profile", icon: UserRound },
   { href: "/kyc", label: "Identity verification", icon: ShieldCheck },
   { href: "/submit-case", label: "Submit a case", icon: FilePlus2 },
-  { href: "/my-cases", label: "My Cases", icon: FolderHeart },
-  { href: "/my-help", label: "My Help", icon: HandHeart },
   { href: "/cases", label: "Browse cases", icon: FolderHeart },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/support", label: "Support", icon: Headphones },
@@ -121,7 +119,7 @@ export function GivethraShell({ children }: { children: ReactNode }) {
             {navigation.map(item => {
               const Icon = item.icon;
               const active = location === item.href;
-              return <Link key={item.href} href={item.href} className={`flex min-w-0 flex-wrap items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${active ? "bg-amber-100 text-emerald-950" : "text-emerald-100/80 hover:bg-emerald-900 hover:text-white"}`}><Icon className="h-4 w-4" />{item.label}</Link>;
+              return <Link key={item.href} href={item.href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${active ? "bg-amber-100 text-emerald-950" : "text-emerald-100/80 hover:bg-emerald-900 hover:text-white"}`}><Icon className="h-4 w-4" />{item.label}</Link>;
             })}
           </nav>
         </aside>
