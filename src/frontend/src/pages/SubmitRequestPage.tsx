@@ -1955,8 +1955,6 @@ export default function SubmitRequestPage() {
           );
         toast.success(`🎉 Free under ${currentOffer.label || "offer"}! Case submitted.`);
       } else {
-        const wallet = await getWallet(uid);
-        await updateWalletBalance(uid, (wallet?.balance ?? 1) - 1);
         if (uid)
           await sendNotification(
             uid,
