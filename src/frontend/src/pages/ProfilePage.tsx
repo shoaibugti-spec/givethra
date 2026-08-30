@@ -28,7 +28,6 @@ import {
   HeartHandshake,
   Unlock,
   XCircle,
-  AlertCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -94,7 +93,6 @@ export default function ProfilePage() {
         });
       }
 
-      // Count all resolutions except rejected and disputed
       const validResolutions = (resolutions || []).filter(
         (r: any) =>
           String(r.status || "").toLowerCase() !== "rejected" &&
@@ -102,19 +100,16 @@ export default function ProfilePage() {
       );
       setHelpedCount(validResolutions.length);
 
-      // Direct helps: paid_to = 'institute'
       const direct = validResolutions.filter(
         (r: any) => String(r.paid_to || "").toLowerCase() === "institute"
       );
       setDirectHelps(direct.length);
 
-      // Contributions: paid_to = 'givethra'
       const contrib = validResolutions.filter(
         (r: any) => String(r.paid_to || "").toLowerCase() === "givethra"
       );
       setContributions(contrib.length);
 
-      // Unlock count (total case unlocks)
       setUnlockCount((unlocks || []).length);
     } catch (err) {
       console.error("Failed to load profile data:", err);
@@ -229,7 +224,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ===== STATS GRID ===== */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
             <div className="text-2xl font-bold text-foreground">{caseStats.submitted}</div>
@@ -237,42 +232,36 @@ export default function ProfilePage() {
               <Briefcase className="h-3 w-3" /> Submitted
             </div>
           </div>
-
           <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
             <div className="text-2xl font-bold text-foreground">{helpedCount}</div>
             <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
               <HeartHandshake className="h-3 w-3 text-green-600" /> Helped
             </div>
           </div>
-
           <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
             <div className="text-2xl font-bold text-foreground">{caseStats.completed}</div>
             <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
               <CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed
             </div>
           </div>
-
           <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
             <div className="text-2xl font-bold text-foreground">{caseStats.rejected}</div>
             <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
               <XCircle className="h-3 w-3 text-red-600" /> Rejected
             </div>
           </div>
-
           <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
             <div className="text-2xl font-bold text-foreground">{directHelps}</div>
             <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
               <Building2 className="h-3 w-3 text-purple-600" /> Direct Helps
             </div>
           </div>
-
           <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
             <div className="text-2xl font-bold text-foreground">{contributions}</div>
             <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
               <HandCoins className="h-3 w-3 text-amber-600" /> Contributions
             </div>
           </div>
-
           <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
             <div className="text-2xl font-bold text-foreground">{unlockCount}</div>
             <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
@@ -281,7 +270,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ===== QUICK ACTIONS ===== */}
+        {/* Quick Actions */}
         <div className="grid grid-cols-3 gap-3">
           {[
             { icon: <Pencil className="h-4 w-4" />, label: "Edit Profile", to: "/edit-profile" },
@@ -300,7 +289,7 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* ===== CONTACT INFO ===== */}
+        {/* Contact Info */}
         <div className="rounded-2xl bg-card border border-border p-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -325,7 +314,7 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* ===== MENU ===== */}
+        {/* Menu */}
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
           {menuItems.map((item, idx) => (
             <button
@@ -343,7 +332,7 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* ===== LOGOUT ===== */}
+        {/* Logout */}
         <button
           type="button"
           onClick={() => setShowLogout(true)}
