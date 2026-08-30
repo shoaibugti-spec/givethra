@@ -319,6 +319,15 @@ export async function insertDeposit(data: any) {
   return res.json();
 }
 
+// ============================================================
+//  TRANSACTIONS (NEW)
+// ============================================================
+export async function getTransactions(userId: string) {
+  const res = await fetch(`${WORKER_URL}/api/transactions/${userId}`, { headers: headers() });
+  if (!res.ok) throw new Error('Failed to fetch transactions');
+  return res.json();
+}
+
 // ---------- PUBLIC IMPACT WALLS ----------
 export async function getHeroesWall(limit = 24) {
   const res = await fetch(`${WORKER_URL}/api/heroes-wall?limit=${limit}`, { headers: headers(), cache: "no-store" });
