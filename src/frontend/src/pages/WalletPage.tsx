@@ -1,5 +1,5 @@
 // src/frontend/src/pages/WalletPage.tsx
-// Fully refactored with credit transaction history (deposits + spends)
+// Enhanced with icons for each transaction type
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -19,6 +19,12 @@ import {
   Calendar,
   ArrowUpCircle,
   ArrowDownCircle,
+  Briefcase,
+  HeartHandshake,
+  HandCoins,
+  Unlock,
+  AlertCircle,
+  FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -52,6 +58,43 @@ const PAYMENT_METHODS = {
 
 const QUICK_AMOUNTS = [1, 2, 3, 5, 10, 20];
 const SUSPENSION_UNLOCK_CREDITS = 5;
+
+// Transaction type icons and colors
+const TX_CONFIG: Record<
+  string,
+  { icon: React.ReactNode; label: string; bg: string; text: string }
+> = {
+  deposit: {
+    icon: <ArrowUpCircle className="h-4 w-4" />,
+    label: "Deposit",
+    bg: "bg-green-100 dark:bg-green-900/30",
+    text: "text-green-700 dark:text-green-400",
+  },
+  case_submission: {
+    icon: <FileText className="h-4 w-4" />,
+    label: "Case Submission",
+    bg: "bg-blue-100 dark:bg-blue-900/30",
+    text: "text-blue-700 dark:text-blue-400",
+  },
+  direct_help: {
+    icon: <HeartHandshake className="h-4 w-4" />,
+    label: "Direct Help",
+    bg: "bg-purple-100 dark:bg-purple-900/30",
+    text: "text-purple-700 dark:text-purple-400",
+  },
+  contribution: {
+    icon: <HandCoins className="h-4 w-4" />,
+    label: "Contribution",
+    bg: "bg-amber-100 dark:bg-amber-900/30",
+    text: "text-amber-700 dark:text-amber-400",
+  },
+  suspension_unlock: {
+    icon: <Unlock className="h-4 w-4" />,
+    label: "Suspension Unlock",
+    bg: "bg-red-100 dark:bg-red-900/30",
+    text: "text-red-700 dark:text-red-400",
+  },
+};
 
 export default function WalletPage() {
   const { user, isAuthenticated } = useAuth();
@@ -199,6 +242,7 @@ export default function WalletPage() {
   return (
     <Layout>
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+        {/* Balance Card */}
         <div className="rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-white p-6 shadow-lg">
           <div className="flex items-center gap-2 mb-2">
             <Wallet className="h-5 w-5 opacity-80" />
@@ -210,6 +254,7 @@ export default function WalletPage() {
           </div>
         </div>
 
+        {/* Suspension Warning */}
         {isSuspended && (
           <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/20 dark:text-red-300">
             <p className="font-semibold">Account suspended</p>
@@ -228,12 +273,14 @@ export default function WalletPage() {
           </div>
         )}
 
+        {/* Info */}
         <div className="rounded-xl bg-muted/40 border p-4 text-xs text-muted-foreground space-y-1">
           <p>• Submitting a help request costs <strong>1 Credit</strong></p>
           <p>• Unlocking a verified case as a Hero costs <strong>1 Credit</strong></p>
           <p>• Credits are for platform fees only — not transferable or withdrawable</p>
         </div>
 
+        {/* Deposit Section */}
         <div className="rounded-2xl border bg-card p-5 space-y-4">
           <h2 className="font-bold text-lg flex items-center gap-2">
             <Coins className="h-5 w-5 text-primary" /> Deposit Credits
@@ -418,7 +465,7 @@ export default function WalletPage() {
           </div>
         </div>
 
-        {/* ========== TRANSACTION HISTORY (ALL MOVEMENTS) ========== */}
+        {/* ========== TRANSACTION HISTORY ========== */}
         <div className="rounded-2xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" /> Transaction History
@@ -428,55 +475,55 @@ export default function WalletPage() {
               Loading...
             </p>
           ) : transactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No transactions yet.
-            </p>
+            <div className="text-center py-8">
+              <Wallet className="h-12 w-12 text-muted-foreground mx-auto mb-2 opacity-30" />
+              <p className="text-sm text-muted-foreground">
+                No transactions yet. Start by depositing credits!
+              </p>
+            </div>
           ) : (
             <div className="space-y-2">
               {transactions.map((tx) => {
                 const isDeposit = tx.amount > 0;
+                const txType = tx.type || "unknown";
+                const config = TX_CONFIG[txType] || TX_CONFIG["deposit"];
                 const isOpen = expanded === tx.id;
-                let label = tx.type || "unknown";
-                let description = tx.description || label;
-                let icon = isDeposit ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />;
-                let color = isDeposit ? "text-green-600" : "text-red-600";
-
-                // Beautify labels
-                const typeLabels: Record<string, string> = {
-                  deposit: "Deposit",
-                  case_submission: "Case Submission",
-                  direct_help: "Direct Help",
-                  contribution: "Contribution",
-                  suspension_unlock: "Suspension Unlock",
-                };
-                label = typeLabels[tx.type] || tx.type;
 
                 return (
                   <div
                     key={tx.id}
-                    className="rounded-xl border border-border overflow-hidden"
+                    className="rounded-xl border border-border overflow-hidden transition-all hover:border-primary/30"
                   >
                     <button
                       onClick={() => setExpanded(isOpen ? null : tx.id)}
-                      className="w-full flex items-center justify-between gap-3 p-3 hover:bg-muted/30 transition-colors text-left"
+                      className="w-full flex items-center justify-between gap-3 p-3 hover:bg-muted/20 transition-colors text-left"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`${isDeposit ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} p-1.5 rounded-full`}>
-                          {icon}
+                        <div className={`p-2 rounded-full ${config.bg} ${config.text}`}>
+                          {isDeposit ? (
+                            <ArrowUpCircle className="h-4 w-4" />
+                          ) : (
+                            config.icon
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium">
-                            {label}
+                            {isDeposit ? "Deposit" : config.label}
                             {tx.reference_id && ` · #${tx.reference_id.slice(0, 8)}`}
                           </p>
                           <p className="text-[11px] text-muted-foreground truncate">
-                            {description}
+                            {tx.description || txType}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className={`font-bold ${color}`}>
-                          {isDeposit ? '+' : ''}{tx.amount}
+                        <span
+                          className={`font-bold ${
+                            isDeposit ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          {isDeposit ? "+" : ""}
+                          {tx.amount}
                         </span>
                         <ChevronDown
                           className={`h-4 w-4 text-muted-foreground transition-transform ${
@@ -487,31 +534,44 @@ export default function WalletPage() {
                     </button>
 
                     {isOpen && (
-                      <div className="px-3 pb-3 pt-1 space-y-2 text-sm border-t border-border bg-muted/20">
+                      <div className="px-3 pb-3 pt-1 space-y-2 text-sm border-t border-border bg-muted/10">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Type</span>
-                          <span className="font-medium">{label}</span>
+                          <span className="font-medium">
+                            {isDeposit ? "Deposit" : config.label}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Description</span>
-                          <span className="font-medium text-right">{description}</span>
+                          <span className="font-medium text-right">
+                            {tx.description || txType}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Amount</span>
-                          <span className={`font-bold ${color}`}>
-                            {isDeposit ? '+' : ''}{tx.amount} credits
+                          <span
+                            className={`font-bold ${
+                              isDeposit ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            {isDeposit ? "+" : ""}
+                            {tx.amount} credits
                           </span>
                         </div>
                         {tx.reference_id && (
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Reference ID</span>
-                            <span className="font-mono text-xs">{tx.reference_id}</span>
+                            <span className="text-muted-foreground">Reference</span>
+                            <span className="font-mono text-xs">
+                              {tx.reference_id}
+                            </span>
                           </div>
                         )}
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Date</span>
                           <span className="font-medium">
-                            {tx.created_at ? new Date(tx.created_at).toLocaleString() : "—"}
+                            {tx.created_at
+                              ? new Date(tx.created_at).toLocaleString()
+                              : "—"}
                           </span>
                         </div>
                       </div>
