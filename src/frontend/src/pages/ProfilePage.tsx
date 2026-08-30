@@ -1,6 +1,6 @@
 // src/frontend/src/pages/ProfilePage.tsx
 // Replaces Supabase with Cloudflare Worker APIs
-// FIX: Help count now uses approved case resolutions instead of unlocks.
+// FIX: Count all resolutions except rejected/disputed as "Helped"
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ import {
   getKycSubmission,
   getCasesByUser,
   getProfile,
-  getCaseResolutionsByHero,  // ✅ changed from getCaseUnlocksByHero
+  getCaseResolutionsByHero,
 } from "@/lib/api";
 
 export default function ProfilePage() {
@@ -67,7 +67,7 @@ export default function ProfilePage() {
         getKycSubmission(user.id),
         getCasesByUser(user.id),
         getProfile(user.id),
-        getCaseResolutionsByHero(user.id), // ✅ now fetches resolutions
+        getCaseResolutionsByHero(user.id),
       ]);
 
       setKycData(kyc);
@@ -81,13 +81,13 @@ export default function ProfilePage() {
         });
       }
 
-      // ✅ Count only approved/confirmed resolutions where the user is the hero
-      const approvedResolutions = (resolutions || []).filter(
+      // Count all resolutions except rejected and disputed
+      const validResolutions = (resolutions || []).filter(
         (r: any) =>
-          String(r.status || "").toLowerCase() === "completed" &&
-          (r.admin_confirmed === true || r.admin_confirmed === 1 || r.admin_confirmed === "1")
+          String(r.status || "").toLowerCase() !== "rejected" &&
+          String(r.status || "").toLowerCase() !== "disputed"
       );
-      setHelpedCount(approvedResolutions.length);
+      setHelpedCount(validResolutions.length);
     } catch (err) {
       console.error("Failed to load profile data:", err);
     }
