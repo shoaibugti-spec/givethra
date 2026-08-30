@@ -1,5 +1,5 @@
 // src/frontend/src/pages/CaseDetailPage.tsx
-// Full working code - Affidavit with TXN and Receipt for all approved help
+// FIXED: Correct approval detection, proper messages for Direct/Contribution/Unlock, Affidavit with TXN and Receipt.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -25,25 +25,8 @@ import {
 import { sendNotification } from "@/lib/notify";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
-  ChevronLeft,
-  Lock,
-  Unlock,
-  CheckCircle2,
-  Heart,
-  FileText,
-  ExternalLink,
-  Copy,
-  Building2,
-  Clock,
-  HandCoins,
-  Video,
-  Star,
-  AlertCircle,
-  XCircle,
-  RefreshCw,
-  Eye,
-  CalendarClock,
-  MapPin,
+  ChevronLeft, Lock, Unlock, MapPin, CheckCircle2,
+  Heart, FileText, ExternalLink, Copy, Building2, Clock, HandCoins, Star, Video, AlertCircle, XCircle, RefreshCw, Eye, CalendarClock,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -81,13 +64,13 @@ function copyToClipboard(text: string, label: string) {
   );
 }
 
+// 🔥 FIX: Robust approval check – if case is completed and resolution not rejected/disputed, it's approved
 function isApprovedCompletedResolution(resolution: any, caseCompleted: boolean = false): boolean {
   if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
   if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)) return true;
   if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
-  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || 
-      resolution?.completed_at || resolution?.admin_confirmed_at) return true;
+  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
   if (caseCompleted && status !== "rejected" && status !== "disputed") return true;
   return false;
 }
@@ -237,6 +220,7 @@ export default function CaseDetailPage() {
   const [receiptName, setReceiptName] = useState("");
   const [userUnlockCount, setUserUnlockCount] = useState(0);
 
+  // Feedback state
   const [existingFeedback, setExistingFeedback] = useState<any>(null);
   const [fbText, setFbText] = useState("");
   const [fbVideoFile, setFbVideoFile] = useState<File | null>(null);
@@ -297,6 +281,7 @@ export default function CaseDetailPage() {
         const count = await getUserUnlockCount(durableUserId);
         setUserUnlockCount(Number(count ?? 0));
 
+        // Get all resolutions and match by hero_id or hero_email
         const res = await getCaseResolutions(id);
         const allResolutions = Array.isArray(res) ? res : [];
         const mine = allResolutions.filter((r) => {
@@ -323,6 +308,7 @@ export default function CaseDetailPage() {
     }
   }
 
+  // ---------- Video recording (unchanged) ----------
   async function startRecording() {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
@@ -565,6 +551,7 @@ export default function CaseDetailPage() {
   const hasPaymentDetails = caseData?.institute_name || caseData?.account_number;
   const unlockMode = myUnlock?.payment_type || payMode;
 
+  // 🔥 Compute help records with correct approval logic
   function getHelpRecords() {
     const records: any[] = [];
     const isCaseCompleted = String(caseData?.status || "").toLowerCase() === "completed";
@@ -588,6 +575,7 @@ export default function CaseDetailPage() {
       });
     });
 
+    // If only unlock (no resolution) exists, add it as non-approved
     if (myUnlock && !myResolutions.some((r) => r.unlock_id === myUnlock.id)) {
       if (isCaseCompleted) {
         const isPartial = myUnlock.payment_type === "partial";
@@ -616,9 +604,7 @@ export default function CaseDetailPage() {
   const hasAnyApproved = approvedRecords.length > 0;
   const isOnlyUnlock = !hasAnyApproved && myUnlock;
 
-  // ============================================================
-  // COMPLETED HELP VIEW (Helper)
-  // ============================================================
+  // ---------- Completed Help View ----------
   if (isCompleted && !isOwner) {
     const totalDirectAmount = approvedRecords.filter(r => r.type === "direct").reduce((sum, r) => sum + r.amount, 0);
     const totalContributionAmount = approvedRecords.filter(r => r.type === "contribution").reduce((sum, r) => sum + r.amount, 0);
@@ -690,9 +676,7 @@ export default function CaseDetailPage() {
               <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Status</span><span className="font-semibold text-green-700">Completed ✓</span></div>
             </div>
 
-            {/* ============================================================ */}
-            {/* 🔥 AFFIDAVITS WITH TXN AND RECEIPT - THE FIX IS HERE 🔥 */}
-            {/* ============================================================ */}
+            {/* 🔥 AFFIDAVITS for approved records */}
             {approvedRecords.length > 0 && (
               <div className="space-y-3">
                 <h2 className="font-semibold text-green-800 dark:text-green-200">Your verified help records (Affidavits)</h2>
@@ -729,9 +713,7 @@ export default function CaseDetailPage() {
     );
   }
 
-  // ============================================================
-  // REJECTED CASE
-  // ============================================================
+  // ---------- Rejected / Expired ----------
   if (isRejected) {
     return (
       <Layout>
@@ -765,9 +747,6 @@ export default function CaseDetailPage() {
     );
   }
 
-  // ============================================================
-  // EXPIRED CASE
-  // ============================================================
   if (isExpired) {
     return (
       <Layout>
@@ -798,9 +777,7 @@ export default function CaseDetailPage() {
     );
   }
 
-  // ============================================================
-  // ACTIVE CASE VIEW (for non-completed, non-rejected, non-expired)
-  // ============================================================
+  // ---------- Active case view (unchanged) ----------
   const canHelpAgain = unlocked && !isOwner && !isCompleted && !isRejected && !isExpired;
 
   return (
