@@ -1,3 +1,4 @@
+import { getCategoryGratitude } from "@/lib/gratitudeMessages";
 // src/frontend/src/pages/CaseDetailPage.tsx
 // FIXED: Correct approval detection, proper messages for Direct/Contribution/Unlock, Affidavit with TXN and Receipt.
 
@@ -132,13 +133,13 @@ function generateAffidavitFromRecord(caseData: any, record: any, seekerKyc: any,
 
       <h2>Help Seeker (Beneficiary)</h2>
       <div class="grid">
-        <div class="field"><div class="label">Full Name</div><div class="value">${seekerName}</div></div>
+        <div class="field"><div class="label">Full Name</div><div class="value">${maskName(seekerName)}</div></div>
         <div class="field"><div class="label">CNIC (Masked)</div><div class="value">${seekerCnic}</div></div>
       </div>
 
       <h2>Assistance & Method Verification</h2>
       <div class="grid">
-        <div class="field"><div class="label">Helper Name (Hero)</div><div class="value">${heroName}</div></div>
+        <div class="field"><div class="label">Helper Name (Hero)</div><div class="value">${maskName(heroName)}</div></div>
         <div class="field"><div class="label">Help Type</div><div class="value">${isFundraising ? "Contribution (Fundraising)" : "Direct Institute Payment"}</div></div>
         <div class="field"><div class="label">Amount Settled</div><div class="value" style="color:#16a34a; font-weight:bold;">${sym} ${paidAmount} ${cur}</div></div>
         <div class="field"><div class="label">TXN Number</div><div class="value">${record.transactionId || "—"}</div></div>
@@ -528,8 +529,8 @@ export default function CaseDetailPage() {
       setFbVideoFile(null);
       setFbVideoBlob(null);
       checkExistingFeedback();
-    } catch {
-      toast.error("Failed to post feedback.");
+    } catch (err) {
+      toast.error(err?.message || "Failed to post feedback.");
     } finally {
       setFbSubmitting(false);
     }
@@ -609,6 +610,7 @@ export default function CaseDetailPage() {
     const totalDirectAmount = approvedRecords.filter(r => r.type === "direct").reduce((sum, r) => sum + r.amount, 0);
     const totalContributionAmount = approvedRecords.filter(r => r.type === "contribution").reduce((sum, r) => sum + r.amount, 0);
     const totalApprovedAmount = totalDirectAmount + totalContributionAmount;
+    const gratitude = getCategoryGratitude(caseData?.category);
 
     return (
       <Layout>
@@ -623,11 +625,7 @@ export default function CaseDetailPage() {
                 <div className="text-5xl">🦸‍♂️</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Direct Help Completed</p>
                 <h1 className="text-2xl font-bold text-green-800 dark:text-green-200">You are a true Hero!</h1>
-                <p className="text-sm text-green-700 dark:text-green-300 max-w-xl mx-auto leading-relaxed">
-                  Thank you for completing direct help of <strong>{sym} {totalDirectAmount} {cur}</strong>! 
-                  Because of your unwavering generosity and courage, this family's burden has been lifted. 
-                  You are an inspiration. We encourage you to continue this beautiful journey—explore new cases and create more smiles. May Allah bless you! 🤲
-                </p>
+                <p className="text-sm text-green-700 dark:text-green-300 max-w-xl mx-auto leading-relaxed">{gratitude.direct.replace("{amount}", `${sym} ${totalDirectAmount} ${cur}`)}</p>
                 <Button variant="outline" className="mt-2 border-green-300 text-green-700 hover:bg-green-50" onClick={() => navigate({ to: "/cases" })}>
                   Continue Being a Hero
                 </Button>
@@ -637,11 +635,7 @@ export default function CaseDetailPage() {
                 <div className="text-5xl">🌟</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-green-700">Contribution Completed</p>
                 <h1 className="text-2xl font-bold text-green-800 dark:text-green-200">Thank you for your contribution!</h1>
-                <p className="text-sm text-green-700 dark:text-green-300 max-w-xl mx-auto leading-relaxed">
-                  Your generous contribution of <strong>{sym} {totalContributionAmount} {cur}</strong> helped complete this case! 
-                  Combined with other heroes, you brought real relief. 
-                  We encourage you to keep contributing to future cases. Your small act of kindness creates a massive impact. Keep being a hero! 🤲
-                </p>
+                <p className="text-sm text-green-700 dark:text-green-300 max-w-xl mx-auto leading-relaxed">{gratitude.contribution.replace("{amount}", `${sym} ${totalContributionAmount} ${cur}`)}</p>
                 <Button variant="outline" className="mt-2 border-green-300 text-green-700 hover:bg-green-50" onClick={() => navigate({ to: "/cases" })}>
                   Find More Cases to Support
                 </Button>
@@ -651,11 +645,7 @@ export default function CaseDetailPage() {
                 <div className="text-5xl">💪</div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Encouragement for Heroes</p>
                 <h1 className="text-2xl font-bold text-amber-800 dark:text-amber-200">You unlocked this case!</h1>
-                <p className="text-sm text-amber-700 dark:text-amber-300 max-w-xl mx-auto leading-relaxed">
-                  Your help could not be verified or completed this time, but <strong>don't lose hope!</strong> 
-                  Every hero's journey starts with a try. We encourage you to explore new cases and keep striving to make a difference. 
-                  Your next opportunity to change a life is waiting for you. Stay determined and become a true Hero! 🤝
-                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-300 max-w-xl mx-auto leading-relaxed">{gratitude.unlock}</p>
                 <Button variant="outline" className="mt-2 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => navigate({ to: "/cases" })}>
                   Browse More Cases
                 </Button>
@@ -978,6 +968,9 @@ export default function CaseDetailPage() {
                   </div>
                 )}
 
+                {isOwner && isCompleted && (
+                  <SeekerFeedbackSection caseId={id} caseData={caseData} user={user} heroName={heroName} onSubmitted={() => checkExistingFeedback()} />
+                )}
                 {isOwner && !isCompleted && (
                   <OwnerResolutions caseId={id} caseData={caseData} seekerKyc={seekerKyc} onConfirm={handleSeekerConfirm} onDispute={handleSeekerDispute} sym={sym} cur={cur} />
                 )}
@@ -1080,4 +1073,122 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
       ))}
     </div>
   );
+}
+
+
+// ============================================================
+//  SEEKER FEEDBACK SECTION (24h gratitude video + caption)
+// ============================================================
+function SeekerFeedbackSection({ caseId, caseData, user, heroName, onSubmitted }: any) {
+  const [text, setText] = useState("");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoName, setVideoName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [submitted, setSubmitted] = useState<any>(null);
+  const [nowMs, setNowMs] = useState(Date.now());
+
+  useEffect(() => {
+    let t: any = null;
+    if (caseData?.feedback_deadline) {
+      t = setInterval(() => setNowMs(Date.now()), 1000);
+    }
+    return () => { if (t) clearInterval(t); };
+  }, [caseData?.feedback_deadline]);
+
+  useEffect(() => {
+    getFeedbackForCase(caseId, user?.id).then(setSubmitted).catch(() => {});
+  }, [caseId, user?.id]);
+
+  const deadline = caseData?.feedback_deadline ? new Date(caseData.feedback_deadline).getTime() : 0;
+  const msLeft = deadline > 0 ? deadline - nowMs : 0;
+  const expired = deadline > 0 && msLeft <= 0;
+  const hoursLeft = Math.max(Math.floor(msLeft / 3600000), 0);
+  const minsLeft = Math.max(Math.floor((msLeft % 3600000) / 60000), 0);
+  const secsLeft = Math.max(Math.floor((msLeft % 60000) / 1000), 0);
+
+  async function submit() {
+    setErrorMsg("");
+    if (!text.trim() || !videoFile) { setErrorMsg("براہ کرم شکریہ ویڈیو اپ لوڈ کریں اور کیپشن لکھیں۔"); return; }
+    setSubmitting(true);
+    try {
+      const url = await uploadFileToStorage(videoFile, `feedbacks/${caseId}/${Date.now()}_video`);
+      const created = await insertFeedback({
+        case_id: caseId,
+        user_id: user?.id,
+        first_name: heroName,
+        text_message: text.trim(),
+        video_url: url,
+        status: "pending_review",
+      });
+      setSubmitted(created);
+      setText("");
+      setVideoFile(null);
+      setVideoName("");
+      toast.success("فیڈ بیک جمع ہو گیا — ایڈمن کی منظوری کے بعد کنڈنس وال پر ظاہر ہوگا۔");
+      if (onSubmitted) onSubmitted();
+    } catch (err: any) {
+      setErrorMsg(err?.message || "فیڈ بیک جمع نہ ہو سکا۔ دوبارہ کوشش کریں۔");
+      toast.error(err?.message || "Failed to post feedback.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl bg-card border-2 border-primary/30 p-5 space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="bg-primary/10 p-2 rounded-full shrink-0"><span className="text-xl">🎬</span></div>
+        <div className="flex-1">
+          <h2 className="font-bold text-foreground">اپنی شکریہ ویڈیو (Gratitude Feedback) جمع کریں</h2>
+          <p className="text-xs text-muted-foreground">آپ کی مدد مکمل ہو چکی ہے — ہیرو کا شکریہ ادا کرنے کے لیے ویڈیو اور کیپشن دینا لازمی ہے۔</p>
+        </div>
+      </div>
+
+      {deadline > 0 && !submitted?.id && (
+        <div className={`rounded-xl border-2 p-4 text-center ${expired ? "border-red-300 bg-red-50" : "border-amber-300 bg-amber-50"}`}>
+          <p className={`text-base font-extrabold ${expired ? "text-red-700" : "text-amber-800"}`}>
+            ⏰ {expired ? "وقت ختم! آپ کا اکاؤنٹ معطل کر دیا گیا ہے — 5 کریڈٹ دے کر بحال کریں" : `فیڈ بیک کے لیے باقی وقت: ${hoursLeft} گھنٹے ${minsLeft} منٹ ${secsLeft} سیکنڈ`}
+          </p>
+          <p className="text-xs mt-1 text-amber-700">24 گھنٹوں کے اندر فیڈ بیک نہ دینے پر اکاؤنٹ پر سسپنشن لگ جاتا ہے — سسپنشن <b>5 کریڈٹ</b> دے کر ہٹایا جا سکتا ہے۔</p>
+        </div>
+      )}
+
+      {submitted?.id ? (
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 space-y-1">
+          <p className="font-bold">✓ فیڈ بیک جمع ہو چکا ہے</p>
+          <p>حیثیت: {submitted.status === "approved" ? "منظور شدہ — کنڈنس وال پر لائیو" : submitted.status === "rejected" ? `واپس کیا گیا — ${submitted.rejection_reason || "براہ کرم دوبارہ جمع کریں"}` : "منظوری کے منتظر"}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="rounded-lg bg-red-50 border-2 border-red-200 p-3 text-sm text-red-700 font-medium">
+            ⚠️ اگر 24 گھنٹوں کے اندر فیڈ بیک ویڈیو اور کیپشن نہیں لکھا گیا تو آپ کے اکاؤنٹ پر سسپنشن لگا دیا جائے گا۔
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">شکریہ ویڈیو (زیادہ سے زیادہ 1 منٹ) *</label>
+            <input type="file" accept="video/*" disabled={submitting} onChange={(e) => { const f = e.target.files?.[0] ?? null; setVideoFile(f); setVideoName(f?.name ?? ""); }} className="block w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white" />
+            {videoName && <p className="text-xs text-green-600">✓ {videoName}</p>}
+            <p className="text-[11px] text-muted-foreground">وہ سیلفی ویڈیو اپ لوڈ کریں جس میں آپ ہیرو کا شکریہ ادا کر رہے ہیں (بلب لگانے کے لیے)۔</p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">کیپشن — اپنا شکریہ لکھیں *</label>
+            <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={submitting} placeholder="مثلاً: مجھے اپنے اور اللہ کی رضا کے لیے مدد ملی — ہیرو کا بہت بہت شکریہ..." />
+          </div>
+          {errorMsg && <p className="text-xs text-red-600 font-medium">{errorMsg}</p>}
+          <Button onClick={submit} disabled={submitting} className="w-full gap-2">
+            {submitting ? "جمع ہو رہا ہے..." : "پوسٹ فیڈ بیک"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// Privacy: show first name + middle initial only.
+function maskName(name?: string): string {
+  if (!name) return "—";
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length <= 1) return parts[0] || "—";
+  return `${parts[0]} ${parts[1].charAt(0)}.`;
 }
