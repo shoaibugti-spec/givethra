@@ -1,6 +1,5 @@
 // src/frontend/src/pages/ProfilePage.tsx
-// Replaces Supabase with Cloudflare Worker APIs
-// FIX: Count all resolutions except rejected/disputed as "Helped"
+// Enhanced with detailed stats: Direct Helps, Contributions, Unlocks, Rejected, etc.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -25,6 +24,11 @@ import {
   ShieldCheck,
   Star,
   Wallet,
+  HandCoins,
+  HeartHandshake,
+  Unlock,
+  XCircle,
+  AlertCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -40,6 +44,7 @@ import {
   getCasesByUser,
   getProfile,
   getCaseResolutionsByHero,
+  getCaseUnlocksByHero,
 } from "@/lib/api";
 
 export default function ProfilePage() {
@@ -48,8 +53,15 @@ export default function ProfilePage() {
   const location = useLocation();
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [caseStats, setCaseStats] = useState({ submitted: 0, approved: 0, completed: 0 });
+  const [caseStats, setCaseStats] = useState({
+    submitted: 0,
+    completed: 0,
+    rejected: 0,
+  });
   const [helpedCount, setHelpedCount] = useState(0);
+  const [directHelps, setDirectHelps] = useState(0);
+  const [contributions, setContributions] = useState(0);
+  const [unlockCount, setUnlockCount] = useState(0);
   const [showLogout, setShowLogout] = useState(false);
 
   useEffect(() => {
@@ -63,11 +75,12 @@ export default function ProfilePage() {
   async function loadData() {
     if (!user) return;
     try {
-      const [kyc, cases, prof, resolutions] = await Promise.all([
+      const [kyc, cases, prof, resolutions, unlocks] = await Promise.all([
         getKycSubmission(user.id),
         getCasesByUser(user.id),
         getProfile(user.id),
         getCaseResolutionsByHero(user.id),
+        getCaseUnlocksByHero(user.id),
       ]);
 
       setKycData(kyc);
@@ -76,8 +89,8 @@ export default function ProfilePage() {
       if (cases) {
         setCaseStats({
           submitted: cases.length,
-          approved: cases.filter((c: any) => c.status === "approved").length,
           completed: cases.filter((c: any) => c.status === "completed").length,
+          rejected: cases.filter((c: any) => c.status === "rejected").length,
         });
       }
 
@@ -88,6 +101,21 @@ export default function ProfilePage() {
           String(r.status || "").toLowerCase() !== "disputed"
       );
       setHelpedCount(validResolutions.length);
+
+      // Direct helps: paid_to = 'institute'
+      const direct = validResolutions.filter(
+        (r: any) => String(r.paid_to || "").toLowerCase() === "institute"
+      );
+      setDirectHelps(direct.length);
+
+      // Contributions: paid_to = 'givethra'
+      const contrib = validResolutions.filter(
+        (r: any) => String(r.paid_to || "").toLowerCase() === "givethra"
+      );
+      setContributions(contrib.length);
+
+      // Unlock count (total case unlocks)
+      setUnlockCount((unlocks || []).length);
     } catch (err) {
       console.error("Failed to load profile data:", err);
     }
@@ -97,7 +125,7 @@ export default function ProfilePage() {
   const displayName = profile?.full_name || user?.fullName || "My Profile";
   const avatarUrl = profile?.avatar_url || null;
   const coverUrl = profile?.cover_url || null;
-  const trustScore = (user?.email ? 20 : 0) + (kycApproved ? 60 : 0) + (caseStats.approved * 5);
+  const trustScore = (user?.email ? 20 : 0) + (kycApproved ? 60 : 0) + (caseStats.completed * 5);
 
   const verificationBadges = [
     { label: "Email Verified", icon: <Mail className="h-3 w-3" />, active: !!user?.email },
@@ -201,29 +229,59 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-3">
-          <div className="col-span-1 rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-white p-3 flex flex-col items-center justify-center text-center shadow-md">
-            <Star className="h-4 w-4 mb-1 opacity-80" />
-            <div className="text-2xl font-bold">{Math.min(trustScore, 100)}</div>
-            <div className="text-[10px] opacity-80 leading-tight">Trust Score</div>
-          </div>
-          {[
-            { label: "Submitted", value: caseStats.submitted },
-            { label: "Helped", value: helpedCount },
-            { label: "Completed", value: caseStats.completed },
-          ].map(({ label, value }) => (
-            <div
-              key={label}
-              className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center justify-center text-center"
-            >
-              <div className="text-2xl font-bold text-foreground">{value}</div>
-              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                {label}
-              </div>
+        {/* ===== STATS GRID ===== */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+            <div className="text-2xl font-bold text-foreground">{caseStats.submitted}</div>
+            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+              <Briefcase className="h-3 w-3" /> Submitted
             </div>
-          ))}
+          </div>
+
+          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+            <div className="text-2xl font-bold text-foreground">{helpedCount}</div>
+            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+              <HeartHandshake className="h-3 w-3 text-green-600" /> Helped
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+            <div className="text-2xl font-bold text-foreground">{caseStats.completed}</div>
+            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+            <div className="text-2xl font-bold text-foreground">{caseStats.rejected}</div>
+            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+              <XCircle className="h-3 w-3 text-red-600" /> Rejected
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+            <div className="text-2xl font-bold text-foreground">{directHelps}</div>
+            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+              <Building2 className="h-3 w-3 text-purple-600" /> Direct Helps
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+            <div className="text-2xl font-bold text-foreground">{contributions}</div>
+            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+              <HandCoins className="h-3 w-3 text-amber-600" /> Contributions
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
+            <div className="text-2xl font-bold text-foreground">{unlockCount}</div>
+            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+              <Unlock className="h-3 w-3 text-indigo-600" /> Total Unlocks
+            </div>
+          </div>
         </div>
 
+        {/* ===== QUICK ACTIONS ===== */}
         <div className="grid grid-cols-3 gap-3">
           {[
             { icon: <Pencil className="h-4 w-4" />, label: "Edit Profile", to: "/edit-profile" },
@@ -242,6 +300,7 @@ export default function ProfilePage() {
           ))}
         </div>
 
+        {/* ===== CONTACT INFO ===== */}
         <div className="rounded-2xl bg-card border border-border p-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -266,6 +325,7 @@ export default function ProfilePage() {
           )}
         </div>
 
+        {/* ===== MENU ===== */}
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
           {menuItems.map((item, idx) => (
             <button
@@ -283,6 +343,7 @@ export default function ProfilePage() {
           ))}
         </div>
 
+        {/* ===== LOGOUT ===== */}
         <button
           type="button"
           onClick={() => setShowLogout(true)}
