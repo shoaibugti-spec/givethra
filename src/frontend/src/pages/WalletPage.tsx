@@ -1,5 +1,5 @@
 // src/frontend/src/pages/WalletPage.tsx
-// Enhanced with transaction history, icons, expandable details, and action buttons.
+// Complete with transaction history, icons, expandable details, and action buttons.
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -15,17 +15,14 @@ import {
   Coins,
   RefreshCw,
   ChevronDown,
-  ExternalLink,
   Calendar,
   ArrowUpCircle,
   ArrowDownCircle,
-  Briefcase,
   HeartHandshake,
   HandCoins,
   Unlock,
   FileText,
   Receipt,
-  FileCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -60,7 +57,7 @@ const PAYMENT_METHODS = {
 const QUICK_AMOUNTS = [1, 2, 3, 5, 10, 20];
 const SUSPENSION_UNLOCK_CREDITS = 5;
 
-// Transaction type configuration
+// Transaction type configuration with icons and colors
 const TX_CONFIG: Record<
   string,
   { icon: React.ReactNode; label: string; bg: string; text: string }
@@ -97,7 +94,7 @@ const TX_CONFIG: Record<
   },
 };
 
-// Default for unknown types (spend)
+// Default for unknown spend types
 const DEFAULT_SPEND = {
   icon: <ArrowDownCircle className="h-5 w-5" />,
   label: "Spend",
@@ -233,11 +230,13 @@ export default function WalletPage() {
     }
   }
 
-  const statusConfig: any = {
-    pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Pending Review", color: "bg-orange-100 text-orange-700" },
-    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Approved", color: "bg-teal-100 text-teal-700" },
-    rejected: { icon: <XCircle className="h-3.5 w-3.5" />, label: "Rejected", color: "bg-red-100 text-red-700" },
-  };
+  function getTxConfig(tx: any) {
+    if (tx.amount > 0) {
+      return TX_CONFIG.deposit || { icon: <ArrowUpCircle className="h-5 w-5" />, label: "Deposit", bg: "bg-green-100", text: "text-green-700" };
+    }
+    const type = tx.type || "";
+    return TX_CONFIG[type] || DEFAULT_SPEND;
+  }
 
   if (!isAuthenticated)
     return (
@@ -248,15 +247,6 @@ export default function WalletPage() {
 
   const amountNum = parseFloat(amount) || 0;
   const pkrAmount = pkrRate ? Math.round(amountNum * pkrRate) : null;
-
-  // Helper to get config for a transaction
-  function getTxConfig(tx: any) {
-    if (tx.amount > 0) {
-      return TX_CONFIG["deposit"] || { icon: <ArrowUpCircle className="h-5 w-5" />, label: "Deposit", bg: "bg-green-100", text: "text-green-700" };
-    }
-    const type = tx.type || "";
-    return TX_CONFIG[type] || DEFAULT_SPEND;
-  }
 
   return (
     <Layout>
@@ -299,7 +289,7 @@ export default function WalletPage() {
           <p>• Credits are for platform fees only — not transferable or withdrawable</p>
         </div>
 
-        {/* ===== DEPOSIT SECTION (unchanged) ===== */}
+        {/* Deposit Section */}
         <div className="rounded-2xl border bg-card p-5 space-y-4">
           <h2 className="font-bold text-lg flex items-center gap-2">
             <Coins className="h-5 w-5 text-primary" /> Deposit Credits
@@ -484,21 +474,17 @@ export default function WalletPage() {
           </div>
         </div>
 
-        {/* ===== TRANSACTION HISTORY (NEW, WITH ICONS & DETAILS) ===== */}
+        {/* ===== TRANSACTION HISTORY ===== */}
         <div className="rounded-2xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" /> Transaction History
           </h2>
           {loading ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Loading...
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-4">Loading...</p>
           ) : transactions.length === 0 ? (
             <div className="text-center py-8">
               <Wallet className="h-12 w-12 text-muted-foreground mx-auto mb-2 opacity-30" />
-              <p className="text-sm text-muted-foreground">
-                No transactions yet. Start by depositing credits!
-              </p>
+              <p className="text-sm text-muted-foreground">No transactions yet.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -506,22 +492,19 @@ export default function WalletPage() {
                 const isDeposit = tx.amount > 0;
                 const config = getTxConfig(tx);
                 const isOpen = expanded === tx.id;
-                const hasReceipt = !!tx.receipt_url || !!tx.proof_url;
-                const canAffidavit = tx.type === "deposit" || tx.type === "direct_help" || tx.type === "contribution";
 
                 return (
                   <div
                     key={tx.id}
                     className="rounded-xl border border-border overflow-hidden transition-all hover:border-primary/30"
                   >
-                    {/* Header / Summary */}
                     <div
                       className="w-full flex items-center justify-between gap-3 p-3 cursor-pointer hover:bg-muted/20 transition-colors"
                       onClick={() => setExpanded(isOpen ? null : tx.id)}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`p-2 rounded-full ${config.bg} ${config.text}`}>
-                          {isDeposit ? TX_CONFIG["deposit"].icon : config.icon}
+                          {isDeposit ? TX_CONFIG.deposit.icon : config.icon}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium">
@@ -534,46 +517,27 @@ export default function WalletPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`font-bold ${
-                            isDeposit ? "text-green-600" : "text-red-600"
-                          }`}
-                        >
-                          {isDeposit ? "+" : ""}
-                          {tx.amount}
+                        <span className={`font-bold ${isDeposit ? "text-green-600" : "text-red-600"}`}>
+                          {isDeposit ? "+" : ""}{tx.amount}
                         </span>
-                        <ChevronDown
-                          className={`h-4 w-4 text-muted-foreground transition-transform ${
-                            isOpen ? "rotate-180" : ""
-                          }`}
-                        />
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
                       </div>
                     </div>
 
-                    {/* Expanded Details */}
                     {isOpen && (
                       <div className="px-3 pb-3 pt-1 space-y-2 text-sm border-t border-border bg-muted/10">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Type</span>
-                          <span className="font-medium">
-                            {isDeposit ? "Deposit" : config.label}
-                          </span>
+                          <span className="font-medium">{isDeposit ? "Deposit" : config.label}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Description</span>
-                          <span className="font-medium text-right">
-                            {tx.description || tx.type || "—"}
-                          </span>
+                          <span className="font-medium text-right">{tx.description || tx.type || "—"}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Amount</span>
-                          <span
-                            className={`font-bold ${
-                              isDeposit ? "text-green-600" : "text-red-600"
-                            }`}
-                          >
-                            {isDeposit ? "+" : ""}
-                            {tx.amount} credits
+                          <span className={`font-bold ${isDeposit ? "text-green-600" : "text-red-600"}`}>
+                            {isDeposit ? "+" : ""}{tx.amount} credits
                           </span>
                         </div>
                         {tx.reference_id && (
@@ -581,10 +545,7 @@ export default function WalletPage() {
                             <span className="text-muted-foreground">Reference ID</span>
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-xs">{tx.reference_id}</span>
-                              <button
-                                onClick={() => copyText(tx.reference_id)}
-                                className="text-muted-foreground hover:text-primary"
-                              >
+                              <button onClick={() => copyText(tx.reference_id)} className="text-muted-foreground hover:text-primary">
                                 <Copy className="h-3.5 w-3.5" />
                               </button>
                             </div>
@@ -595,10 +556,7 @@ export default function WalletPage() {
                             <span className="text-muted-foreground">TXN ID</span>
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-xs">{tx.transaction_id}</span>
-                              <button
-                                onClick={() => copyText(tx.transaction_id)}
-                                className="text-muted-foreground hover:text-primary"
-                              >
+                              <button onClick={() => copyText(tx.transaction_id)} className="text-muted-foreground hover:text-primary">
                                 <Copy className="h-3.5 w-3.5" />
                               </button>
                             </div>
@@ -607,54 +565,20 @@ export default function WalletPage() {
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Date</span>
                           <span className="font-medium">
-                            {tx.created_at
-                              ? new Date(tx.created_at).toLocaleString()
-                              : "—"}
+                            {tx.created_at ? new Date(tx.created_at).toLocaleString() : "—"}
                           </span>
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-                          {hasReceipt && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1.5 text-xs"
-                              onClick={() => window.open(tx.receipt_url || tx.proof_url, "_blank")}
-                            >
-                              <Receipt className="h-3.5 w-3.5" /> View Receipt
-                            </Button>
-                          )}
-                          {tx.transaction_id && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1.5 text-xs"
-                              onClick={() => copyText(tx.transaction_id)}
-                            >
-                              <Copy className="h-3.5 w-3.5" /> Copy TXN
-                            </Button>
-                          )}
-                          {canAffidavit && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1.5 text-xs border-green-300 text-green-700"
-                              // Placeholder: you can implement affidavit generation later
-                              onClick={() => toast.info("Affidavit generation coming soon.")}
-                            >
-                              <FileCheck className="h-3.5 w-3.5" /> Affidavit
-                            </Button>
-                          )}
+                        {tx.receipt_url && (
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="gap-1.5 text-xs ml-auto"
-                            onClick={() => setExpanded(null)}
+                            variant="outline"
+                            className="w-full gap-1.5 text-xs"
+                            onClick={() => window.open(tx.receipt_url, "_blank")}
                           >
-                            Close
+                            <Receipt className="h-3.5 w-3.5" /> View Receipt
                           </Button>
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>
