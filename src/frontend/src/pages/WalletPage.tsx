@@ -1,5 +1,5 @@
 // src/frontend/src/pages/WalletPage.tsx
-// Replaces Supabase with Cloudflare Worker APIs
+// Fully refactored with credit transaction history (deposits + spends)
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -17,15 +17,18 @@ import {
   ChevronDown,
   ExternalLink,
   Calendar,
+  ArrowUpCircle,
+  ArrowDownCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   getWallet,
-  getDeposits,
+  getTransactions,
   getUserSuspension,
   insertDeposit,
   uploadFileToStorage,
+  upsertUserSuspension,
 } from "@/lib/api";
 
 const PAYMENT_METHODS = {
@@ -54,7 +57,7 @@ export default function WalletPage() {
   const { user, isAuthenticated } = useAuth();
   const [balance, setBalance] = useState(0);
   const [isSuspended, setIsSuspended] = useState(false);
-  const [deposits, setDeposits] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState<"nayapay" | "binance">("nayapay");
   const [amount, setAmount] = useState("");
@@ -63,6 +66,7 @@ export default function WalletPage() {
   const [proofName, setProofName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
 
   const [pkrRate, setPkrRate] = useState<number | null>(null);
   const [rateLoading, setRateLoading] = useState(true);
@@ -99,8 +103,8 @@ export default function WalletPage() {
       setBalance(wallet?.balance ?? 0);
       const suspension = await getUserSuspension(user!.id);
       setIsSuspended(Boolean(suspension?.is_active));
-      const deps = await getDeposits(user!.id);
-      setDeposits(deps ?? []);
+      const txs = await getTransactions(user!.id);
+      setTransactions(txs ?? []);
     } catch (err) {
       console.error("Failed to load wallet data:", err);
     } finally {
@@ -128,7 +132,6 @@ export default function WalletPage() {
     }
     setSubmitting(true);
     try {
-      // Upload proof file to Cloudflare storage (via worker)
       const safeProofName = proofFile.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
       const path = `deposits/${user!.id}/${Date.now()}-${safeProofName}`;
       const proofUrl = await uploadFileToStorage(proofFile, path);
@@ -147,7 +150,6 @@ export default function WalletPage() {
 
       await insertDeposit(depositData);
       toast.success("Deposit submitted! Credits will be added after Givethra reviews it.");
-      // Reset form
       setAmount("");
       setTxId("");
       setProofFile(null);
@@ -157,6 +159,24 @@ export default function WalletPage() {
       toast.error(`Error: ${err instanceof Error ? err.message : "Unknown"}`);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleUnlockAccount() {
+    if (!user?.id) return;
+    setUnlocking(true);
+    try {
+      await upsertUserSuspension({
+        user_id: user.id,
+        is_active: false,
+      });
+      toast.success(`✅ Account unlocked! ${SUSPENSION_UNLOCK_CREDITS} credits deducted.`);
+      setIsSuspended(false);
+      await loadWallet();
+    } catch (err) {
+      toast.error(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setUnlocking(false);
     }
   }
 
@@ -193,7 +213,18 @@ export default function WalletPage() {
         {isSuspended && (
           <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/20 dark:text-red-300">
             <p className="font-semibold">Account suspended</p>
-            <p className="mt-1">You can still view your wallet and add credits, but submitting a case or helping a case is disabled. Add at least <strong>{SUSPENSION_UNLOCK_CREDITS} credits</strong>, then open the Submit page to reactivate your account.</p>
+            <p className="mt-1">You can still view your wallet and add credits, but submitting a case or helping a case is disabled. Add at least <strong>{SUSPENSION_UNLOCK_CREDITS} credits</strong>, then click the button below to unlock.</p>
+            <Button
+              className="mt-3"
+              variant="outline"
+              onClick={handleUnlockAccount}
+              disabled={balance < SUSPENSION_UNLOCK_CREDITS || unlocking}
+            >
+              {unlocking ? "Unlocking..." : `Unlock Account (${SUSPENSION_UNLOCK_CREDITS} Credits)`}
+            </Button>
+            {balance < SUSPENSION_UNLOCK_CREDITS && (
+              <p className="text-xs text-muted-foreground mt-2">You need {SUSPENSION_UNLOCK_CREDITS - balance} more credits.</p>
+            )}
           </div>
         )}
 
@@ -387,48 +418,65 @@ export default function WalletPage() {
           </div>
         </div>
 
+        {/* ========== TRANSACTION HISTORY (ALL MOVEMENTS) ========== */}
         <div className="rounded-2xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold flex items-center gap-2">
-            <Clock className="h-4 w-4 text-primary" /> Deposit History
+            <Clock className="h-4 w-4 text-primary" /> Transaction History
           </h2>
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               Loading...
             </p>
-          ) : deposits.length === 0 ? (
+          ) : transactions.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
-              No deposits yet.
+              No transactions yet.
             </p>
           ) : (
             <div className="space-y-2">
-              {deposits.map((d) => {
-                const cfg = statusConfig[d.status] ?? statusConfig.pending;
-                const isOpen = expanded === d.id;
+              {transactions.map((tx) => {
+                const isDeposit = tx.amount > 0;
+                const isOpen = expanded === tx.id;
+                let label = tx.type || "unknown";
+                let description = tx.description || label;
+                let icon = isDeposit ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />;
+                let color = isDeposit ? "text-green-600" : "text-red-600";
+
+                // Beautify labels
+                const typeLabels: Record<string, string> = {
+                  deposit: "Deposit",
+                  case_submission: "Case Submission",
+                  direct_help: "Direct Help",
+                  contribution: "Contribution",
+                  suspension_unlock: "Suspension Unlock",
+                };
+                label = typeLabels[tx.type] || tx.type;
+
                 return (
                   <div
-                    key={d.id}
+                    key={tx.id}
                     className="rounded-xl border border-border overflow-hidden"
                   >
                     <button
-                      onClick={() => setExpanded(isOpen ? null : d.id)}
+                      onClick={() => setExpanded(isOpen ? null : tx.id)}
                       className="w-full flex items-center justify-between gap-3 p-3 hover:bg-muted/30 transition-colors text-left"
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">
-                          ${d.amount} · {d.method}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />{" "}
-                          {d.submitted_at
-                            ? new Date(d.submitted_at).toLocaleDateString()
-                            : "—"}
-                        </p>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`${isDeposit ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} p-1.5 rounded-full`}>
+                          {icon}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">
+                            {label}
+                            {tx.reference_id && ` · #${tx.reference_id.slice(0, 8)}`}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {description}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.color}`}
-                        >
-                          {cfg.icon} {cfg.label}
+                        <span className={`font-bold ${color}`}>
+                          {isDeposit ? '+' : ''}{tx.amount}
                         </span>
                         <ChevronDown
                           className={`h-4 w-4 text-muted-foreground transition-transform ${
@@ -441,69 +489,31 @@ export default function WalletPage() {
                     {isOpen && (
                       <div className="px-3 pb-3 pt-1 space-y-2 text-sm border-t border-border bg-muted/20">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Amount Sent
-                          </span>
-                          <span className="font-medium">
-                            ${d.amount} {d.currency || "USD"}
-                          </span>
+                          <span className="text-muted-foreground">Type</span>
+                          <span className="font-medium">{label}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Credits {d.status === "approved" ? "Added" : "Requested"}
-                          </span>
-                          <span className="font-bold text-primary">
-                            {d.credits ?? d.amount}
-                          </span>
+                          <span className="text-muted-foreground">Description</span>
+                          <span className="font-medium text-right">{description}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Method</span>
-                          <span className="font-medium">{d.method}</span>
-                        </div>
-                        <div className="flex justify-between gap-2">
-                          <span className="text-muted-foreground shrink-0">
-                            Transaction ID
-                          </span>
-                          <span className="font-mono text-xs break-all text-right">
-                            {d.transaction_id}
+                          <span className="text-muted-foreground">Amount</span>
+                          <span className={`font-bold ${color}`}>
+                            {isDeposit ? '+' : ''}{tx.amount} credits
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Submitted
-                          </span>
-                          <span className="font-medium">
-                            {d.submitted_at
-                              ? new Date(d.submitted_at).toLocaleString()
-                              : "—"}
-                          </span>
-                        </div>
-                        {d.reviewed_at && (
+                        {tx.reference_id && (
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Reviewed
-                            </span>
-                            <span className="font-medium">
-                              {new Date(d.reviewed_at).toLocaleString()}
-                            </span>
+                            <span className="text-muted-foreground">Reference ID</span>
+                            <span className="font-mono text-xs">{tx.reference_id}</span>
                           </div>
                         )}
-                        {d.rejection_reason && (
-                          <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 p-2 text-xs text-red-700">
-                            <strong>Reason:</strong> {d.rejection_reason}
-                          </div>
-                        )}
-                        {d.proof_url && (
-                          <a
-                            href={d.proof_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-primary text-xs font-medium pt-1"
-                          >
-                            <ExternalLink className="h-3 w-3" /> View My Payment
-                            Proof
-                          </a>
-                        )}
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Date</span>
+                          <span className="font-medium">
+                            {tx.created_at ? new Date(tx.created_at).toLocaleString() : "—"}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
