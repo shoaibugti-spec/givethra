@@ -257,8 +257,43 @@ function canAccessUser(user, userId) {
   return isAdmin(user) || !userId || user.user_id === userId;
 }
 
+// Auto-suspend: seeker must post gratitude feedback (video + caption) within 24h
+// of the case being completed by an admin-confirmed payment. Overdue => suspended
+// (lift with 5 credits).
+async function maybeAutoSuspendForMissingFeedback(env, userId) {
+  try {
+    const nowIso = new Date().toISOString();
+    const overdue = await env.DB.prepare(
+      `SELECT c.id FROM case_submissions c
+       WHERE c.user_id = ? AND lower(COALESCE(c.status,'')) = 'completed'
+         AND c.feedback_deadline IS NOT NULL AND c.feedback_deadline < ?
+         AND NOT EXISTS (
+           SELECT 1 FROM feedbacks f
+           WHERE f.case_id = c.id AND f.user_id = c.user_id
+             AND lower(COALESCE(f.status,'')) IN ('approved','pending_review')
+         )
+       LIMIT 1`
+    ).bind(userId, nowIso).all();
+    if (!overdue?.results?.length) return;
+    await env.DB.prepare(
+      `INSERT INTO user_suspensions (user_id, suspension_count, is_active, suspended_at, rejection_count_at_suspension, credits_used_to_unlock)
+       VALUES (?, 1, 1, ?, 0, 0)
+       ON CONFLICT(user_id) DO UPDATE SET
+         is_active = 1,
+         suspension_count = user_suspensions.suspension_count + 1,
+         suspended_at = excluded.suspended_at`
+    ).bind(userId, nowIso).run();
+    await env.DB.prepare(
+      `UPDATE profiles SET is_suspended = 1, suspended_reason = ?, suspended_at = ? WHERE user_id = ?`
+    ).bind("Missing 24-hour gratitude feedback after case completion.", nowIso, userId).run();
+  } catch (err) {
+    // Migration column may be missing -> skip gracefully.
+  }
+}
+
 async function getActiveSuspension(env, userId) {
   if (!env.DB || !userId) return null;
+  await maybeAutoSuspendForMissingFeedback(env, userId);
   const row = await env.DB.prepare(
     `SELECT u.user_id, s.is_active, s.suspension_count, s.suspended_at,
             s.rejection_count_at_suspension, s.credits_used_to_unlock,
@@ -969,8 +1004,8 @@ export async function synchronizeCompletedCase(env, resolutionId) {
   const nextStatus = directPayment && goalReached ? "completed" : undefined;
   if (nextStatus) {
     await env.DB.prepare(
-      "UPDATE case_submissions SET amount_collected = ?, status = ? WHERE id = ?"
-    ).bind(verifiedTotal, nextStatus, resolution.case_id).run();
+      "UPDATE case_submissions SET amount_collected = ?, status = ?, feedback_deadline = ? WHERE id = ?"
+    ).bind(verifiedTotal, nextStatus, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), resolution.case_id).run();
   } else {
     await env.DB.prepare(
       "UPDATE case_submissions SET amount_collected = ? WHERE id = ?"
@@ -1210,6 +1245,17 @@ async function handleRequest(request, env, ctx) {
         const caseIsCompleted = String(caseRow?.status || "").toLowerCase() === "completed" || Boolean(verifiedCompletion?.id);
         if (!caseRow || String(caseRow.user_id) !== feedbackUserId || !caseIsCompleted) {
           return json({ error: "Feedback is available only for your completed case" }, 400, origin);
+        }
+        if (!String(body?.text_message ?? body?.comment ?? "").trim()) {
+          return json({ error: "Feedback caption is required" }, 400, origin);
+        }
+        let feedbackDeadline = null;
+        try {
+          const dn = await env.DB.prepare("SELECT feedback_deadline FROM case_submissions WHERE id = ?").bind(body?.case_id).first();
+          feedbackDeadline = dn?.feedback_deadline || null;
+        } catch { /* migration not applied yet */ }
+        if (feedbackDeadline && String(feedbackDeadline) < new Date().toISOString()) {
+          return json({ error: "The 24-hour feedback window has passed. Your account is suspended; reactivate with 5 credits.", code: "FEEDBACK_WINDOW_EXPIRED", required_credits: 5 }, 403, origin);
         }
         const fbId = body?.id || id();
         await env.DB.prepare(
