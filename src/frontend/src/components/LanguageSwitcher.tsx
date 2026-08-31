@@ -1,34 +1,43 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-function waitForGoogleCombo(callback: (select: HTMLSelectElement) => void, attempts = 0) {
+function waitForGoogleCombo(
+  callback: (select: HTMLSelectElement) => void,
+  attempts = 0
+) {
   const select = document.querySelector<HTMLSelectElement>(".goog-te-combo");
   if (select) {
     callback(select);
     return;
   }
-  if (attempts > 40) return; // ~10 سیکنڈ بعد چھوڑ دیں
+  if (attempts > 40) return; // ~10 سیکنڈ کے بعد چھوڑ دیں
   setTimeout(() => waitForGoogleCombo(callback, attempts + 1), 250);
-}
-
-function triggerGoogleTranslate(targetLang: "en" | "ur") {
-  waitForGoogleCombo((select) => {
-    select.value = targetLang;
-    select.dispatchEvent(new Event("change"));
-  });
 }
 
 export default function LanguageSwitcher() {
   const [currentLang, setCurrentLang] = useState<"en" | "ur">("en");
   const [ready, setReady] = useState(false);
+  const isTranslating = useRef(false);
 
   useEffect(() => {
     waitForGoogleCombo(() => setReady(true));
   }, []);
 
   const toggleLanguage = () => {
+    if (isTranslating.current) return; // دوران عمل دوبارہ کلک بلاک کریں — یہی وہیل کے مسلسل چلنے کی روک تھام ہے
     const newLang = currentLang === "en" ? "ur" : "en";
-    triggerGoogleTranslate(newLang);
-    setCurrentLang(newLang);
+
+    isTranslating.current = true;
+
+    waitForGoogleCombo((select) => {
+      select.value = newLang;
+      select.dispatchEvent(new Event("change"));
+      setCurrentLang(newLang);
+
+      // ترجمہ مکمل ہونے کا وقت دیں، پھر lock ہٹا دیں
+      setTimeout(() => {
+        isTranslating.current = false;
+      }, 1200);
+    });
   };
 
   return (
