@@ -17,7 +17,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Givethra" />
 
-    <!-- ⚠️ React + Google Translate DOM ٹکراؤ کا محفوظ حل — سب سے پہلے، ہر چیز سے پہلے لوڈ ہو -->
+    <!-- ⚠️ React + Google Translate DOM ٹکراؤ کا محفوظ حل — سب سے پہلے لوڈ ہو -->
     <script>
       (function () {
         if (typeof Node !== "function" || !Node.prototype) return;
@@ -51,7 +51,6 @@
     <style>
       body { top: 0 !important; position: static !important; }
 
-      /* گوگل کا اوپری بینر، بلون، مینیو مکمل چھپائیں */
       .skiptranslate, .goog-te-banner-frame, #goog-gt-tt,
       .goog-te-balloon-frame, .goog-te-menu-frame,
       .goog-te-spinner-pos {
@@ -62,15 +61,6 @@
         box-shadow: none !important;
       }
       html.translated-ltr, html.translated-rtl { top: 0 !important; }
-
-      /* Radix کے Portal (Drawer/Dialog/Sheet/Dropdown وغیرہ) کو گوگل ترجمہ نہ چھیڑے — اسی سے نیویگیشن غائب ہونے کا مسئلہ حل ہوتا ہے */
-      [data-radix-portal],
-      [data-radix-popper-content-wrapper],
-      [role="dialog"],
-      [vaul-drawer],
-      [vaul-drawer-wrapper] {
-        translate: no;
-      }
     </style>
 
     <div id="google_translate_element" style="display:none"></div>
@@ -92,7 +82,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
-    <div id="root" translate="no"></div>
+    <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
     <script>
       if ("serviceWorker" in navigator) {
