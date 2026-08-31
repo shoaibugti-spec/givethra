@@ -1,5 +1,4 @@
-// src/frontend/src/components/LanguageSwitcher.tsx
-
+// src/components/LanguageSwitcher.tsx
 import { useState, useEffect, useRef } from "react";
 import { Languages, Search, Check } from "lucide-react";
 
@@ -46,22 +45,14 @@ const LANGUAGES = [
   { code: "fil", label: "Filipino (Tagalog)" },
 ];
 
-declare global {
-  interface Window {
-    googleTranslateElementInit?: () => void;
-    google?: any;
-  }
-}
-
 export default function LanguageSwitcher() {
   const [open, setOpen] = useState(false);
-  const [currentLabel, setCurrentLabel] = useState("English");
   const [currentCode, setCurrentCode] = useState("en");
   const [query, setQuery] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Load Google Translate script
+  // Load Google Translate
   useEffect(() => {
     if (document.getElementById("google-translate-script")) {
       setIsLoaded(true);
@@ -71,11 +62,7 @@ export default function LanguageSwitcher() {
     window.googleTranslateElementInit = () => {
       if (window.google?.translate) {
         new window.google.translate.TranslateElement(
-          { 
-            pageLanguage: "en", 
-            autoDisplay: false,
-            layout: window.google.translate.TranslateElement.InlineLayout.HORIZONTAL 
-          },
+          { pageLanguage: "en", autoDisplay: false },
           "google_translate_element"
         );
         setIsLoaded(true);
@@ -84,47 +71,31 @@ export default function LanguageSwitcher() {
 
     const script = document.createElement("script");
     script.id = "google-translate-script";
-    script.src =
-      "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     script.async = true;
     document.body.appendChild(script);
-
-    // Restore saved language
-    const saved = localStorage.getItem("gtranslate_lang");
-    if (saved) {
-      try {
-        const { code, label } = JSON.parse(saved);
-        setCurrentCode(code);
-        setCurrentLabel(label);
-        // Wait for Google Translate to load then apply
-        setTimeout(() => {
-          setLanguage(code, label, true);
-        }, 1500);
-      } catch {}
-    }
   }, []);
 
-  function setLanguage(code: string, label: string, silent: boolean = false) {
+  function setLanguage(code: string) {
     const select = document.querySelector<HTMLSelectElement>(".goog-te-combo");
     if (select) {
       select.value = code;
       select.dispatchEvent(new Event("change"));
       setCurrentCode(code);
-      setCurrentLabel(label);
-      localStorage.setItem("gtranslate_lang", JSON.stringify({ code, label }));
-      
-      if (!silent) {
-        setOpen(false);
-        // 🔥 KEY FIX: Force a React key reset by reloading the page
-        // This completely eliminates the removeChild error
-        // The page reload is a small price for a 100% bug-free experience
-        window.location.reload();
-      }
-    } else if (!silent) {
-      // If the select isn't ready yet, try again after a delay
-      setTimeout(() => setLanguage(code, label, silent), 500);
+      localStorage.setItem("g_lang", code);
+      setOpen(false);
+    } else {
+      setTimeout(() => setLanguage(code), 500);
     }
   }
+
+  // Restore saved language
+  useEffect(() => {
+    const saved = localStorage.getItem("g_lang");
+    if (saved && saved !== "en") {
+      setTimeout(() => setLanguage(saved), 1500);
+    }
+  }, [isLoaded]);
 
   const filtered = LANGUAGES.filter((l) =>
     l.label.toLowerCase().includes(query.toLowerCase())
@@ -143,63 +114,44 @@ export default function LanguageSwitcher() {
 
   // Get button label - shows "اردو" when English, "English" when Urdu
   const getButtonLabel = () => {
-    if (currentCode === "ur") return "English";
-    if (currentCode === "en") return "اردو";
     return currentCode === "ur" ? "English" : "اردو";
   };
 
-  const getButtonCode = () => {
-    if (currentCode === "ur") return "en";
-    if (currentCode === "en") return "ur";
+  const getToggleCode = () => {
     return currentCode === "ur" ? "en" : "ur";
   };
 
-  // Quick toggle between Urdu and English
-  const handleQuickToggle = () => {
-    const targetCode = currentCode === "ur" ? "en" : "ur";
-    const targetLabel = targetCode === "ur" ? "Urdu (اردو)" : "English";
-    // Find the full label
-    const lang = LANGUAGES.find(l => l.code === targetCode);
-    if (lang) {
-      setLanguage(lang.code, lang.label);
-    }
+  const handleToggle = () => {
+    setLanguage(getToggleCode());
   };
 
   return (
     <>
       <div id="google_translate_element" style={{ display: "none" }} />
       <div className="relative flex items-center gap-1" ref={dropdownRef}>
-        {/* Main button - shows "اردو" or "English" */}
+        {/* Main toggle button - shows "اردو" or "English" */}
         <button
-          onClick={handleQuickToggle}
+          onClick={handleToggle}
           className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium text-sm border border-border/50"
-          aria-label="Toggle language between Urdu and English"
+          aria-label="Toggle language"
         >
           <Languages className="h-4 w-4" />
-          <span className="text-sm font-medium">
-            {getButtonLabel()}
-          </span>
+          <span>{getButtonLabel()}</span>
         </button>
 
-        {/* Dropdown arrow/chevron to open full language list */}
+        {/* Dropdown arrow */}
         <button
           onClick={() => setOpen(!open)}
           className="flex items-center h-9 px-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          aria-label="Open language selection"
         >
-          <svg 
-            className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
+          <svg className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
 
         {/* Dropdown with search */}
         {open && (
-          <div className="absolute right-0 top-full mt-1 w-72 rounded-xl border border-border bg-card shadow-lg z-50 p-2 notranslate flex flex-col gap-2">
+          <div className="absolute right-0 top-full mt-1 w-64 rounded-xl border border-border bg-card shadow-lg z-50 p-2 notranslate flex flex-col gap-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <input
@@ -211,25 +163,20 @@ export default function LanguageSwitcher() {
                 autoFocus
               />
             </div>
-
-            <div className="max-h-64 overflow-y-auto space-y-0.5">
+            <div className="max-h-56 overflow-y-auto space-y-0.5">
               {filtered.length === 0 ? (
-                <div className="p-3 text-center text-sm text-muted-foreground">
-                  No language found
-                </div>
+                <div className="p-3 text-center text-sm text-muted-foreground">No language found</div>
               ) : (
                 filtered.map((l) => (
                   <button
                     key={l.code}
-                    onClick={() => setLanguage(l.code, l.label)}
+                    onClick={() => setLanguage(l.code)}
                     className={`w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors flex items-center justify-between ${
                       currentCode === l.code ? "bg-primary/10" : ""
                     }`}
                   >
                     <span>{l.label}</span>
-                    {currentCode === l.code && (
-                      <Check className="h-4 w-4 text-primary" />
-                    )}
+                    {currentCode === l.code && <Check className="h-4 w-4 text-primary" />}
                   </button>
                 ))
               )}
