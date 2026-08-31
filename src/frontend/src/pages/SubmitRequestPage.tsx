@@ -2789,51 +2789,57 @@ export default function SubmitRequestPage() {
             <h2 className="font-bold text-lg">📝 Basic Information</h2>
             <div className="space-y-2">
               <Label>Help Category *</Label>
-              <Select
-                value={category}
-                onValueChange={(v) => {
-                  setCategory(v);
-                  setInstituteName("");
-                  setIsOtherInstitute(false);
-                  setRefNumber("");
-                  setOtherName("");
-                  setOtherContact("");
-                  setOtherAddress("");
-                  setCatFields({});
-                  setCatDocUrls({});
-                  setCatDocNames({});
-                  setPropertyOwnership("");
-                  setGender("");
-                  setMaritalStatus("");
-                  setIsOrphan("");
-                  setOrphanParent("");
-                  setSeekerName("");
-                  setSeekerContact("");
-                  setReceiverName("");
-                  setReceiverContact("");
-                  setReceiverBank("");
-                  setReceiverAccount("");
-                  setReceiverAddress("");
-                  setReceiverShopName("");
-                  setDisabilityMode("");
-                  setAmount("");
-                  setDebtTotalAmount("");
-                  setEduSubType("");
-                  setEduAdmissionLevel("");
-                  setEduSubFields({});
-                }}
-              >
-                <SelectTrigger className={!category ? "border-red-400" : ""}>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              
+              {/* ✅ FIX: Added notranslate div to prevent Google Translate conflicts */}
+              <div className="notranslate" translate="no">
+                <Select
+                  value={category}
+                  onValueChange={(v) => {
+                    setCategory(v);
+                    setInstituteName("");
+                    setIsOtherInstitute(false);
+                    setRefNumber("");
+                    setOtherName("");
+                    setOtherContact("");
+                    setOtherAddress("");
+                    setCatFields({});
+                    setCatDocUrls({});
+                    setCatDocNames({});
+                    setPropertyOwnership("");
+                    setGender("");
+                    setMaritalStatus("");
+                    setIsOrphan("");
+                    setOrphanParent("");
+                    setSeekerName("");
+                    setSeekerContact("");
+                    setReceiverName("");
+                    setReceiverContact("");
+                    setReceiverBank("");
+                    setReceiverAccount("");
+                    setReceiverAddress("");
+                    setReceiverShopName("");
+                    setDisabilityMode("");
+                    setAmount("");
+                    setDebtTotalAmount("");
+                    setEduSubType("");
+                    setEduAdmissionLevel("");
+                    setEduSubFields({});
+                  }}
+                >
+                  <SelectTrigger className={!category ? "border-red-400" : ""}>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* ✅ End of fix */}
+
               {willBeFree && !isFreeDisabled && (
                 <p className="text-xs text-green-600 font-medium flex items-center gap-1">
                   <Gift className="h-3 w-3" /> {isFirstCaseFree ? "Your first case is FREE!" : "This category has a FREE offer!"}
