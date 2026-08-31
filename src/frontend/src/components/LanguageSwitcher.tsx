@@ -91,41 +91,23 @@ export default function LanguageSwitcher() {
     }
   }, []);
 
-  // ⭐ FIXED: This is the CORRECT way to trigger Google Translate
+  // ✅ گوگل کا تجویز کردہ طریقہ - فوراً ری لوڈ
   function setLanguage(code: string) {
-    // Method 1: Find the select and trigger change
     const select = document.querySelector<HTMLSelectElement>(".goog-te-combo");
     if (select) {
       select.value = code;
-      // Google Translate listens to this specific event
       select.dispatchEvent(new Event("change", { bubbles: true }));
       setCurrentCode(code);
       localStorage.setItem("g_lang", code);
       setOpen(false);
+      
+      // ✅ فوراً پیج ریفرش کریں تاکہ React کا DOM کریش ہونے سے پہلے محفوظ ہو جائے
+      window.location.reload();
       return;
     }
-
-    // Method 2: If select not found, try the Google Translate API directly
-    if (window.google?.translate?.TranslateElement) {
-      try {
-        // Force a reload of the translation widget
-        const element = document.getElementById("google_translate_element");
-        if (element) {
-          // @ts-ignore
-          new window.google.translate.TranslateElement(
-            { pageLanguage: "en", autoDisplay: false },
-            "google_translate_element"
-          );
-          // Try again after a moment
-          setTimeout(() => setLanguage(code), 500);
-        }
-      } catch (e) {
-        console.warn("Translation error:", e);
-      }
-    } else {
-      // If not loaded yet, try again
-      setTimeout(() => setLanguage(code), 500);
-    }
+    
+    // اگر سلیکٹر نہ ملے تو تھوڑی دیر بعد دوبارہ کوشش کریں
+    setTimeout(() => setLanguage(code), 200);
   }
 
   const filtered = LANGUAGES.filter((l) =>
