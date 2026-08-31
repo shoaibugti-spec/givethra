@@ -19,34 +19,34 @@
 
     <!-- ⚠️ React + Google Translate DOM ٹکراؤ کا محفوظ حل — سب سے پہلے لوڈ ہو -->
     <script>
-      (function () {
-        if (typeof Node !== "function" || !Node.prototype) return;
+  (function () {
+    if (typeof Node !== "function" || !Node.prototype) return;
 
-        const originalRemoveChild = Node.prototype.removeChild;
-        Node.prototype.removeChild = function (child) {
-          if (child && child.parentNode !== this) {
-            return child;
-          }
-          return originalRemoveChild.apply(this, arguments);
-        };
+    const originalRemoveChild = Node.prototype.removeChild;
+    Node.prototype.removeChild = function (child) {
+      if (child && child.parentNode !== this) {
+        return child; // خاموشی سے نظر انداز کریں
+      }
+      return originalRemoveChild.apply(this, arguments);
+    };
 
-        const originalInsertBefore = Node.prototype.insertBefore;
-        Node.prototype.insertBefore = function (newNode, referenceNode) {
-          if (referenceNode && referenceNode.parentNode !== this) {
-            return this.appendChild(newNode);
-          }
-          return originalInsertBefore.apply(this, arguments);
-        };
+    const originalInsertBefore = Node.prototype.insertBefore;
+    Node.prototype.insertBefore = function (newNode, referenceNode) {
+      if (referenceNode && referenceNode.parentNode !== this) {
+        return newNode; // ⚠️ appendChild نہیں — بس واپس کر دیں، کہیں منتقل نہ کریں
+      }
+      return originalInsertBefore.apply(this, arguments);
+    };
 
-        const originalReplaceChild = Node.prototype.replaceChild;
-        Node.prototype.replaceChild = function (newChild, oldChild) {
-          if (oldChild && oldChild.parentNode !== this) {
-            return this.appendChild(newChild);
-          }
-          return originalReplaceChild.apply(this, arguments);
-        };
-      })();
-    </script>
+    const originalReplaceChild = Node.prototype.replaceChild;
+    Node.prototype.replaceChild = function (newChild, oldChild) {
+      if (oldChild && oldChild.parentNode !== this) {
+        return newChild; // ⚠️ یہاں بھی appendChild نہیں
+      }
+      return originalReplaceChild.apply(this, arguments);
+    };
+  })();
+</script>
 
     <style>
       body { top: 0 !important; position: static !important; }
