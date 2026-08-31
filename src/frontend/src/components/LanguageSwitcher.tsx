@@ -1,52 +1,41 @@
 import { useEffect, useState } from "react";
 
-declare global {
-  interface Window {
-    google: any;
+function waitForGoogleCombo(callback: (select: HTMLSelectElement) => void, attempts = 0) {
+  const select = document.querySelector<HTMLSelectElement>(".goog-te-combo");
+  if (select) {
+    callback(select);
+    return;
   }
+  if (attempts > 40) return; // ~10 سیکنڈ بعد چھوڑ دیں
+  setTimeout(() => waitForGoogleCombo(callback, attempts + 1), 250);
 }
 
-function getGoogTransCookie(): string {
-  const match = document.cookie.match(/googtrans=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : "";
-}
-
-function setLanguage(targetLang: "en" | "ur") {
-  const value = targetLang === "en" ? "" : `/en/${targetLang}`;
-
-  // پرانی cookie صاف کریں (تمام ممکنہ paths/domains پر) تاکہ ٹکراؤ نہ ہو
-  const hostname = window.location.hostname;
-  const domain = hostname.startsWith("www.") ? hostname.slice(3) : hostname;
-
-  document.cookie = "googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC";
-  document.cookie = `googtrans=; path=/; domain=.${domain}; expires=Thu, 01 Jan 1970 00:00:00 UTC`;
-
-  if (value) {
-    document.cookie = `googtrans=${value}; path=/`;
-    document.cookie = `googtrans=${value}; path=/; domain=.${domain}`;
-  }
-
-  // ایک ہی بار ری لوڈ — بار بار ریفریش نہ ہو اس کے لیے flag لگاتے ہیں
-  window.location.reload();
+function triggerGoogleTranslate(targetLang: "en" | "ur") {
+  waitForGoogleCombo((select) => {
+    select.value = targetLang;
+    select.dispatchEvent(new Event("change"));
+  });
 }
 
 export default function LanguageSwitcher() {
   const [currentLang, setCurrentLang] = useState<"en" | "ur">("en");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = getGoogTransCookie();
-    setCurrentLang(stored.includes("ur") ? "ur" : "en");
+    waitForGoogleCombo(() => setReady(true));
   }, []);
 
   const toggleLanguage = () => {
     const newLang = currentLang === "en" ? "ur" : "en";
-    setLanguage(newLang);
+    triggerGoogleTranslate(newLang);
+    setCurrentLang(newLang);
   };
 
   return (
     <button
       onClick={toggleLanguage}
-      className="notranslate flex items-center h-9 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium text-sm border border-border/50"
+      disabled={!ready}
+      className="notranslate flex items-center h-9 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium text-sm border border-border/50 disabled:opacity-50"
     >
       {currentLang === "ur" ? "English" : "اردو"}
     </button>
