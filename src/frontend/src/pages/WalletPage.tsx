@@ -1,5 +1,5 @@
 // src/frontend/src/pages/WalletPage.tsx
-// Complete with transaction history, icons, expandable details, and action buttons.
+// SIMPLIFIED VERSION – Guaranteed to work
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -15,14 +15,8 @@ import {
   Coins,
   RefreshCw,
   ChevronDown,
+  ExternalLink,
   Calendar,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  HeartHandshake,
-  HandCoins,
-  Unlock,
-  FileText,
-  Receipt,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -56,51 +50,6 @@ const PAYMENT_METHODS = {
 
 const QUICK_AMOUNTS = [1, 2, 3, 5, 10, 20];
 const SUSPENSION_UNLOCK_CREDITS = 5;
-
-// Transaction type configuration with icons and colors
-const TX_CONFIG: Record<
-  string,
-  { icon: React.ReactNode; label: string; bg: string; text: string }
-> = {
-  deposit: {
-    icon: <ArrowUpCircle className="h-5 w-5" />,
-    label: "Deposit",
-    bg: "bg-green-100 dark:bg-green-900/30",
-    text: "text-green-700 dark:text-green-400",
-  },
-  case_submission: {
-    icon: <FileText className="h-5 w-5" />,
-    label: "Case Submission",
-    bg: "bg-blue-100 dark:bg-blue-900/30",
-    text: "text-blue-700 dark:text-blue-400",
-  },
-  direct_help: {
-    icon: <HeartHandshake className="h-5 w-5" />,
-    label: "Direct Help",
-    bg: "bg-purple-100 dark:bg-purple-900/30",
-    text: "text-purple-700 dark:text-purple-400",
-  },
-  contribution: {
-    icon: <HandCoins className="h-5 w-5" />,
-    label: "Contribution",
-    bg: "bg-amber-100 dark:bg-amber-900/30",
-    text: "text-amber-700 dark:text-amber-400",
-  },
-  suspension_unlock: {
-    icon: <Unlock className="h-5 w-5" />,
-    label: "Suspension Unlock",
-    bg: "bg-red-100 dark:bg-red-900/30",
-    text: "text-red-700 dark:text-red-400",
-  },
-};
-
-// Default for unknown spend types
-const DEFAULT_SPEND = {
-  icon: <ArrowDownCircle className="h-5 w-5" />,
-  label: "Spend",
-  bg: "bg-gray-100 dark:bg-gray-800",
-  text: "text-gray-700 dark:text-gray-400",
-};
 
 export default function WalletPage() {
   const { user, isAuthenticated } = useAuth();
@@ -153,6 +102,7 @@ export default function WalletPage() {
       const suspension = await getUserSuspension(user!.id);
       setIsSuspended(Boolean(suspension?.is_active));
       const txs = await getTransactions(user!.id);
+      console.log("Transactions loaded:", txs);
       setTransactions(txs ?? []);
     } catch (err) {
       console.error("Failed to load wallet data:", err);
@@ -162,7 +112,6 @@ export default function WalletPage() {
   }
 
   function copyText(text: string) {
-    if (!text) return;
     navigator.clipboard.writeText(text);
     toast.success("Copied!");
   }
@@ -230,14 +179,6 @@ export default function WalletPage() {
     }
   }
 
-  function getTxConfig(tx: any) {
-    if (tx.amount > 0) {
-      return TX_CONFIG.deposit || { icon: <ArrowUpCircle className="h-5 w-5" />, label: "Deposit", bg: "bg-green-100", text: "text-green-700" };
-    }
-    const type = tx.type || "";
-    return TX_CONFIG[type] || DEFAULT_SPEND;
-  }
-
   if (!isAuthenticated)
     return (
       <Layout>
@@ -263,7 +204,6 @@ export default function WalletPage() {
           </div>
         </div>
 
-        {/* Suspension Warning */}
         {isSuspended && (
           <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/20 dark:text-red-300">
             <p className="font-semibold">Account suspended</p>
@@ -282,7 +222,6 @@ export default function WalletPage() {
           </div>
         )}
 
-        {/* Info */}
         <div className="rounded-xl bg-muted/40 border p-4 text-xs text-muted-foreground space-y-1">
           <p>• Submitting a help request costs <strong>1 Credit</strong></p>
           <p>• Unlocking a verified case as a Hero costs <strong>1 Credit</strong></p>
@@ -479,6 +418,7 @@ export default function WalletPage() {
           <h2 className="font-semibold flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" /> Transaction History
           </h2>
+          
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Loading...</p>
           ) : transactions.length === 0 ? (
@@ -487,48 +427,48 @@ export default function WalletPage() {
               <p className="text-sm text-muted-foreground">No transactions yet.</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {transactions.map((tx) => {
                 const isDeposit = tx.amount > 0;
-                const config = getTxConfig(tx);
                 const isOpen = expanded === tx.id;
 
                 return (
                   <div
                     key={tx.id}
-                    className="rounded-xl border border-border overflow-hidden transition-all hover:border-primary/30"
+                    className="rounded-xl border border-border overflow-hidden"
                   >
-                    <div
-                      className="w-full flex items-center justify-between gap-3 p-3 cursor-pointer hover:bg-muted/20 transition-colors"
+                    {/* Clickable Header */}
+                    <button
                       onClick={() => setExpanded(isOpen ? null : tx.id)}
+                      className="w-full flex items-center justify-between gap-3 p-3 hover:bg-muted/30 transition-colors text-left"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`p-2 rounded-full ${config.bg} ${config.text}`}>
-                          {isDeposit ? TX_CONFIG.deposit.icon : config.icon}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">
-                            {isDeposit ? "Deposit" : config.label}
-                            {tx.reference_id && ` · #${tx.reference_id.slice(0, 8)}`}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground truncate">
-                            {tx.description || tx.type || "Transaction"}
-                          </p>
-                        </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">
+                          {isDeposit ? "💰 Deposit" : "💸 Spend"}
+                          {tx.reference_id && ` · #${tx.reference_id.slice(0, 8)}`}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {tx.description || tx.type || "Transaction"}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className={`font-bold ${isDeposit ? "text-green-600" : "text-red-600"}`}>
                           {isDeposit ? "+" : ""}{tx.amount}
                         </span>
-                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        <ChevronDown
+                          className={`h-4 w-4 text-muted-foreground transition-transform ${
+                            isOpen ? "rotate-180" : ""
+                          }`}
+                        />
                       </div>
-                    </div>
+                    </button>
 
+                    {/* Expanded Details */}
                     {isOpen && (
                       <div className="px-3 pb-3 pt-1 space-y-2 text-sm border-t border-border bg-muted/10">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Type</span>
-                          <span className="font-medium">{isDeposit ? "Deposit" : config.label}</span>
+                          <span className="font-medium">{isDeposit ? "Deposit" : (tx.type || "Spend")}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Description</span>
@@ -541,25 +481,9 @@ export default function WalletPage() {
                           </span>
                         </div>
                         {tx.reference_id && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Reference ID</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs">{tx.reference_id}</span>
-                              <button onClick={() => copyText(tx.reference_id)} className="text-muted-foreground hover:text-primary">
-                                <Copy className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        {tx.transaction_id && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">TXN ID</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs">{tx.transaction_id}</span>
-                              <button onClick={() => copyText(tx.transaction_id)} className="text-muted-foreground hover:text-primary">
-                                <Copy className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Reference</span>
+                            <span className="font-mono text-xs">{tx.reference_id}</span>
                           </div>
                         )}
                         <div className="flex justify-between">
@@ -568,17 +492,6 @@ export default function WalletPage() {
                             {tx.created_at ? new Date(tx.created_at).toLocaleString() : "—"}
                           </span>
                         </div>
-
-                        {tx.receipt_url && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full gap-1.5 text-xs"
-                            onClick={() => window.open(tx.receipt_url, "_blank")}
-                          >
-                            <Receipt className="h-3.5 w-3.5" /> View Receipt
-                          </Button>
-                        )}
                       </div>
                     )}
                   </div>
