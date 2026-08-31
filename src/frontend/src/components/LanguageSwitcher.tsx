@@ -45,6 +45,13 @@ const LANGUAGES = [
   { code: "fil", label: "Filipino (Tagalog)" },
 ];
 
+declare global {
+  interface Window {
+    googleTranslateElementInit?: () => void;
+    google?: any;
+  }
+}
+
 export default function LanguageSwitcher() {
   const [open, setOpen] = useState(false);
   const [currentCode, setCurrentCode] = useState("en");
@@ -74,28 +81,52 @@ export default function LanguageSwitcher() {
     script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     script.async = true;
     document.body.appendChild(script);
+
+    // Restore saved language
+    const saved = localStorage.getItem("g_lang");
+    if (saved && saved !== "en") {
+      setTimeout(() => {
+        setLanguage(saved);
+      }, 2000);
+    }
   }, []);
 
+  // ⭐ FIXED: This is the CORRECT way to trigger Google Translate
   function setLanguage(code: string) {
+    // Method 1: Find the select and trigger change
     const select = document.querySelector<HTMLSelectElement>(".goog-te-combo");
     if (select) {
       select.value = code;
-      select.dispatchEvent(new Event("change"));
+      // Google Translate listens to this specific event
+      select.dispatchEvent(new Event("change", { bubbles: true }));
       setCurrentCode(code);
       localStorage.setItem("g_lang", code);
       setOpen(false);
+      return;
+    }
+
+    // Method 2: If select not found, try the Google Translate API directly
+    if (window.google?.translate?.TranslateElement) {
+      try {
+        // Force a reload of the translation widget
+        const element = document.getElementById("google_translate_element");
+        if (element) {
+          // @ts-ignore
+          new window.google.translate.TranslateElement(
+            { pageLanguage: "en", autoDisplay: false },
+            "google_translate_element"
+          );
+          // Try again after a moment
+          setTimeout(() => setLanguage(code), 500);
+        }
+      } catch (e) {
+        console.warn("Translation error:", e);
+      }
     } else {
+      // If not loaded yet, try again
       setTimeout(() => setLanguage(code), 500);
     }
   }
-
-  // Restore saved language
-  useEffect(() => {
-    const saved = localStorage.getItem("g_lang");
-    if (saved && saved !== "en") {
-      setTimeout(() => setLanguage(saved), 1500);
-    }
-  }, [isLoaded]);
 
   const filtered = LANGUAGES.filter((l) =>
     l.label.toLowerCase().includes(query.toLowerCase())
@@ -112,7 +143,7 @@ export default function LanguageSwitcher() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Get button label - shows "اردو" when English, "English" when Urdu
+  // Get button label
   const getButtonLabel = () => {
     return currentCode === "ur" ? "English" : "اردو";
   };
@@ -129,7 +160,6 @@ export default function LanguageSwitcher() {
     <>
       <div id="google_translate_element" style={{ display: "none" }} />
       <div className="relative flex items-center gap-1" ref={dropdownRef}>
-        {/* Main toggle button - shows "اردو" or "English" */}
         <button
           onClick={handleToggle}
           className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium text-sm border border-border/50"
@@ -139,7 +169,6 @@ export default function LanguageSwitcher() {
           <span>{getButtonLabel()}</span>
         </button>
 
-        {/* Dropdown arrow */}
         <button
           onClick={() => setOpen(!open)}
           className="flex items-center h-9 px-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -149,7 +178,6 @@ export default function LanguageSwitcher() {
           </svg>
         </button>
 
-        {/* Dropdown with search */}
         {open && (
           <div className="absolute right-0 top-full mt-1 w-64 rounded-xl border border-border bg-card shadow-lg z-50 p-2 notranslate flex flex-col gap-2">
             <div className="relative">
