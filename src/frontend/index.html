@@ -17,15 +17,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Givethra" />
 
-    <!-- ⚠️ React + Google Translate ٹکراؤ روکنے کا پیچ — سب سے پہلے لوڈ ہونا ضروری ہے -->
+    <!-- ⚠️ React + Google Translate DOM ٹکراؤ کا محفوظ حل — سب سے پہلے، ہر چیز سے پہلے لوڈ ہو -->
     <script>
-      if (typeof Node === "function" && Node.prototype) {
+      (function () {
+        if (typeof Node !== "function" || !Node.prototype) return;
+
         const originalRemoveChild = Node.prototype.removeChild;
         Node.prototype.removeChild = function (child) {
-          if (child.parentNode !== this) {
-            if (console) {
-              console.warn("Cannot remove a child from a different parent", child, this);
-            }
+          if (child && child.parentNode !== this) {
             return child;
           }
           return originalRemoveChild.apply(this, arguments);
@@ -34,20 +33,28 @@
         const originalInsertBefore = Node.prototype.insertBefore;
         Node.prototype.insertBefore = function (newNode, referenceNode) {
           if (referenceNode && referenceNode.parentNode !== this) {
-            if (console) {
-              console.warn("Cannot insert before a reference node from a different parent", referenceNode, this);
-            }
-            return newNode;
+            return this.appendChild(newNode);
           }
           return originalInsertBefore.apply(this, arguments);
         };
-      }
+
+        const originalReplaceChild = Node.prototype.replaceChild;
+        Node.prototype.replaceChild = function (newChild, oldChild) {
+          if (oldChild && oldChild.parentNode !== this) {
+            return this.appendChild(newChild);
+          }
+          return originalReplaceChild.apply(this, arguments);
+        };
+      })();
     </script>
 
     <style>
       body { top: 0 !important; position: static !important; }
+
+      /* گوگل کا اوپری بینر، بلون، مینیو مکمل چھپائیں */
       .skiptranslate, .goog-te-banner-frame, #goog-gt-tt,
-      .goog-te-balloon-frame, .goog-te-menu-frame {
+      .goog-te-balloon-frame, .goog-te-menu-frame,
+      .goog-te-spinner-pos {
         display: none !important;
       }
       .goog-text-highlight {
@@ -55,6 +62,15 @@
         box-shadow: none !important;
       }
       html.translated-ltr, html.translated-rtl { top: 0 !important; }
+
+      /* Radix کے Portal (Drawer/Dialog/Sheet/Dropdown وغیرہ) کو گوگل ترجمہ نہ چھیڑے — اسی سے نیویگیشن غائب ہونے کا مسئلہ حل ہوتا ہے */
+      [data-radix-portal],
+      [data-radix-popper-content-wrapper],
+      [role="dialog"],
+      [vaul-drawer],
+      [vaul-drawer-wrapper] {
+        translate: no;
+      }
     </style>
 
     <div id="google_translate_element" style="display:none"></div>
@@ -76,7 +92,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" translate="no"></div>
     <script type="module" src="./src/main.tsx"></script>
     <script>
       if ("serviceWorker" in navigator) {
