@@ -14,7 +14,6 @@ import {
 } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import { Suspense, lazy } from "react";
-import './i18n'; // یہ لائن شامل کریں
 
 const HomePage = lazy(() => import("@/pages/HomePage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const SignUpPage = lazy(() => import("@/pages/SignUpPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
@@ -67,7 +66,6 @@ function BottomNavFallback() {
   );
 }
 
-// ✅ RootLayout میں Layout نہیں ڈالا (صرف Outlet اور BottomNav)
 function RootLayout() {
   return (
     <>
