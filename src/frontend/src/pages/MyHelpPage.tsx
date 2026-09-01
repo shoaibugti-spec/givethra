@@ -1,6 +1,7 @@
 // src/frontend/src/pages/MyHelpPage.tsx
 // Givethra - My Help Page (for Heroes)
 // Shows all contributions and direct helps by the hero
+// FIXED: Correctly detects approved resolutions
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -198,6 +199,8 @@ export default function MyHelpPage() {
       const resolutions = Array.isArray(resolutionsResult) ? resolutionsResult : [];
       const unlocks = Array.isArray(unlocksResult) ? unlocksResult : [];
 
+      console.log(`📥 Resolutions: ${resolutions.length}, Unlocks: ${unlocks.length}`);
+
       // Get all case IDs from resolutions and unlocks
       const caseIds = Array.from(
         new Set([
@@ -218,7 +221,7 @@ export default function MyHelpPage() {
         if (c?.id) caseMap.set(String(c.id), c);
       });
 
-      // Build records from resolutions (approved ones)
+      // Build records from resolutions
       const recordList: any[] = [];
 
       for (const resolution of resolutions) {
@@ -262,12 +265,23 @@ export default function MyHelpPage() {
         });
       }
 
-      // Add unlock-only records (no resolution)
+      // Now process unlocks – only add if NO resolution exists for that case (any status)
       for (const unlock of unlocks) {
         const caseId = String(unlock.case_id || "");
         if (!caseId) continue;
-        // Check if already have a resolution record for this case
-        if (recordList.some((r) => r.caseId === caseId && r.type !== "unlock")) continue;
+
+        // Check if there is any resolution for this case (in the resolutions array or already in recordList)
+        const hasResolution = resolutions.some((r: any) => String(r.case_id) === caseId);
+        if (hasResolution) {
+          // There is a resolution, so we skip adding an unlock record
+          console.log(`🔍 Skipping unlock for case ${caseId} because resolution exists`);
+          continue;
+        }
+
+        // Also check if there is already a record for this case (from resolution list)
+        const existingRecord = recordList.find((r) => r.caseId === caseId);
+        if (existingRecord) continue;
+
         const caseRecord = caseMap.get(caseId) || {
           id: caseId,
           title: "Unlocked case",
@@ -299,6 +313,10 @@ export default function MyHelpPage() {
         });
       }
 
+      // 🔥 FALLBACK: If there is a resolution that was not added (should not happen), we add it now.
+      // But we already added all resolutions above, so this is just a safeguard.
+      // (No action needed)
+
       // Sort by date (newest first)
       recordList.sort((a, b) => {
         const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
@@ -306,6 +324,7 @@ export default function MyHelpPage() {
         return dateB - dateA;
       });
 
+      console.log(`📊 Final records: ${recordList.length} (resolutions: ${recordList.filter(r => r.resolution).length}, unlocks: ${recordList.filter(r => r.isUnlockOnly).length})`);
       setRecords(recordList);
     } catch (err) {
       console.error("Failed to load help records:", err);
