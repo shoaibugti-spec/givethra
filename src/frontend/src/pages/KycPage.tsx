@@ -3,7 +3,6 @@
 // Fully functional with Cloudflare Worker APIs
 
 import { useAuth } from "@/contexts/AuthContext";
-import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,7 +87,7 @@ export default function KycPage() {
     if (!user) return;
     try {
       const data = await getKycSubmission(user.id);
-      setSubmission(data);
+      setSubmission(data ? { ...data, status: String(data.status || "none").trim().toLowerCase() } : null);
     } catch (err) {
       console.error("Failed to load KYC submission", err);
     } finally {
@@ -414,7 +413,7 @@ export default function KycPage() {
     const isBack = activeCamera === "back";
 
     return (
-      <Layout>
+      <div className="min-h-screen bg-background">
         <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
           <h2 className="font-bold text-lg text-center">
             {isFront ? "CNIC Front — Capture" : isBack ? "CNIC Back — Capture" : "Selfie — Capture"}
@@ -474,7 +473,7 @@ export default function KycPage() {
             </Button>
           </div>
         </div>
-      </Layout>
+      </div>
     );
   }
 
@@ -483,7 +482,7 @@ export default function KycPage() {
     const isFront = capturedKind === "front";
     
     return (
-      <Layout>
+      <div className="min-h-screen bg-background">
         <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
           <h2 className="font-bold text-lg text-center">
             {isFront ? "CNIC Front — Preview" : capturedKind === "back" ? "CNIC Back — Preview" : "Selfie — Preview"}
@@ -527,7 +526,7 @@ export default function KycPage() {
             </Button>
           </div>
         </div>
-      </Layout>
+      </div>
     );
   }
 
@@ -535,7 +534,7 @@ export default function KycPage() {
   const isRejected = submission?.status === "rejected";
 
   return (
-    <Layout>
+    <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 rounded-xl bg-primary/10"><Shield className="h-5 w-5 text-primary" /></div>
@@ -782,6 +781,6 @@ export default function KycPage() {
           </div>
         )}
       </div>
-    </Layout>
+    </div>
   );
 }
