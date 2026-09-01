@@ -1,6 +1,5 @@
-// ============================================================
-// FILE: worker.js (COMPLETE - ALL FEATURES + CREDIT TRANSACTIONS)
-// ============================================================
+// src/frontend/worker.js
+// Givethra - Complete Cloudflare Worker with all APIs including Onboarding Status
 
 const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
@@ -123,17 +122,14 @@ async function verifyGoogleCredential(credential, clientId) {
 
 async function findOrCreateUser(env, identity) {
   if (!env.DB) return { ...identity, user_id: id() };
-  // The verified email is the durable legacy identity. Never use the Google
-  // sub/provider ID to decide whether an imported D1 account already exists.
   const selectExisting = () => env.DB.prepare(
     `SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases,
-            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit
+            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit,
+            onboarding_completed
      FROM users WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1`
   ).bind(identity.email).first();
   const existing = await selectExisting();
 
-  // Existing imported users are read-only during login. This preserves their
-  // original user_id and avoids every duplicate INSERT/UPSERT path.
   if (existing) {
     return {
       user_id: String(existing.user_id),
@@ -143,6 +139,7 @@ async function findOrCreateUser(env, identity) {
       kyc_status: existing.kyc_status || "none",
       role: isAdmin(existing) || isAdmin(identity) ? "admin" : null,
       last_community_visit: existing.last_community_visit || null,
+      onboarding_completed: existing.onboarding_completed === 1,
     };
   }
 
@@ -150,17 +147,14 @@ async function findOrCreateUser(env, identity) {
   const userId = id();
   try {
     await env.DB.prepare(
-      `INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at, onboarding_completed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
     ).bind(userId, identity.email, identity.full_name, identity.avatar_url, timestamp, timestamp, timestamp).run();
     await env.DB.prepare(
       `INSERT INTO profiles (user_id, full_name, avatar_url, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?)`
     ).bind(userId, identity.full_name, identity.avatar_url, timestamp, timestamp).run();
   } catch (error) {
-    // Another login may have inserted this email between SELECT and INSERT.
-    // Reconcile that race by returning the now-existing row, never creating a
-    // second account or exposing a raw D1 constraint error to the frontend.
     const raced = await selectExisting();
     if (!raced) throw error;
     return {
@@ -171,6 +165,7 @@ async function findOrCreateUser(env, identity) {
       kyc_status: raced.kyc_status || "none",
       role: isAdmin(raced) || isAdmin(identity) ? "admin" : null,
       last_community_visit: raced.last_community_visit || null,
+      onboarding_completed: raced.onboarding_completed === 1,
     };
   }
   return {
@@ -181,6 +176,7 @@ async function findOrCreateUser(env, identity) {
     kyc_status: "none",
     role: isAdmin(identity) ? "admin" : null,
     last_community_visit: timestamp,
+    onboarding_completed: false,
   };
 }
 
@@ -190,7 +186,7 @@ async function hydrateAuthenticatedUser(env, session) {
     const row = await env.DB.prepare(
       `SELECT u.user_id, u.email, u.full_name, u.avatar_url, u.kyc_status,
               u.total_cases, u.pending_cases, u.active_or_completed_cases, u.rejected_cases,
-              u.balance, u.last_community_visit,
+              u.balance, u.last_community_visit, u.onboarding_completed,
               p.full_name AS profile_full_name, p.avatar_url AS profile_avatar_url
        FROM users u
        LEFT JOIN profiles p ON p.user_id = u.user_id
@@ -212,6 +208,7 @@ async function hydrateAuthenticatedUser(env, session) {
       rejected_cases: row.rejected_cases,
       balance: row.balance,
       last_community_visit: row.last_community_visit,
+      onboarding_completed: row.onboarding_completed === 1,
       role: isAdmin(row) ? "admin" : session.role || null,
     };
   } catch {
@@ -231,7 +228,8 @@ async function authenticate(request, env, clientId, createUser = false) {
   if (!env.DB) return { ...identity, user_id: identity.google_id };
   const existing = await env.DB.prepare(
     `SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases,
-            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit
+            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit,
+            onboarding_completed
      FROM users WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1`
   ).bind(identity.email).first();
   return hydrateAuthenticatedUser(env, {
@@ -242,6 +240,7 @@ async function authenticate(request, env, clientId, createUser = false) {
     kyc_status: existing?.kyc_status || "none",
     role: isAdmin(identity) ? "admin" : null,
     last_community_visit: existing?.last_community_visit || null,
+    onboarding_completed: existing?.onboarding_completed === 1,
   });
 }
 
@@ -257,9 +256,6 @@ function canAccessUser(user, userId) {
   return isAdmin(user) || !userId || user.user_id === userId;
 }
 
-// Auto-suspend: seeker must post gratitude feedback (video + caption) within 24h
-// of the case being completed by an admin-confirmed payment. Overdue => suspended
-// (lift with 5 credits).
 async function maybeAutoSuspendForMissingFeedback(env, userId) {
   try {
     const nowIso = new Date().toISOString();
@@ -329,7 +325,7 @@ function pick(body, fields) {
 }
 
 // ============================================================
-//  CREDIT TRANSACTIONS HELPERS (NEW)
+//  CREDIT TRANSACTIONS HELPERS
 // ============================================================
 async function getWalletBalance(env, userId) {
   const row = await env.DB.prepare(
@@ -367,7 +363,7 @@ async function addCredits(env, userId, amount, type, description, referenceId = 
 }
 
 // ============================================================
-//  PROFILE HANDLER - FIXED
+//  PROFILE HANDLER
 // ============================================================
 async function handleProfile(request, env, user, parts, origin) {
   const userId = String(parts[2] || user.user_id || "");
@@ -407,8 +403,6 @@ async function handleProfile(request, env, user, parts, origin) {
     updated_at: now()
   };
 
-  // Upsert preserves existing rows and repairs accounts without a profile row.
-  // It does not delete or migrate any existing data.
   await env.DB.prepare(
     `INSERT INTO profiles
       (user_id, full_name, phone_number, country, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
@@ -541,8 +535,6 @@ async function handleCases(request, env, user, url, parts, origin) {
       const found = new Map((rows.results || []).map((row) => [row.id, decodeCaseRow(row)]));
       return json(ids.map((value) => found.get(value)).filter(Boolean), 200, origin);
     }
-    // Public approved case links are intentionally readable without a session.
-    // This is the guest path used by Home → Help Now and shared links.
     if (parts[2] && parts[2] !== "counts" && parts[2] !== "category-counts") {
       const publicRow = await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(parts[2]).first();
       const publicStatus = String(publicRow?.status || "").toLowerCase();
@@ -559,8 +551,6 @@ async function handleCases(request, env, user, url, parts, origin) {
       const status = String(row.status || "").toLowerCase();
       let allowed = isAdmin(user) || row.user_id === user.user_id || ["approved", "published", "active"].includes(status);
 
-      // Completed cases remain available to the specific Hero who unlocked or resolved them,
-      // so their verified help and affidavit can be opened after the public case closes.
       if (!allowed && status === "completed" && user?.user_id) {
         const access = await env.DB.prepare(
           `SELECT 1 AS allowed FROM case_unlocks WHERE case_id = ? AND hero_id = ?
@@ -603,7 +593,6 @@ async function handleCases(request, env, user, url, parts, origin) {
     const photoUrls = Array.isArray(record.photo_urls) || (record.photo_urls && typeof record.photo_urls === "object") ? JSON.stringify(record.photo_urls) : (record.photo_urls || null);
     const categoryDetails = Array.isArray(record.category_details) || (record.category_details && typeof record.category_details === "object") ? JSON.stringify(record.category_details) : (record.category_details || null);
 
-    // ---- NEW: Check credits for non-free case submission ----
     const isFree = body?.was_free === true;
     if (!isFree) {
       const balance = await getWalletBalance(env, user.user_id);
@@ -617,7 +606,6 @@ async function handleCases(request, env, user, url, parts, origin) {
     ).bind(caseId, user.user_id, record.category || null, record.title || null, record.short_description || null, record.country || null, record.city || null, record.urgency || null, record.description || null, record.amount_needed || null, record.currency || "USD", record.why_help || null, record.deadline || null, record.institute_name || null, record.institute_contact || null, record.institute_address || null, record.payment_method || null, record.account_title || null, record.account_number || null, record.account_iban || null, photoUrls, record.selfie_url || null, record.video_url || null, categoryDetails, record.was_free ? 1 : 0, now()).run();
     await env.DB.prepare("UPDATE users SET total_cases = COALESCE(total_cases, 0) + 1, pending_cases = COALESCE(pending_cases, 0) + 1, updated_at = ? WHERE user_id = ?").bind(now(), user.user_id).run();
 
-    // ---- NEW: Deduct credit if not free ----
     if (!isFree) {
       await deductCredits(env, user.user_id, 1, 'case_submission', `Case "${record.title || caseId}" submission fee`, caseId);
     }
@@ -634,10 +622,6 @@ async function handleHeroesWall(request, env, origin) {
   if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
   const url = new URL(request.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 100);
-  // A case is public on the Heroes Wall once either the case itself is closed
-  // or an admin-approved direct/contribution resolution has completed it. The
-  // resolution fallback is important because some legacy admin flows close the
-  // payment record before mirroring status onto case_submissions.
   const rows = await env.DB.prepare(
     `SELECT c.id, c.user_id, c.title, c.category, c.currency, c.amount_needed,
             c.amount_collected, c.submitted_at AS updated_at,
@@ -674,9 +658,6 @@ async function handleHeroesWall(request, env, origin) {
   }));
   if (!completedCases.length) return json({ cases: [], metrics: { solved_cases: 0, total_amount: 0, currency: "PKR" } }, 200, origin);
 
-  // Social post creation is best-effort. A missing/older social table must not
-  // hide a verified completed case or turn the entire public wall into an API
-  // error during an upgrade.
   for (const caseRow of completedCases) {
     try {
       await env.DB.prepare(
@@ -714,10 +695,10 @@ async function handleHeroesWall(request, env, origin) {
   const totalAmount = completedCases.reduce((sum, caseRow) => sum + Math.max(Number(caseRow.verified_amount || caseRow.amount_collected || caseRow.amount_needed || 0), 0), 0);
   return json({ cases: wallCases, metrics: { solved_cases: completedCases.length, total_amount: totalAmount, currency: completedCases[0]?.currency || "PKR" } }, 200, origin);
 }
+
 // ============================================================
 //  COMMUNITY POSTS HANDLER
 // ============================================================
-// Compatibility helpers retained for focused worker regression tests. Runtime auth continues to use v2 sessions above.
 async function signSessionPayload(payload, secret) {
   if (!secret) return null;
   const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
@@ -827,7 +808,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
     })), 200, origin);
   }
 
-    if (request.method === "POST" && parts.length === 3) {
+  if (request.method === "POST" && parts.length === 3) {
     const body = await readJson(request);
     const message = String(body?.message || "").trim();
     if (!message) return json({ error: "Message is required" }, 400, origin);
@@ -877,7 +858,7 @@ async function handleCommunityLikes(request, env, user, url, parts, origin, ctx)
     return json(likes.results || [], 200, origin);
   }
 
-    if (request.method === "POST") {
+  if (request.method === "POST") {
     const guest = user ? null : guestIdentity(request);
     const actorId = user?.user_id || guest?.id;
     if (!actorId) return json({ error: "Guest identity is required" }, 400, origin);
@@ -1034,9 +1015,9 @@ async function handleNotifications(request, env, user, url, parts, origin) {
 }
 
 // ============================================================
-//  MAIN HANDLER
+//  SYNC COMPLETED CASE
 // ============================================================
-export async function synchronizeCompletedCase(env, resolutionId) {
+async function synchronizeCompletedCase(env, resolutionId) {
   const resolution = await env.DB.prepare(
     "SELECT case_id, paid_to, status, admin_confirmed FROM case_resolutions WHERE id = ?"
   ).bind(resolutionId).first();
@@ -1068,6 +1049,9 @@ export async function synchronizeCompletedCase(env, resolutionId) {
   return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "open" };
 }
 
+// ============================================================
+//  MAIN HANDLER
+// ============================================================
 async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const origin = url.origin;
@@ -1080,7 +1064,7 @@ async function handleRequest(request, env, ctx) {
     });
   }
 
-    if (parts[0] === "health" && request.method === "GET") {
+  if (parts[0] === "health" && request.method === "GET") {
     return json({ status: "ok", timestamp: now() }, 200, origin);
   }
 
@@ -1107,9 +1091,7 @@ async function handleRequest(request, env, ctx) {
     return json({ valid: true, user }, 200, origin);
   }
 
-  // Public static assets must be served before the auth-required API branch.
-  // Otherwise anonymous visitors receive JSON { error: "Authentication required" }
-  // instead of the SPA HTML/JavaScript bundle.
+  // Public static assets
   if (url.pathname.startsWith("/uploads/")) {
     const key = url.pathname.slice(9);
     try {
@@ -1190,7 +1172,7 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
-    // ✅ PROFILES - NOW FIXED
+    // ✅ PROFILES
     if (parts[1] === "profiles") {
       return handleProfile(request, env, user, parts, origin);
     }
@@ -1612,7 +1594,6 @@ async function handleRequest(request, env, ctx) {
           if (requestedStatus === "approved" && current.status !== "approved") {
             const credits = Number(values.credits ?? current.credits ?? current.amount ?? 0);
             if (!Number.isFinite(credits) || credits < 0) return json({ error: "Invalid deposit credits" }, 400, origin);
-            // ---- NEW: Add transaction log for deposit approval ----
             await addCredits(env, current.user_id, credits, 'deposit', `Deposit #${recordId} approved`, recordId);
           }
           return json(await env.DB.prepare("SELECT * FROM deposits WHERE id = ?").bind(recordId).first(), 200, origin);
@@ -1644,7 +1625,19 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No KYC fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE kyc_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
-          if (values.status !== undefined) await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?").bind(values.status, now(), current.user_id).run();
+          if (values.status !== undefined) {
+            await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?").bind(values.status, now(), current.user_id).run();
+            // Send notification for KYC approval with onboarding link
+            if (values.status === "approved") {
+              await sendNotification(
+                current.user_id,
+                "kyc_approved",
+                "✅ KYC Approved!",
+                "Your identity has been verified. Please complete the onboarding guide to get started.",
+                "/onboarding"
+              );
+            }
+          }
           return json(await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
         }
         if (parts[2] === "cases" && recordId) {
@@ -1731,7 +1724,7 @@ async function handleRequest(request, env, ctx) {
     }
 
     // ============================================================
-    //  CREDIT TRANSACTIONS ENDPOINT (NEW)
+    //  CREDIT TRANSACTIONS
     // ============================================================
     if (parts[1] === "transactions" && parts[2]) {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
@@ -1743,7 +1736,37 @@ async function handleRequest(request, env, ctx) {
       return json(rows.results || [], 200, origin);
     }
 
-    // Case unlocks: Contribution gets three free uses per user; Direct Help always costs one credit.
+    // ============================================================
+    //  ONBOARDING STATUS
+    // ============================================================
+    if (parts[1] === "onboarding-status" && parts[2]) {
+      const target = parts[2];
+      if (!canAccessUser(user, target)) {
+        return json({ error: "Forbidden" }, 403, origin);
+      }
+
+      if (request.method === "GET") {
+        const row = await env.DB.prepare(
+          "SELECT onboarding_completed FROM users WHERE user_id = ?"
+        ).bind(target).first();
+        return json({ completed: row?.onboarding_completed === 1 }, 200, origin);
+      }
+
+      if (request.method === "PUT") {
+        const body = await readJson(request);
+        const completed = body?.completed === true ? 1 : 0;
+        await env.DB.prepare(
+          "UPDATE users SET onboarding_completed = ? WHERE user_id = ?"
+        ).bind(completed, target).run();
+        return json({ completed: completed === 1 }, 200, origin);
+      }
+
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+
+    // ============================================================
+    //  CASE UNLOCKS
+    // ============================================================
     if (parts[1] === "case-unlocks") {
       if (parts[2] === "count" && request.method === "GET") {
         const heroId = String(url.searchParams.get("hero_id") || "").trim();
@@ -1797,7 +1820,6 @@ async function handleRequest(request, env, ctx) {
           if (creditsCharged > 0) await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(creditsCharged, now(), heroId).run();
           throw error;
         }
-        // ---- NEW: Log transaction if credits charged ----
         if (creditsCharged > 0) {
           const type = paymentType === 'full' ? 'direct_help' : 'contribution';
           const desc = paymentType === 'full' ? `Direct help for case ${caseId}` : `Contribution to case ${caseId}`;
@@ -1809,7 +1831,9 @@ async function handleRequest(request, env, ctx) {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
-    // Case resolutions
+    // ============================================================
+    //  CASE RESOLUTIONS
+    // ============================================================
     if (parts[1] === "case-resolutions") {
       if (request.method === "GET") {
         const caseId = String(url.searchParams.get("case_id") || "").trim();
@@ -1820,15 +1844,11 @@ async function handleRequest(request, env, ctx) {
           filters.push("r.case_id = ?");
           bind.push(caseId);
           if (!heroId && user) {
-            // Case-only reads are still private: return the case owner's rows or the
-            // authenticated helper's rows by durable ID/email for legacy-account recovery.
             filters.push("(r.hero_id = ? OR lower(u.email) = lower(?) OR c.user_id = ?)");
             bind.push(user.user_id, String(user.email || ""), user.user_id);
           }
         }
         if (heroId) {
-          // Legacy Google users can retain an older hero_id while their verified email
-          // is unchanged. If IDs differ, return only rows owned by that authenticated email.
           if (user?.user_id === heroId) {
             filters.push("r.hero_id = ?");
             bind.push(heroId);
@@ -1840,8 +1860,6 @@ async function handleRequest(request, env, ctx) {
           }
         }
         if (!filters.length) return json({ error: "case_id or hero_id is required" }, 400, origin);
-        // A helper may read only their own resolution rows; the case owner may read the case set.
-        // The frontend applies the separate approved/completed affidavit gate after this query.
         const sql = "SELECT r.*, c.title AS case_title, c.category AS case_category, c.city AS case_city, c.country AS case_country, c.institute_name AS case_institute_name, c.payment_method AS case_payment_method, c.account_number AS case_account_number, c.account_iban AS case_account_iban, c.reference_number AS case_reference_number, COALESCE(p.full_name, u.full_name) AS hero_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.hero_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS hero_cnic_number, COALESCE(sp.full_name, su.full_name) AS seeker_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.seeker_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS seeker_cnic_number FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id LEFT JOIN profiles p ON p.user_id = r.hero_id LEFT JOIN users u ON u.user_id = r.hero_id LEFT JOIN profiles sp ON sp.user_id = r.seeker_id LEFT JOIN users su ON su.user_id = r.seeker_id WHERE " + filters.join(" AND ") + " ORDER BY r.submitted_at DESC";
         const rows = await env.DB.prepare(sql).bind(...bind).all();
         return json(rows.results || [], 200, origin);
@@ -1896,7 +1914,9 @@ async function handleRequest(request, env, ctx) {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
-    // Offers
+    // ============================================================
+    //  OFFERS
+    // ============================================================
     if (parts[1] === "offers") {
       if (request.method === "GET") {
         const category = url.searchParams.get("category");
@@ -1916,7 +1936,9 @@ async function handleRequest(request, env, ctx) {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
-    // Offer claims
+    // ============================================================
+    //  OFFER CLAIMS
+    // ============================================================
     if (parts[1] === "offer-claims") {
       if (request.method === "GET" && parts[2] === "count") {
         const userId = url.searchParams.get("user_id");
@@ -1936,7 +1958,9 @@ async function handleRequest(request, env, ctx) {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
-    // User suspension
+    // ============================================================
+    //  USER SUSPENSION
+    // ============================================================
     if (parts[1] === "user-suspension" && parts[2]) {
       if (request.method === "GET") {
         const row = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(parts[2]).first();
@@ -1966,7 +1990,6 @@ async function handleRequest(request, env, ctx) {
           if (!Number(charged?.meta?.changes || 0)) {
             return json({ error: `Insufficient credits. ${unlockCost} credits are required to unlock this account.`, required: unlockCost, balance }, 402, origin);
           }
-          // ---- NEW: Log transaction for suspension unlock ----
           await addTransaction(env, userId, -unlockCost, 'suspension_unlock', 'Account suspension unlock (5 credits)', userId);
           try {
             const unlocked = await env.DB.prepare(
