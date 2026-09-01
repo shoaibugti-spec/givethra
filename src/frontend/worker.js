@@ -367,86 +367,61 @@ async function addCredits(env, userId, amount, type, description, referenceId = 
 // ============================================================
 async function handleProfile(request, env, user, parts, origin) {
   const userId = String(parts[2] || user.user_id || "");
-  if (!userId || !canAccessUser(user, userId)) {
-    return json({ error: "Forbidden" }, 403, origin);
-  }
+  if (!userId || !canAccessUser(user, userId)) return json({ error: "Forbidden" }, 403, origin);
+  const queryRole = String(new URL(request.url).searchParams.get("profile_role") || "").toLowerCase();
+  const profileRole = queryRole === "hero" || queryRole === "requester" ? queryRole : (user?.role === "hero" ? "hero" : "requester");
+  const allowedFields = ["full_name", "phone_number", "country", "city", "bio", "preferred_language", "avatar_url", "cover_url"];
 
   if (request.method === "GET") {
-    const profile = await env.DB.prepare(
-      "SELECT * FROM profiles WHERE user_id = ?"
-    ).bind(userId).first();
-    return json(profile || { user_id: userId }, 200, origin);
+    try {
+      const variant = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
+      if (variant) return json({ ...variant, user_id: userId, profile_role: profileRole }, 200, origin);
+    } catch { /* migration is additive; use legacy profile until applied */ }
+    const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
+    return json({ ...(profile || {}), user_id: userId, profile_role: profileRole }, 200, origin);
   }
-
-  if (request.method !== "PUT") {
-    return json({ error: "Method not allowed" }, 405, origin);
-  }
-
+  if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
   const body = await readJson(request);
-  const allowedFields = [
-    "full_name", "phone_number", "country", "city",
-    "bio", "preferred_language", "avatar_url", "cover_url"
-  ];
   const values = pick(body, allowedFields);
-  if (Object.keys(values).length === 0) {
-    return json({ error: "No valid fields to update" }, 400, origin);
-  }
+  if (Object.keys(values).length === 0) return json({ error: "No valid fields to update" }, 400, origin);
+  const timestamp = now();
 
-  const current = await env.DB.prepare(
-    "SELECT * FROM profiles WHERE user_id = ?"
-  ).bind(userId).first();
-  const merged = {
-    ...(current || {}),
-    ...values,
-    user_id: userId,
-    created_at: current?.created_at || now(),
-    updated_at: now()
-  };
+  try {
+    const current = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
+    const merged = { ...(current || {}), ...values };
+    await env.DB.prepare(
+      `INSERT INTO profile_variants
+        (id, user_id, profile_role, full_name, phone_number, country, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id, profile_role) DO UPDATE SET
+        full_name = excluded.full_name, phone_number = excluded.phone_number, country = excluded.country,
+        city = excluded.city, bio = excluded.bio, preferred_language = excluded.preferred_language,
+        avatar_url = excluded.avatar_url, cover_url = excluded.cover_url, updated_at = excluded.updated_at`
+    ).bind(current?.id || id(), userId, profileRole, merged.full_name || null, merged.phone_number || null,
+      merged.country || null, merged.city || null, merged.bio || null, merged.preferred_language || "en",
+      merged.avatar_url || null, merged.cover_url || null, current?.created_at || timestamp, timestamp).run();
+    const saved = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
+    if (saved) {
+      await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?")
+        .bind(saved.full_name || user.full_name || null, saved.avatar_url || user.avatar_url || null, timestamp, userId).run();
+      return json({ ...saved, profile_role: profileRole }, 200, origin);
+    }
+  } catch { /* migration is additive; use legacy profile until applied */ }
 
+  const current = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
+  const merged = { ...(current || {}), ...values, user_id: userId, created_at: current?.created_at || timestamp, updated_at: timestamp };
   await env.DB.prepare(
-    `INSERT INTO profiles
-      (user_id, full_name, phone_number, country, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
+    `INSERT INTO profiles (user_id, full_name, phone_number, country, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET
-      full_name = excluded.full_name,
-      phone_number = excluded.phone_number,
-      country = excluded.country,
-      city = excluded.city,
-      bio = excluded.bio,
-      preferred_language = excluded.preferred_language,
-      avatar_url = excluded.avatar_url,
-      cover_url = excluded.cover_url,
-      updated_at = excluded.updated_at`
-  ).bind(
-    userId,
-    merged.full_name || null,
-    merged.phone_number || null,
-    merged.country || null,
-    merged.city || null,
-    merged.bio || null,
-    merged.preferred_language || "en",
-    merged.avatar_url || null,
-    merged.cover_url || null,
-    merged.created_at,
-    merged.updated_at
-  ).run();
-
-  await env.DB.prepare(
-    "UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?"
-  ).bind(
-    merged.full_name || user.full_name || null,
-    merged.avatar_url || user.avatar_url || null,
-    merged.updated_at,
-    userId
-  ).run();
-
-  const persisted = await env.DB.prepare(
-    "SELECT * FROM profiles WHERE user_id = ?"
-  ).bind(userId).first();
-  if (!persisted) {
-    return json({ error: "Profile update could not be verified" }, 500, origin);
-  }
-  return json(persisted, 200, origin);
+     ON CONFLICT(user_id) DO UPDATE SET full_name = excluded.full_name, phone_number = excluded.phone_number,
+      country = excluded.country, city = excluded.city, bio = excluded.bio, preferred_language = excluded.preferred_language,
+      avatar_url = excluded.avatar_url, cover_url = excluded.cover_url, updated_at = excluded.updated_at`
+  ).bind(userId, merged.full_name || null, merged.phone_number || null, merged.country || null, merged.city || null,
+    merged.bio || null, merged.preferred_language || "en", merged.avatar_url || null, merged.cover_url || null,
+    merged.created_at, merged.updated_at).run();
+  await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?")
+    .bind(merged.full_name || user.full_name || null, merged.avatar_url || user.avatar_url || null, timestamp, userId).run();
+  return json({ ...merged, profile_role: profileRole }, 200, origin);
 }
 
 // ============================================================

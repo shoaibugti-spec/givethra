@@ -272,16 +272,18 @@ async function readApiResponse<T = any>(res: Response): Promise<T> {
   return payload as T;
 }
 
-export async function getProfile(userId: string) {
-  const res = await fetch(`${WORKER_URL}/api/profiles/${userId}`, {
+export async function getProfile(userId: string, profileRole?: "hero" | "requester" | null) {
+  const query = profileRole ? `?profile_role=${encodeURIComponent(profileRole)}` : "";
+  const res = await fetch(`${WORKER_URL}/api/profiles/${userId}${query}`, {
     headers: headers(),
     cache: "no-store",
   });
   return readApiResponse(res);
 }
 
-export async function updateProfile(userId: string, data: any) {
-  const res = await fetch(`${WORKER_URL}/api/profiles/${userId}`, {
+export async function updateProfile(userId: string, data: any, profileRole?: "hero" | "requester" | null) {
+  const query = profileRole ? `?profile_role=${encodeURIComponent(profileRole)}` : "";
+  const res = await fetch(`${WORKER_URL}/api/profiles/${userId}${query}`, {
     method: "PUT",
     headers: headers(),
     cache: "no-store",

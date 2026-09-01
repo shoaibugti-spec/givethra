@@ -166,7 +166,7 @@ export default function ProfilePage() {
       const [kyc, cases, prof, resolutions, unlocks] = await Promise.all([
         getKycSubmission(user.id),
         getCasesByUser(user.id),
-        getProfile(user.id),
+        getProfile(user.id, role),
         getCaseResolutionsByHero(user.id),
         getCaseUnlocksByHero(user.id),
       ]);

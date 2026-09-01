@@ -18,6 +18,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRole } from "@/contexts/RoleContext";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Camera, Check, Globe, ImagePlus, Loader2, MapPin, Phone } from "lucide-react";
 import type React from "react";
@@ -148,6 +149,7 @@ function getInitials(name: string): string {
 
 export default function EditProfilePage() {
   const { isAuthenticated, user, refreshUser } = useAuth();
+  const { role } = useRole();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -175,12 +177,12 @@ export default function EditProfilePage() {
       return;
     }
     loadProfile();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, role]);
 
   async function loadProfile() {
     setLoading(true);
     try {
-      const data = await getProfile(user!.id);
+      const data = await getProfile(user!.id, role);
       if (data) {
         setFullName(data.full_name ?? user?.fullName ?? "");
         setCountry(data.country ?? "");
@@ -271,7 +273,7 @@ export default function EditProfilePage() {
         avatar_url: finalAvatar,
         cover_url: finalCover,
         updated_at: new Date().toISOString(),
-      });
+      }, role);
       if (!savedProfile || savedProfile.user_id !== user!.id) {
         throw new Error("Profile was not saved. Please try again.");
       }
