@@ -36,10 +36,15 @@ export default function RoleSelectionPage() {
       <div className="max-w-4xl w-full space-y-12">
         {/* Header with stats */}
         <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-2">
-            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">G+</span>
-            </div>
+  <div className="flex items-center justify-center gap-2">
+    <div className="h-12 w-12 rounded-xl bg-[#008fa1] flex items-center justify-center shadow-lg">
+      {/* پلس کے نشان کو G کے بالکل ساتھ جوڑنے کے لیے نیگیٹو مارجن (negative margin) استعمال کیا گیا ہے */}
+      <span className="text-white font-extrabold text-3xl tracking-tighter flex items-center">
+        G<span className="-ml-1 text-2xl font-bold">+</span>
+      </span>
+    </div>
+  </div>
+</div>
             <span className="text-2xl font-bold text-foreground">Givethra</span>
           </div>
           <div className="flex justify-center gap-8 text-sm font-medium text-muted-foreground">
