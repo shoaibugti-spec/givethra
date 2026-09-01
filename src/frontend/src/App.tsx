@@ -77,8 +77,58 @@ function BottomNavFallback() {
 
 import BottomNav from "@/components/BottomNav";
 
-// Root layout with BottomNav
+// Root layout with BottomNav and authenticated-route guards.
+// This component is rendered inside RouterProvider, so router hooks always have
+// an initialized router store available.
 function RootLayout() {
+  const { isAuthenticated, user } = useAuth();
+  const { role } = useRole();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      setCheckingOnboarding(false);
+      return;
+    }
+
+    let cancelled = false;
+    const checkStatus = async () => {
+      try {
+        const kyc = await getKycStatus(user.id);
+        if (kyc?.status === "approved") {
+          const onboardingCompleted = await getOnboardingStatus(user.id);
+          if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
+            navigate({ to: "/onboarding" });
+          }
+        }
+      } catch (err) {
+        console.error("Error checking onboarding:", err);
+      } finally {
+        if (!cancelled) setCheckingOnboarding(false);
+      }
+    };
+
+    checkStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (!role && !checkingOnboarding && isAuthenticated) {
+      const publicPaths = ["/", "/sign-in", "/sign-up", "/onboarding"];
+      if (!publicPaths.includes(location.pathname)) {
+        navigate({ to: "/" });
+      }
+    }
+  }, [role, isAuthenticated, location.pathname, navigate, checkingOnboarding]);
+
+  if (isAuthenticated && checkingOnboarding) {
+    return <AppLoadingScreen />;
+  }
+
   return (
     <>
       <Outlet />
@@ -203,52 +253,6 @@ function AppLoadingScreen() {
 }
 
 function AppShell() {
-  const { isAuthenticated, user } = useAuth();
-  const { role } = useRole();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
-
-  // Check onboarding status when user is authenticated and KYC is approved
-  useEffect(() => {
-    if (!isAuthenticated || !user) {
-      setCheckingOnboarding(false);
-      return;
-    }
-
-    const checkStatus = async () => {
-      try {
-        const kyc = await getKycStatus(user.id);
-        if (kyc?.status === "approved") {
-          const onboardingCompleted = await getOnboardingStatus(user.id);
-          if (!onboardingCompleted && location.pathname !== "/onboarding") {
-            navigate({ to: "/onboarding" });
-          }
-        }
-      } catch (err) {
-        console.error("Error checking onboarding:", err);
-      } finally {
-        setCheckingOnboarding(false);
-      }
-    };
-
-    checkStatus();
-  }, [isAuthenticated, user, location.pathname, navigate]);
-
-  // If no role and not on root, sign-in, sign-up, or onboarding, redirect to root
-  useEffect(() => {
-    if (!role && !checkingOnboarding && isAuthenticated) {
-      const publicPaths = ["/", "/sign-in", "/sign-up", "/onboarding"];
-      if (!publicPaths.includes(location.pathname)) {
-        navigate({ to: "/" });
-      }
-    }
-  }, [role, isAuthenticated, location.pathname, navigate, checkingOnboarding]);
-
-  if (isAuthenticated && checkingOnboarding) {
-    return <AppLoadingScreen />;
-  }
-
   return <RouterProvider router={router} />;
 }
 

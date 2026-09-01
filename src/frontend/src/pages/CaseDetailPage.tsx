@@ -591,7 +591,8 @@ export default function CaseDetailPage() {
       setFbVideoBlob(null);
       checkExistingFeedback();
     } catch (err) {
-      toast.error(err?.message || "Failed to post feedback.");
+      const message = err instanceof Error ? err.message : "Failed to post feedback.";
+      toast.error(message);
     } finally {
       setFbSubmitting(false);
     }
