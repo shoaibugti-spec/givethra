@@ -1,5 +1,6 @@
 // src/frontend/src/pages/HomePage.tsx
-// Replaces Supabase with Cloudflare Worker APIs
+// Givethra - Complete HomePage with Help Now slider, case listings, etc.
+// This is the main dashboard page shown after role selection
 
 import InstallButton from "@/components/InstallButton";
 import Layout from "@/components/Layout";
@@ -18,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRole } from "@/contexts/RoleContext";
 import { runUserGuide } from "@/lib/userGuide";
 import { orderCasesForViewer } from "@/lib/caseOrdering";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -48,7 +50,7 @@ import {
   Stethoscope,
   ShoppingCart,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "motion-react";
 import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -68,7 +70,7 @@ const WHATSAPP_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
 
-// Category-specific visual treatments keep Help Now guidance clear without horizontal overflow.
+// Category-specific visual treatments
 const CATEGORY_SLIDE_STYLE: Record<string, { icon: typeof Battery; color: string; bg: string }> = {
   "Electricity Bill": { icon: Battery, color: "text-amber-600", bg: "bg-amber-500/10" },
   "Gas Bill": { icon: Flame, color: "text-orange-600", bg: "bg-orange-500/10" },
@@ -79,14 +81,6 @@ const CATEGORY_SLIDE_STYLE: Record<string, { icon: typeof Battery; color: string
   "Other": { icon: Gift, color: "text-teal-600", bg: "bg-teal-600" },
 };
 
-// Verified case action remains a direct route: navigate({ to: "/submit-request" }).
-// Category labels use uppercase tracking-wide treatment; urgent states retain border-orange-300 and border-red-300.
-// Legacy allowance state is intentionally derived from the authenticated case history.
-// const freeCaseComplete = freeCasesUsed >= 2;
-// if (!freeCaseComplete) { key: "credits", to: "/become-hero"; }
-// getCasesByUser(user.id)
-
-// ====== ANNOUNCEMENT ======
 const ANNOUNCEMENT =
   "🎉 Big Offer for Everyone! Complete your KYC and submit your FIRST CASE completely FREE — no fee! After review & approval, Heroes will help you. Start now at givethra.org 🤲   •   🎉 Heroes: Your first 3 helps are FREE! After that, 1 credit per help. Become a Hero and change lives today.";
 
@@ -154,7 +148,6 @@ const FILTER_CATEGORIES = [
   "Other",
 ];
 
-// Canonical Help Now category contract; categories remain available through the case filters.
 const HELP_NOW_CATEGORY_SLIDES = FILTER_CATEGORIES.map((category) => ({
   key: `category_${category}`,
   category,
@@ -197,6 +190,7 @@ const TRUST_BADGES = [
 export default function HomePage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
+  const { role } = useRole();
   const [cases, setCases] = useState<any[]>([]);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>(
     {}
@@ -260,10 +254,7 @@ export default function HomePage() {
       loadGuideStatus();
       loadUnlockCount();
 
-      // Poll for notifications every 20 seconds
       const interval = setInterval(loadNotifCount, 20000);
-
-      // Refresh cases periodically
       const caseInterval = setInterval(loadCases, 60000);
 
       return () => {
@@ -340,7 +331,6 @@ export default function HomePage() {
   guideSlides.push(HAND_SLIDE);
 
   if (!isAuthenticated) {
-    // For non-authenticated users: show two action slides
     guideSlides.push({
       key: "free_helps",
       type: "action",
@@ -364,7 +354,6 @@ export default function HomePage() {
       bg: "bg-primary/10",
     });
   } else {
-    // For authenticated users, keep the existing guide slides
     if (kycStatus !== "approved") {
       guideSlides.push({ key: "announce", type: "announce", to: "/kyc" });
       guideSlides.push({
@@ -417,7 +406,7 @@ export default function HomePage() {
     }
   }
 
-  // Restore every category as a first-class Help Now slide while keeping guide slides intact.
+  // Category slides
   guideSlides.push(...HELP_NOW_CATEGORY_SLIDES.map((slide) => ({
     key: slide.key,
     type: "category" as const,
@@ -431,7 +420,7 @@ export default function HomePage() {
     bg: slide.style.bg,
   })));
 
-  // Touch controls keep the Help Now slider usable on phones.
+  // Touch controls
   const sliderTouchStart = useRef<number | null>(null);
   function handleSliderTouchStart(event: React.TouchEvent<HTMLDivElement>) {
     sliderTouchStart.current = event.changedTouches[0]?.clientX ?? null;
@@ -518,7 +507,6 @@ export default function HomePage() {
 
   const currentSlide = guideSlides[slideIndex] ?? HAND_SLIDE;
 
-  // Render slide content based on type
   function renderSlideContent() {
     if (currentSlide.type === "image") {
       return (
@@ -591,7 +579,6 @@ export default function HomePage() {
         </button>
       );
     }
-    // Default guide slide (for authenticated)
     return (
       <button
         type="button"
@@ -688,7 +675,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ===== NEW ROW: WhatsApp Channel & 24/7 Customer Support ===== */}
+      {/* WhatsApp Channel & Customer Support */}
       <section className="py-4 px-4 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto flex items-center justify-center gap-6 flex-wrap">
           <a
