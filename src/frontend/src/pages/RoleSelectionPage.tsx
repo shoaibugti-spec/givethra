@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { Heart, HandHelping, ShieldCheck, Users, Globe, Sparkles } from "lucide-react";
-import { motion } from "motion";
+import { motion } from "motion/react";
 import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 

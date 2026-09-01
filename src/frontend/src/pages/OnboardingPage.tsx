@@ -22,7 +22,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "motion";
+import { motion, AnimatePresence } from "motion/react";
 import { getKycStatus, getOnboardingStatus, setOnboardingStatus } from "@/lib/api";
 
 interface Slide {
