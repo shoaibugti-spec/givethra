@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { Heart, HandHelping, ShieldCheck, Users, Globe, Sparkles } from "lucide-react";
-import { motion } from "motion-react";
+import { motion } from "motion";
 import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -15,21 +15,11 @@ export default function RoleSelectionPage() {
   const { setRole } = useRole();
   const navigate = useNavigate();
 
-  // If user is already authenticated and has selected a role, redirect to home
-  useEffect(() => {
-    // In a real app, we would check if the user has already completed onboarding etc.
-    // But here, we always show the selection page when the app loads.
-    // The role selection will be handled by the buttons.
-  }, []);
-
   const handleRoleSelect = async (role: "hero" | "requester") => {
     setRole(role);
     if (!isAuthenticated) {
-      // Redirect to sign-in with role param
       navigate({ to: "/sign-in", search: { role } });
     } else {
-      // User is already authenticated, check KYC and onboarding status
-      // For now, simply go to home
       navigate({ to: "/home" });
     }
   };
