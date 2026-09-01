@@ -38,9 +38,9 @@ export default function RoleSelectionPage() {
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
             <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">G</span>
+              <span className="text-white font-bold text-2xl">G+</span>
             </div>
-            <span className="text-2xl font-bold text-foreground">ivethra</span>
+            <span className="text-2xl font-bold text-foreground">Givethra</span>
           </div>
           <div className="flex justify-center gap-8 text-sm font-medium text-muted-foreground">
             <span className="flex items-center gap-1">
