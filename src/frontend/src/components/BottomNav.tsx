@@ -18,6 +18,8 @@ export default function BottomNav() {
   const router = useRouterState();
   const currentPath = router.location.pathname;
 
+  if (currentPath === "/") return null;
+
   // Define navigation items based on role
   const getNavItems = () => {
     if (role === "hero") {
