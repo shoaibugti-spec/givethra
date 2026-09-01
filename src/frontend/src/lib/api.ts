@@ -1,7 +1,4 @@
-// ============================================================
-// FILE: src/frontend/src/lib/api.ts
-// ============================================================
-
+// src/frontend/src/lib/api.ts
 // Cloudflare Worker API client – all backend calls go through this file
 
 // Use the public custom domain so browser requests are not sent through the
@@ -320,7 +317,7 @@ export async function insertDeposit(data: any) {
 }
 
 // ============================================================
-//  TRANSACTIONS (NEW)
+//  TRANSACTIONS
 // ============================================================
 export async function getTransactions(userId: string) {
   const res = await fetch(`${WORKER_URL}/api/transactions/${userId}`, { headers: headers() });
@@ -335,6 +332,7 @@ export async function getHeroesWall(limit = 24) {
   if (!res.ok) throw new Error(data?.error || `Heroes Wall request failed (${res.status})`);
   return data;
 }
+
 export async function getCommunityPosts() {
   const res = await fetch(`${WORKER_URL}/api/community/posts`, {
     headers: { ...headers(), "X-Guest-ID": getGuestId() },
@@ -344,6 +342,7 @@ export async function getCommunityPosts() {
   if (!res.ok) throw new Error(data?.error || `Community posts request failed (${res.status})`);
   return data;
 }
+
 export async function createCommunityPost(data: Record<string, unknown>) {
   const payload = { ...data, guest_id: data.guest_id || getGuestId() };
   const res = await fetch(`${WORKER_URL}/api/community/posts`, {
@@ -355,6 +354,7 @@ export async function createCommunityPost(data: Record<string, unknown>) {
   if (!res.ok) throw new Error(result?.error || `Community post request failed (${res.status})`);
   return result;
 }
+
 export async function toggleLike(postId: string) {
   const res = await fetch(`${WORKER_URL}/api/community/posts/${encodeURIComponent(postId)}/likes`, {
     method: "POST",
@@ -630,6 +630,7 @@ export async function adminSendSupportReply(data: Record<string, unknown>) {
   if (!res.ok) throw new Error(result?.error || "Failed to send support reply");
   return result;
 }
+
 export async function adminMarkSupportMessagesAsRead(userId: string) {
   const res = await fetch(`${WORKER_URL}/api/admin/support/mark-read`, {
     method: "PUT",
@@ -645,6 +646,7 @@ export async function adminGetAllFeedbacks() {
   const res = await fetch(`${WORKER_URL}/api/admin/feedbacks`, { headers: headers() });
   return res.json();
 }
+
 export async function adminBroadcastNotification(data: Record<string, unknown>) {
   const res = await fetch(`${WORKER_URL}/api/admin/notifications/broadcast`, {
     method: "POST",
@@ -665,7 +667,6 @@ export async function adminGetAllSuspensions() {
   const res = await fetch(`${WORKER_URL}/api/admin/suspensions`, { headers: headers() });
   return res.json();
 }
-
 
 export async function adminUpdateKyc(id: string, data: any) {
   const res = await fetch(`${WORKER_URL}/api/admin/kyc/${id}`, {
@@ -857,4 +858,23 @@ export async function getChatMessages(userId: string) {
 
 export async function sendChatMessage(data: any) {
   return sendSupportMessage(data);
+}
+
+// ---------- ONBOARDING STATUS ----------
+export async function getOnboardingStatus(userId: string): Promise<boolean> {
+  const res = await fetch(`${WORKER_URL}/api/onboarding-status/${userId}`, {
+    headers: headers(),
+  });
+  if (!res.ok) return false;
+  const data = await res.json();
+  return data.completed === true;
+}
+
+export async function setOnboardingStatus(userId: string, completed: boolean): Promise<void> {
+  const res = await fetch(`${WORKER_URL}/api/onboarding-status/${userId}`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify({ completed }),
+  });
+  if (!res.ok) throw new Error("Failed to update onboarding status");
 }
