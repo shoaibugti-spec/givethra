@@ -103,6 +103,16 @@ function RootLayout() {
     const checkStatus = async () => {
       try {
         const kyc = await getKycStatus(user.id);
+        const publicPaths = [
+          "/", "/sign-in", "/sign-up", "/about", "/account-privacy", "/privacy",
+          "/terms", "/community-guidelines", "/faq", "/contact", "/community",
+          "/heroes-wall", "/kindness-wall", "/become-hero", "/need-help",
+        ];
+        const isPublicPath = publicPaths.includes(location.pathname);
+        if (kyc?.status !== "approved" && !isPublicPath && location.pathname !== "/kyc") {
+          if (!cancelled) navigate({ to: "/kyc" });
+          return;
+        }
         if (kyc?.status === "approved") {
           const onboardingCompleted = await getOnboardingStatus(user.id);
           if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
@@ -124,7 +134,11 @@ function RootLayout() {
 
   useEffect(() => {
     if (!role && !checkingOnboarding && isAuthenticated) {
-      const publicPaths = ["/", "/sign-in", "/sign-up", "/onboarding"];
+      const publicPaths = [
+        "/", "/sign-in", "/sign-up", "/kyc", "/onboarding", "/about", "/account-privacy",
+        "/privacy", "/terms", "/community-guidelines", "/faq", "/contact", "/community",
+        "/heroes-wall", "/kindness-wall", "/become-hero", "/need-help",
+      ];
       if (!publicPaths.includes(location.pathname)) {
         navigate({ to: "/" });
       }
