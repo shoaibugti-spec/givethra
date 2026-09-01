@@ -1,5 +1,5 @@
 // src/frontend/src/App.tsx
-// Givethra - Full App with Role Selection and Role-based routing
+// Givethra - Full App with Role Selection, Onboarding, and Role-based routing
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -13,10 +13,11 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
-  redirect,
 } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { useNavigate, useLocation } from "@tanstack/react-router";
+import { getKycStatus, getOnboardingStatus } from "@/lib/api";
 
 // Lazy imports
 const HomePage = lazy(() => import("@/pages/HomePage").catch(() => ({ default: () => <div>Failed to load page</div> })));
@@ -74,7 +75,6 @@ function BottomNavFallback() {
   );
 }
 
-// Import BottomNav dynamically
 import BottomNav from "@/components/BottomNav";
 
 // Root layout with BottomNav
@@ -91,10 +91,6 @@ function RootLayout() {
 
 const rootRoute = createRootRoute({
   component: RootLayout,
-  // This loader runs before any route to check role
-  beforeLoad: ({ location }) => {
-    // We cannot access context here, so we'll handle in component
-  },
 });
 
 // --- Routes ---
@@ -105,64 +101,21 @@ const indexRoute = createRoute({
   component: () => <Suspense fallback={<PageLoader />}><RoleSelectionPage /></Suspense>,
 });
 
-// Home route (/home) -> HomePage, but requires role
+// Home route (/home) -> HomePage
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/home",
   component: () => {
     const { role } = useRole();
-    const { isAuthenticated } = useAuth();
-    // If no role, redirect to /
     if (!role) {
-      return <PageLoader />; // will be replaced by redirect
+      // This should not happen as AppShell redirects, but just in case
+      return <PageLoader />;
     }
     return <Suspense fallback={<PageLoader />}><HomePage /></Suspense>;
   },
-  // Use a loader to redirect if no role
-  beforeLoad: ({ location }) => {
-    // We need to check role from context, but we can't in beforeLoad easily.
-    // We'll do a client-side check in the component.
-    // For simplicity, we'll keep the component check.
-    // Alternatively, we can use a wrapper component.
-    // We'll handle via a guard component.
-    return;
-  },
 });
 
-// For other routes, we'll add a guard component that checks role
-// We can create a ProtectedRoute component and wrap all routes that need role.
-
-// But for simplicity, we'll just add a check in each route's component.
-// However, to keep code clean, we'll create a wrapper component.
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { role } = useRole();
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!role) {
-      navigate({ to: "/" });
-    }
-  }, [role, navigate]);
-
-  if (!role) {
-    return <PageLoader />;
-  }
-  return children;
-}
-
-// But we can't use hooks in route component directly? We can.
-
-// We'll define a helper component to wrap each protected route.
-
-// For now, let's create a simpler approach: In the root layout, we can check role and redirect.
-
-// But since we are building incrementally, we'll proceed with the route definitions.
-
-// We'll add the remaining routes without guards for now, and later we'll add role checks.
-
-// ----- Define all routes -----
+// ----- Define all remaining routes -----
 const signUpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-up", component: () => <Suspense fallback={<PageLoader />}><SignUpPage /></Suspense> });
 const signInRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-in", component: () => <Suspense fallback={<PageLoader />}><SignInPage /></Suspense> });
 const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases", component: () => <Suspense fallback={<PageLoader />}><CasesPage /></Suspense> });
@@ -250,12 +203,52 @@ function AppLoadingScreen() {
 }
 
 function AppShell() {
-  const { isInitializing } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { role } = useRole();
-  // If no role and not on sign-in/sign-up/root, redirect to root
-  // We'll handle in component
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
-  if (isInitializing) return <AppLoadingScreen />;
+  // Check onboarding status when user is authenticated and KYC is approved
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      setCheckingOnboarding(false);
+      return;
+    }
+
+    const checkStatus = async () => {
+      try {
+        const kyc = await getKycStatus(user.id);
+        if (kyc?.status === "approved") {
+          const onboardingCompleted = await getOnboardingStatus(user.id);
+          if (!onboardingCompleted && location.pathname !== "/onboarding") {
+            navigate({ to: "/onboarding" });
+          }
+        }
+      } catch (err) {
+        console.error("Error checking onboarding:", err);
+      } finally {
+        setCheckingOnboarding(false);
+      }
+    };
+
+    checkStatus();
+  }, [isAuthenticated, user, location.pathname, navigate]);
+
+  // If no role and not on root, sign-in, sign-up, or onboarding, redirect to root
+  useEffect(() => {
+    if (!role && !checkingOnboarding && isAuthenticated) {
+      const publicPaths = ["/", "/sign-in", "/sign-up", "/onboarding"];
+      if (!publicPaths.includes(location.pathname)) {
+        navigate({ to: "/" });
+      }
+    }
+  }, [role, isAuthenticated, location.pathname, navigate, checkingOnboarding]);
+
+  if (isAuthenticated && checkingOnboarding) {
+    return <AppLoadingScreen />;
+  }
+
   return <RouterProvider router={router} />;
 }
 
