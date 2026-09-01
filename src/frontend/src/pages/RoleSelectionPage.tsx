@@ -87,7 +87,7 @@ export default function RoleSelectionPage() {
                 className="w-full h-12 text-base font-semibold"
                 onClick={() => handleRoleSelect("hero")}
               >
-                <Heart className="h-5 w-5 mr-2" /> Become a Hero
+                Become a Hero
               </Button>
             </div>
           </motion.div>
