@@ -1,9 +1,11 @@
 // src/frontend/src/pages/ProfilePage.tsx
-// Enhanced with detailed stats: Direct Helps, Contributions, Unlocks, Rejected, etc.
+// Givethra - Role-based Profile Page
+// Shows different data for Hero vs Requester
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRole } from "@/contexts/RoleContext";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import {
   Bell,
@@ -22,12 +24,19 @@ import {
   Phone,
   Settings,
   ShieldCheck,
-  Star,
   Wallet,
   HandCoins,
   HeartHandshake,
   Unlock,
   XCircle,
+  Award,
+  Trophy,
+  Sparkles,
+  TrendingUp,
+  TrendingDown,
+  Info,
+  HelpCircle,
+  Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -45,23 +54,103 @@ import {
   getCaseResolutionsByHero,
   getCaseUnlocksByHero,
 } from "@/lib/api";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+// Helper: Check if a resolution is approved
+function isApprovedResolution(resolution: any): boolean {
+  if (!resolution) return false;
+  const status = String(resolution?.status || "").trim().toLowerCase();
+  if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)) return true;
+  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
+  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
+  return false;
+}
+
+// Helper to get badge based on hero stats
+function getBadge(unlockCount: number, contributionCount: number, directHelpCount: number) {
+  if (directHelpCount > 0 && contributionCount > 0 && unlockCount > 0) {
+    return {
+      title: "Super Hero",
+      emoji: "🌟",
+      description: "You have unlocked cases, contributed, and provided direct help. You are the ultimate Hero!",
+      icon: <Trophy className="h-6 w-6 text-yellow-500" />,
+      color: "bg-gradient-to-r from-yellow-400 to-orange-500 text-white",
+    };
+  }
+  if (directHelpCount > 0) {
+    return {
+      title: "Hero",
+      emoji: "🦸",
+      description: "You paid directly for someone's need. You are a true Hero!",
+      icon: <Award className="h-6 w-6 text-blue-500" />,
+      color: "bg-gradient-to-r from-blue-400 to-indigo-500 text-white",
+    };
+  }
+  if (contributionCount > 0) {
+    return {
+      title: "Young Hero",
+      emoji: "⭐",
+      description: "You contributed to a fundraising pool. Every contribution counts! Keep going to become a full Hero.",
+      icon: <Sparkles className="h-6 w-6 text-green-500" />,
+      color: "bg-gradient-to-r from-green-400 to-emerald-500 text-white",
+    };
+  }
+  if (unlockCount > 0) {
+    return {
+      title: "Newborn Hero",
+      emoji: "🆕",
+      description: "You unlocked a case. Take the next step to become a full Hero!",
+      icon: <Sparkles className="h-6 w-6 text-purple-500" />,
+      color: "bg-gradient-to-r from-purple-400 to-pink-500 text-white",
+    };
+  }
+  return null;
+}
+
+function getTrustLevel(rejected: number, approved: number, expired: number) {
+  let trust = 100;
+  trust -= rejected * 10;
+  trust += approved * 5;
+  trust -= expired * 5;
+  return Math.max(0, Math.min(100, trust));
+}
 
 export default function ProfilePage() {
   const { isAuthenticated, user, logout } = useAuth();
+  const { role } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [showLogout, setShowLogout] = useState(false);
+  const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
+
+  // Stats for all users
   const [caseStats, setCaseStats] = useState({
     submitted: 0,
     completed: 0,
     rejected: 0,
+    expired: 0,
   });
+
+  // Hero specific stats
   const [helpedCount, setHelpedCount] = useState(0);
   const [directHelps, setDirectHelps] = useState(0);
   const [contributions, setContributions] = useState(0);
   const [unlockCount, setUnlockCount] = useState(0);
-  const [showLogout, setShowLogout] = useState(false);
+  const [totalAmountSpent, setTotalAmountSpent] = useState(0);
+
+  // Requester specific stats
+  const [totalHelpReceived, setTotalHelpReceived] = useState(0);
+  const [trustLevel, setTrustLevel] = useState(100);
+
+  // Badge
+  const [badge, setBadge] = useState<{ title: string; emoji: string; description: string; icon: JSX.Element; color: string } | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -69,7 +158,7 @@ export default function ProfilePage() {
       return;
     }
     loadData();
-  }, [isAuthenticated, location.pathname]);
+  }, [isAuthenticated, location.pathname, role]);
 
   async function loadData() {
     if (!user) return;
@@ -85,32 +174,51 @@ export default function ProfilePage() {
       setKycData(kyc);
       setProfile(prof);
 
-      if (cases) {
-        setCaseStats({
-          submitted: cases.length,
-          completed: cases.filter((c: any) => c.status === "completed").length,
-          rejected: cases.filter((c: any) => c.status === "rejected").length,
-        });
-      }
+      // --- Requester Stats (for everyone) ---
+      const caseList = Array.isArray(cases) ? cases : [];
+      const submitted = caseList.length;
+      const completed = caseList.filter((c: any) => c.status === "completed").length;
+      const rejected = caseList.filter((c: any) => c.status === "rejected").length;
+      const expired = caseList.filter((c: any) => c.status === "expired").length;
+      setCaseStats({ submitted, completed, rejected, expired });
 
-      const validResolutions = (resolutions || []).filter(
-        (r: any) =>
-          String(r.status || "").toLowerCase() !== "rejected" &&
-          String(r.status || "").toLowerCase() !== "disputed"
-      );
+      // Total Help Received (sum of amount_collected from completed cases)
+      const totalReceived = caseList
+        .filter((c: any) => c.status === "completed")
+        .reduce((sum: number, c: any) => sum + (Number(c.amount_collected) || 0), 0);
+      setTotalHelpReceived(totalReceived);
+
+      // Trust Level (for requester)
+      const trust = getTrustLevel(rejected, completed, expired);
+      setTrustLevel(trust);
+
+      // --- Hero Stats ---
+      const resolutionList = Array.isArray(resolutions) ? resolutions : [];
+      const validResolutions = resolutionList.filter((r: any) => isApprovedResolution(r));
       setHelpedCount(validResolutions.length);
 
       const direct = validResolutions.filter(
-        (r: any) => String(r.paid_to || "").toLowerCase() === "institute"
+        (r: any) => String(r.paid_to || "").toLowerCase() !== "givethra"
       );
-      setDirectHelps(direct.length);
-
       const contrib = validResolutions.filter(
         (r: any) => String(r.paid_to || "").toLowerCase() === "givethra"
       );
+      setDirectHelps(direct.length);
       setContributions(contrib.length);
 
-      setUnlockCount((unlocks || []).length);
+      const totalSpent = validResolutions.reduce(
+        (sum: number, r: any) => sum + (Number(r.seeker_confirmed_amount ?? r.amount_paid) || 0),
+        0
+      );
+      setTotalAmountSpent(totalSpent);
+
+      const unlockList = Array.isArray(unlocks) ? unlocks : [];
+      setUnlockCount(unlockList.length);
+
+      // --- Badge (only for Hero) ---
+      const badgeInfo = getBadge(unlockList.length, contrib.length, direct.length);
+      setBadge(badgeInfo);
+
     } catch (err) {
       console.error("Failed to load profile data:", err);
     }
@@ -120,7 +228,6 @@ export default function ProfilePage() {
   const displayName = profile?.full_name || user?.fullName || "My Profile";
   const avatarUrl = profile?.avatar_url || null;
   const coverUrl = profile?.cover_url || null;
-  const trustScore = (user?.email ? 20 : 0) + (kycApproved ? 60 : 0) + (caseStats.completed * 5);
 
   const verificationBadges = [
     { label: "Email Verified", icon: <Mail className="h-3 w-3" />, active: !!user?.email },
@@ -150,8 +257,8 @@ export default function ProfilePage() {
   return (
     <Layout>
       <div className="max-w-xl mx-auto px-4 pt-0 pb-24 space-y-4">
+        {/* Cover & Avatar */}
         <div className="rounded-b-3xl bg-card border border-border shadow-sm">
-          {/* Cover */}
           <div className="h-32 relative rounded-t-3xl overflow-hidden bg-gradient-to-br from-primary via-primary/80 to-primary/40">
             {coverUrl ? (
               <img src={coverUrl} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
@@ -163,7 +270,7 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Avatar */}
+          {/* Avatar & Name */}
           <div className="px-5 pb-5">
             <div className="flex items-end justify-between -mt-14 mb-3">
               <div className="h-28 w-28 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary relative z-10">
@@ -184,7 +291,33 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-1">
-              <h1 className="text-xl font-bold text-foreground">{displayName}</h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-xl font-bold text-foreground">{displayName}</h1>
+                {badge && role === "hero" && (
+                  <div className="flex items-center gap-1">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
+                      {badge.icon}
+                      {badge.title}
+                    </span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setBadgeInfoOpen(true)}
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                          >
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-xs">{badge.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
+              </div>
               {(profile?.city || profile?.country) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <MapPin className="h-3 w-3" />{" "}
@@ -224,51 +357,104 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-            <div className="text-2xl font-bold text-foreground">{caseStats.submitted}</div>
-            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-              <Briefcase className="h-3 w-3" /> Submitted
+        {/* Role-based Stats */}
+        {role === "hero" ? (
+          // ----- HERO STATS -----
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{totalAmountSpent > 0 ? `$${totalAmountSpent.toFixed(2)}` : "—"}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HandCoins className="h-3 w-3" /> Total Spent
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{helpedCount}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HeartHandshake className="h-3 w-3" /> Helped
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{directHelps}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Building2 className="h-3 w-3" /> Direct Helps
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{contributions}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HandCoins className="h-3 w-3" /> Contributions
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
+                <div className="text-2xl font-bold text-foreground">{unlockCount}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Unlock className="h-3 w-3" /> Total Unlocks
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-            <div className="text-2xl font-bold text-foreground">{helpedCount}</div>
-            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-              <HeartHandshake className="h-3 w-3 text-green-600" /> Helped
+          </>
+        ) : (
+          // ----- REQUESTER STATS -----
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{caseStats.submitted}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Briefcase className="h-3 w-3" /> Submitted
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{caseStats.completed}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{caseStats.rejected}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <XCircle className="h-3 w-3 text-red-600" /> Rejected
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{caseStats.expired}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Calendar className="h-3 w-3 text-amber-600" /> Expired
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
+                <div className="text-2xl font-bold text-green-600">
+                  {totalHelpReceived > 0 ? `$${totalHelpReceived.toFixed(2)}` : "—"}
+                </div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HeartHandshake className="h-3 w-3" /> Total Help Received
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-            <div className="text-2xl font-bold text-foreground">{caseStats.completed}</div>
-            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed
+
+            {/* Trust Level for Requester */}
+            <div className="rounded-2xl bg-card border border-border p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Trust Level</span>
+                <span className="text-sm font-bold text-primary">{trustLevel}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                <div
+                  className={`h-3 rounded-full transition-all ${
+                    trustLevel >= 70 ? "bg-green-500" : trustLevel >= 40 ? "bg-amber-500" : "bg-red-500"
+                  }`}
+                  style={{ width: `${trustLevel}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>Based on your case history</span>
+                <span>
+                  +{caseStats.completed * 5} approvals · -{caseStats.rejected * 10} rejections · -{caseStats.expired * 5} expired
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-            <div className="text-2xl font-bold text-foreground">{caseStats.rejected}</div>
-            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-              <XCircle className="h-3 w-3 text-red-600" /> Rejected
-            </div>
-          </div>
-          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-            <div className="text-2xl font-bold text-foreground">{directHelps}</div>
-            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-              <Building2 className="h-3 w-3 text-purple-600" /> Direct Helps
-            </div>
-          </div>
-          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-            <div className="text-2xl font-bold text-foreground">{contributions}</div>
-            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-              <HandCoins className="h-3 w-3 text-amber-600" /> Contributions
-            </div>
-          </div>
-          <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
-            <div className="text-2xl font-bold text-foreground">{unlockCount}</div>
-            <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-              <Unlock className="h-3 w-3 text-indigo-600" /> Total Unlocks
-            </div>
-          </div>
-        </div>
+          </>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-3 gap-3">
@@ -342,10 +528,11 @@ export default function ProfilePage() {
         </button>
 
         <p className="text-center text-xs text-muted-foreground pb-2">
-          Givethra v1.0 · Built with ❤️
+          Givethra v2.0 · Built with ❤️
         </p>
       </div>
 
+      {/* Logout Dialog */}
       <Dialog open={showLogout} onOpenChange={setShowLogout}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -364,11 +551,58 @@ export default function ProfilePage() {
               onClick={() => {
                 logout();
                 setShowLogout(false);
-                navigate({ to: "/sign-in" });
+                navigate({ to: "/" });
               }}
             >
               <LogOut className="h-4 w-4 mr-1.5" /> Logout
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Badge Info Dialog */}
+      <Dialog open={badgeInfoOpen} onOpenChange={setBadgeInfoOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" /> Hero Badges
+            </DialogTitle>
+            <DialogDescription>
+              Understand what each badge means and how you earn them.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+              <div className="mt-0.5 text-xl">🆕</div>
+              <div>
+                <p className="font-semibold text-sm">Newborn Hero</p>
+                <p className="text-xs text-muted-foreground">You unlocked a case but did not complete a payment. Take the next step!</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+              <div className="mt-0.5 text-xl">⭐</div>
+              <div>
+                <p className="font-semibold text-sm">Young Hero</p>
+                <p className="text-xs text-muted-foreground">You contributed to a fundraising pool. Every contribution counts!</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+              <div className="mt-0.5 text-xl">🦸</div>
+              <div>
+                <p className="font-semibold text-sm">Hero</p>
+                <p className="text-xs text-muted-foreground">You paid directly for someone's need. You are a true Hero!</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+              <div className="mt-0.5 text-xl">🌟</div>
+              <div>
+                <p className="font-semibold text-sm">Super Hero</p>
+                <p className="text-xs text-muted-foreground">You have unlocked, contributed, and provided direct help. The ultimate Hero!</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setBadgeInfoOpen(false)}>Got it</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
