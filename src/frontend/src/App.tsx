@@ -106,7 +106,7 @@ function RootLayout() {
         const publicPaths = [
           "/", "/sign-in", "/sign-up", "/about", "/account-privacy", "/privacy",
           "/terms", "/community-guidelines", "/faq", "/contact", "/community",
-          "/heroes-wall", "/kindness-wall", "/become-hero", "/need-help",
+          "/heroes-wall", "/kindness-wall",
         ];
         const isPublicPath = publicPaths.includes(location.pathname);
         if (!isAdmin && kyc?.status !== "approved" && !isPublicPath && location.pathname !== "/kyc") {
@@ -137,7 +137,7 @@ function RootLayout() {
       const publicPaths = [
         "/", "/sign-in", "/sign-up", "/kyc", "/onboarding", "/about", "/account-privacy",
         "/privacy", "/terms", "/community-guidelines", "/faq", "/contact", "/community",
-        "/heroes-wall", "/kindness-wall", "/become-hero", "/need-help",
+        "/heroes-wall", "/kindness-wall",
       ];
       if (!publicPaths.includes(location.pathname)) {
         navigate({ to: "/" });
