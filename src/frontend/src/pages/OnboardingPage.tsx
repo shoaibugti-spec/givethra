@@ -1,5 +1,6 @@
 // src/frontend/src/pages/OnboardingPage.tsx
 // Givethra - Mandatory Onboarding Guide (Role-based slideshow)
+// This page cannot be skipped. User must go through all slides.
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
@@ -10,21 +11,19 @@ import {
   HandHelping,
   ShieldCheck,
   Users,
-  Globe,
   Sparkles,
   FileText,
-  Wallet,
   CheckCircle2,
   ArrowRight,
   ChevronLeft,
   ChevronRight,
   Award,
-  Building2,
   HandCoins,
   Unlock,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion-react";
+import { getKycStatus, getOnboardingStatus, setOnboardingStatus } from "@/lib/api";
 
 interface Slide {
   title: string;
@@ -38,8 +37,35 @@ export default function OnboardingPage() {
   const { role } = useRole();
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [completed, setCompleted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Check if user already completed onboarding or KYC not approved
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (!user?.id) {
+        navigate({ to: "/" });
+        return;
+      }
+      try {
+        const kyc = await getKycStatus(user.id);
+        if (kyc?.status !== "approved") {
+          navigate({ to: "/home" });
+          return;
+        }
+        const onboardingDone = await getOnboardingStatus(user.id);
+        if (onboardingDone) {
+          navigate({ to: "/home" });
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking onboarding status:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkStatus();
+  }, [user, navigate]);
 
   // Hero slides
   const heroSlides: Slide[] = [
@@ -165,14 +191,19 @@ export default function OnboardingPage() {
   const totalSlides = slides.length;
   const isLastSlide = currentSlide === totalSlides - 1;
 
-  const goToNext = () => {
+  const goToNext = async () => {
     if (isLastSlide) {
-      // Mark as completed and navigate
-      setCompleted(true);
+      // Mark onboarding as completed
+      try {
+        if (user?.id) {
+          await setOnboardingStatus(user.id, true);
+        }
+      } catch (err) {
+        console.error("Failed to update onboarding status:", err);
+      }
       navigate({ to: "/home" });
     } else {
       setCurrentSlide(currentSlide + 1);
-      // Scroll to top of container for next slide
       if (containerRef.current) {
         containerRef.current.scrollTop = 0;
       }
@@ -203,6 +234,14 @@ export default function OnboardingPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentSlide, isLastSlide]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Progress Bar */}
@@ -227,12 +266,10 @@ export default function OnboardingPage() {
             transition={{ duration: 0.4 }}
             className="space-y-6"
           >
-            {/* Slide counter */}
             <div className="text-center text-sm text-muted-foreground">
               {currentSlide + 1} / {totalSlides}
             </div>
 
-            {/* Icon */}
             <div className="flex justify-center">
               <div
                 className={`h-24 w-24 rounded-2xl bg-gradient-to-br ${slides[currentSlide].color} flex items-center justify-center`}
@@ -241,45 +278,36 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            {/* Title */}
             <h1 className="text-3xl md:text-4xl font-bold text-center text-foreground">
               {slides[currentSlide].title}
             </h1>
 
-            {/* Description */}
             <p className="text-lg text-muted-foreground text-center max-w-md mx-auto leading-relaxed">
               {slides[currentSlide].description}
             </p>
 
-            {/* Additional tips for specific slides */}
             {currentSlide === 2 && role === "hero" && (
               <div className="rounded-xl bg-primary/10 border border-primary/20 p-4 text-sm text-center">
-                💡 <strong>Free tip:</strong> Your first 3 unlocks are FREE.
-                After that, 1 credit per unlock.
+                💡 <strong>Free tip:</strong> Your first 3 unlocks are FREE. After that, 1 credit per unlock.
               </div>
             )}
 
             {currentSlide === 3 && role === "hero" && (
               <div className="rounded-xl bg-primary/10 border border-primary/20 p-4 text-sm text-center">
-                💡 <strong>Direct Help:</strong> Pay the institute directly (1
-                credit). <br />
-                <strong>Contribution:</strong> Contribute any amount to a
-                fundraising pool (1 credit).
+                💡 <strong>Direct Help:</strong> Pay the institute directly (1 credit). <br />
+                <strong>Contribution:</strong> Contribute any amount to a fundraising pool (1 credit).
               </div>
             )}
 
             {currentSlide === 6 && role === "requester" && (
               <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 text-center">
-                ⚠️ <strong>Important:</strong> You must submit a feedback video
-                within 24 hours after your case is completed. Failure to do so
-                will suspend your account.
+                ⚠️ <strong>Important:</strong> You must submit a feedback video within 24 hours after your case is completed. Failure to do so will suspend your account.
               </div>
             )}
 
             {currentSlide === 3 && role === "requester" && (
               <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800 text-center">
-                🎉 <strong>Good news:</strong> Your first case is FREE! After
-                that, it's 1 credit per case.
+                🎉 <strong>Good news:</strong> Your first case is FREE! After that, it's 1 credit per case.
               </div>
             )}
           </motion.div>
@@ -322,18 +350,13 @@ export default function OnboardingPage() {
             className="shrink-0 gap-1 bg-primary hover:bg-primary/90"
           >
             {isLastSlide ? (
-              <>
-                Get Started <ArrowRight className="h-4 w-4 ml-1" />
-              </>
+              <>Get Started <ArrowRight className="h-4 w-4 ml-1" /></>
             ) : (
-              <>
-                Next <ChevronRight className="h-4 w-4 ml-1" />
-              </>
+              <>Next <ChevronRight className="h-4 w-4 ml-1" /></>
             )}
           </Button>
         </div>
 
-        {/* Footer text */}
         <p className="text-[10px] text-center text-muted-foreground mt-2">
           {isLastSlide
             ? "Tap 'Get Started' to begin your journey!"
