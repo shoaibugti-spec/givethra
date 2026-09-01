@@ -1,3 +1,6 @@
+// src/frontend/src/main.tsx
+// Givethra - Application Entry Point
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ReactDOM from "react-dom/client";
 import App from "./App";
