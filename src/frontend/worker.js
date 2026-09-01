@@ -32,7 +32,15 @@ function json(data, status = 200, origin = "") {
 function now() {
   return new Date().toISOString();
 }
-
+async function sendNotification(env, userId, type, title, message, link = null) {
+  const notificationId = id();
+  const createdAt = now();
+  await env.DB.prepare(
+    `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
+  ).bind(notificationId, String(userId), String(type), String(title), String(message), link, createdAt).run();
+  return { id: notificationId, user_id: String(userId), type, title, message, link, is_read: 0, created_at: createdAt };
+}
 function id() {
   return crypto.randomUUID();
 }
@@ -1617,20 +1625,38 @@ async function handleRequest(request, env, ctx) {
           if (!current) return json({ error: "KYC submission not found" }, 404, origin);
           const allowed = ["status", "rejection_reason", "reviewed_at", "reviewed_by"];
           const values = pick(body, allowed);
+          if (values.status !== undefined) {
+            values.status = String(values.status).trim().toLowerCase();
+            if (!["pending", "approved", "rejected"].includes(values.status)) {
+              return json({ error: "Invalid KYC status" }, 400, origin);
+            }
+          }
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No KYC fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE kyc_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
           if (values.status !== undefined) {
             await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?").bind(values.status, now(), current.user_id).run();
-            // Send notification for KYC approval with onboarding link
-            if (values.status === "approved") {
-              await sendNotification(
-                current.user_id,
-                "kyc_approved",
-                "✅ KYC Approved!",
-                "Your identity has been verified. Please complete the onboarding guide to get started.",
-                "/onboarding"
-              );
+            if (String(current.status || "").trim().toLowerCase() !== values.status) {
+              if (values.status === "approved") {
+                await sendNotification(
+                  env,
+                  current.user_id,
+                  "kyc_approved",
+                  "KYC Approved",
+                  "Your identity has been verified. Please complete the onboarding guide to get started.",
+                  "/onboarding"
+                );
+              } else if (values.status === "rejected") {
+                const reason = String(values.rejection_reason || "").trim();
+                await sendNotification(
+                  env,
+                  current.user_id,
+                  "kyc_rejected",
+                  "KYC Needs Attention",
+                  reason ? `Your KYC submission was rejected. Reason: ${reason}. Please update and resubmit your KYC.` : "Your KYC submission was rejected. Please update and resubmit your KYC.",
+                  "/kyc"
+                );
+              }
             }
           }
           return json(await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(recordId).first(), 200, origin);

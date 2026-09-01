@@ -50,7 +50,7 @@ export default function OnboardingPage() {
       try {
         const kyc = await getKycStatus(user.id);
         if (kyc?.status !== "approved") {
-          navigate({ to: "/home" });
+          navigate({ to: "/kyc" });
           return;
         }
         const onboardingDone = await getOnboardingStatus(user.id);

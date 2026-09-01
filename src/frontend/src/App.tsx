@@ -103,17 +103,33 @@ function RootLayout() {
     const checkStatus = async () => {
       try {
         const kyc = await getKycStatus(user.id);
+        const kycCacheKey = `givethra_kyc_status_${user.id}`;
+        let cachedKycStatus = "unknown";
+        try {
+          cachedKycStatus = localStorage.getItem(kycCacheKey) || "unknown";
+        } catch {
+          cachedKycStatus = "unknown";
+        }
+        const apiKycStatus = String(kyc?.status || "unknown").trim().toLowerCase();
+        const effectiveKycStatus = apiKycStatus === "unknown" ? cachedKycStatus : apiKycStatus;
+        if (apiKycStatus !== "unknown") {
+          try {
+            localStorage.setItem(kycCacheKey, apiKycStatus);
+          } catch {
+            // Storage is optional; the API status remains authoritative.
+          }
+        }
         const publicPaths = [
           "/", "/sign-in", "/sign-up", "/about", "/account-privacy", "/privacy",
           "/terms", "/community-guidelines", "/faq", "/contact", "/community",
           "/heroes-wall", "/kindness-wall",
         ];
         const isPublicPath = publicPaths.includes(location.pathname);
-        if (!isAdmin && kyc?.status !== "approved" && !isPublicPath && location.pathname !== "/kyc") {
+        if (!isAdmin && effectiveKycStatus !== "approved" && !isPublicPath && location.pathname !== "/kyc") {
           if (!cancelled) navigate({ to: "/kyc" });
           return;
         }
-        if (!isAdmin && kyc?.status === "approved") {
+        if (!isAdmin && effectiveKycStatus === "approved") {
           const onboardingCompleted = await getOnboardingStatus(user.id);
           if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
             navigate({ to: "/onboarding" });
