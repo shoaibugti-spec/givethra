@@ -466,6 +466,26 @@ async function handleKyc(request, env, user, url, parts, origin) {
   if (request.method === "POST") {
     const body = await readJson(request);
     const record = pick(body, ["full_name", "date_of_birth", "address", "cnic_number", "cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url", "document_type"]);
+    const existing = await env.DB.prepare(
+      "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC LIMIT 1"
+    ).bind(user.user_id).first();
+
+    if (existing && ["pending", "approved"].includes(String(existing.status || "").toLowerCase())) {
+      return json({
+        error: existing.status === "approved" ? "KYC is already approved for this user" : "KYC is already under review for this user",
+        code: existing.status === "approved" ? "KYC_ALREADY_APPROVED" : "KYC_ALREADY_PENDING",
+        submission: existing,
+      }, 409, origin);
+    }
+
+    if (existing && String(existing.status || "").toLowerCase() === "rejected") {
+      await env.DB.prepare(
+        "UPDATE kyc_submissions SET full_name = ?, date_of_birth = ?, address = ?, cnic_number = ?, cnic_front_url = ?, cnic_back_url = ?, selfie_url = ?, passport_url = ?, face_video_url = ?, document_type = ?, status = 'pending', rejection_reason = NULL, reviewed_at = NULL, reviewed_by = NULL, submitted_at = ? WHERE id = ? AND user_id = ?"
+      ).bind(record.full_name || null, record.date_of_birth || null, record.address || null, record.cnic_number || null, record.cnic_front_url || null, record.cnic_back_url || null, record.selfie_url || null, record.passport_url || null, record.face_video_url || null, record.document_type || null, now(), existing.id, user.user_id).run();
+      await env.DB.prepare("UPDATE users SET kyc_status = 'pending', updated_at = ? WHERE user_id = ?").bind(now(), user.user_id).run();
+      return json({ id: existing.id, user_id: user.user_id, ...record, status: "pending" }, 200, origin);
+    }
+
     const submissionId = body?.id || id();
     await env.DB.prepare(
       "INSERT INTO kyc_submissions (id, user_id, full_name, date_of_birth, address, cnic_number, cnic_front_url, cnic_back_url, selfie_url, passport_url, face_video_url, document_type, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
