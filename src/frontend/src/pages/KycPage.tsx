@@ -1,5 +1,6 @@
 // src/frontend/src/pages/KycPage.tsx
-// Replaces Supabase with Cloudflare Worker APIs
+// Givethra - Complete KYC Page with Camera, OCR, Selfie, and Video Recording
+// Fully functional with Cloudflare Worker APIs
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -65,15 +66,10 @@ export default function KycPage() {
   useEffect(() => {
     if (user) {
       loadSubmission();
-
-      // Poll every 30 seconds
       const interval = setInterval(loadSubmission, 30000);
-
-      // Also reload on focus/visibility
       const onFocus = () => loadSubmission();
       window.addEventListener("focus", onFocus);
       document.addEventListener("visibilitychange", onFocus);
-
       return () => {
         clearInterval(interval);
         window.removeEventListener("focus", onFocus);
@@ -110,7 +106,6 @@ export default function KycPage() {
       const s = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: target === "selfie" ? "user" : "environment",
-          // @ts-ignore
           advanced: [{ focusMode: "continuous" }],
         },
       });
@@ -197,11 +192,7 @@ export default function KycPage() {
           const digits = match[0].replace(/\D/g, "");
           const formatted = `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12, 13)}`;
           setOcrProcessing(false);
-          
-          // Auto-fill but keep field editable
           setForm(p => ({ ...p, cnic_number: formatted }));
-          
-          // Save the captured image
           finalizeCapture(capturedKind, capturedCanvas);
           toast.success(`CNIC number parh liya: ${formatted}. Agar galat hai to khud durust kar lein.`);
         } else {
@@ -221,7 +212,6 @@ export default function KycPage() {
         setCapturedKind(null);
       }
     } else {
-      // Back or Selfie - directly finalize
       finalizeCapture(capturedKind, capturedCanvas);
     }
   }
@@ -310,7 +300,6 @@ export default function KycPage() {
     }
   }
 
-  // Upload file using Cloudflare Worker API
   async function uploadFile(file: File, path: string): Promise<string> {
     try {
       const url = await uploadFileToStorage(file, path);
@@ -340,7 +329,6 @@ export default function KycPage() {
     setReapplying(true);
   }
 
-  // Validate CNIC format before submit
   function isValidCnic(cnic: string): boolean {
     const cleaned = cnic.replace(/-/g, "");
     return /^\d{13}$/.test(cleaned);
@@ -355,7 +343,6 @@ export default function KycPage() {
         toast.error("All CNIC fields, photos and selfie are required");
         return;
       }
-      // Validate CNIC number format
       if (!isValidCnic(form.cnic_number)) {
         toast.error("CNIC number must be 13 digits (format: 00000-0000000-0)");
         return;
