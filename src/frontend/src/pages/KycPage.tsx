@@ -106,7 +106,7 @@ export default function KycPage() {
       const s = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: target === "selfie" ? "user" : "environment",
-          advanced: [{ focusMode: "continuous" }],
+          advanced: [{ focusMode: "continuous" } as any],
         },
       });
 
