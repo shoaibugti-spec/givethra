@@ -240,8 +240,10 @@ export async function getKycSubmission(userId: string) {
     `${WORKER_URL}/api/kyc-submissions?user_id=${userId}&limit=1`,
     { headers: headers() }
   );
-  const data = await res.json();
-  return data[0] || null;
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || `KYC status request failed (${res.status})`);
+  const rows = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+  return rows[0] || null;
 }
 
 export async function insertKycSubmission(data: any) {
@@ -834,9 +836,9 @@ export async function deleteUserAccount(userId: string) {
 export async function getKycStatus(userId: string): Promise<{ status: string }> {
   try {
     const submission = await getKycSubmission(userId);
-    return { status: submission?.status || 'none' };
+    return { status: String(submission?.status || 'none').trim().toLowerCase() };
   } catch {
-    return { status: 'none' };
+    return { status: 'unknown' };
   }
 }
 

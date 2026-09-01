@@ -434,7 +434,7 @@ async function handleKyc(request, env, user, url, parts, origin) {
 
   if (request.method === "GET") {
     const rows = await env.DB.prepare(
-      "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC LIMIT ?"
+      "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC, rowid DESC LIMIT ?"
     ).bind(target, Number(url.searchParams.get("limit") || 50)).all();
     return json(rows.results || [], 200, origin);
   }
@@ -442,7 +442,7 @@ async function handleKyc(request, env, user, url, parts, origin) {
     const body = await readJson(request);
     const record = pick(body, ["full_name", "date_of_birth", "address", "cnic_number", "cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url", "document_type"]);
     const existing = await env.DB.prepare(
-      "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC LIMIT 1"
+      "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC, rowid DESC LIMIT 1"
     ).bind(user.user_id).first();
 
     if (existing && ["pending", "approved"].includes(String(existing.status || "").toLowerCase())) {
