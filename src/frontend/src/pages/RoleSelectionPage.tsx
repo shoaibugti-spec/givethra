@@ -11,12 +11,13 @@ import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 
 export default function RoleSelectionPage() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, setRole: setAuthRole } = useAuth();
   const { setRole } = useRole();
   const navigate = useNavigate();
 
   const handleRoleSelect = async (role: "hero" | "requester") => {
     setRole(role);
+    setAuthRole(role === "requester" ? "help_seeker" : "hero");
     if (!isAuthenticated) {
       navigate({ to: "/sign-in", search: { role } });
     } else {

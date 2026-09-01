@@ -81,11 +81,17 @@ import BottomNav from "@/components/BottomNav";
 // This component is rendered inside RouterProvider, so router hooks always have
 // an initialized router store available.
 function RootLayout() {
-  const { isAuthenticated, user } = useAuth();
-  const { role } = useRole();
+  const { isAuthenticated, user, role: authRole } = useAuth();
+  const { role, setRole } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (authRole === "hero" && role !== "hero") setRole("hero");
+    if (authRole === "help_seeker" && role !== "requester") setRole("requester");
+  }, [authRole, isAuthenticated, role, setRole]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {

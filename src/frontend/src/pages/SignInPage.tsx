@@ -1,13 +1,23 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRole } from "@/contexts/RoleContext";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Heart, Loader2 } from "lucide-react";
 import { useEffect } from "react";
 
 export default function SignInPage() {
   const navigate = useNavigate();
-  const { loginWithGoogle, isLoggingIn, isAuthenticated, loginError } = useAuth();
+  const { loginWithGoogle, isLoggingIn, isAuthenticated, loginError, setRole: setAuthRole } = useAuth();
+  const { setRole: setSelectedRole } = useRole();
+
+  useEffect(() => {
+    const selected = new URLSearchParams(window.location.search).get("role");
+    if (selected === "hero" || selected === "requester") {
+      setSelectedRole(selected);
+      setAuthRole(selected === "requester" ? "help_seeker" : "hero");
+    }
+  }, [setAuthRole, setSelectedRole]);
 
   useEffect(() => {
     if (isAuthenticated) navigate({ to: "/" });
