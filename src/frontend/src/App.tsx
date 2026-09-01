@@ -81,7 +81,7 @@ import BottomNav from "@/components/BottomNav";
 // This component is rendered inside RouterProvider, so router hooks always have
 // an initialized router store available.
 function RootLayout() {
-  const { isAuthenticated, user, role: authRole } = useAuth();
+  const { isAuthenticated, user, role: authRole, isAdmin } = useAuth();
   const { role, setRole } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
@@ -109,11 +109,11 @@ function RootLayout() {
           "/heroes-wall", "/kindness-wall", "/become-hero", "/need-help",
         ];
         const isPublicPath = publicPaths.includes(location.pathname);
-        if (kyc?.status !== "approved" && !isPublicPath && location.pathname !== "/kyc") {
+        if (!isAdmin && kyc?.status !== "approved" && !isPublicPath && location.pathname !== "/kyc") {
           if (!cancelled) navigate({ to: "/kyc" });
           return;
         }
-        if (kyc?.status === "approved") {
+        if (!isAdmin && kyc?.status === "approved") {
           const onboardingCompleted = await getOnboardingStatus(user.id);
           if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
             navigate({ to: "/onboarding" });
@@ -130,10 +130,10 @@ function RootLayout() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, user, location.pathname, navigate]);
+  }, [isAdmin, isAuthenticated, user, location.pathname, navigate]);
 
   useEffect(() => {
-    if (!role && !checkingOnboarding && isAuthenticated) {
+    if (!role && !isAdmin && !checkingOnboarding && isAuthenticated) {
       const publicPaths = [
         "/", "/sign-in", "/sign-up", "/kyc", "/onboarding", "/about", "/account-privacy",
         "/privacy", "/terms", "/community-guidelines", "/faq", "/contact", "/community",
@@ -143,7 +143,7 @@ function RootLayout() {
         navigate({ to: "/" });
       }
     }
-  }, [role, isAuthenticated, location.pathname, navigate, checkingOnboarding]);
+  }, [role, isAdmin, isAuthenticated, location.pathname, navigate, checkingOnboarding]);
 
   if (isAuthenticated && checkingOnboarding) {
     return <AppLoadingScreen />;
