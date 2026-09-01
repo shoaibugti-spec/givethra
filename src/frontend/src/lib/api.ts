@@ -345,9 +345,9 @@ export async function getCommunityPosts() {
     headers: { ...headers(), "X-Guest-ID": getGuestId() },
     cache: "no-store",
   });
-  const data = await res.json().catch(() => []);
+  const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error || `Community posts request failed (${res.status})`);
-  return data;
+  return Array.isArray(data) ? data : Array.isArray(data?.posts) ? data.posts : [];
 }
 
 export async function createCommunityPost(data: Record<string, unknown>) {
@@ -374,9 +374,9 @@ export async function toggleLike(postId: string) {
 
 export async function getPostComments(postId: string) {
   const res = await fetch(`${WORKER_URL}/api/community/posts/${encodeURIComponent(postId)}/comments`, { headers: headers() });
-  const data = await res.json().catch(() => []);
+  const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error || `Comments request failed (${res.status})`);
-  return data;
+  return Array.isArray(data) ? data : Array.isArray(data?.comments) ? data.comments : [];
 }
 
 export async function addComment(postId: string, comment: string) {
