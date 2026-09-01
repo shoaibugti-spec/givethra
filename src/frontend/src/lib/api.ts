@@ -41,6 +41,13 @@ function headers(): HeadersInit {
   };
 }
 
+async function readArrayResponse(res: Response): Promise<any[]> {
+  const data = await res.json().catch(() => null);
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.results)) return data.results;
+  return [];
+}
+
 // ---------- AUTH ----------
 export async function verifyToken(): Promise<{ valid: boolean; user?: any }> {
   const token = getAuthToken();
@@ -54,12 +61,12 @@ export async function verifyToken(): Promise<{ valid: boolean; user?: any }> {
 // ---------- CASES ----------
 export async function getApprovedCases() {
   const res = await fetch(`${WORKER_URL}/api/cases/approved`, { headers: headers() });
-  return res.json();
+  return readArrayResponse(res);
 }
 
 export async function getCasesByUser(userId: string) {
   const res = await fetch(`${WORKER_URL}/api/cases?user_id=${userId}`, { headers: headers() });
-  return res.json();
+  return readArrayResponse(res);
 }
 
 export async function getCaseById(id: string) {
@@ -75,7 +82,7 @@ export async function getCasesByIds(ids: string[]) {
     `${WORKER_URL}/api/cases/by-ids?ids=${ids.join(",")}`,
     { headers: headers() }
   );
-  return res.json();
+  return readArrayResponse(res);
 }
 
 export async function insertCaseSubmission(data: any) {
@@ -105,7 +112,7 @@ export async function getCaseUnlock(caseId: string, heroId: string) {
     `${WORKER_URL}/api/case-unlocks?case_id=${caseId}&hero_id=${heroId}`,
     { headers: headers() }
   );
-  const data = await res.json();
+  const data = await readArrayResponse(res);
   return data[0] || null;
 }
 
@@ -184,7 +191,7 @@ export async function getCaseUnlocksByHero(heroId: string) {
     `${WORKER_URL}/api/case-unlocks?hero_id=${heroId}`,
     { headers: headers() }
   );
-  return res.json();
+  return readArrayResponse(res);
 }
 
 export async function insertCaseUnlock(data: any) {
@@ -201,12 +208,12 @@ export async function getCaseResolutions(caseId: string, heroId?: string) {
   let url = `${WORKER_URL}/api/case-resolutions?case_id=${caseId}`;
   if (heroId) url += `&hero_id=${heroId}`;
   const res = await fetch(url, { headers: headers() });
-  return res.json();
+  return readArrayResponse(res);
 }
 
 export async function getCaseResolutionsByHero(heroId: string) {
   const res = await fetch(`${WORKER_URL}/api/case-resolutions?hero_id=${encodeURIComponent(heroId)}`, { headers: headers() });
-  return res.json();
+  return readArrayResponse(res);
 }
 
 export async function insertCaseResolution(data: any) {
