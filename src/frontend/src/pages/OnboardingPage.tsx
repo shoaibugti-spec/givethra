@@ -22,7 +22,7 @@ import {
   Unlock,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "motion-react";
+import { motion, AnimatePresence } from "motion";
 import { getKycStatus, getOnboardingStatus, setOnboardingStatus } from "@/lib/api";
 
 interface Slide {
@@ -193,7 +193,6 @@ export default function OnboardingPage() {
 
   const goToNext = async () => {
     if (isLastSlide) {
-      // Mark onboarding as completed
       try {
         if (user?.id) {
           await setOnboardingStatus(user.id, true);
