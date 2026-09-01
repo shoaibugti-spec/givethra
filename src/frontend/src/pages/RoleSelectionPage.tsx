@@ -8,7 +8,6 @@ import { useRole } from "@/contexts/RoleContext";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Heart, HandHelping, ShieldCheck, Users, Globe, Sparkles, Facebook, Instagram, Linkedin, Mail, MessageCircle } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect } from "react";
 
 const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
@@ -36,16 +35,9 @@ export default function RoleSelectionPage() {
       <div className="max-w-4xl w-full space-y-12">
         {/* Header with stats */}
         <div className="text-center space-y-4">
-  <div className="flex items-center justify-center gap-2">
-    <div className="h-12 w-12 rounded-xl bg-[#008fa1] flex items-center justify-center shadow-lg">
-      {/* پلس کے نشان کو G کے بالکل ساتھ جوڑنے کے لیے نیگیٹو مارجن (negative margin) استعمال کیا گیا ہے */}
-      <span className="text-white font-extrabold text-3xl tracking-tighter flex items-center">
-        G<span className="-ml-1 text-2xl font-bold">+</span>
-      </span>
-    </div>
-  </div>
-</div>
-            <span className="text-2xl font-bold text-foreground">Givethra</span>
+          {/* ✅ Logo: صرف "Givethra" سادہ متن */}
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-3xl font-bold text-foreground">Givethra</span>
           </div>
           <div className="flex justify-center gap-8 text-sm font-medium text-muted-foreground">
             <span className="flex items-center gap-1">
@@ -75,7 +67,7 @@ export default function RoleSelectionPage() {
 
         {/* Role Cards */}
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Become a Hero */}
+          {/* Become a Hero (دل کا آئیکن ہٹا دیا) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -97,7 +89,7 @@ export default function RoleSelectionPage() {
             </div>
           </motion.div>
 
-          {/* Request Help */}
+          {/* Request Help → اب عنوان "Requester" ہے */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -108,7 +100,7 @@ export default function RoleSelectionPage() {
               <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
                 <HandHelping className="h-8 w-8 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold text-foreground">Request Help</h2>
+              <h2 className="text-2xl font-bold text-foreground">Requester</h2>
               <p className="text-sm text-muted-foreground">
                 Facing a difficult time? You are not alone. Submit your request with complete details. Get help from verified Heroes around the world.
               </p>
@@ -148,6 +140,7 @@ export default function RoleSelectionPage() {
           </div>
         </div>
 
+        {/* Footer Section */}
         <section className="py-10 px-4 bg-card border-t border-border">
           <div className="max-w-2xl mx-auto text-center space-y-5">
             <div className="space-y-1">
@@ -169,6 +162,7 @@ export default function RoleSelectionPage() {
             <p className="text-xs text-muted-foreground pt-1">© {new Date().getFullYear()} Givethra. All rights reserved.</p>
           </div>
         </section>
+
         <div className="text-center text-xs text-muted-foreground pt-4">
           <p>"Be the reason someone believes in kindness."</p>
           <p className="mt-2">givethra.org</p>
