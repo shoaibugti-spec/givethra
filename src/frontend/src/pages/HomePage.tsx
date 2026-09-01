@@ -50,7 +50,7 @@ import {
   Stethoscope,
   ShoppingCart,
 } from "lucide-react";
-import { motion } from "motion-react";
+import { motion } from "motion";
 import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 import {
