@@ -169,9 +169,9 @@ export default function MyCasesPage() {
   const [loading, setLoading] = useState(true);
   const [heroName, setHeroName] = useState("Verified Hero");
 
-  const [myCaseStatusFilter, setMyCaseStatusFilter] = useState("pending");
+  const [myCaseStatusFilter, setMyCaseStatusFilter] = useState("completed");
   const [helpTypeFilter, setHelpTypeFilter] = useState("contribution");
-  const [helpStatusFilter, setHelpStatusFilter] = useState("pending");
+  const [helpStatusFilter, setHelpStatusFilter] = useState("completed");
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -484,7 +484,7 @@ export default function MyCasesPage() {
 
             {/* My Help Tab */}
             <TabsContent value="myhelp" className="space-y-4 mt-4">
-              <Tabs value={helpTypeFilter} onValueChange={(val) => { setHelpTypeFilter(val); setHelpStatusFilter("pending"); }} className="w-full">
+              <Tabs value={helpTypeFilter} onValueChange={(val) => { setHelpTypeFilter(val); setHelpStatusFilter("completed"); }} className="w-full">
                 <TabsList className="grid grid-cols-2 w-full">
                   <TabsTrigger value="contribution">🤝 Contribution</TabsTrigger>
                   <TabsTrigger value="direct">🦸 Direct Help</TabsTrigger>
