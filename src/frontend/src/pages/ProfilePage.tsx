@@ -171,7 +171,7 @@ export default function ProfilePage() {
   const [heroesCount, setHeroesCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [supportsCount, setSupportsCount] = useState(0);
-  const [relationshipType, setRelationshipType] = useState<"heroes" | "requesters" | null>(null);
+  const [relationshipType, setRelationshipType] = useState<"heroes" | "requesters" | "supporters" | null>(null);
   const [relationshipUsers, setRelationshipUsers] = useState<any[]>([]);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
 
@@ -307,7 +307,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function openRelationshipList(type: "heroes" | "requesters") {
+  async function openRelationshipList(type: "heroes" | "requesters" | "supporters") {
     setRelationshipType(type);
     setRelationshipLoading(true);
     try {
@@ -354,6 +354,7 @@ export default function ProfilePage() {
 
   const menuItems = [
     { icon: <Pencil className="h-5 w-5" />, label: "Edit Profile", to: "/edit-profile" },
+    { icon: <MessageCircle className="h-5 w-5" />, label: "Community", to: "/community" },
     { icon: <Briefcase className="h-5 w-5" />, label: "My Cases Dashboard", to: "/my-cases" },
     { icon: <Bell className="h-5 w-5" />, label: "Notifications", to: "/notifications" },
     { icon: <Wallet className="h-5 w-5" />, label: "Wallet", to: "/wallet" },
@@ -533,11 +534,15 @@ export default function ProfilePage() {
                 <span className="text-lg font-bold text-foreground leading-tight">{followingCount}</span>
                 <span className="text-[11px] text-muted-foreground">Heroes</span>
               </button>
-              <div className="flex flex-col items-center gap-0.5">
+              <button
+                onClick={() => openRelationshipList("supporters")}
+                className="flex flex-col items-center gap-0.5 hover:opacity-70 transition-opacity"
+                aria-label="View Supporters"
+              >
                 <Gift className="h-3.5 w-3.5 text-amber-600" />
                 <span className="text-lg font-bold text-amber-600 leading-tight">{supportsCount.toLocaleString()}</span>
                 <span className="text-[11px] text-muted-foreground">Supports</span>
-              </div>
+              </button>
             </div>
 
             {/* Verification Badges */}
@@ -900,30 +905,43 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Relationship List Dialog (Requesters / Heroes) */}
+      {/* Relationship List Dialog (Requesters / Heroes / Supporters) */}
       <Dialog open={relationshipType !== null} onOpenChange={(open) => !open && setRelationshipType(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{relationshipType === "heroes" ? "Your Heroes" : "Your Requesters"}</DialogTitle>
+            <DialogTitle>
+              {relationshipType === "heroes" ? "Your Heroes" : relationshipType === "supporters" ? "Your Supporters" : "Your Requesters"}
+            </DialogTitle>
             <DialogDescription>
-              {relationshipType === "heroes" ? "People you have chosen as Heroes." : "People who have chosen you as their Hero."}
+              {relationshipType === "heroes"
+                ? "People you have chosen as Heroes."
+                : relationshipType === "supporters"
+                ? "People who have sent Support to your posts."
+                : "People who have chosen you as their Hero."}
+              {!relationshipLoading && relationshipUsers.length > 0 && (
+                <span className="block mt-0.5 text-xs font-medium text-foreground">{relationshipUsers.length} total</span>
+              )}
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[55vh] overflow-y-auto space-y-2">
+          {/* Scrolls internally — however many people there are, the list
+              stays reachable instead of overflowing the dialog. */}
+          <div className="max-h-[55vh] overflow-y-auto space-y-2 pr-1">
             {relationshipLoading ? (
               <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
             ) : relationshipUsers.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">No {relationshipType} yet.</p>
             ) : (
-              relationshipUsers.map((item) => {
-                const name = item.full_name || "User";
+              relationshipUsers.map((item, idx) => {
+                const userId = item.user_id ?? item.id ?? item.hero_id ?? item.requester_id ?? item.supporter_id ?? "";
+                const name = item.full_name ?? item.name ?? item.user_name ?? "Givethra User";
                 const initials2 = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
+                const supportCount = item.support_count ?? item.supports ?? null;
                 return (
-                  <div key={item.user_id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                  <div key={String(userId || idx)} className="flex items-center gap-3 rounded-xl border border-border p-3">
                     <button
                       onClick={() => {
                         setRelationshipType(null);
-                        navigate({ to: "/profile/$id", params: { id: String(item.user_id) } });
+                        if (userId) navigate({ to: "/profile/$id", params: { id: String(userId) } });
                       }}
                       className="h-10 w-10 rounded-full overflow-hidden bg-primary text-white flex items-center justify-center font-semibold shrink-0"
                     >
@@ -936,15 +954,20 @@ export default function ProfilePage() {
                     <button
                       onClick={() => {
                         setRelationshipType(null);
-                        navigate({ to: "/profile/$id", params: { id: String(item.user_id) } });
+                        if (userId) navigate({ to: "/profile/$id", params: { id: String(userId) } });
                       }}
-                      className="flex-1 text-left font-medium truncate"
+                      className="flex-1 text-left min-w-0"
                     >
-                      {name}
-                      {item.is_verified ? <span className="ml-1 text-teal-600">✓</span> : null}
+                      <span className="font-medium truncate block">
+                        {name}
+                        {item.is_verified ? <span className="ml-1 text-teal-600">✓</span> : null}
+                      </span>
+                      {relationshipType === "supporters" && supportCount !== null && (
+                        <span className="text-[11px] text-muted-foreground">Supported {supportCount}x</span>
+                      )}
                     </button>
-                    {isOwnProfile && (
-                      <Button variant="outline" size="sm" onClick={() => removeRelationship(String(item.user_id))}>
+                    {isOwnProfile && relationshipType !== "supporters" && (
+                      <Button variant="outline" size="sm" onClick={() => removeRelationship(String(userId))}>
                         {relationshipType === "heroes" ? "Unhero" : "Remove"}
                       </Button>
                     )}
