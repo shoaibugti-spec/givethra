@@ -313,6 +313,7 @@ export default function ProfilePage() {
   ];
 
   const menuItems = [
+    { icon: <Pencil className="h-5 w-5" />, label: "Edit Profile", to: "/edit-profile" },
     { icon: <Briefcase className="h-5 w-5" />, label: "My Cases Dashboard", to: "/my-cases" },
     { icon: <Bell className="h-5 w-5" />, label: "Notifications", to: "/notifications" },
     { icon: <Wallet className="h-5 w-5" />, label: "Wallet", to: "/wallet" },
@@ -378,7 +379,7 @@ export default function ProfilePage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3 flex-wrap min-w-0">
-                  <h1 className="text-xl font-bold text-foreground">{displayName}</h1>
+                  <h1 className="text-xl font-bold text-foreground truncate">{displayName}</h1>
                 {badge && role === "hero" && (
                   <div className="flex items-center gap-1">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
@@ -404,7 +405,7 @@ export default function ProfilePage() {
                   </div>
                 )}
                 </div>
-                {isOwnProfile && <button type="button" onClick={() => navigate({ to: "/edit-profile" })} className="h-9 w-9 shrink-0 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" aria-label="Edit Profile"><Pencil className="h-4 w-4 text-muted-foreground" /></button>}
+                {isOwnProfile && <button type="button" onClick={() => navigate({ to: "/edit-profile" })} title="Edit Profile" className="h-9 w-9 shrink-0 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" aria-label="Edit Profile"><Pencil className="h-4 w-4 text-muted-foreground" /></button>}
               </div>
               {(profile?.city || profile?.country) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
