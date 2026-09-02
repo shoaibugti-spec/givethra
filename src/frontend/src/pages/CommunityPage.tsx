@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Heart, MessageCircle, Send, User, Loader2, CheckCircle2, Share2, Repeat, Users, Pin } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "@tanstack/react-router";
 import {
   getCommunityPosts,
   toggleLike,
@@ -101,6 +102,7 @@ function writeCachedCommunityPosts(posts: Post[]) {
 }
 
 export default function CommunityPage() {
+  const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const [posts, setPosts] = useState<Post[]>(readCachedCommunityPosts);
   const [loading, setLoading] = useState(() => readCachedCommunityPosts().length === 0);
@@ -444,12 +446,18 @@ export default function CommunityPage() {
               >
                 {/* Post Header */}
                 <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
-                    {post.avatar_url ? <img src={post.avatar_url} alt="" className="h-full w-full object-cover" /> : <User className="h-5 w-5 text-primary" />}
-                  </div>
+                  {post.user_id && !post.is_guest ? (
+                    <button type="button" aria-label={`Open ${post.display_name || "user"} profile`} onClick={() => navigate({ to: "/profile/$id", params: { id: String(post.user_id) } })} className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden hover:ring-2 hover:ring-primary/40 transition-all">
+                      {post.avatar_url ? <img src={post.avatar_url} alt={post.display_name || "User"} className="h-full w-full object-cover" /> : <User className="h-5 w-5 text-primary" />}
+                    </button>
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+                      {post.avatar_url ? <img src={post.avatar_url} alt="" className="h-full w-full object-cover" /> : <User className="h-5 w-5 text-primary" />}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-foreground">{post.display_name || "User"}</span>
+                      {post.user_id && !post.is_guest ? <button type="button" onClick={() => navigate({ to: "/profile/$id", params: { id: String(post.user_id) } })} className="font-semibold text-foreground hover:text-primary transition-colors text-left">{post.display_name || "User"}</button> : <span className="font-semibold text-foreground">{post.display_name || "User"}</span>}
                       {post.user_id && !post.is_guest && <button onClick={() => handleFollow(post)} className={`text-[10px] rounded-full px-2 py-0.5 font-semibold ${post.is_following ? "bg-primary/10 text-primary border border-primary/30" : "bg-primary text-primary-foreground"}`}>{post.is_following ? "Hero ✓" : "Hero"}</button>}
                       {post.is_guest ? (
                         <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Guest</span>
