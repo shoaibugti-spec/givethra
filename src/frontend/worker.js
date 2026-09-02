@@ -368,6 +368,7 @@ async function deductCredits(env, userId, amount, type, description, referenceId
 }
 
 async function addCredits(env, userId, amount, type, description, referenceId = null) {
+  if (type !== "deposit") throw new Error("Credits can only be created from an approved deposit");
   await env.DB.prepare(
     "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?"
   ).bind(amount, now(), userId).run();

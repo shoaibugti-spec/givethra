@@ -196,7 +196,7 @@ export default function WalletPage() {
         <div className="rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-white p-6 shadow-lg">
           <div className="flex items-center gap-2 mb-2">
             <Wallet className="h-5 w-5 opacity-80" />
-            <span className="text-sm opacity-90">Support Credits Balance</span>
+            <span className="text-sm opacity-90">Credits Balance</span>
           </div>
           <div className="text-4xl font-bold">{balance.toLocaleString()}</div>
           <div className="text-sm opacity-80 mt-1">
