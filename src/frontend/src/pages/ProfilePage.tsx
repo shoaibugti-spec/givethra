@@ -280,14 +280,13 @@ export default function ProfilePage() {
                   <span className="text-white font-bold text-3xl">{initials}</span>
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate({ to: "/edit-profile" })}
-                className="gap-1.5 h-8 text-xs rounded-xl mb-2"
-              >
-                <Pencil className="h-3.5 w-3.5" /> Edit Profile
-              </Button>
+              <button
+  onClick={() => navigate({ to: "/edit-profile" })}
+  className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors"
+  aria-label="Edit Profile"
+>
+  <Pencil className="h-4 w-4 text-muted-foreground" />
+</button>
             </div>
 
             <div className="space-y-1">
