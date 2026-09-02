@@ -214,8 +214,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loginWithGoogle = useCallback(() => {
+  const loginWithGoogle = useCallback(async () => {
+    if (isLoggingIn) return;
     clearLegacyBrowserState();
+    setLoginError(null);
+    setIsLoggingIn(true);
+    const deadline = Date.now() + 5000;
+    while (!(window as any).google?.accounts?.id && Date.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    }
     const googleIdentity = (window as any).google;
     if (!GOOGLE_CLIENT_ID || !googleIdentity?.accounts?.id) {
       const message = "Google sign-in is not ready yet. Please wait a moment and try again.";
@@ -225,8 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setLoginError(null);
-    setIsLoggingIn(true);
+
     if (!googleInitializedRef.current) {
       googleIdentity.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
@@ -255,7 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       });
     }, 30000);
-  }, [finishGoogleLogin]);
+  }, [finishGoogleLogin, isLoggingIn]);
 
   const handleLogout = useCallback(async () => {
     safeLocalRemove("auth_token");
