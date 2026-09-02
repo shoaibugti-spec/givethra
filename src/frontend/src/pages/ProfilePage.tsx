@@ -133,6 +133,7 @@ export default function ProfilePage() {
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [showLogout, setShowLogout] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
   const [heroesCount, setHeroesCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -329,7 +330,7 @@ export default function ProfilePage() {
 >
   <Pencil className="h-4 w-4 text-muted-foreground" />
 </button>
-              {isOwnProfile && <button aria-label="Profile menu" className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" onClick={() => navigate({ to: "/settings" })}><MoreHorizontal className="h-4 w-4" /></button>}
+              {isOwnProfile && <button aria-label="Profile menu" className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" onClick={() => setShowMenu(true)}><MoreHorizontal className="h-4 w-4" /></button>}
               </div>
             </div>
 
@@ -507,25 +508,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { icon: <Pencil className="h-4 w-4" />, label: "Edit Profile", to: "/edit-profile" },
-            { icon: <ShieldCheck className="h-4 w-4" />, label: "Security", to: "/security" },
-            { icon: <Settings className="h-4 w-4" />, label: "Settings", to: "/settings" },
-          ].map(({ icon, label, to }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => navigate({ to: to as "/" })}
-              className="flex flex-col items-center justify-center gap-1.5 py-3 rounded-2xl border border-border bg-card hover:bg-muted/50 transition-colors"
-            >
-              <span className="text-primary">{icon}</span>
-              <span className="text-xs font-medium text-foreground">{label}</span>
-            </button>
-          ))}
-        </div>
-
         {/* Contact Info */}
         <div className="rounded-2xl bg-card border border-border p-4">
           <div className="flex items-center gap-3">
@@ -551,23 +533,18 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Menu */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-          {menuItems.map((item, idx) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => navigate({ to: item.to as "/" })}
-              className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors ${
-                idx < menuItems.length - 1 ? "border-b border-border" : ""
-              }`}
-            >
-              <span className="text-primary">{item.icon}</span>
-              <span className="flex-1 text-left">{item.label}</span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-          ))}
-        </div>
+        <Dialog open={showMenu} onOpenChange={setShowMenu}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Account menu</DialogTitle><DialogDescription>Manage your profile and account settings.</DialogDescription></DialogHeader>
+            <div className="rounded-2xl border border-border overflow-hidden">
+              {menuItems.map((item, idx) => (
+                <button key={item.label} type="button" onClick={() => { setShowMenu(false); navigate({ to: item.to as "/" }); }} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors ${idx < menuItems.length - 1 ? "border-b border-border" : ""}`}>
+                  <span className="text-primary">{item.icon}</span><span className="flex-1 text-left">{item.label}</span><ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Logout */}
         <button
