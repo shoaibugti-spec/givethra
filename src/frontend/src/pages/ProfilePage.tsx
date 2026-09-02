@@ -53,6 +53,9 @@ import {
   getProfile,
   getCaseResolutionsByHero,
   getCaseUnlocksByHero,
+  getFollowList,
+  unfollowUser,
+  removeRequester,
 } from "@/lib/api";
 import {
   Tooltip,
@@ -133,6 +136,9 @@ export default function ProfilePage() {
   const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
   const [heroesCount, setHeroesCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [relationshipType, setRelationshipType] = useState<"heroes" | "requesters" | null>(null);
+  const [relationshipUsers, setRelationshipUsers] = useState<any[]>([]);
+  const [relationshipLoading, setRelationshipLoading] = useState(false);
 
   // Stats for all users
   const [caseStats, setCaseStats] = useState({
@@ -229,6 +235,32 @@ export default function ProfilePage() {
     }
   }
 
+  async function openRelationshipList(type: "heroes" | "requesters") {
+    setRelationshipType(type);
+    setRelationshipLoading(true);
+    try {
+      setRelationshipUsers(await getFollowList(profileUserId, type));
+    } catch (error) {
+      console.error("Failed to load relationship list", error);
+      setRelationshipUsers([]);
+    } finally {
+      setRelationshipLoading(false);
+    }
+  }
+
+  async function removeRelationship(targetId: string) {
+    if (!isOwnProfile) return;
+    try {
+      if (relationshipType === "heroes") await unfollowUser(targetId);
+      if (relationshipType === "requesters") await removeRequester(targetId);
+      setRelationshipUsers((items) => items.filter((item) => String(item.user_id) !== String(targetId)));
+      if (relationshipType === "heroes") setFollowingCount((count) => Math.max(0, count - 1));
+      if (relationshipType === "requesters") setHeroesCount((count) => Math.max(0, count - 1));
+    } catch (error) {
+      console.error("Failed to remove relationship", error);
+    }
+  }
+
   const kycApproved = kycData?.status === "approved";
   const displayName = profile?.full_name || user?.fullName || "My Profile";
   const avatarUrl = profile?.avatar_url || null;
@@ -287,8 +319,8 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center gap-2">
               <div className="flex items-center gap-3 mr-2">
-                <button onClick={() => navigate({ to: "/profile/$id", params: { id: user?.id || "" } })} className="text-center hover:opacity-70 transition-opacity"><span className="block text-xl font-bold text-primary">{heroesCount}</span><span className="text-xs text-muted-foreground">Heroes</span></button>
-                <button onClick={() => navigate({ to: "/profile/$id", params: { id: user?.id || "" } })} className="text-center hover:opacity-70 transition-opacity"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Following</span></button>
+                <button onClick={() => openRelationshipList("requesters")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Requesters"><span className="block text-xl font-bold text-primary">{heroesCount}</span><span className="text-xs text-muted-foreground">Requesters</span></button>
+                <button onClick={() => openRelationshipList("heroes")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Heroes"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Heroes</span></button>
               </div>
               <button
   onClick={() => navigate({ to: "/edit-profile" })} disabled={!isOwnProfile}
@@ -623,6 +655,27 @@ export default function ProfilePage() {
           <DialogFooter>
             <Button onClick={() => setBadgeInfoOpen(false)}>Got it</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={relationshipType !== null} onOpenChange={(open) => !open && setRelationshipType(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{relationshipType === "heroes" ? "Your Heroes" : "Your Requesters"}</DialogTitle>
+            <DialogDescription>{relationshipType === "heroes" ? "People you have chosen as Heroes." : "People who have chosen you as their Hero."}</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[55vh] overflow-y-auto space-y-2">
+            {relationshipLoading ? <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p> : relationshipUsers.length === 0 ? <p className="text-sm text-muted-foreground py-6 text-center">No {relationshipType} yet.</p> : relationshipUsers.map((item) => {
+              const name = item.full_name || "User";
+              const initials = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
+              return <div key={item.user_id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <button onClick={() => { setRelationshipType(null); navigate({ to: "/profile/$id", params: { id: String(item.user_id) } }); }} className="h-10 w-10 rounded-full overflow-hidden bg-primary text-white flex items-center justify-center font-semibold shrink-0">
+                  {item.avatar_url ? <img src={item.avatar_url} alt={name} className="h-full w-full object-cover" /> : initials}
+                </button>
+                <button onClick={() => { setRelationshipType(null); navigate({ to: "/profile/$id", params: { id: String(item.user_id) } }); }} className="flex-1 text-left font-medium truncate">{name}{item.is_verified ? <span className="ml-1 text-teal-600">✓</span> : null}</button>
+                {isOwnProfile && <Button variant="outline" size="sm" onClick={() => removeRelationship(String(item.user_id))}>{relationshipType === "heroes" ? "Unhero" : "Remove"}</Button>}
+              </div>;
+            })}
+          </div>
         </DialogContent>
       </Dialog>
     </Layout>
