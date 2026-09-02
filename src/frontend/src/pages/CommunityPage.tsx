@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Heart, MessageCircle, Send, User, Loader2, CheckCircle2, Share2 } from "lucide-react";
+import { Heart, MessageCircle, Send, User, Loader2, CheckCircle2, Share2, Repeat, Users, Pin } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -14,6 +14,8 @@ import {
   getPostComments,
   createCommunityPost,
   getGuestId,
+  followUser,
+  unfollowUser,
 } from "@/lib/api";
 
 interface Post {
@@ -27,6 +29,10 @@ interface Post {
   likes_count?: number;
   comments_count?: number;
   is_liked?: boolean;
+  avatar_url?: string | null;
+  is_following?: boolean;
+  repost_count?: number;
+  is_pinned?: boolean;
 }
 
 interface Comment {
@@ -104,12 +110,10 @@ export default function CommunityPage() {
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [liking, setLiking] = useState<string | null>(null);
   const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({});
-  const [feedTab, setFeedTab] = useState<"for-you" | "my-posts">("for-you");
+  const [feedTab, setFeedTab] = useState<"for-you" | "my-heroes" | "my-posts">("for-you");
 
   const currentActorId = isAuthenticated && user?.id ? user.id : `guest:${getGuestId()}`;
-  const visiblePosts = feedTab === "for-you"
-    ? posts
-    : posts.filter((post) => post.user_id === currentActorId || (post.is_guest && !isAuthenticated && post.user_id === currentActorId));
+  const visiblePosts = posts;
 
   // New post state
   const [newPost, setNewPost] = useState("");
@@ -119,7 +123,7 @@ export default function CommunityPage() {
   const fetchPosts = async (showLoader = false) => {
     if (showLoader && posts.length === 0) setLoading(true);
     try {
-      const data = await getCommunityPosts();
+      const data = await getCommunityPosts(feedTab);
       const nextPosts = Array.isArray(data) ? data.map(normalizeCachedPost) : [];
       setPosts(nextPosts);
       setLikeCounts((prev) => {
@@ -286,7 +290,7 @@ export default function CommunityPage() {
       clearInterval(interval);
       window.removeEventListener("post-updated", handlePostUpdate);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, feedTab]);
 
   // --- شیئر کرنا ---
   const handleShare = (postId: string) => {
@@ -306,6 +310,25 @@ export default function CommunityPage() {
     }
   };
 
+  const handleRepost = async (post: Post) => {
+    const comment = window.prompt("Add a comment to your Support (optional):", "");
+    if (comment === null) return;
+    try {
+      await createCommunityPost({ message: "", role: "hero", repost_id: post.id, repost_comment: comment.trim() });
+      toast.success("Post supported and shared");
+      await fetchPosts(false);
+    } catch (error: any) { toast.error(error?.message || "Unable to support this post"); }
+  };
+
+  const handleFollow = async (post: Post) => {
+    if (!post.user_id) return;
+    if (!isAuthenticated) { window.location.href = "/sign-in"; return; }
+    try {
+      if (post.is_following) await unfollowUser(post.user_id); else await followUser(post.user_id);
+      setPosts((prev) => prev.map((item) => item.user_id === post.user_id ? { ...item, is_following: !post.is_following } : item));
+    } catch (error: any) { toast.error(error?.message || "Unable to update Hero status"); }
+  };
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
@@ -320,7 +343,7 @@ export default function CommunityPage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Community post feeds">
+        <div className="grid grid-cols-3 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Community post feeds">
           <button
             type="button"
             role="tab"
@@ -329,6 +352,15 @@ export default function CommunityPage() {
             className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${feedTab === "for-you" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
             For You
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={feedTab === "my-heroes"}
+            onClick={() => setFeedTab("my-heroes")}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${feedTab === "my-heroes" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Users className="inline h-4 w-4 mr-1" /> My Heroes
           </button>
           <button
             type="button"
@@ -401,7 +433,7 @@ export default function CommunityPage() {
         ) : visiblePosts.length === 0 ? (
           <div className="text-center py-16 border rounded-2xl bg-muted/10">
             <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">{feedTab === "my-posts" ? "You have not shared a post yet." : "No posts yet. Be the first to share!"}</p>
+            <p className="text-muted-foreground">{feedTab === "my-posts" ? "You have not shared a post yet." : feedTab === "my-heroes" ? "Follow Heroes to see their posts here." : "No posts yet. Be the first to share!"}</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -412,14 +444,13 @@ export default function CommunityPage() {
               >
                 {/* Post Header */}
                 <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <User className="h-5 w-5 text-primary" />
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+                    {post.avatar_url ? <img src={post.avatar_url} alt="" className="h-full w-full object-cover" /> : <User className="h-5 w-5 text-primary" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-foreground">
-                        {post.display_name || "User"}
-                      </span>
+                      <span className="font-semibold text-foreground">{post.display_name || "User"}</span>
+                      {post.user_id && !post.is_guest && <button onClick={() => handleFollow(post)} className={`text-[10px] rounded-full px-2 py-0.5 font-semibold ${post.is_following ? "bg-primary/10 text-primary border border-primary/30" : "bg-primary text-primary-foreground"}`}>{post.is_following ? "Hero ✓" : "Hero"}</button>}
                       {post.is_guest ? (
                         <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Guest</span>
                       ) : (
@@ -465,6 +496,8 @@ export default function CommunityPage() {
                     <MessageCircle className="h-5 w-5" />
                     <span className="font-medium">{post.comments_count ?? post.comments?.length ?? 0}</span>
                   </button>
+
+                  <button onClick={() => handleRepost(post)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"><Repeat className="h-5 w-5" /><span className="text-xs">{post.repost_count || 0} Support</span></button>
 
                   <button
                     onClick={() => handleShare(post.id)}

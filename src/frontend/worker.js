@@ -379,7 +379,7 @@ async function addCredits(env, userId, amount, type, description, referenceId = 
 // ============================================================
 async function handleProfile(request, env, user, parts, origin) {
   const userId = String(parts[2] || user.user_id || "");
-  if (!userId || !canAccessUser(user, userId)) return json({ error: "Forbidden" }, 403, origin);
+  if (!userId || (request.method !== "GET" && !canAccessUser(user, userId))) return json({ error: "Forbidden" }, 403, origin);
   const queryRole = String(new URL(request.url).searchParams.get("profile_role") || "").toLowerCase();
   const profileRole = queryRole === "hero" || queryRole === "requester" ? queryRole : (user?.role === "hero" ? "hero" : "requester");
   const allowedFields = ["full_name", "phone_number", "country", "city", "bio", "preferred_language", "avatar_url", "cover_url"];
@@ -387,10 +387,19 @@ async function handleProfile(request, env, user, parts, origin) {
   if (request.method === "GET") {
     try {
       const variant = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
-      if (variant) return json({ ...variant, user_id: userId, profile_role: profileRole }, 200, origin);
+      if (variant) {
+        const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
+        const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
+        const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
+        return json({ ...variant, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
+      }
     } catch { /* migration is additive; use legacy profile until applied */ }
     const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
-    return json({ ...(profile || {}), user_id: userId, profile_role: profileRole }, 200, origin);
+    const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
+    const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
+    const activeCase = profileRole === "requester" ? await env.DB.prepare("SELECT * FROM case_submissions WHERE user_id=? AND lower(COALESCE(status,'')) IN ('approved','open','in_progress') ORDER BY submitted_at DESC LIMIT 1").bind(userId).first() : null;
+    const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
+    return json({ ...(profile || {}), user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), is_following:Boolean(following), posts:posts.results||[], active_case:activeCase||null }, 200, origin);
   }
   if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
   const body = await readJson(request);
@@ -778,74 +787,51 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
   if (request.method === "GET" && parts.length === 3) {
     const guest = user ? null : guestIdentity(request);
     const actorId = user?.user_id || guest?.id || "";
+    const tab = url.searchParams.get("tab") || "for-you";
+    let filter = "";
+    const binds = [actorId, actorId];
+    if (tab === "my-heroes" && user) { filter = "WHERE cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)"; binds.push(user.user_id); }
+    if (tab === "my-posts" && user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
     const posts = await env.DB.prepare(
-      `WITH like_counts AS (
-         SELECT post_id,
-           COUNT(*) AS likes_count,
-           MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked
-         FROM community_post_likes
-         GROUP BY post_id
-       ), comment_counts AS (
-         SELECT post_id, COUNT(*) AS comments_count
-         FROM community_post_comments
-         GROUP BY post_id
-       )
-       SELECT cp.*,
-        u.full_name as user_name,
-        u.kyc_status as user_kyc_status,
-        COALESCE(lc.likes_count, 0) AS likes_count,
-        COALESCE(cc.comments_count, 0) AS comments_count,
-        COALESCE(lc.is_liked, 0) AS is_liked
-       FROM community_posts cp
-       LEFT JOIN users u ON cp.user_id = u.user_id
-       LEFT JOIN like_counts lc ON lc.post_id = cp.id
-       LEFT JOIN comment_counts cc ON cc.post_id = cp.id
-       ORDER BY cp.created_at DESC
-       LIMIT 500`
-    ).bind(actorId).all();
-
-    return json((posts.results || []).map((post) => ({
-      ...post,
-      is_guest: !post.user_id,
-      display_name: publicDisplayName(post.user_name, publicDisplayName(post.display_name, "User")),
-      is_verified: post.user_kyc_status === "approved",
-      likes_count: Number(post.likes_count || 0),
-      comments_count: Number(post.comments_count || 0),
-      is_liked: Boolean(post.is_liked),
-    })), 200, origin);
+      `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),
+       comment_counts AS (SELECT post_id, COUNT(*) AS comments_count FROM community_post_comments GROUP BY post_id),
+       repost_counts AS (SELECT repost_id, COUNT(*) AS repost_count FROM community_posts WHERE repost_id IS NOT NULL GROUP BY repost_id)
+       SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, p.avatar_url,
+       COALESCE(lc.likes_count,0) AS likes_count, COALESCE(cc.comments_count,0) AS comments_count, COALESCE(lc.is_liked,0) AS is_liked,
+       COALESCE(rc.repost_count,0) AS repost_count,
+       CASE WHEN cp.user_id IS NOT NULL AND cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 1 ELSE 0 END AS is_following
+       FROM community_posts cp LEFT JOIN users u ON cp.user_id=u.user_id LEFT JOIN profiles p ON p.user_id=cp.user_id
+       LEFT JOIN like_counts lc ON lc.post_id=cp.id LEFT JOIN comment_counts cc ON cc.post_id=cp.id LEFT JOIN repost_counts rc ON rc.repost_id=cp.id
+       ${filter} ORDER BY (COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 2) DESC, cp.created_at DESC LIMIT 500`
+    ).bind(...binds).all();
+    return json((posts.results || []).map((post) => ({ ...post, is_guest: !post.user_id, display_name: publicDisplayName(post.user_name, publicDisplayName(post.display_name,"User")), is_verified: post.user_kyc_status === "approved", likes_count: Number(post.likes_count||0), comments_count: Number(post.comments_count||0), repost_count: Number(post.repost_count||0), is_liked: Boolean(post.is_liked), is_following: Boolean(post.is_following) })), 200, origin);
   }
 
   if (request.method === "POST" && parts.length === 3) {
     const body = await readJson(request);
     const message = String(body?.message || "").trim();
-    if (!message) return json({ error: "Message is required" }, 400, origin);
+    const repostId = body?.repost_id ? String(body.repost_id) : null;
+    if (!message && !repostId) return json({ error: "Message or repost ID required" }, 400, origin);
     const guest = user ? null : guestIdentity(request, body);
     if (!user && !guest) return json({ error: "Guest identity is required" }, 400, origin);
     const postId = id();
-    const displayName = user
-      ? publicDisplayName(user.full_name, "User")
-      : guest.name;
-    await env.DB.prepare(
-      `INSERT INTO community_posts (id, user_id, display_name, message, created_at)
-       VALUES (?, ?, ?, ?, ?)`
-    ).bind(postId, user?.user_id || null, displayName, message, now()).run();
+    const displayName = user ? publicDisplayName(user.full_name,"User") : guest.name;
+    let finalMessage = message;
+    if (repostId) { const original = await env.DB.prepare("SELECT display_name, message FROM community_posts WHERE id = ?").bind(repostId).first(); if (!original) return json({ error: "Original post not found" }, 404, origin); finalMessage = `${body?.repost_comment ? String(body.repost_comment).trim() + " — " : ""}Reposted from ${publicDisplayName(original.display_name,"User")}`; }
+    await env.DB.prepare(`INSERT INTO community_posts (id,user_id,display_name,message,role,repost_id,repost_comment,created_at) VALUES (?,?,?,?,?,?,?,?)`).bind(postId,user?.user_id||guest.id,displayName,finalMessage,body?.role||null,repostId,body?.repost_comment||null,now()).run();
+    if (repostId) { const original = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(repostId).first(); if (original?.user_id) await insertCommunityNotification(env,ctx,original.user_id,user?.user_id||guest.id,displayName,"repost","Post Supported","supported your post"); }
+    return json({ id: postId, user_id: user?.user_id || guest.id, display_name: displayName, message: finalMessage, repost_id: repostId, is_guest: !user, likes_count: 0, comments_count: 0, repost_count: 0 }, 201, origin);
+  }
 
-    const newPost = await env.DB.prepare(
-      `SELECT cp.*, u.full_name as user_name, u.kyc_status as user_kyc_status
-       FROM community_posts cp
-       LEFT JOIN users u ON cp.user_id = u.user_id
-       WHERE cp.id = ?`
-    ).bind(postId).first();
-
-    return json({
-      ...newPost,
-      is_guest: !user,
-      display_name: displayName,
-      is_verified: newPost?.user_kyc_status === "approved",
-      likes_count: 0,
-      comments_count: 0,
-      comments: [],
-    }, 201, origin);
+  if (request.method === "POST" && parts[3] === "pin") {
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    const body = await readJson(request); const postId = body?.post_id;
+    const post = await env.DB.prepare("SELECT user_id, is_pinned FROM community_posts WHERE id = ?").bind(postId).first();
+    if (!post || post.user_id !== user.user_id) return json({ error: "You can only pin your own post" }, 403, origin);
+    const next = post.is_pinned ? 0 : 1;
+    await env.DB.prepare("UPDATE community_posts SET is_pinned = 0 WHERE user_id = ?").bind(user.user_id).run();
+    await env.DB.prepare("UPDATE community_posts SET is_pinned = ? WHERE id = ?").bind(next, postId).run();
+    return json({ success: true, is_pinned: Boolean(next) }, 200, origin);
   }
 
   return json({ error: "Method not allowed" }, 405, origin);
@@ -964,6 +950,21 @@ async function handleCommunityComments(request, env, user, url, parts, origin, c
   }
 
   return json({ error: "Method not allowed" }, 405, origin);
+}
+
+
+async function handleFollow(request, env, user, url, parts, origin, ctx) {
+  const targetId = (await readJson(request).catch(() => ({})))?.target_user_id || url.searchParams.get("target") || url.searchParams.get("user");
+  if (!targetId) return json({ error: "Target user ID required" }, 400, origin);
+  if (request.method === "GET") {
+    if (parts[2] === "status") { const row = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,targetId).first() : null; return json({ isFollowing: Boolean(row) },200,origin); }
+    const followers = await env.DB.prepare("SELECT COUNT(*) AS count FROM follows WHERE following_id=?").bind(targetId).first(); const following = await env.DB.prepare("SELECT COUNT(*) AS count FROM follows WHERE follower_id=?").bind(targetId).first(); return json({ followers:Number(followers?.count||0), following:Number(following?.count||0) },200,origin);
+  }
+  if (!user) return json({ error: "Authentication required" }, 401, origin);
+  if (targetId === user.user_id) return json({ error: "Cannot follow yourself" }, 400, origin);
+  if (request.method === "POST") { await env.DB.prepare("INSERT OR IGNORE INTO follows (id,follower_id,following_id,created_at) VALUES (?,?,?,?)").bind(id(),user.user_id,targetId,now()).run(); await insertCommunityNotification(env,ctx,targetId,user.user_id,user.full_name,"new_follower","New Hero","became your Hero"); return json({ success:true, isFollowing:true },201,origin); }
+  if (request.method === "DELETE") { await env.DB.prepare("DELETE FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,targetId).run(); return json({ success:true, isFollowing:false },200,origin); }
+  return json({ error: "Method not allowed" },405,origin);
 }
 
 // ============================================================
@@ -1160,6 +1161,11 @@ async function handleRequest(request, env, ctx) {
     const rows = await env.DB.prepare("SELECT fc.*, u.full_name as user_name FROM feedback_comments fc LEFT JOIN users u ON fc.user_id = u.user_id").all();
     return json(rows.results || [], 200, origin);
   }
+  if (parts[0] === "api" && parts[1] === "follow") {
+    const followUser = await authenticate(request, env, googleClientId(env));
+    return handleFollow(request, env, followUser, url, parts, origin, ctx);
+  }
+
   if (parts[0] === "api" && parts[1] === "community") {
     const user = await authenticate(request, env, googleClientId(env));
     if (parts[2] === "mark-read" && request.method === "PUT") {
