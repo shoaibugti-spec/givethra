@@ -39,20 +39,6 @@ export default function RoleSelectionPage() {
           <div className="flex items-center justify-center gap-2">
             <span className="text-3xl font-bold text-foreground">Givethra</span>
           </div>
-          <div className="flex justify-center gap-8 text-sm font-medium text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Users className="h-4 w-4 text-primary" />
-              23,456+ <span className="hidden sm:inline">Heroes</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <Heart className="h-4 w-4 text-primary" />
-              19,873+ <span className="hidden sm:inline">Lives Helped</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <ShieldCheck className="h-4 w-4 text-primary" />
-              100% <span className="hidden sm:inline">Verified Cases</span>
-            </span>
-          </div>
           <div className="space-y-2">
             <h1 className="text-4xl md:text-5xl font-bold text-foreground">
               Real People. <br className="sm:hidden" />
@@ -79,6 +65,13 @@ export default function RoleSelectionPage() {
               <p className="text-sm text-muted-foreground">
                 Support someone in need and change a life. Be a part of a trusted community of helpers. Even a small help can make a big difference.
               </p>
+              <Link to="/community" className="group w-full rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left transition-all hover:border-primary/50 hover:bg-primary/10 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"><MessageCircle className="h-5 w-5" aria-hidden="true" /></div>
+                  <div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Givethra Community</p><p className="mt-1 text-sm font-semibold text-foreground">Share, discuss, and make an impact together.</p><p className="mt-1 text-xs text-muted-foreground">Open to guests and signed-in users: post, like, comment, and share.</p></div>
+                  <span className="text-primary transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+                </div>
+              </Link>
               <Button
                 size="lg"
                 className="w-full h-12 text-base font-semibold"
