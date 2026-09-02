@@ -3,6 +3,8 @@
 // Only English, no Urdu
 
 import { Button } from "@/components/ui/button";
+import HeroesWall from "@/components/HeroesWall";
+import KindnessWall from "@/components/KindnessWall";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -108,6 +110,12 @@ export default function RoleSelectionPage() {
             </div>
           </motion.div>
         </div>
+
+        {/* Public impact walls: available to guests and signed-in users */}
+        <section className="space-y-8 bg-background py-8" aria-label="Community impact walls">
+          <HeroesWall />
+          <KindnessWall />
+        </section>
 
         {/* Trust Badges */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-xs text-muted-foreground pt-4 border-t border-border">

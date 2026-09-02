@@ -1176,15 +1176,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="space-y-8 bg-background py-8" aria-label="Community impact">
-        <HeroesWall />
-        <KindnessWall />
-        <div className="mx-auto grid w-full max-w-3xl gap-3 px-4 sm:grid-cols-2">
-          <Link to="/heroes-wall" className="rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10"><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Completed impact</p><p className="mt-1 font-bold">Open Heroes Wall</p><p className="mt-1 text-sm text-muted-foreground">Browse verified completed help.</p></Link>
-          <Link to="/kindness-wall" className="rounded-2xl border border-primary/20 bg-primary/5 p-4 transition-colors hover:bg-primary/10"><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Approved feedback</p><p className="mt-1 font-bold">Open Kindness Wall</p><p className="mt-1 text-sm text-muted-foreground">Read approved seeker stories.</p></Link>
-        </div>
-      </section>
-
       <section className="max-w-3xl mx-auto px-4 pt-8">
         <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left">
