@@ -810,22 +810,28 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
     const actorId = user?.user_id || guest?.id || "";
     const tab = url.searchParams.get("tab") || "for-you";
     let filter = "";
-    const binds = [actorId, actorId];
+    const binds = [actorId, actorId, actorId];
     if (tab === "my-heroes" && user) { filter = "WHERE cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)"; binds.push(user.user_id); }
     if (tab === "my-posts" && user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
+    const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3)";
+    const heroBoost = "(CASE WHEN cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 100 ELSE 0 END)";
+    const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.created_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
+    const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
+    const orderBy = tab === "my-posts" ? "cp.created_at DESC" : tab === "my-heroes" ? `${heroBoost} DESC, ${engagementScore} DESC, cp.created_at DESC` : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC`;
+    if (tab !== "my-posts") binds.push(user?.user_id || actorId);
     const posts = await env.DB.prepare(
       `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),
        comment_counts AS (SELECT post_id, COUNT(*) AS comments_count FROM community_post_comments GROUP BY post_id),
        repost_counts AS (SELECT repost_id, COUNT(*) AS repost_count FROM community_posts WHERE repost_id IS NOT NULL GROUP BY repost_id)
-       SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, p.avatar_url,
+       SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, u.created_at AS user_created_at, p.avatar_url,
        COALESCE(lc.likes_count,0) AS likes_count, COALESCE(cc.comments_count,0) AS comments_count, COALESCE(lc.is_liked,0) AS is_liked,
        COALESCE(rc.repost_count,0) AS repost_count,
        CASE WHEN cp.user_id IS NOT NULL AND cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 1 ELSE 0 END AS is_following
        FROM community_posts cp LEFT JOIN users u ON cp.user_id=u.user_id LEFT JOIN profiles p ON p.user_id=cp.user_id
        LEFT JOIN like_counts lc ON lc.post_id=cp.id LEFT JOIN comment_counts cc ON cc.post_id=cp.id LEFT JOIN repost_counts rc ON rc.repost_id=cp.id
-       ${filter} ORDER BY (COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 2) DESC, cp.created_at DESC LIMIT 500`
+       ${filter} ORDER BY ${orderBy} LIMIT 500`
     ).bind(...binds).all();
-    return json((posts.results || []).map((post) => ({ ...post, is_guest: !post.user_id, display_name: publicDisplayName(post.user_name, publicDisplayName(post.display_name,"User")), is_verified: post.user_kyc_status === "approved", likes_count: Number(post.likes_count||0), comments_count: Number(post.comments_count||0), repost_count: Number(post.repost_count||0), is_liked: Boolean(post.is_liked), is_following: Boolean(post.is_following) })), 200, origin);
+    return json((posts.results || []).map((post) => ({ ...post, is_guest: !post.user_id, display_name: publicDisplayName(post.user_name, publicDisplayName(post.display_name,"User")), is_verified: post.user_kyc_status === "approved", is_new_creator: Boolean(post.user_created_at && (Date.now() - new Date(post.user_created_at).getTime()) <= 30 * 86400000), likes_count: Number(post.likes_count||0), comments_count: Number(post.comments_count||0), repost_count: Number(post.repost_count||0), is_liked: Boolean(post.is_liked), is_following: Boolean(post.is_following) })), 200, origin);
   }
 
   if (request.method === "POST" && parts.length === 3) {
