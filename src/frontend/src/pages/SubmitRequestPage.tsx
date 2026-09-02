@@ -154,7 +154,7 @@ const COMMON_GUIDE_TAIL = [
 // ===== SUSPENSION CONSTANTS =====
 const MAX_REJECTIONS_BEFORE_SUSPENSION = 5;
 const UNLOCK_CREDITS_REQUIRED = 5;
-const MAX_FREE_CASES = 2;
+const MAX_FREE_CASES = 2; // first case + one rejection-based resubmission
 
 // ===== UTILITY CATEGORIES =====
 const UTILITY_CATS: Record<
@@ -666,11 +666,8 @@ export default function SubmitRequestPage() {
 
   // ===== Check if user can use free case =====
   const canUseFreeCase = () => {
-    if (isSuspended) return false;
-    if (isFreeDisabled) return false;
-    if (userFreeCasesUsed >= MAX_FREE_CASES) return false;
-    if (userRejectionCount >= 3) return false;
-    return true;
+    if (isSuspended || isFreeDisabled) return false;
+    return userFreeCasesUsed < MAX_FREE_CASES;
   };
 
   const hasFixedStipend = () => {
@@ -731,13 +728,13 @@ export default function SubmitRequestPage() {
       const cases = await getCasesByUser(user.id);
       const totalCases = cases?.length || 0;
       const rejectedCases = cases?.filter((c: any) => c.status === "rejected").length || 0;
-      const freeCasesUsed = cases?.filter((c: any) => c.was_free === true && c.status !== "rejected").length || 0;
+      const freeCasesUsed = cases?.filter((c: any) => c.was_free === true).length || 0;
 
       setUserTotalCases(totalCases);
       setUserRejectionCount(rejectedCases);
       setUserFreeCasesUsed(freeCasesUsed);
 
-      const freeDisabled = rejectedCases >= 3 || freeCasesUsed >= MAX_FREE_CASES;
+      const freeDisabled = rejectedCases >= 3 || freeCasesUsed >= MAX_FREE_CASES || (freeCasesUsed === 1 && !cases?.some((c: any) => c.was_free === true && String(c.status || "").toLowerCase() === "rejected"));
       setIsFreeDisabled(freeDisabled);
 
       const suspensionData = await getUserSuspension(user.id);
@@ -1112,7 +1109,7 @@ export default function SubmitRequestPage() {
     setHasClaimedOfferBefore((count ?? 0) > 0);
   }
 
-  const isFirstCaseFree = activeCaseCount === 0 && canUseFreeCase();
+  const isFirstCaseFree = canUseFreeCase();
   const offerApplies =
     !!offer &&
     offer.is_active &&
@@ -1715,7 +1712,7 @@ export default function SubmitRequestPage() {
       const freshRejections = freshCases?.filter((c: any) => c.status === "rejected").length || 0;
       const freshFreeUsed = freshCases?.filter((c: any) => c.was_free === true).length || 0;
 
-      const freeDisabled = freshRejections >= 3 || freshFreeUsed >= MAX_FREE_CASES;
+      const freeDisabled = freshRejections >= 3 || freshFreeUsed >= MAX_FREE_CASES || (freshFreeUsed === 1 && !freshCases?.some((c: any) => c.was_free === true && String(c.status || "").toLowerCase() === "rejected"));
       const userSuspended = freshRejections >= MAX_REJECTIONS_BEFORE_SUSPENSION;
 
       if (userSuspended) {

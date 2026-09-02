@@ -630,7 +630,10 @@ async function handleCases(request, env, user, url, parts, origin) {
     const photoUrls = Array.isArray(record.photo_urls) || (record.photo_urls && typeof record.photo_urls === "object") ? JSON.stringify(record.photo_urls) : (record.photo_urls || null);
     const categoryDetails = Array.isArray(record.category_details) || (record.category_details && typeof record.category_details === "object") ? JSON.stringify(record.category_details) : (record.category_details || null);
 
-    const isFree = body?.was_free === true;
+    const freeAttempts = await env.DB.prepare("SELECT was_free, status FROM case_submissions WHERE user_id = ? AND COALESCE(was_free, 0) = 1 ORDER BY submitted_at ASC").bind(user.user_id).all();
+    const freeHistory = freeAttempts.results || [];
+    const lastFreeWasRejected = freeHistory.length === 1 && String(freeHistory[0]?.status || "").toLowerCase() === "rejected";
+    const isFree = freeHistory.length === 0 || lastFreeWasRejected;
     if (!isFree) {
       const balance = await getWalletBalance(env, user.user_id);
       if (balance < 1) {
@@ -647,7 +650,7 @@ async function handleCases(request, env, user, url, parts, origin) {
       await deductCredits(env, user.user_id, 1, 'case_submission', `Case "${record.title || caseId}" submission fee`, caseId);
     }
 
-    return json({ id: caseId, user_id: user.user_id, ...record, status: "pending" }, 201, origin);
+    return json({ id: caseId, user_id: user.user_id, ...record, was_free: isFree, credits_charged: isFree ? 0 : 1, free_reason: freeHistory.length === 0 ? "first_case" : isFree ? "rejected_resubmission" : null, status: "pending" }, 201, origin);
   }
   return json({ error: "Method not allowed" }, 405, origin);
 }
