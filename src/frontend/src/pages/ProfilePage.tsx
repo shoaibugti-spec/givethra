@@ -1,5 +1,5 @@
 // src/frontend/src/pages/ProfilePage.tsx
-// Givethra - Complete Profile Page with Correct Layout
+// Givethra - Complete Profile Page with Corrected, Professional Layout
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,14 @@ import {
   CheckCircle2,
   ChevronRight,
   Circle,
+  Coins,
+  Gift,
   KeyRound,
   Lock,
   LogOut,
   Mail,
   MapPin,
+  MessageCircle,
   Pencil,
   Phone,
   Settings,
@@ -27,6 +30,7 @@ import {
   HandCoins,
   HeartHandshake,
   Unlock,
+  Users,
   XCircle,
   Award,
   Trophy,
@@ -63,7 +67,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Helper: Check if a resolution is approved
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+
+// How many "Supports" equal 1 Credit, and how many Credits unlock a full
+// perk cycle (submit / unlock / clear suspension). Kept as constants so
+// the backend and UI can be lined up easily.
+const SUPPORTS_PER_CREDIT = 100;
+const CREDITS_PER_REWARD = 5;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function isApprovedResolution(resolution: any): boolean {
   if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
@@ -73,14 +90,13 @@ function isApprovedResolution(resolution: any): boolean {
   return false;
 }
 
-// Helper to get badge based on hero stats
 function getBadge(unlockCount: number, contributionCount: number, directHelpCount: number) {
   if (directHelpCount > 0 && contributionCount > 0 && unlockCount > 0) {
     return {
       title: "Super Hero",
       emoji: "🌟",
       description: "You have unlocked cases, contributed, and provided direct help. You are the ultimate Hero!",
-      icon: <Trophy className="h-6 w-6 text-yellow-500" />,
+      icon: <Trophy className="h-4 w-4 text-yellow-500" />,
       color: "bg-gradient-to-r from-yellow-400 to-orange-500 text-white",
     };
   }
@@ -89,7 +105,7 @@ function getBadge(unlockCount: number, contributionCount: number, directHelpCoun
       title: "Hero",
       emoji: "🦸",
       description: "You paid directly for someone's need. You are a true Hero!",
-      icon: <Award className="h-6 w-6 text-blue-500" />,
+      icon: <Award className="h-4 w-4 text-blue-500" />,
       color: "bg-gradient-to-r from-blue-400 to-indigo-500 text-white",
     };
   }
@@ -98,7 +114,7 @@ function getBadge(unlockCount: number, contributionCount: number, directHelpCoun
       title: "Young Hero",
       emoji: "⭐",
       description: "You contributed to a fundraising pool. Every contribution counts! Keep going to become a full Hero.",
-      icon: <Sparkles className="h-6 w-6 text-green-500" />,
+      icon: <Sparkles className="h-4 w-4 text-green-500" />,
       color: "bg-gradient-to-r from-green-400 to-emerald-500 text-white",
     };
   }
@@ -107,7 +123,7 @@ function getBadge(unlockCount: number, contributionCount: number, directHelpCoun
       title: "Newborn Hero",
       emoji: "🆕",
       description: "You unlocked a case. Take the next step to become a full Hero!",
-      icon: <Sparkles className="h-6 w-6 text-purple-500" />,
+      icon: <Sparkles className="h-4 w-4 text-purple-500" />,
       color: "bg-gradient-to-r from-purple-400 to-pink-500 text-white",
     };
   }
@@ -122,6 +138,19 @@ function getTrustLevel(rejected: number, approved: number, expired: number) {
   return Math.max(0, Math.min(100, trust));
 }
 
+function getCaseStatusStyle(status: string) {
+  const s = String(status || "").toLowerCase();
+  if (s === "completed") return "bg-blue-50 text-blue-700 border-blue-200";
+  if (s === "active" || s === "approved" || s === "live") return "bg-teal-50 text-teal-700 border-teal-200";
+  if (s === "rejected") return "bg-red-50 text-red-700 border-red-200";
+  if (s === "expired") return "bg-amber-50 text-amber-700 border-amber-200";
+  return "bg-muted text-muted-foreground border-border";
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export default function ProfilePage() {
   const { isAuthenticated, user, logout } = useAuth();
   const { role } = useRole();
@@ -131,12 +160,14 @@ export default function ProfilePage() {
   const isOwnProfile = Boolean(user?.id && profileUserId === user.id);
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [cases, setCases] = useState<any[]>([]);
   const [showLogout, setShowLogout] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [isMyHero, setIsMyHero] = useState(false);
   const [heroUpdating, setHeroUpdating] = useState(false);
   const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
+  const [creditsInfoOpen, setCreditsInfoOpen] = useState(false);
   const [heroesCount, setHeroesCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [supportsCount, setSupportsCount] = useState(0);
@@ -144,7 +175,9 @@ export default function ProfilePage() {
   const [relationshipUsers, setRelationshipUsers] = useState<any[]>([]);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
 
-  // Stats for all users
+  // Case stats - now computed for WHICHEVER profile is being viewed, not
+  // only the logged-in user's own profile, so a visitor can see another
+  // member's track record and trust level too.
   const [caseStats, setCaseStats] = useState({
     submitted: 0,
     completed: 0,
@@ -158,6 +191,7 @@ export default function ProfilePage() {
   const [contributions, setContributions] = useState(0);
   const [unlockCount, setUnlockCount] = useState(0);
   const [totalAmountSpent, setTotalAmountSpent] = useState(0);
+  const [helpedCases, setHelpedCases] = useState<any[]>([]);
 
   // Requester specific stats
   const [totalHelpReceived, setTotalHelpReceived] = useState(0);
@@ -180,12 +214,16 @@ export default function ProfilePage() {
   async function loadData() {
     setProfileLoading(true);
     try {
-      const [kyc, cases, prof, resolutions, unlocks] = await Promise.all([
-        isOwnProfile && user ? getKycSubmission(user.id) : Promise.resolve(null),
-        isOwnProfile && user ? getCasesByUser(user.id) : Promise.resolve([]),
+      // NOTE: previously these were only fetched for `isOwnProfile`, which
+      // meant visiting someone else's profile showed all-zero stats and no
+      // trust level. They are now fetched for whichever profile is open so
+      // any visitor can see that account's real history and trust score.
+      const [kyc, caseList, prof, resolutions, unlocks] = await Promise.all([
+        getKycSubmission(profileUserId),
+        getCasesByUser(profileUserId),
         getProfile(profileUserId, role),
-        isOwnProfile && user ? getCaseResolutionsByHero(user.id) : Promise.resolve([]),
-        isOwnProfile && user ? getCaseUnlocksByHero(user.id) : Promise.resolve([]),
+        getCaseResolutionsByHero(profileUserId),
+        getCaseUnlocksByHero(profileUserId),
       ]);
 
       setKycData(kyc);
@@ -195,28 +233,27 @@ export default function ProfilePage() {
       setSupportsCount(Number(prof?.supports_count || 0));
       setIsMyHero(Boolean(prof?.is_following));
 
-      // --- Requester Stats (for everyone) ---
-      const caseList = Array.isArray(cases) ? cases : [];
-      const submitted = caseList.length;
-      const completed = caseList.filter((c: any) => c.status === "completed").length;
-      const rejected = caseList.filter((c: any) => c.status === "rejected").length;
-      const expired = caseList.filter((c: any) => c.status === "expired").length;
+      // --- Requester / Case Stats ---
+      const list = Array.isArray(caseList) ? caseList : [];
+      setCases(list);
+      const submitted = list.length;
+      const completed = list.filter((c: any) => c.status === "completed").length;
+      const rejected = list.filter((c: any) => c.status === "rejected").length;
+      const expired = list.filter((c: any) => c.status === "expired").length;
       setCaseStats({ submitted, completed, rejected, expired });
 
-      // Total Help Received (sum of amount_collected from completed cases)
-      const totalReceived = caseList
+      const totalReceived = list
         .filter((c: any) => c.status === "completed")
         .reduce((sum: number, c: any) => sum + (Number(c.amount_collected) || 0), 0);
       setTotalHelpReceived(totalReceived);
 
-      // Trust Level (for requester)
-      const trust = getTrustLevel(rejected, completed, expired);
-      setTrustLevel(trust);
+      setTrustLevel(getTrustLevel(rejected, completed, expired));
 
       // --- Hero Stats ---
       const resolutionList = Array.isArray(resolutions) ? resolutions : [];
       const validResolutions = resolutionList.filter((r: any) => isApprovedResolution(r));
       setHelpedCount(validResolutions.length);
+      setHelpedCases(validResolutions.slice(0, 5));
 
       const direct = validResolutions.filter(
         (r: any) => String(r.paid_to || "").toLowerCase() !== "givethra"
@@ -236,10 +273,7 @@ export default function ProfilePage() {
       const unlockList = Array.isArray(unlocks) ? unlocks : [];
       setUnlockCount(unlockList.length);
 
-      // --- Badge (only for Hero) ---
-      const badgeInfo = getBadge(unlockList.length, contrib.length, direct.length);
-      setBadge(badgeInfo);
-
+      setBadge(getBadge(unlockList.length, contrib.length, direct.length));
     } catch (err) {
       console.error("Failed to load profile data:", err);
     } finally {
@@ -304,8 +338,15 @@ export default function ProfilePage() {
   const avatarUrl = profile?.avatar_url || null;
   const coverUrl = profile?.cover_url || null;
 
+  // Credits derived from Supports (100 Supports = 1 Credit).
+  const creditCount = Math.floor(supportsCount / SUPPORTS_PER_CREDIT);
+  const supportsIntoCurrentCredit = supportsCount % SUPPORTS_PER_CREDIT;
+  const creditProgressPct = Math.round((supportsIntoCurrentCredit / SUPPORTS_PER_CREDIT) * 100);
+  const rewardsUnlocked = Math.floor(creditCount / CREDITS_PER_REWARD);
+  const creditsIntoCurrentReward = creditCount % CREDITS_PER_REWARD;
+
   const verificationBadges = [
-    { label: "Email Verified", icon: <Mail className="h-3 w-3" />, active: !!user?.email },
+    { label: "Email Verified", icon: <Mail className="h-3 w-3" />, active: isOwnProfile ? !!user?.email : !!profile?.email_verified },
     { label: "Mobile Verified", icon: <Phone className="h-3 w-3" />, active: !!profile?.phone_number },
     { label: "Identity Verified", icon: <ShieldCheck className="h-3 w-3" />, active: kycApproved },
     { label: "Institution Verified", icon: <Building2 className="h-3 w-3" />, active: false },
@@ -332,15 +373,26 @@ export default function ProfilePage() {
   const profileReady = !profileLoading && profile && String(profile.user_id || "") === String(profileUserId);
 
   if (!profileReady) {
-    return <Layout><div className="max-w-xl mx-auto px-4 pt-8 pb-24"><div className="rounded-3xl border border-border bg-card p-8 text-center"><div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted animate-pulse" /><div className="mx-auto h-5 w-40 rounded bg-muted animate-pulse" /><p className="mt-4 text-sm text-muted-foreground">Loading profile...</p></div></div></Layout>;
+    return (
+      <Layout>
+        <div className="max-w-xl mx-auto px-4 pt-8 pb-24">
+          <div className="rounded-3xl border border-border bg-card p-8 text-center">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted animate-pulse" />
+            <div className="mx-auto h-5 w-40 rounded bg-muted animate-pulse" />
+            <p className="mt-4 text-sm text-muted-foreground">Loading profile...</p>
+          </div>
+        </div>
+      </Layout>
+    );
   }
 
   return (
     <Layout>
       <div className="max-w-xl mx-auto px-4 pt-0 pb-24 space-y-4">
-        {/* Cover & Avatar */}
-        <div className="rounded-b-3xl bg-card border border-border shadow-sm">
-          <div className="h-32 relative rounded-t-3xl overflow-hidden bg-gradient-to-br from-primary via-primary/80 to-primary/40">
+        {/* ============================= Header Card ============================= */}
+        <div className="rounded-b-3xl bg-card border border-border shadow-sm overflow-hidden">
+          {/* Cover */}
+          <div className="h-32 relative bg-gradient-to-br from-primary via-primary/80 to-primary/40">
             {coverUrl ? (
               <img src={coverUrl} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
@@ -349,129 +401,107 @@ export default function ProfilePage() {
                 <div className="absolute bottom-0 left-8 h-12 w-12 rounded-full bg-white/10 blur-lg" />
               </div>
             )}
+
+            {/* Sandwich menu now lives on the cover, top-right, so it never
+                competes with the name/stats row for space. */}
+            {isOwnProfile && (
+              <button
+                aria-label="Profile menu"
+                className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur-sm flex items-center justify-center hover:bg-black/35 transition-colors"
+                onClick={() => setShowMenu(true)}
+              >
+                <MoreHorizontal className="h-4 w-4 text-white" />
+              </button>
+            )}
           </div>
 
-          {/* Avatar & Name Row */}
           <div className="px-5 pb-5">
-            <div className="flex items-start gap-4 -mt-14 mb-3">
-              {/* Avatar */}
-              <div className="h-28 w-28 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary relative z-10 shrink-0">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-white font-bold text-3xl">{initials}</span>
+            {/* Avatar sits on its own row so it never squeezes the name or
+                the stats — avoids the horizontal overflow / cut-off bug. */}
+            <div className="flex items-end justify-between -mt-12 mb-3">
+              <div className="relative shrink-0">
+                <div className="h-24 w-24 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-white font-bold text-2xl">{initials}</span>
+                  )}
+                </div>
+                {/* Edit-profile pencil badge, pinned to the avatar corner —
+                    the single, obvious "edit" entry point for your own
+                    profile (photo, cover, bio, name all live behind it). */}
+                {isOwnProfile && (
+                  <button
+                    type="button"
+                    onClick={() => navigate({ to: "/edit-profile" })}
+                    title="Edit Profile"
+                    aria-label="Edit Profile"
+                    className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full border-2 border-card bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
                 )}
               </div>
 
-              {/* Name, Badge, and Buttons */}
-              <div className="flex-1 min-w-0 pt-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                    <h1 className="text-xl font-bold text-foreground truncate">{displayName}</h1>
-                    {badge && role === "hero" && (
-                      <div className="flex items-center gap-1">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
-                          {badge.icon}
-                          {badge.title}
-                        </span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => setBadgeInfoOpen(true)}
-                                className="text-muted-foreground hover:text-primary transition-colors"
-                              >
-                                <Info className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs text-xs">{badge.description}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Hero toggle button (only for other users) */}
-                    {!isOwnProfile && (
-                      <Button
-                        type="button"
-                        onClick={toggleHero}
-                        disabled={heroUpdating}
-                        className={`rounded-full px-4 h-9 font-semibold shadow-sm ${
-                          isMyHero
-                            ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15"
-                            : "bg-primary text-primary-foreground hover:bg-primary/90"
-                        }`}
-                      >
-                        <HeartHandshake className="h-4 w-4 mr-1.5" />
-                        {heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
-                      </Button>
-                    )}
-                    {/* Edit Pencil Icon (only for own profile) */}
-                    {isOwnProfile && (
-                      <button
-                        type="button"
-                        onClick={() => navigate({ to: "/edit-profile" })}
-                        title="Edit Profile"
-                        className="h-9 w-9 shrink-0 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors"
-                        aria-label="Edit Profile"
-                      >
-                        <Pencil className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    )}
-                    {/* Sandwich Menu (•••) — only for own profile */}
-                    {isOwnProfile && (
-                      <button
-                        aria-label="Profile menu"
-                        className="h-9 w-9 shrink-0 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors"
-                        onClick={() => setShowMenu(true)}
-                      >
-                        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Stats Row: Requesters | Heroes | Supports */}
-                <div className="flex items-center gap-5 mt-2 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 shadow-sm">
-                  <button
-                    onClick={() => openRelationshipList("requesters")}
-                    className="text-center hover:opacity-70 transition-opacity"
-                    aria-label="View Requesters"
-                  >
-                    <span className="block text-xl font-bold text-primary">{heroesCount}</span>
-                    <span className="text-xs text-muted-foreground">Requesters</span>
-                  </button>
-                  <button
-                    onClick={() => openRelationshipList("heroes")}
-                    className="text-center hover:opacity-70 transition-opacity"
-                    aria-label="View Heroes"
-                  >
-                    <span className="block text-xl font-bold text-foreground">{followingCount}</span>
-                    <span className="text-xs text-muted-foreground">Heroes</span>
-                  </button>
-                  <div className="text-center">
-                    <span className="block text-xl font-bold text-amber-600">{supportsCount.toLocaleString()}</span>
-                    <span className="text-xs text-muted-foreground">Supports</span>
-                  </div>
-                </div>
-              </div>
+              {/* Hero toggle for other users' profiles — its own slot, no
+                  longer crammed next to the name. */}
+              {!isOwnProfile && (
+                <Button
+                  type="button"
+                  onClick={toggleHero}
+                  disabled={heroUpdating}
+                  className={`rounded-full px-4 h-9 font-semibold shadow-sm shrink-0 ${
+                    isMyHero
+                      ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90"
+                  }`}
+                >
+                  <HeartHandshake className="h-4 w-4 mr-1.5" />
+                  {heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
+                </Button>
+              )}
             </div>
 
-            {/* Location, Member Since, KYC */}
-            <div className="space-y-1">
+            {/* Name + badge, full width now, free to wrap */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-foreground">{displayName}</h1>
+              {badge && role === "hero" && (
+                <div className="flex items-center gap-1">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
+                    {badge.icon}
+                    {badge.title}
+                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setBadgeInfoOpen(true)}
+                          className="text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs text-xs">{badge.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
+            </div>
+
+            {/* Location, Member Since, KYC, Bio */}
+            <div className="space-y-1 mt-1">
               {(profile?.city || profile?.country) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />{" "}
+                  <MapPin className="h-3 w-3" />
                   {[profile?.city, profile?.country].filter(Boolean).join(", ")}
                 </p>
               )}
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" /> Member since 2026
+                  <Calendar className="h-3 w-3" /> Member since {profile?.member_since || 2026}
                 </span>
                 {kycApproved && (
                   <span className="flex items-center gap-1 text-teal-600 font-medium">
@@ -479,136 +509,241 @@ export default function ProfilePage() {
                   </span>
                 )}
               </div>
-              {profile?.bio && (
-                <p className="text-sm text-muted-foreground italic pt-1">{profile.bio}</p>
-              )}
+              {profile?.bio && <p className="text-sm text-muted-foreground italic pt-1">{profile.bio}</p>}
+            </div>
+
+            {/* Requesters | Heroes | Supports — full-width grid so nothing
+                gets pushed off-screen on narrow phones. */}
+            <div className="grid grid-cols-3 gap-2 mt-4 rounded-2xl border border-border/70 bg-background/70 px-2 py-3 shadow-sm">
+              <button
+                onClick={() => openRelationshipList("requesters")}
+                className="flex flex-col items-center gap-0.5 hover:opacity-70 transition-opacity"
+                aria-label="View Requesters"
+              >
+                <Users className="h-3.5 w-3.5 text-primary" />
+                <span className="text-lg font-bold text-primary leading-tight">{heroesCount}</span>
+                <span className="text-[11px] text-muted-foreground">Requesters</span>
+              </button>
+              <button
+                onClick={() => openRelationshipList("heroes")}
+                className="flex flex-col items-center gap-0.5 hover:opacity-70 transition-opacity border-x border-border/60"
+                aria-label="View Heroes"
+              >
+                <HeartHandshake className="h-3.5 w-3.5 text-foreground" />
+                <span className="text-lg font-bold text-foreground leading-tight">{followingCount}</span>
+                <span className="text-[11px] text-muted-foreground">Heroes</span>
+              </button>
+              <div className="flex flex-col items-center gap-0.5">
+                <Gift className="h-3.5 w-3.5 text-amber-600" />
+                <span className="text-lg font-bold text-amber-600 leading-tight">{supportsCount.toLocaleString()}</span>
+                <span className="text-[11px] text-muted-foreground">Supports</span>
+              </div>
             </div>
 
             {/* Verification Badges */}
             <div className="mt-3 flex flex-wrap gap-2">
-              {verificationBadges.map((badge) => (
+              {verificationBadges.map((b) => (
                 <span
-                  key={badge.label}
+                  key={b.label}
                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                    badge.active
+                    b.active
                       ? "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800"
                       : "bg-muted text-muted-foreground border-border"
                   }`}
                 >
-                  {badge.active ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
-                  {badge.label}
+                  {b.active ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                  {b.label}
                 </span>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Role-based Stats */}
-        {role === "hero" ? (
-          // ----- HERO STATS -----
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">
-                  {totalAmountSpent > 0 ? `$${totalAmountSpent.toFixed(2)}` : "—"}
-                </div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <HandCoins className="h-3 w-3" /> Total Spent
-                </div>
-              </div>
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">{helpedCount}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <HeartHandshake className="h-3 w-3" /> Helped
-                </div>
-              </div>
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">{directHelps}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <Building2 className="h-3 w-3" /> Direct Helps
-                </div>
-              </div>
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">{contributions}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <HandCoins className="h-3 w-3" /> Contributions
-                </div>
-              </div>
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
-                <div className="text-2xl font-bold text-foreground">{unlockCount}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <Unlock className="h-3 w-3" /> Total Unlocks
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          // ----- REQUESTER STATS -----
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">{caseStats.submitted}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <Briefcase className="h-3 w-3" /> Submitted
-                </div>
-              </div>
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">{caseStats.completed}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed
-                </div>
-              </div>
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">{caseStats.rejected}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <XCircle className="h-3 w-3 text-red-600" /> Rejected
-                </div>
-              </div>
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">{caseStats.expired}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <Calendar className="h-3 w-3 text-amber-600" /> Expired
-                </div>
-              </div>
-              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
-                <div className="text-2xl font-bold text-green-600">
-                  {totalHelpReceived > 0 ? `$${totalHelpReceived.toFixed(2)}` : "—"}
-                </div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                  <HeartHandshake className="h-3 w-3" /> Total Help Received
-                </div>
-              </div>
-            </div>
+        {/* ============================= Trust Level ============================= */}
+        {/* Shown for EVERY profile you visit — not just your own — so
+            visitors can judge how reliable this account has been. */}
+        <div className="rounded-2xl bg-card border border-border p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Trust Level</span>
+            <span className="text-sm font-bold text-primary">{trustLevel}%</span>
+          </div>
+          <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+            <div
+              className={`h-3 rounded-full transition-all ${
+                trustLevel >= 70 ? "bg-green-500" : trustLevel >= 40 ? "bg-amber-500" : "bg-red-500"
+              }`}
+              style={{ width: `${trustLevel}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>Based on case history</span>
+            <span>
+              +{caseStats.completed * 5} approvals · -{caseStats.rejected * 10} rejections · -{caseStats.expired * 5} expired
+            </span>
+          </div>
+        </div>
 
-            {/* Trust Level for Requester */}
-            <div className="rounded-2xl bg-card border border-border p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Trust Level</span>
-                <span className="text-sm font-bold text-primary">{trustLevel}%</span>
+        {/* ============================= Credits (from Supports) ============================= */}
+        <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Coins className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-semibold">Credits</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-lg font-bold text-amber-600">{creditCount}</span>
+              <button
+                type="button"
+                onClick={() => setCreditsInfoOpen(true)}
+                className="text-muted-foreground hover:text-primary transition-colors"
+                aria-label="How credits work"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+            <div className="h-2 rounded-full bg-amber-500 transition-all" style={{ width: `${creditProgressPct}%` }} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {SUPPORTS_PER_CREDIT - supportsIntoCurrentCredit} more Supports to your next Credit · {creditsIntoCurrentReward}/{CREDITS_PER_REWARD} Credits toward your next reward
+            {rewardsUnlocked > 0 ? ` (${rewardsUnlocked} unlocked so far)` : ""}
+          </p>
+        </div>
+
+        {/* ============================= Role-based Stats ============================= */}
+        {role === "hero" ? (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">
+                {totalAmountSpent > 0 ? `$${totalAmountSpent.toFixed(2)}` : "—"}
               </div>
-              <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-                <div
-                  className={`h-3 rounded-full transition-all ${
-                    trustLevel >= 70 ? "bg-green-500" : trustLevel >= 40 ? "bg-amber-500" : "bg-red-500"
-                  }`}
-                  style={{ width: `${trustLevel}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>Based on your case history</span>
-                <span>
-                  +{caseStats.completed * 5} approvals · -{caseStats.rejected * 10} rejections · -{caseStats.expired * 5} expired
-                </span>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <HandCoins className="h-3 w-3" /> Total Spent
               </div>
             </div>
-          </>
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">{helpedCount}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <HeartHandshake className="h-3 w-3" /> Helped
+              </div>
+            </div>
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">{directHelps}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <Building2 className="h-3 w-3" /> Direct Helps
+              </div>
+            </div>
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">{contributions}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <HandCoins className="h-3 w-3" /> Contributions
+              </div>
+            </div>
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
+              <div className="text-2xl font-bold text-foreground">{unlockCount}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <Unlock className="h-3 w-3" /> Total Unlocks
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">{caseStats.submitted}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <Briefcase className="h-3 w-3" /> Submitted
+              </div>
+            </div>
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">{caseStats.completed}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed
+              </div>
+            </div>
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">{caseStats.rejected}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <XCircle className="h-3 w-3 text-red-600" /> Rejected
+              </div>
+            </div>
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">{caseStats.expired}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <Calendar className="h-3 w-3 text-amber-600" /> Expired
+              </div>
+            </div>
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
+              <div className="text-2xl font-bold text-green-600">
+                {totalHelpReceived > 0 ? `$${totalHelpReceived.toFixed(2)}` : "—"}
+              </div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <HeartHandshake className="h-3 w-3" /> Total Help Received
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* Community Posts Section */}
+        {/* ============================= Cases List ============================= */}
+        {cases.length > 0 && (
+          <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold flex items-center gap-1.5">
+                <Briefcase className="h-4 w-4 text-primary" /> Cases
+              </h2>
+              {isOwnProfile && (
+                <button
+                  onClick={() => navigate({ to: "/my-cases" })}
+                  className="text-xs text-primary font-medium flex items-center hover:underline"
+                >
+                  View all <ChevronRight className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            <div className="space-y-2">
+              {cases.slice(0, 5).map((c: any) => (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-border p-3"
+                >
+                  <span className="text-sm font-medium truncate">{c.title || `Case #${c.id}`}</span>
+                  <span
+                    className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border capitalize ${getCaseStatusStyle(c.status)}`}
+                  >
+                    {c.status || "pending"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ============================= Helped Cases (Hero view) ============================= */}
+        {role === "hero" && helpedCases.length > 0 && (
+          <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+            <h2 className="font-semibold flex items-center gap-1.5">
+              <HeartHandshake className="h-4 w-4 text-primary" /> Cases You Helped
+            </h2>
+            <div className="space-y-2">
+              {helpedCases.map((r: any) => (
+                <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-border p-3">
+                  <span className="text-sm font-medium truncate">{r.case_title || `Case #${r.case_id ?? r.id}`}</span>
+                  <span className="shrink-0 text-xs font-semibold text-green-600">
+                    {r.seeker_confirmed_amount ?? r.amount_paid ? `$${Number(r.seeker_confirmed_amount ?? r.amount_paid).toFixed(2)}` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ============================= Community Posts ============================= */}
         {Array.isArray(profile?.posts) && profile.posts.length > 0 && (
           <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold">Community Posts</h2>
+              <h2 className="font-semibold flex items-center gap-1.5">
+                <MessageCircle className="h-4 w-4 text-primary" /> Community Posts
+              </h2>
               <span className="text-xs text-muted-foreground">{profile.posts.length} posts</span>
             </div>
             {profile.posts.map((post: any) => (
@@ -652,18 +787,18 @@ export default function ProfilePage() {
           </DialogContent>
         </Dialog>
 
-        {/* Logout Button */}
-        <button
-          type="button"
-          onClick={() => setShowLogout(true)}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/20 font-medium text-sm transition-colors"
-        >
-          <LogOut className="h-4 w-4" /> Logout
-        </button>
+        {/* Logout Button — only ever shown on your OWN profile */}
+        {isOwnProfile && (
+          <button
+            type="button"
+            onClick={() => setShowLogout(true)}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/20 font-medium text-sm transition-colors"
+          >
+            <LogOut className="h-4 w-4" /> Logout
+          </button>
+        )}
 
-        <p className="text-center text-xs text-muted-foreground pb-2">
-          Givethra v2.0 · Built with ❤️
-        </p>
+        <p className="text-center text-xs text-muted-foreground pb-2">Givethra v2.0 · Built with ❤️</p>
       </div>
 
       {/* Logout Dialog */}
@@ -701,9 +836,7 @@ export default function ProfilePage() {
             <DialogTitle className="flex items-center gap-2">
               <Info className="h-5 w-5 text-primary" /> Hero Badges
             </DialogTitle>
-            <DialogDescription>
-              Understand what each badge means and how you earn them.
-            </DialogDescription>
+            <DialogDescription>Understand what each badge means and how you earn them.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
@@ -741,6 +874,32 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Credits Info Dialog */}
+      <Dialog open={creditsInfoOpen} onOpenChange={setCreditsInfoOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-amber-600" /> How Credits Work
+            </DialogTitle>
+            <DialogDescription>Turn community Supports into real perks.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-sm text-muted-foreground">
+            <p>
+              Every <span className="font-semibold text-foreground">{SUPPORTS_PER_CREDIT} Supports</span> your posts and
+              cases receive from the community earn you{" "}
+              <span className="font-semibold text-foreground">1 Credit</span>.
+            </p>
+            <p>
+              Collect <span className="font-semibold text-foreground">{CREDITS_PER_REWARD} Credits</span> to unlock a
+              reward — submit a new case, unlock a case, or clear an account suspension.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setCreditsInfoOpen(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Relationship List Dialog (Requesters / Heroes) */}
       <Dialog open={relationshipType !== null} onOpenChange={(open) => !open && setRelationshipType(null)}>
         <DialogContent className="max-w-md">
@@ -758,7 +917,7 @@ export default function ProfilePage() {
             ) : (
               relationshipUsers.map((item) => {
                 const name = item.full_name || "User";
-                const initials = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
+                const initials2 = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
                 return (
                   <div key={item.user_id} className="flex items-center gap-3 rounded-xl border border-border p-3">
                     <button
@@ -771,7 +930,7 @@ export default function ProfilePage() {
                       {item.avatar_url ? (
                         <img src={item.avatar_url} alt={name} className="h-full w-full object-cover" />
                       ) : (
-                        initials
+                        initials2
                       )}
                     </button>
                     <button
