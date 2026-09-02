@@ -1,11 +1,39 @@
 // src/frontend/src/pages/CommunityPage.tsx
+// Givethra Community
+// Existing features preserved:
+// Posts + Comments + Likes + Share + Hero/Follow + Guest users
+// + For You / My Heroes / My Posts
+// + Community cache
+// + Support Reaction: 🫴🏻 -> 🫳🏻
+//
+// IMPORTANT:
+// Support is only a reaction/gesture.
+// It is NOT a donation, repost, or Like.
+// No changes are required in api.ts.
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Heart, MessageCircle, Send, User, Loader2, CheckCircle2, Share2, Repeat, Users, Pin } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Heart,
+  MessageCircle,
+  Send,
+  User,
+  Loader2,
+  CheckCircle2,
+  Share2,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "@tanstack/react-router";
@@ -35,6 +63,10 @@ interface Post {
   is_following?: boolean;
   repost_count?: number;
   is_pinned?: boolean;
+
+  // Support reaction fields
+  support_count?: number;
+  supported_by_me?: boolean;
 }
 
 interface Comment {
@@ -47,6 +79,8 @@ interface Comment {
 }
 
 const COMMUNITY_POSTS_CACHE_KEY = "givethra:community-posts:v1";
+const COMMUNITY_SUPPORT_CACHE_KEY =
+  "givethra:community-support-reactions:v1";
 
 function safeDisplayName(value: unknown, fallback: string): string {
   const name = String(value || "").trim();
@@ -55,36 +89,102 @@ function safeDisplayName(value: unknown, fallback: string): string {
 
 function guestDisplayName(userId: unknown): string {
   const raw = String(userId || "").replace(/^guest:/, "");
-  const suffix = raw.replace(/[^0-9]/g, "").slice(-6) || raw.slice(-6) || "Guest";
+  const suffix =
+    raw.replace(/[^0-9]/g, "").slice(-6) ||
+    raw.slice(-6) ||
+    "Guest";
+
   return `Guest ${suffix}`;
 }
 
+/**
+ * Read locally saved Support reactions.
+ *
+ * This is intentionally separate from Like.
+ * It does not call the Like API and does not change the existing
+ * Like/Comment/Follow functionality.
+ */
+function readSupportReactions(): Record<
+  string,
+  { supported: boolean; count: number }
+> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = localStorage.getItem(COMMUNITY_SUPPORT_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSupportReactions(
+  reactions: Record<string, { supported: boolean; count: number }>
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(
+      COMMUNITY_SUPPORT_CACHE_KEY,
+      JSON.stringify(reactions)
+    );
+  } catch {
+    // Local storage failure must never block the Community page.
+  }
+}
+
 function normalizeCachedPost(post: any): Post {
-  const isGuest = Boolean(post?.is_guest) || String(post?.user_id || "").startsWith("guest:");
+  const isGuest =
+    Boolean(post?.is_guest) ||
+    String(post?.user_id || "").startsWith("guest:");
+
   return {
     ...post,
     is_guest: isGuest,
-    display_name: safeDisplayName(post?.display_name, isGuest ? guestDisplayName(post?.user_id) : "User"),
+    display_name: safeDisplayName(
+      post?.display_name,
+      isGuest ? guestDisplayName(post?.user_id) : "User"
+    ),
     comments: undefined,
+
+    // Preserve backend values if they exist.
+    support_count: Number(post?.support_count || 0),
+    supported_by_me: Boolean(post?.supported_by_me),
   };
 }
 
 function normalizeComment(comment: any): Comment {
   const isGuest = String(comment?.user_id || "").startsWith("guest:");
+
   return {
     ...comment,
-    user_name: safeDisplayName(comment?.user_name, isGuest ? guestDisplayName(comment?.user_id) : "User"),
+    user_name: safeDisplayName(
+      comment?.user_name,
+      isGuest ? guestDisplayName(comment?.user_id) : "User"
+    ),
   };
 }
 
 function readCachedCommunityPosts(): Post[] {
   if (typeof window === "undefined") return [];
+
   try {
-    const parsed = JSON.parse(localStorage.getItem(COMMUNITY_POSTS_CACHE_KEY) || "null");
+    const parsed = JSON.parse(
+      localStorage.getItem(COMMUNITY_POSTS_CACHE_KEY) || "null"
+    );
+
     const cached = Array.isArray(parsed) ? parsed : parsed?.posts;
+
     return Array.isArray(cached)
       ? cached
-          .filter((post) => post && typeof post.id === "string" && typeof post.message === "string")
+          .filter(
+            (post) =>
+              post &&
+              typeof post.id === "string" &&
+              typeof post.message === "string"
+          )
           .map(normalizeCachedPost)
       : [];
   } catch {
@@ -94,9 +194,19 @@ function readCachedCommunityPosts(): Post[] {
 
 function writeCachedCommunityPosts(posts: Post[]) {
   if (typeof window === "undefined") return;
+
   try {
-    const cacheablePosts = posts.map(({ comments: _comments, is_liked: _isLiked, ...post }) => post);
-    localStorage.setItem(COMMUNITY_POSTS_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), posts: cacheablePosts }));
+    const cacheablePosts = posts.map(
+      ({ comments: _comments, is_liked: _isLiked, ...post }) => post
+    );
+
+    localStorage.setItem(
+      COMMUNITY_POSTS_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        posts: cacheablePosts,
+      })
+    );
   } catch {
     // A full or restricted browser cache must never block the feed.
   }
@@ -105,44 +215,141 @@ function writeCachedCommunityPosts(posts: Post[]) {
 export default function CommunityPage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
+
   const [posts, setPosts] = useState<Post[]>(readCachedCommunityPosts);
-  const [loading, setLoading] = useState(() => readCachedCommunityPosts().length === 0);
+
+  const [loading, setLoading] = useState(
+    () => readCachedCommunityPosts().length === 0
+  );
+
   const [newComment, setNewComment] = useState<Record<string, string>>({});
-  const [showComments, setShowComments] = useState<Record<string, boolean>>({});
+  const [showComments, setShowComments] = useState<
+    Record<string, boolean>
+  >({});
+
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [liking, setLiking] = useState<string | null>(null);
-  const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({});
-  const [feedTab, setFeedTab] = useState<"for-you" | "my-heroes" | "my-posts">("for-you");
 
-  const currentActorId = isAuthenticated && user?.id ? user.id : `guest:${getGuestId()}`;
-  const visiblePosts = posts;
+  const [commentsLoading, setCommentsLoading] = useState<
+    Record<string, boolean>
+  >({});
+
+  const [feedTab, setFeedTab] = useState<
+    "for-you" | "my-heroes" | "my-posts"
+  >("for-you");
+
+  /**
+   * Support reactions.
+   *
+   * Separate from Likes.
+   */
+  const [supportReactions, setSupportReactions] = useState<
+    Record<string, { supported: boolean; count: number }>
+  >({});
+
+  const [supportingPostId, setSupportingPostId] = useState<string | null>(
+    null
+  );
 
   // New post state
   const [newPost, setNewPost] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [supportPost, setSupportPost] = useState<Post | null>(null);
-  const [supportComment, setSupportComment] = useState("");
-  const [supporting, setSupporting] = useState(false);
 
-  // --- پوسٹس لوڈ کریں ---
+  const visiblePosts = posts;
+
+  /**
+   * Load locally saved Support reactions once.
+   */
+  useEffect(() => {
+    setSupportReactions(readSupportReactions());
+  }, []);
+
+  /**
+   * Apply local Support reaction data to loaded posts.
+   *
+   * If the backend ever starts returning support_count /
+   * supported_by_me, those values can be used as the initial values.
+   */
+  useEffect(() => {
+    if (!posts.length) return;
+
+    const saved = readSupportReactions();
+
+    setPosts((prev) =>
+      prev.map((post) => {
+        const reaction = saved[post.id];
+
+        if (!reaction) {
+          return {
+            ...post,
+            support_count: Number(post.support_count || 0),
+            supported_by_me: Boolean(post.supported_by_me),
+          };
+        }
+
+        return {
+          ...post,
+          support_count: reaction.count,
+          supported_by_me: reaction.supported,
+        };
+      })
+    );
+  }, [posts.length]);
+
+  // ------------------------------------------------------------
+  // Posts load
+  // ------------------------------------------------------------
+
   const fetchPosts = async (showLoader = false) => {
-    if (showLoader && posts.length === 0) setLoading(true);
+    if (showLoader && posts.length === 0) {
+      setLoading(true);
+    }
+
     try {
       const data = await getCommunityPosts(feedTab);
-      const nextPosts = Array.isArray(data) ? data.map(normalizeCachedPost) : [];
-      setPosts(nextPosts);
+
+      const nextPosts = Array.isArray(data)
+        ? data.map(normalizeCachedPost)
+        : [];
+
+      const savedReactions = readSupportReactions();
+
+      const postsWithSupport = nextPosts.map((post) => {
+        const saved = savedReactions[post.id];
+
+        if (!saved) return post;
+
+        return {
+          ...post,
+          support_count: saved.count,
+          supported_by_me: saved.supported,
+        };
+      });
+
+      setPosts(postsWithSupport);
+
       setLikeCounts((prev) => {
         const next = { ...prev };
-        nextPosts.forEach((post: Post) => { next[post.id] = Number(post.likes_count || 0); });
+
+        postsWithSupport.forEach((post: Post) => {
+          next[post.id] = Number(post.likes_count || 0);
+        });
+
         return next;
       });
+
       setLikedPosts((prev) => {
         const next = { ...prev };
-        nextPosts.forEach((post: Post) => { next[post.id] = Boolean(post.is_liked); });
+
+        postsWithSupport.forEach((post: Post) => {
+          next[post.id] = Boolean(post.is_liked);
+        });
+
         return next;
       });
-      writeCachedCommunityPosts(nextPosts);
+
+      writeCachedCommunityPosts(postsWithSupport);
     } catch (error) {
       console.error("Error fetching posts:", error);
       toast.error("Failed to load posts");
@@ -151,14 +358,24 @@ export default function CommunityPage() {
     }
   };
 
-  // --- کمنٹس لوڈ کریں ---
+  // ------------------------------------------------------------
+  // Comments
+  // ------------------------------------------------------------
+
   const fetchComments = async (postId: string) => {
     try {
       const data = await getPostComments(postId);
+
       setPosts((prev) =>
         prev.map((post) =>
           post.id === postId
-            ? { ...post, comments: Array.isArray(data) ? data.map(normalizeComment) : [], comments_count: Array.isArray(data) ? data.length : 0 }
+            ? {
+                ...post,
+                comments: Array.isArray(data)
+                  ? data.map(normalizeComment)
+                  : [],
+                comments_count: Array.isArray(data) ? data.length : 0,
+              }
             : post
         )
       );
@@ -167,477 +384,936 @@ export default function CommunityPage() {
     }
   };
 
-  // --- نئی پوسٹ کریں ---
+  // ------------------------------------------------------------
+  // Create post
+  // ------------------------------------------------------------
+
   const handleCreatePost = async () => {
     const message = newPost.trim();
+
     if (!message) {
       toast.error("Please write something.");
       return;
     }
+
     setSubmitting(true);
+
     try {
       const payload = {
         message,
-        display_name: isAuthenticated ? (user?.fullName || "User") : undefined,
+        display_name: isAuthenticated
+          ? user?.fullName || "User"
+          : undefined,
         is_guest: !isAuthenticated,
-        user_id: isAuthenticated ? (user?.id || null) : null,
+        user_id: isAuthenticated ? user?.id || null : null,
         guest_id: isAuthenticated ? undefined : getGuestId(),
       };
+
       const result = await createCommunityPost(payload);
+
       if (result?.id) {
         toast.success("Post shared!");
         setNewPost("");
+
         const newPostObj: Post = {
           id: result.id,
           user_id: user?.id || null,
-          display_name: safeDisplayName(result.display_name || payload.display_name, isAuthenticated ? (user?.fullName || "User") : `Guest ${getGuestId().slice(-6)}`),
+
+          display_name: safeDisplayName(
+            result.display_name || payload.display_name,
+            isAuthenticated
+              ? user?.fullName || "User"
+              : `Guest ${getGuestId().slice(-6)}`
+          ),
+
           message,
+
           is_guest: !isAuthenticated,
+
           created_at: new Date().toISOString(),
+
           comments: [],
+
           likes_count: 0,
           comments_count: 0,
           is_liked: false,
+
+          // New Support Reaction
+          support_count: 0,
+          supported_by_me: false,
         };
+
         setPosts((prev) => {
           const next = [newPostObj, ...prev];
+
           writeCachedCommunityPosts(next);
+
           return next;
         });
+
         window.dispatchEvent(new CustomEvent("post-updated"));
       } else {
         toast.error("Failed to post. Please try again.");
       }
     } catch (error: any) {
       console.error("Error creating post:", error);
+
       toast.error(error?.message || "Failed to post.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // --- لائک ٹوگل کریں ---
+  // ------------------------------------------------------------
+  // Like
+  // ------------------------------------------------------------
+
   const handleLike = async (postId: string) => {
     if (liking === postId) return;
+
     setLiking(postId);
+
     try {
       const result = await toggleLike(postId);
-      const postSnapshot = posts.find((post) => post.id === postId);
-      const currentCount = likeCounts[postId] ?? postSnapshot?.likes_count ?? 0;
+
+      const postSnapshot = posts.find(
+        (post) => post.id === postId
+      );
+
+      const currentCount =
+        likeCounts[postId] ??
+        postSnapshot?.likes_count ??
+        0;
+
       const nextLiked = Boolean(result.liked);
-      const nextCount = Math.max(currentCount + (nextLiked ? 1 : -1), 0);
-      setLikedPosts((prev) => ({ ...prev, [postId]: nextLiked }));
-      setLikeCounts((prev) => ({ ...prev, [postId]: nextCount }));
+
+      const nextCount = Math.max(
+        currentCount + (nextLiked ? 1 : -1),
+        0
+      );
+
+      setLikedPosts((prev) => ({
+        ...prev,
+        [postId]: nextLiked,
+      }));
+
+      setLikeCounts((prev) => ({
+        ...prev,
+        [postId]: nextCount,
+      }));
+
       setPosts((prev) => {
-        const next = prev.map((post) => post.id === postId ? { ...post, is_liked: nextLiked, likes_count: nextCount } : post);
+        const next = prev.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                is_liked: nextLiked,
+                likes_count: nextCount,
+              }
+            : post
+        );
+
         writeCachedCommunityPosts(next);
+
         return next;
       });
     } catch (error: any) {
       console.error("Error toggling like:", error);
+
       toast.error(error?.message || "Failed to like.");
     } finally {
       setLiking(null);
     }
   };
 
-  // --- کمنٹ کریں ---
+  // ------------------------------------------------------------
+  // Support Reaction
+  //
+  // 🫴🏻 = not reacted
+  // 🫳🏻 = reacted
+  //
+  // This is deliberately NOT connected to toggleLike().
+  // ------------------------------------------------------------
+
+  const handleSupportReaction = (post: Post) => {
+    if (supportingPostId === post.id) return;
+
+    setSupportingPostId(post.id);
+
+    const currentSupported = Boolean(post.supported_by_me);
+
+    const currentCount = Number(post.support_count || 0);
+
+    const nextSupported = !currentSupported;
+
+    const nextCount = Math.max(
+      currentCount + (nextSupported ? 1 : -1),
+      0
+    );
+
+    const nextReaction = {
+      supported: nextSupported,
+      count: nextCount,
+    };
+
+    // Immediate UI update.
+    setPosts((prev) =>
+      prev.map((item) =>
+        item.id === post.id
+          ? {
+              ...item,
+              supported_by_me: nextSupported,
+              support_count: nextCount,
+            }
+          : item
+      )
+    );
+
+    // Update reaction state.
+    setSupportReactions((prev) => {
+      const next = {
+        ...prev,
+        [post.id]: nextReaction,
+      };
+
+      writeSupportReactions(next);
+
+      return next;
+    });
+
+    // Update cached posts too.
+    setPosts((prev) => {
+      const next = prev.map((item) =>
+        item.id === post.id
+          ? {
+              ...item,
+              supported_by_me: nextSupported,
+              support_count: nextCount,
+            }
+          : item
+      );
+
+      writeCachedCommunityPosts(next);
+
+      return next;
+    });
+
+    // Small visual lock to prevent double taps.
+    window.setTimeout(() => {
+      setSupportingPostId((current) =>
+        current === post.id ? null : current
+      );
+    }, 220);
+  };
+
+  // ------------------------------------------------------------
+  // Comments
+  // ------------------------------------------------------------
+
   const handleComment = async (postId: string) => {
     const comment = newComment[postId]?.trim();
+
     if (!comment) {
       toast.error("Please write a comment.");
       return;
     }
+
     try {
       const data = await addComment(postId, comment);
+
       setPosts((prev) =>
         prev.map((post) =>
           post.id === postId
             ? {
                 ...post,
-                comments: [...(post.comments || []), normalizeComment(data)],
-                comments_count: (post.comments_count ?? post.comments?.length ?? 0) + 1,
+
+                comments: [
+                  ...(post.comments || []),
+                  normalizeComment(data),
+                ],
+
+                comments_count:
+                  (post.comments_count ??
+                    post.comments?.length ??
+                    0) + 1,
               }
             : post
         )
       );
-      setNewComment((prev) => ({ ...prev, [postId]: "" }));
+
+      setNewComment((prev) => ({
+        ...prev,
+        [postId]: "",
+      }));
+
       toast.success("Comment added!");
+
       setTimeout(() => {
-        const commentEl = document.getElementById(`comment-${data.id}`);
-        if (commentEl) commentEl.scrollIntoView({ behavior: "smooth" });
+        const commentEl = document.getElementById(
+          `comment-${data.id}`
+        );
+
+        if (commentEl) {
+          commentEl.scrollIntoView({
+            behavior: "smooth",
+          });
+        }
       }, 100);
     } catch (error: any) {
       console.error("Error adding comment:", error);
-      toast.error(error?.message || "Failed to add comment.");
+
+      toast.error(
+        error?.message || "Failed to add comment."
+      );
     }
   };
 
-  // --- کمنٹس دکھائیں/چھپائیں ---
+  // ------------------------------------------------------------
+  // Toggle comments
+  // ------------------------------------------------------------
+
   const toggleComments = async (postId: string) => {
     const shouldOpen = !showComments[postId];
-    setShowComments((prev) => ({ ...prev, [postId]: shouldOpen }));
-    if (!shouldOpen || posts.find((post) => post.id === postId)?.comments !== undefined || commentsLoading[postId]) return;
-    setCommentsLoading((prev) => ({ ...prev, [postId]: true }));
+
+    setShowComments((prev) => ({
+      ...prev,
+      [postId]: shouldOpen,
+    }));
+
+    if (
+      !shouldOpen ||
+      posts.find((post) => post.id === postId)?.comments !==
+        undefined ||
+      commentsLoading[postId]
+    ) {
+      return;
+    }
+
+    setCommentsLoading((prev) => ({
+      ...prev,
+      [postId]: true,
+    }));
+
     try {
       await fetchComments(postId);
     } finally {
-      setCommentsLoading((prev) => ({ ...prev, [postId]: false }));
+      setCommentsLoading((prev) => ({
+        ...prev,
+        [postId]: false,
+      }));
     }
   };
 
-  // --- پہلی بار اور وقتاً فوقتاً لوڈ کریں ---
+  // ------------------------------------------------------------
+  // Initial load + refresh
+  // ------------------------------------------------------------
+
   useEffect(() => {
     void fetchPosts(true);
-    const interval = setInterval(() => { void fetchPosts(false); }, 600000);
-    const handlePostUpdate = () => { void fetchPosts(false); };
-    window.addEventListener("post-updated", handlePostUpdate);
+
+    const interval = setInterval(() => {
+      void fetchPosts(false);
+    }, 600000);
+
+    const handlePostUpdate = () => {
+      void fetchPosts(false);
+    };
+
+    window.addEventListener(
+      "post-updated",
+      handlePostUpdate
+    );
+
     return () => {
       clearInterval(interval);
-      window.removeEventListener("post-updated", handlePostUpdate);
+
+      window.removeEventListener(
+        "post-updated",
+        handlePostUpdate
+      );
     };
+
+    // feedTab intentionally controls this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, feedTab]);
 
-  // --- شیئر کرنا ---
+  // ------------------------------------------------------------
+  // Share
+  // ------------------------------------------------------------
+
   const handleShare = (postId: string) => {
     const url = `${window.location.origin}/community?post=${postId}`;
+
     if (navigator.share) {
-      navigator.share({
-        title: "Check out this post on Givethra Community",
-        text: "Join the conversation on Givethra Community!",
-        url: url,
-      }).catch(() => {});
+      navigator
+        .share({
+          title:
+            "Check out this post on Givethra Community",
+          text:
+            "Join the conversation on Givethra Community!",
+          url,
+        })
+        .catch(() => {});
     } else {
-      navigator.clipboard?.writeText(url).then(() => {
-        toast.success("Link copied to clipboard!");
-      }).catch(() => {
-        toast.info(`Share this link: ${url}`);
-      });
+      navigator.clipboard
+        ?.writeText(url)
+        .then(() => {
+          toast.success("Link copied to clipboard!");
+        })
+        .catch(() => {
+          toast.info(`Share this link: ${url}`);
+        });
     }
   };
 
-  const handleRepost = (post: Post) => {
-    setSupportPost(post);
-    setSupportComment("");
-  };
-
-  const submitSupport = async () => {
-    if (!supportPost || supporting) return;
-    setSupporting(true);
-    try {
-      await createCommunityPost({ message: "", role: "hero", repost_id: supportPost.id, repost_comment: supportComment.trim() });
-      toast.success("Post supported and shared");
-      setSupportPost(null);
-      setSupportComment("");
-      await fetchPosts(false);
-    } catch (error: any) { toast.error(error?.message || "Unable to support this post"); }
-    finally { setSupporting(false); }
-  };
+  // ------------------------------------------------------------
+  // Follow / Hero
+  // ------------------------------------------------------------
 
   const handleFollow = async (post: Post) => {
     if (!post.user_id) return;
-    if (!isAuthenticated) { window.location.href = "/sign-in"; return; }
+
+    if (!isAuthenticated) {
+      window.location.href = "/sign-in";
+      return;
+    }
+
     try {
-      if (post.is_following) await unfollowUser(post.user_id); else await followUser(post.user_id);
-      setPosts((prev) => prev.map((item) => item.user_id === post.user_id ? { ...item, is_following: !post.is_following } : item));
-    } catch (error: any) { toast.error(error?.message || "Unable to update Hero status"); }
+      if (post.is_following) {
+        await unfollowUser(post.user_id);
+      } else {
+        await followUser(post.user_id);
+      }
+
+      setPosts((prev) =>
+        prev.map((item) =>
+          item.user_id === post.user_id
+            ? {
+                ...item,
+                is_following: !post.is_following,
+              }
+            : item
+        )
+      );
+    } catch (error: any) {
+      toast.error(
+        error?.message || "Unable to update Hero status"
+      );
+    }
   };
+
+  // ------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------
 
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Community</h1>
-            <p className="text-sm text-muted-foreground">Share and connect with the Givethra family</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              Community
+            </h1>
+
+            <p className="text-sm text-muted-foreground">
+              Share and connect with the Givethra family
+            </p>
           </div>
+
           <span className="text-sm font-medium bg-primary/10 text-primary px-3 py-1 rounded-full">
             {posts.length} posts
           </span>
         </div>
 
-        <div className="grid grid-cols-3 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Community post feeds">
+        {/* Feed Tabs */}
+        <div
+          className="grid grid-cols-3 rounded-xl border border-border bg-muted/30 p-1"
+          role="tablist"
+          aria-label="Community post feeds"
+        >
           <button
             type="button"
             role="tab"
             aria-selected={feedTab === "for-you"}
             onClick={() => setFeedTab("for-you")}
-            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${feedTab === "for-you" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+              feedTab === "for-you"
+                ? "bg-card text-primary shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
           >
             For You
           </button>
+
           <button
             type="button"
             role="tab"
             aria-selected={feedTab === "my-heroes"}
             onClick={() => setFeedTab("my-heroes")}
-            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${feedTab === "my-heroes" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+              feedTab === "my-heroes"
+                ? "bg-card text-primary shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
           >
-            <Users className="inline h-4 w-4 mr-1" /> My Heroes
+            <Users className="inline h-4 w-4 mr-1" />
+            My Heroes
           </button>
+
           <button
             type="button"
             role="tab"
             aria-selected={feedTab === "my-posts"}
             onClick={() => setFeedTab("my-posts")}
-            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${feedTab === "my-posts" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+              feedTab === "my-posts"
+                ? "bg-card text-primary shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
           >
             My Posts
           </button>
         </div>
 
-        {/* Public New Post Box: guests and signed-in users can post */}
-        {true ? (
-          <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <span className="font-medium text-sm">
-                {isAuthenticated ? (user?.fullName || "User") : `Guest ${getGuestId().slice(-6)}`}
+        {/* New Post */}
+        <div className="rounded-2xl border border-primary/20 bg-card p-4 shadow-sm space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <User className="h-5 w-5 text-primary" />
+            </div>
+
+            <span className="font-medium text-sm">
+              {isAuthenticated
+                ? user?.fullName || "User"
+                : `Guest ${getGuestId().slice(-6)}`}
+            </span>
+
+            {isAuthenticated && (
+              <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Verified
               </span>
-              {isAuthenticated && (
-                <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" /> Verified
-                </span>
-              )}
-            </div>
-            <Textarea
-              placeholder="What's on your mind? Share your thoughts..."
-              value={newPost}
-              onChange={(e) => setNewPost(e.target.value)}
-              rows={3}
-              className="resize-none border-border focus:border-primary"
-            />
-            <div className="flex justify-end">
-              <Button
-                onClick={handleCreatePost}
-                disabled={submitting || !newPost.trim()}
-                className="px-6 rounded-full"
-              >
-                {submitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Send className="h-4 w-4 mr-2" />
-                )}
-                Post
-              </Button>
-            </div>
+            )}
           </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-6 text-center">
-            <p className="text-muted-foreground">Sign in to share your thoughts with the community.</p>
+
+          <Textarea
+            placeholder="What's on your mind? Share your thoughts..."
+            value={newPost}
+            onChange={(e) => setNewPost(e.target.value)}
+            rows={3}
+            className="resize-none border-border focus:border-primary"
+          />
+
+          <div className="flex justify-end">
             <Button
-              variant="outline"
-              className="mt-3 rounded-full"
-              onClick={() => window.location.href = "/sign-in"}
+              onClick={handleCreatePost}
+              disabled={submitting || !newPost.trim()}
+              className="px-6 rounded-full"
             >
-              Sign In
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+
+              {submitting ? "Posting..." : "Post"}
             </Button>
           </div>
-        )}
+        </div>
 
-        {/* Posts List: the shell and composer stay interactive while the feed request is pending */}
+        {/* Loading */}
         {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center" role="status" aria-live="polite">
+          <div
+            className="rounded-2xl border border-border bg-card p-8 text-center"
+            role="status"
+            aria-live="polite"
+          >
             <Loader2 className="h-7 w-7 animate-spin text-primary mx-auto" />
-            <p className="mt-3 text-sm text-muted-foreground">Loading posts...</p>
+
+            <p className="mt-3 text-sm text-muted-foreground">
+              Loading posts...
+            </p>
           </div>
         ) : visiblePosts.length === 0 ? (
           <div className="text-center py-16 border rounded-2xl bg-muted/10">
             <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">{feedTab === "my-posts" ? "You have not shared a post yet." : feedTab === "my-heroes" ? "Follow Heroes to see their posts here." : "No posts yet. Be the first to share!"}</p>
+
+            <p className="text-muted-foreground">
+              {feedTab === "my-posts"
+                ? "You have not shared a post yet."
+                : feedTab === "my-heroes"
+                ? "Follow Heroes to see their posts here."
+                : "No posts yet. Be the first to share!"}
+            </p>
           </div>
         ) : (
           <div className="space-y-6">
-            {visiblePosts.map((post) => (
-              <div
-                key={post.id}
-                className="rounded-2xl border border-border bg-card p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow"
-              >
-                {/* Post Header */}
-                <div className="flex items-start gap-3">
-                  {post.user_id && !post.is_guest ? (
-                    <button type="button" aria-label={`Open ${post.display_name || "user"} profile`} onClick={() => navigate({ to: "/profile/$id", params: { id: String(post.user_id) } })} className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden hover:ring-2 hover:ring-primary/40 transition-all">
-                      {post.avatar_url ? <img src={post.avatar_url} alt={post.display_name || "User"} className="h-full w-full object-cover" /> : <User className="h-5 w-5 text-primary" />}
-                    </button>
-                  ) : (
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
-                      {post.avatar_url ? <img src={post.avatar_url} alt="" className="h-full w-full object-cover" /> : <User className="h-5 w-5 text-primary" />}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {post.user_id && !post.is_guest ? <button type="button" onClick={() => navigate({ to: "/profile/$id", params: { id: String(post.user_id) } })} className="font-semibold text-foreground hover:text-primary transition-colors text-left">{post.display_name || "User"}</button> : <span className="font-semibold text-foreground">{post.display_name || "User"}</span>}
-                      {post.user_id && !post.is_guest && <button onClick={() => handleFollow(post)} className={`text-[10px] rounded-full px-2 py-0.5 font-semibold ${post.is_following ? "bg-primary/10 text-primary border border-primary/30" : "bg-primary text-primary-foreground"}`}>{post.is_following ? "Hero ✓" : "Hero"}</button>}
-                      {post.is_guest ? (
-                        <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">Guest</span>
-                      ) : (
-                        <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" /> Verified
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                </div>
 
-                {/* Post Content */}
-                <p className="text-foreground whitespace-pre-wrap break-words leading-relaxed">
-                  {post.message}
-                </p>
+            {visiblePosts.map((post) => {
+              const isSupported = Boolean(
+                post.supported_by_me
+              );
 
-                {/* Actions */}
-                <div className="flex items-center gap-6 pt-2 border-t border-border">
-                  <button
-                    onClick={() => handleLike(post.id)}
-                    disabled={liking === post.id}
-                    className={`flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50 ${
-                      likedPosts[post.id]
-                        ? "text-red-500"
-                        : "text-muted-foreground hover:text-red-500"
-                    }`}
-                  >
-                    <Heart
-                      className={`h-5 w-5 transition-all ${
-                        likedPosts[post.id] ? "fill-red-500" : ""
-                      }`}
-                    />
-                    <span className="font-medium">{likeCounts[post.id] ?? post.likes_count ?? 0}</span>
-                  </button>
+              const supportCount = Number(
+                post.support_count || 0
+              );
 
-                  <button
-                    onClick={() => toggleComments(post.id)}
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    <MessageCircle className="h-5 w-5" />
-                    <span className="font-medium">{post.comments_count ?? post.comments?.length ?? 0}</span>
-                  </button>
+              return (
+                <div
+                  key={post.id}
+                  className="rounded-2xl border border-border bg-card p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow"
+                >
 
-                  <button onClick={() => handleRepost(post)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"><Repeat className="h-5 w-5" /><span className="text-xs">{post.repost_count || 0} Support</span></button>
+                  {/* Post Header */}
+                  <div className="flex items-start gap-3">
 
-                  <button
-                    onClick={() => handleShare(post.id)}
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    <Share2 className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {/* Comments Section */}
-                    {showComments[post.id] && (
-                  <div className="space-y-4 pt-2 border-t border-border">
-                    {commentsLoading[post.id] ? (
-                      <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground" role="status">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Loading comments...
-                      </div>
-                    ) : post.comments && post.comments.length > 0 ? (
-                      <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                        {post.comments.map((comment) => (
-                          <div
-                            key={comment.id}
-                            id={`comment-${comment.id}`}
-                            className="flex gap-3"
-                          >
-                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-foreground">
-                                  {comment.user_name || "User"}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {formatDistanceToNow(new Date(comment.created_at), {
-                                    addSuffix: true,
-                                  })}
-                                </span>
-                              </div>
-                              <p className="text-sm text-foreground break-words">
-                                {comment.comment}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                    {post.user_id && !post.is_guest ? (
+                      <button
+                        type="button"
+                        aria-label={`Open ${
+                          post.display_name || "user"
+                        } profile`}
+                        onClick={() =>
+                          navigate({
+                            to: "/profile/$id",
+                            params: {
+                              id: String(post.user_id),
+                            },
+                          })
+                        }
+                        className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden hover:ring-2 hover:ring-primary/40 transition-all"
+                      >
+                        {post.avatar_url ? (
+                          <img
+                            src={post.avatar_url}
+                            alt={
+                              post.display_name || "User"
+                            }
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <User className="h-5 w-5 text-primary" />
+                        )}
+                      </button>
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-2">
-                        No comments yet.
-                      </p>
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+                        {post.avatar_url ? (
+                          <img
+                            src={post.avatar_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <User className="h-5 w-5 text-primary" />
+                        )}
+                      </div>
                     )}
 
-                    {/* Public Comment Input */}
-                    {true ? (
+                    <div className="flex-1 min-w-0">
+
+                      <div className="flex items-center gap-2 flex-wrap">
+
+                        {post.user_id &&
+                        !post.is_guest ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate({
+                                to: "/profile/$id",
+                                params: {
+                                  id: String(
+                                    post.user_id
+                                  ),
+                                },
+                              })
+                            }
+                            className="font-semibold text-foreground hover:text-primary transition-colors text-left"
+                          >
+                            {post.display_name || "User"}
+                          </button>
+                        ) : (
+                          <span className="font-semibold text-foreground">
+                            {post.display_name || "User"}
+                          </span>
+                        )}
+
+                        {post.user_id &&
+                          !post.is_guest && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleFollow(post)
+                              }
+                              className={`text-[10px] rounded-full px-2 py-0.5 font-semibold ${
+                                post.is_following
+                                  ? "bg-primary/10 text-primary border border-primary/30"
+                                  : "bg-primary text-primary-foreground"
+                              }`}
+                            >
+                              {post.is_following
+                                ? "Hero ✓"
+                                : "Hero"}
+                            </button>
+                          )}
+
+                        {post.is_guest ? (
+                          <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+                            Guest
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Verified
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(
+                          new Date(post.created_at),
+                          {
+                            addSuffix: true,
+                          }
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Post Content */}
+                  <p className="text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                    {post.message}
+                  </p>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-5 pt-2 border-t border-border">
+
+                    {/* LIKE */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleLike(post.id)
+                      }
+                      disabled={liking === post.id}
+                      className={`flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50 ${
+                        likedPosts[post.id]
+                          ? "text-red-500"
+                          : "text-muted-foreground hover:text-red-500"
+                      }`}
+                    >
+                      <Heart
+                        className={`h-5 w-5 transition-all ${
+                          likedPosts[post.id]
+                            ? "fill-red-500"
+                            : ""
+                        }`}
+                      />
+
+                      <span className="font-medium">
+                        {likeCounts[post.id] ??
+                          post.likes_count ??
+                          0}
+                      </span>
+                    </button>
+
+                    {/* COMMENTS */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleComments(post.id)
+                      }
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <MessageCircle className="h-5 w-5" />
+
+                      <span className="font-medium">
+                        {post.comments_count ??
+                          post.comments?.length ??
+                          0}
+                      </span>
+                    </button>
+
+                    {/* SHARE */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleShare(post.id)
+                      }
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <Share2 className="h-5 w-5" />
+                    </button>
+
+                    {/* SUPPORT REACTION */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSupportReaction(post)
+                      }
+                      disabled={
+                        supportingPostId === post.id
+                      }
+                      aria-label={
+                        isSupported
+                          ? "Remove support reaction"
+                          : "Support this post"
+                      }
+                      aria-pressed={isSupported}
+                      className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold border transition-all duration-200 disabled:opacity-60 ${
+                        isSupported
+                          ? "bg-amber-500 border-amber-500 text-white scale-105 shadow-sm"
+                          : "bg-muted/40 border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <span
+                        className={`text-lg leading-none transition-transform duration-200 ${
+                          isSupported
+                            ? "-translate-y-0.5"
+                            : ""
+                        }`}
+                      >
+                        {isSupported
+                          ? "🫳🏻"
+                          : "🫴🏻"}
+                      </span>
+
+                      <span>
+                        {isSupported
+                          ? "Supported"
+                          : "Support"}
+                      </span>
+
+                      <span
+                        className={`text-xs ${
+                          isSupported
+                            ? "text-white/90"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {supportCount.toLocaleString()}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Comments Section */}
+                  {showComments[post.id] && (
+                    <div className="space-y-4 pt-2 border-t border-border">
+
+                      {commentsLoading[post.id] ? (
+                        <div
+                          className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground"
+                          role="status"
+                        >
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading comments...
+                        </div>
+                      ) : post.comments &&
+                        post.comments.length > 0 ? (
+                        <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+
+                          {post.comments.map(
+                            (comment) => (
+                              <div
+                                key={comment.id}
+                                id={`comment-${comment.id}`}
+                                className="flex gap-3"
+                              >
+                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-foreground">
+                                      {comment.user_name ||
+                                        "User"}
+                                    </span>
+
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {formatDistanceToNow(
+                                        new Date(
+                                          comment.created_at
+                                        ),
+                                        {
+                                          addSuffix:
+                                            true,
+                                        }
+                                      )}
+                                    </span>
+                                  </div>
+
+                                  <p className="text-sm text-foreground break-words">
+                                    {comment.comment}
+                                  </p>
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-2">
+                          No comments yet.
+                        </p>
+                      )}
+
+                      {/* Comment Input */}
                       <div className="flex items-end gap-2 mt-2">
+
                         <textarea
                           placeholder="Write a comment..."
-                          value={newComment[post.id] || ""}
+                          value={
+                            newComment[post.id] || ""
+                          }
                           onChange={(e) =>
-                            setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))
+                            setNewComment(
+                              (prev) => ({
+                                ...prev,
+                                [post.id]:
+                                  e.target.value,
+                              })
+                            )
                           }
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
+                            if (
+                              e.key === "Enter" &&
+                              !e.shiftKey
+                            ) {
                               e.preventDefault();
-                              handleComment(post.id);
+                              handleComment(
+                                post.id
+                              );
                             }
                           }}
                           rows={3}
                           className="flex-1 min-h-12 resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
                         />
+
                         <Button
                           size="icon"
-                          onClick={() => handleComment(post.id)}
-                          disabled={!newComment[post.id]?.trim()}
+                          onClick={() =>
+                            handleComment(
+                              post.id
+                            )
+                          }
+                          disabled={
+                            !newComment[
+                              post.id
+                            ]?.trim()
+                          }
                           className="rounded-full shrink-0 h-10 w-10"
                         >
                           <Send className="h-4 w-4" />
                         </Button>
                       </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground text-center">
-                        Public comments are welcome.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
-
-        <Dialog open={Boolean(supportPost)} onOpenChange={(open) => { if (!open && !supporting) { setSupportPost(null); setSupportComment(""); } }}>
-          <DialogContent className="max-w-md rounded-3xl border-primary/20 shadow-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-xl">Support this post</DialogTitle>
-              <DialogDescription>
-                Repost this post to your Community feed. You may add a comment, or leave it empty.
-              </DialogDescription>
-            </DialogHeader>
-            {supportPost && (
-              <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-2">
-                <p className="text-sm font-semibold">{supportPost.display_name || "User"}</p>
-                <p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">{supportPost.message}</p>
-              </div>
-            )}
-            <Textarea
-              value={supportComment}
-              onChange={(event) => setSupportComment(event.target.value)}
-              placeholder="Write an optional comment..."
-              rows={4}
-              className="resize-none rounded-2xl border-border focus:border-primary"
-            />
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button type="button" variant="outline" className="rounded-full" disabled={supporting} onClick={() => { setSupportPost(null); setSupportComment(""); }}>Cancel</Button>
-              <Button type="button" className="rounded-full px-6" disabled={!supportPost || supporting} onClick={submitSupport}>
-                {supporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Repeat className="h-4 w-4 mr-2" />}
-                {supporting ? "Supporting..." : "Support"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </Layout>
   );
