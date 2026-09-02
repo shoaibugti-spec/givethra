@@ -368,10 +368,10 @@ async function deductCredits(env, userId, amount, type, description, referenceId
 }
 
 async function addCredits(env, userId, amount, type, description, referenceId = null) {
-  if (type !== "deposit") throw new Error("Credits can only be created from an approved deposit");
+  if (!["deposit", "support_to_credit"].includes(type)) throw new Error("Credits can only come from an approved deposit or Support conversion");
   await env.DB.prepare(
-    "UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?"
-  ).bind(amount, now(), userId).run();
+    "INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = balance + excluded.balance, updated_at = excluded.updated_at"
+  ).bind(userId, amount, now()).run();
   await addTransaction(env, userId, amount, type, description, referenceId);
 }
 
@@ -407,8 +407,9 @@ async function handleProfile(request, env, user, parts, origin) {
         const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
         const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
         const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
+        const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
         const profileData = user?.user_id === userId ? variant : withoutPrivateContact(variant);
-        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
+        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
       }
     } catch { /* migration is additive; use legacy profile until applied */ }
     const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
@@ -416,9 +417,10 @@ async function handleProfile(request, env, user, parts, origin) {
     const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
     const activeCase = profileRole === "requester" ? await env.DB.prepare("SELECT * FROM case_submissions WHERE user_id=? AND lower(COALESCE(status,'')) IN ('approved','open','in_progress') ORDER BY submitted_at DESC LIMIT 1").bind(userId).first() : null;
     const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
+    const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
     const profileData = user?.user_id === userId ? (profile || {}) : withoutPrivateContact(profile || {});
     const safeCase = user?.user_id === userId ? activeCase : withoutPrivateContact(activeCase);
-    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), is_following:Boolean(following), posts:posts.results||[], active_case:safeCase||null }, 200, origin);
+    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts:posts.results||[], active_case:safeCase||null }, 200, origin);
   }
   if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
   const body = await readJson(request);
@@ -808,7 +810,28 @@ async function insertCommunityNotification(env, ctx, recipientId, actorId, actor
   ).bind(id(), recipientId, type, title, `${publicDisplayName(actorName, "A Givethra member")}: ${message}`, "/community", now()).run());
 }
 
-async function handleCommunityPosts(request, env, user, url, parts, origin) {
+async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, postId, actorName) {
+  if (!originalUserId || !sourceUserId || originalUserId === sourceUserId) return { added: false, supports: 0, creditsEarned: 0 };
+  const inserted = await env.DB.prepare(
+    "INSERT OR IGNORE INTO user_supports (id, user_id, source_user_id, post_id, created_at) VALUES (?, ?, ?, ?, ?)"
+  ).bind(id(), originalUserId, sourceUserId, postId, now()).run();
+  if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, creditsEarned: 0 };
+  const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(originalUserId).first();
+  const supports = Number(current?.supports_count || 0) + 1;
+  const previousCredits = Number(current?.credits_from_supports || 0);
+  const totalCredits = Math.floor(supports / 100);
+  const creditsEarned = Math.max(0, totalCredits - previousCredits);
+  await env.DB.prepare("UPDATE users SET supports_count = ?, credits_from_supports = ?, updated_at = ? WHERE user_id = ?").bind(supports, totalCredits, now(), originalUserId).run();
+  await env.DB.prepare("UPDATE community_posts SET repost_count = COALESCE(repost_count, 0) + 1 WHERE id = ?").bind(postId).run();
+  if (creditsEarned > 0) {
+    await addCredits(env, originalUserId, creditsEarned, "support_to_credit", `${creditsEarned * 100} supports converted to ${creditsEarned} credit${creditsEarned === 1 ? "" : "s"}`, postId);
+    await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "credit_earned", "Credit earned from Supports", `${creditsEarned} credit${creditsEarned === 1 ? "" : "s"} earned from ${creditsEarned * 100} Supports`);
+  }
+  await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);
+  return { added: true, supports, creditsEarned };
+}
+
+async function handleCommunityPosts(request, env, user, url, parts, origin, ctx) {
   if (request.method === "GET" && parts.length === 3) {
     const guest = user ? null : guestIdentity(request);
     const actorId = user?.user_id || guest?.id || "";
@@ -850,8 +873,12 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
     let finalMessage = message;
     if (repostId) { const original = await env.DB.prepare("SELECT display_name, message FROM community_posts WHERE id = ?").bind(repostId).first(); if (!original) return json({ error: "Original post not found" }, 404, origin); finalMessage = `${body?.repost_comment ? String(body.repost_comment).trim() + " — " : ""}Reposted from ${publicDisplayName(original.display_name,"User")}`; }
     await env.DB.prepare(`INSERT INTO community_posts (id,user_id,display_name,message,role,repost_id,repost_comment,created_at) VALUES (?,?,?,?,?,?,?,?)`).bind(postId,user?.user_id||guest.id,displayName,finalMessage,body?.role||null,repostId,body?.repost_comment||null,now()).run();
-    if (repostId) { const original = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(repostId).first(); if (original?.user_id) await insertCommunityNotification(env,ctx,original.user_id,user?.user_id||guest.id,displayName,"repost","Post Supported","supported your post"); }
-    return json({ id: postId, user_id: user?.user_id || guest.id, display_name: displayName, message: finalMessage, repost_id: repostId, is_guest: !user, likes_count: 0, comments_count: 0, repost_count: 0 }, 201, origin);
+    let supportResult = { added: false, supports: 0, creditsEarned: 0 };
+    if (repostId) {
+      const original = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(repostId).first();
+      if (original?.user_id) supportResult = await recordCommunitySupport(env, ctx, original.user_id, user?.user_id || guest.id, repostId, displayName);
+    }
+    return json({ id: postId, user_id: user?.user_id || guest.id, display_name: displayName, message: finalMessage, repost_id: repostId, is_guest: !user, likes_count: 0, comments_count: 0, repost_count: 0, support_added: supportResult.added, supports_received: supportResult.supports, credits_earned: supportResult.creditsEarned }, 201, origin);
   }
 
   if (request.method === "POST" && parts[3] === "pin") {
@@ -1222,10 +1249,10 @@ async function handleRequest(request, env, ctx) {
     }
     
     if (parts[2] === "posts" && parts.length === 3 && request.method === "GET") {
-      return handleCommunityPosts(request, env, user, url, parts, origin);
+      return handleCommunityPosts(request, env, user, url, parts, origin, ctx);
     }
     if (parts[2] === "posts" && parts.length === 3 && request.method === "POST") {
-      return handleCommunityPosts(request, env, user, url, parts, origin);
+      return handleCommunityPosts(request, env, user, url, parts, origin, ctx);
     }
     if (parts[2] === "posts" && parts[4] === "likes") {
       return handleCommunityLikes(request, env, user, url, parts, origin, ctx);
@@ -1261,6 +1288,12 @@ async function handleRequest(request, env, ctx) {
       return handleNotifications(request, env, user, url, parts, origin);
     }
 
+    if (parts[1] === "user-supports" && parts[2] && request.method === "GET") {
+      const target = String(parts[2]);
+      const row = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports, COALESCE(credits_from_supports, 0) AS creditsFromSupports FROM users WHERE user_id = ?").bind(target).first();
+      return json({ user_id: target, supports: Number(row?.supports || 0), creditsFromSupports: Number(row?.creditsFromSupports || 0) }, 200, origin);
+    }
+
     if (parts[1] === "wallets" && parts[2]) {
       if (request.method === "GET") {
         if (!canAccessUser(user, parts[2])) return json({ error: "Forbidden" }, 403, origin);
@@ -1268,7 +1301,7 @@ async function handleRequest(request, env, ctx) {
         return json(wallet || { user_id: parts[2], balance: 0 }, 200, origin);
       }
       if (request.method === "PUT") {
-        if (!canAccessUser(user, parts[2])) return json({ error: "Forbidden" }, 403, origin);
+        if (!user || !isAdmin(user)) return json({ error: "Only administrators can adjust wallet balances" }, 403, origin);
         const body = await readJson(request);
         const balance = Number(body?.balance || 0);
         await env.DB.prepare(

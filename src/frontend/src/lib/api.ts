@@ -299,6 +299,13 @@ export async function updateProfile(userId: string, data: any, profileRole?: "he
 }
 
 // ---------- WALLET ----------
+export async function getUserSupports(userId: string): Promise<{ user_id: string; supports: number; creditsFromSupports: number }> {
+  const res = await fetch(`${WORKER_URL}/api/user-supports/${encodeURIComponent(userId)}`, { headers: headers(), cache: "no-store" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `Support balance request failed (${res.status})`);
+  return { user_id: String(data?.user_id || userId), supports: Number(data?.supports || 0), creditsFromSupports: Number(data?.creditsFromSupports || 0) };
+}
+
 export async function getWallet(userId: string) {
   const res = await fetch(`${WORKER_URL}/api/wallets/${userId}`, { headers: headers() });
   return res.json();

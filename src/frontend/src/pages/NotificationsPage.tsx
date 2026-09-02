@@ -46,6 +46,8 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   follow: { icon: UserPlus, color: "text-primary", bg: "bg-primary/10" },
   repost: { icon: Repeat, color: "text-violet-500", bg: "bg-violet-500/10" },
   support: { icon: Repeat, color: "text-violet-500", bg: "bg-violet-500/10" },
+  new_support: { icon: Repeat, color: "text-violet-500", bg: "bg-violet-500/10" },
+  credit_earned: { icon: CreditCard, color: "text-amber-500", bg: "bg-amber-500/10" },
 };
 
 function relativeTime(iso: string): string {
