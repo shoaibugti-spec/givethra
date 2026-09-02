@@ -36,7 +36,7 @@ import {
   TrendingDown,
   Info,
   HelpCircle,
-  Users,
+  Users, MoreHorizontal, Pin,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -129,6 +129,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null);
   const [showLogout, setShowLogout] = useState(false);
   const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
+  const [heroesCount, setHeroesCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   // Stats for all users
   const [caseStats, setCaseStats] = useState({
@@ -173,6 +175,8 @@ export default function ProfilePage() {
 
       setKycData(kyc);
       setProfile(prof);
+      setHeroesCount(Number(prof?.heroes_count || prof?.followers_count || 0));
+      setFollowingCount(Number(prof?.following_count || 0));
 
       // --- Requester Stats (for everyone) ---
       const caseList = Array.isArray(cases) ? cases : [];
@@ -280,6 +284,11 @@ export default function ProfilePage() {
                   <span className="text-white font-bold text-3xl">{initials}</span>
                 )}
               </div>
+              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 mr-2">
+                <button onClick={() => navigate({ to: "/profile/$id", params: { id: user?.id || "" } })} className="text-center hover:opacity-70 transition-opacity"><span className="block text-xl font-bold text-primary">{heroesCount}</span><span className="text-xs text-muted-foreground">Heroes</span></button>
+                <button onClick={() => navigate({ to: "/profile/$id", params: { id: user?.id || "" } })} className="text-center hover:opacity-70 transition-opacity"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Following</span></button>
+              </div>
               <button
   onClick={() => navigate({ to: "/edit-profile" })}
   className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors"
@@ -287,6 +296,8 @@ export default function ProfilePage() {
 >
   <Pencil className="h-4 w-4 text-muted-foreground" />
 </button>
+              <button aria-label="Profile menu" className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" onClick={() => navigate({ to: "/settings" })}><MoreHorizontal className="h-4 w-4" /></button>
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -453,6 +464,14 @@ export default function ProfilePage() {
               </div>
             </div>
           </>
+        )}
+
+
+        {Array.isArray(profile?.posts) && profile.posts.length > 0 && (
+          <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+            <div className="flex items-center justify-between"><h2 className="font-semibold">Community Posts</h2><span className="text-xs text-muted-foreground">{profile.posts.length} posts</span></div>
+            {profile.posts.map((post: any) => <article key={post.id} className="rounded-xl border border-border p-3"><div className="flex items-center gap-2 text-xs text-muted-foreground">{post.is_pinned ? <Pin className="h-3 w-3 text-primary" /> : null}<span>{post.is_pinned ? "Pinned" : "Community post"}</span></div><p className="mt-2 text-sm whitespace-pre-wrap">{post.message}</p></article>)}
+          </div>
         )}
 
         {/* Quick Actions */}

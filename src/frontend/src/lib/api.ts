@@ -348,14 +348,39 @@ export async function getHeroesWall(limit = 24) {
   return data;
 }
 
-export async function getCommunityPosts() {
-  const res = await fetch(`${WORKER_URL}/api/community/posts`, {
+export async function getCommunityPosts(tab: "for-you" | "my-heroes" | "my-posts" = "for-you") {
+  const res = await fetch(`${WORKER_URL}/api/community/posts?tab=${encodeURIComponent(tab)}`, {
     headers: { ...headers(), "X-Guest-ID": getGuestId() },
     cache: "no-store",
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error || `Community posts request failed (${res.status})`);
   return Array.isArray(data) ? data : Array.isArray(data?.posts) ? data.posts : [];
+}
+
+export async function followUser(targetUserId: string) {
+  const res = await fetch(`${WORKER_URL}/api/follow`, { method: "POST", headers: headers(), body: JSON.stringify({ target_user_id: targetUserId }) });
+  return readApiResponse(res);
+}
+
+export async function unfollowUser(targetUserId: string) {
+  const res = await fetch(`${WORKER_URL}/api/follow`, { method: "DELETE", headers: headers(), body: JSON.stringify({ target_user_id: targetUserId }) });
+  return readApiResponse(res);
+}
+
+export async function getFollowStatus(targetUserId: string) {
+  const res = await fetch(`${WORKER_URL}/api/follow/status?target=${encodeURIComponent(targetUserId)}`, { headers: headers() });
+  return readApiResponse(res);
+}
+
+export async function getFollowCounts(userId: string) {
+  const res = await fetch(`${WORKER_URL}/api/follow/count?user=${encodeURIComponent(userId)}`, { headers: headers() });
+  return readApiResponse(res);
+}
+
+export async function pinCommunityPost(postId: string) {
+  const res = await fetch(`${WORKER_URL}/api/community/posts/pin`, { method: "POST", headers: headers(), body: JSON.stringify({ post_id: postId }) });
+  return readApiResponse(res);
 }
 
 export async function createCommunityPost(data: Record<string, unknown>) {
