@@ -36,6 +36,51 @@ function json(data, status = 200, origin = "") {
 function now() {
   return new Date().toISOString();
 }
+
+async function ensureUserCoreRows(env, user) {
+  if (!env.DB || !user?.user_id) return { kyc_status: user?.kyc_status || 'none' };
+  const timestamp = now();
+  let effectiveKycStatus = String(user.kyc_status || 'none').toLowerCase();
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO profiles (user_id, full_name, avatar_url, preferred_language, created_at, updated_at)
+     VALUES (?, ?, ?, 'en', ?, ?)`
+  ).bind(String(user.user_id), user.full_name || null, user.avatar_url || null, timestamp, timestamp).run();
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO wallets (user_id, balance, updated_at)
+     VALUES (?, ?, ?)`
+  ).bind(String(user.user_id), Number(user.balance || 0), timestamp).run();
+  const kyc = await env.DB.prepare(
+    `SELECT lower(status) AS status
+     FROM kyc_submissions
+     WHERE user_id = ? AND COALESCE(is_current, 1) = 1
+     ORDER BY CASE lower(COALESCE(status, ''))
+       WHEN 'approved' THEN 1 WHEN 'pending' THEN 2 WHEN 'rejected' THEN 3 ELSE 4 END,
+       submitted_at DESC, rowid DESC LIMIT 1`
+  ).bind(String(user.user_id)).first();
+  if (kyc?.status) {
+    effectiveKycStatus = String(kyc.status).toLowerCase();
+    if (effectiveKycStatus !== String(user.kyc_status || '').toLowerCase()) {
+      await env.DB.prepare(
+        `UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?`
+      ).bind(effectiveKycStatus, timestamp, String(user.user_id)).run();
+    }
+  }
+  return { kyc_status: effectiveKycStatus };
+}
+
+async function syncUserCaseCounters(env, userId) {
+  if (!env.DB || !userId) return;
+  await env.DB.prepare(
+    `UPDATE users SET
+       total_cases = (SELECT COUNT(*) FROM case_submissions WHERE user_id = ?),
+       pending_cases = (SELECT COUNT(*) FROM case_submissions WHERE user_id = ? AND lower(COALESCE(status, '')) = 'pending'),
+       active_or_completed_cases = (SELECT COUNT(*) FROM case_submissions WHERE user_id = ? AND lower(COALESCE(status, '')) IN ('approved', 'published', 'active', 'open', 'in_progress', 'completed')),
+       rejected_cases = (SELECT COUNT(*) FROM case_submissions WHERE user_id = ? AND lower(COALESCE(status, '')) = 'rejected'),
+       updated_at = ?
+     WHERE user_id = ?`
+  ).bind(userId, userId, userId, userId, now(), userId).run();
+}
+
 async function sendNotification(env, userId, type, title, message, link = null) {
   const notificationId = id();
   const createdAt = now();
@@ -143,12 +188,19 @@ async function findOrCreateUser(env, identity) {
   const existing = await selectExisting();
 
   if (existing) {
+    const ensured = await ensureUserCoreRows(env, {
+      user_id: String(existing.user_id),
+      full_name: existing.full_name || identity.full_name,
+      avatar_url: existing.avatar_url || identity.avatar_url,
+      balance: existing.balance,
+      kyc_status: existing.kyc_status,
+    });
     return {
       user_id: String(existing.user_id),
       email: String(existing.email || identity.email).toLowerCase(),
       full_name: existing.full_name || identity.full_name,
       avatar_url: existing.avatar_url || identity.avatar_url,
-      kyc_status: existing.kyc_status || "none",
+      kyc_status: ensured?.kyc_status || existing.kyc_status || "none",
       role: isAdmin(existing) || isAdmin(identity) ? "admin" : null,
       last_community_visit: existing.last_community_visit || null,
       onboarding_completed: existing.onboarding_completed === 1,
@@ -180,6 +232,13 @@ async function findOrCreateUser(env, identity) {
       onboarding_completed: raced.onboarding_completed === 1,
     };
   }
+  await ensureUserCoreRows(env, {
+    user_id: userId,
+    full_name: identity.full_name,
+    avatar_url: identity.avatar_url,
+    balance: 0,
+    kyc_status: 'none',
+  });
   return {
     user_id: userId,
     email: identity.email,
@@ -196,12 +255,18 @@ async function hydrateAuthenticatedUser(env, session) {
   if (!env.DB || !session?.user_id) return session;
   try {
     const row = await env.DB.prepare(
-      `SELECT u.user_id, u.email, u.full_name, u.avatar_url, u.kyc_status,
+      `SELECT u.user_id, u.email, u.full_name, u.avatar_url,
+              COALESCE((SELECT lower(k.status) FROM kyc_submissions k
+                WHERE k.user_id = u.user_id AND COALESCE(k.is_current, 1) = 1
+                ORDER BY CASE lower(COALESCE(k.status, ''))
+                  WHEN 'approved' THEN 1 WHEN 'pending' THEN 2 WHEN 'rejected' THEN 3 ELSE 4 END,
+                  k.submitted_at DESC, k.rowid DESC LIMIT 1), u.kyc_status, 'none') AS kyc_status,
               u.total_cases, u.pending_cases, u.active_or_completed_cases, u.rejected_cases,
-              u.balance, u.last_community_visit, u.onboarding_completed,
+              COALESCE(w.balance, u.balance, 0) AS balance, u.last_community_visit, u.onboarding_completed,
               p.full_name AS profile_full_name, p.avatar_url AS profile_avatar_url
        FROM users u
        LEFT JOIN profiles p ON p.user_id = u.user_id
+       LEFT JOIN wallets w ON w.user_id = u.user_id
        WHERE u.user_id = ? LIMIT 1`
     ).bind(session.user_id).first();
     if (!row) return session;
@@ -636,7 +701,7 @@ async function handleCases(request, env, user, url, parts, origin) {
     const freeAttempts = await env.DB.prepare("SELECT was_free, status FROM case_submissions WHERE user_id = ? AND COALESCE(was_free, 0) = 1 ORDER BY submitted_at ASC").bind(user.user_id).all();
     const freeHistory = freeAttempts.results || [];
     const lastFreeWasRejected = freeHistory.length === 1 && String(freeHistory[0]?.status || "").toLowerCase() === "rejected";
-    const isFree = freeHistory.length === 0 || lastFreeWasRejected;
+    const isFree = freeHistory.length < 2;
     if (!isFree) {
       const balance = await getWalletBalance(env, user.user_id);
       if (balance < 1) {
@@ -646,14 +711,14 @@ async function handleCases(request, env, user, url, parts, origin) {
 
     await env.DB.prepare(
       "INSERT INTO case_submissions (id, user_id, category, title, short_description, country, city, urgency, description, amount_needed, currency, why_help, deadline, institute_name, institute_contact, institute_address, payment_method, account_title, account_number, account_iban, photo_urls, selfie_url, video_url, category_details, was_free, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
-    ).bind(caseId, user.user_id, record.category || null, record.title || null, record.short_description || null, record.country || null, record.city || null, record.urgency || null, record.description || null, record.amount_needed || null, record.currency || "USD", record.why_help || null, record.deadline || null, record.institute_name || null, record.institute_contact || null, record.institute_address || null, record.payment_method || null, record.account_title || null, record.account_number || null, record.account_iban || null, photoUrls, record.selfie_url || null, record.video_url || null, categoryDetails, record.was_free ? 1 : 0, now()).run();
-    await env.DB.prepare("UPDATE users SET total_cases = COALESCE(total_cases, 0) + 1, pending_cases = COALESCE(pending_cases, 0) + 1, updated_at = ? WHERE user_id = ?").bind(now(), user.user_id).run();
+    ).bind(caseId, user.user_id, record.category || null, record.title || null, record.short_description || null, record.country || null, record.city || null, record.urgency || null, record.description || null, record.amount_needed || null, record.currency || "USD", record.why_help || null, record.deadline || null, record.institute_name || null, record.institute_contact || null, record.institute_address || null, record.payment_method || null, record.account_title || null, record.account_number || null, record.account_iban || null, photoUrls, record.selfie_url || null, record.video_url || null, categoryDetails, isFree ? 1 : 0, now()).run();
+    await syncUserCaseCounters(env, user.user_id);
 
     if (!isFree) {
       await deductCredits(env, user.user_id, 1, 'case_submission', `Case "${record.title || caseId}" submission fee`, caseId);
     }
 
-    return json({ id: caseId, user_id: user.user_id, ...record, was_free: isFree, credits_charged: isFree ? 0 : 1, free_reason: freeHistory.length === 0 ? "first_case" : isFree ? "rejected_resubmission" : null, status: "pending" }, 201, origin);
+    return json({ id: caseId, user_id: user.user_id, ...record, was_free: isFree, credits_charged: isFree ? 0 : 1, free_reason: freeHistory.length === 0 ? "first_case" : isFree ? "second_free_case" : null, status: "pending" }, 201, origin);
   }
   return json({ error: "Method not allowed" }, 405, origin);
 }
@@ -837,7 +902,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     const actorId = user?.user_id || guest?.id || "";
     const tab = url.searchParams.get("tab") || "for-you";
     let filter = "";
-    const binds = [actorId, actorId, actorId];
+    const binds = [actorId, actorId];
     if (tab === "my-heroes" && user) { filter = "WHERE cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)"; binds.push(user.user_id); }
     if (tab === "my-posts" && user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
     const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3)";
@@ -1110,7 +1175,7 @@ async function synchronizeCompletedCase(env, resolutionId) {
 
   // Sum all approved resolutions for this case
   const totals = await env.DB.prepare(
-    `SELECT c.amount_needed, c.amount_collected,
+    `SELECT c.user_id, c.amount_needed, c.amount_collected,
             COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0)) 
                       FROM case_resolutions r
                       WHERE r.case_id = c.id
@@ -1128,18 +1193,15 @@ async function synchronizeCompletedCase(env, resolutionId) {
   const nextStatus = directPayment && goalReached ? "completed" : undefined;
   if (nextStatus) {
     await env.DB.prepare(
-      "UPDATE case_submissions SET amount_collected = ?, status = ?, feedback_deadline = ? WHERE id = ?"
-    ).bind(verifiedTotal, nextStatus, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), resolution.case_id).run();
+      "UPDATE case_submissions SET amount_collected = ?, status = ? WHERE id = ?"
+    ).bind(verifiedTotal, nextStatus, resolution.case_id).run();
   } else {
     await env.DB.prepare(
       "UPDATE case_submissions SET amount_collected = ? WHERE id = ?"
     ).bind(verifiedTotal, resolution.case_id).run();
   }
 
-  // Also update the user stats (optional but helpful)
-  // This is already done in the admin case update, but we can do it here for safety.
-  // Not strictly necessary.
-
+  if (totals.user_id) await syncUserCaseCounters(env, totals.user_id);
   return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "open" };
 }
 
@@ -1737,7 +1799,15 @@ async function handleRequest(request, env, ctx) {
           if (!fields.length) return json({ error: "No KYC fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE kyc_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
           if (values.status !== undefined) {
-            await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?").bind(values.status, now(), current.user_id).run();
+            const effectiveKyc = await env.DB.prepare(
+              `SELECT lower(status) AS status FROM kyc_submissions
+               WHERE user_id = ? AND COALESCE(is_current, 1) = 1
+               ORDER BY CASE lower(COALESCE(status, ''))
+                 WHEN 'approved' THEN 1 WHEN 'pending' THEN 2 WHEN 'rejected' THEN 3 ELSE 4 END,
+                 submitted_at DESC, rowid DESC LIMIT 1`
+            ).bind(current.user_id).first();
+            await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?")
+              .bind(String(effectiveKyc?.status || values.status).toLowerCase(), now(), current.user_id).run();
             if (String(current.status || "").trim().toLowerCase() !== values.status) {
               if (values.status === "approved") {
                 await sendNotification(
@@ -1773,16 +1843,7 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No case fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE case_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
-          const counts = await env.DB.prepare(
-            `SELECT COUNT(*) AS total_cases,
-                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_cases,
-                    SUM(CASE WHEN status IN ('approved', 'completed') THEN 1 ELSE 0 END) AS active_or_completed_cases,
-                    SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected_cases
-             FROM case_submissions WHERE user_id = ?`
-          ).bind(current.user_id).first();
-          await env.DB.prepare(
-            "UPDATE users SET total_cases = ?, pending_cases = ?, active_or_completed_cases = ?, rejected_cases = ?, updated_at = ? WHERE user_id = ?"
-          ).bind(Number(counts?.total_cases || 0), Number(counts?.pending_cases || 0), Number(counts?.active_or_completed_cases || 0), Number(counts?.rejected_cases || 0), now(), current.user_id).run();
+          await syncUserCaseCounters(env, current.user_id);
           return json(await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
         }
         if (parts[2] === "feedbacks" && recordId) {
@@ -2145,7 +2206,7 @@ async function handleRequest(request, env, ctx) {
   return new Response("Not found", { status: 404 });
 }
 
-export { signSessionPayload, verifySessionToken, handlePublicFeedback };
+export { signSessionPayload, verifySessionToken, handlePublicFeedback, synchronizeCompletedCase };
 
 export default {
   async fetch(request, env, ctx) {
