@@ -39,6 +39,7 @@ import {
   Users, MoreHorizontal, Pin,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,7 @@ import {
   getCaseResolutionsByHero,
   getCaseUnlocksByHero,
   getFollowList,
+  followUser,
   unfollowUser,
   removeRequester,
 } from "@/lib/api";
@@ -135,6 +137,8 @@ export default function ProfilePage() {
   const [showLogout, setShowLogout] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [isMyHero, setIsMyHero] = useState(false);
+  const [heroUpdating, setHeroUpdating] = useState(false);
   const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
   const [heroesCount, setHeroesCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -190,6 +194,7 @@ export default function ProfilePage() {
       setProfile(prof);
       setHeroesCount(Number(prof?.heroes_count || prof?.followers_count || 0));
       setFollowingCount(Number(prof?.following_count || 0));
+      setIsMyHero(Boolean(prof?.is_following));
 
       // --- Requester Stats (for everyone) ---
       const caseList = Array.isArray(cases) ? cases : [];
@@ -240,6 +245,32 @@ export default function ProfilePage() {
       console.error("Failed to load profile data:", err);
     } finally {
       setProfileLoading(false);
+    }
+  }
+
+  async function toggleHero() {
+    if (!isAuthenticated || !user?.id) {
+      navigate({ to: "/sign-in" });
+      return;
+    }
+    if (isOwnProfile || heroUpdating) return;
+    setHeroUpdating(true);
+    try {
+      if (isMyHero) {
+        await unfollowUser(profileUserId);
+        setIsMyHero(false);
+        setHeroesCount((count) => Math.max(0, count - 1));
+        toast.success("Removed from My Heroes");
+      } else {
+        await followUser(profileUserId);
+        setIsMyHero(true);
+        setHeroesCount((count) => count + 1);
+        toast.success("Added to My Heroes");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update Hero status");
+    } finally {
+      setHeroUpdating(false);
     }
   }
 
@@ -331,6 +362,9 @@ export default function ProfilePage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+              {!isOwnProfile && <Button type="button" onClick={toggleHero} disabled={heroUpdating} className={`rounded-full px-4 h-9 font-semibold shadow-sm ${isMyHero ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                <HeartHandshake className="h-4 w-4 mr-1.5" />{heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
+              </Button>}
               <div className="flex items-center gap-3 mr-2">
                 <button onClick={() => openRelationshipList("requesters")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Requesters"><span className="block text-xl font-bold text-primary">{heroesCount}</span><span className="text-xs text-muted-foreground">Requesters</span></button>
                 <button onClick={() => openRelationshipList("heroes")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Heroes"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Heroes</span></button>
