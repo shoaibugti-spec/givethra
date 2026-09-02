@@ -1,5 +1,6 @@
 // src/frontend/src/pages/SubmitRequestPage.tsx
 // Fully refactored with enhanced T&C, feedback suspension, and complete validation.
+// FIXED: Free case logic — first case free, second chance free if first rejected.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -734,7 +735,12 @@ export default function SubmitRequestPage() {
       setUserRejectionCount(rejectedCases);
       setUserFreeCasesUsed(freeCasesUsed);
 
-      const freeDisabled = rejectedCases >= 3 || freeCasesUsed >= MAX_FREE_CASES || (freeCasesUsed === 1 && !cases?.some((c: any) => c.was_free === true && String(c.status || "").toLowerCase() === "rejected"));
+      // 🔥 FIX: Simplified free case logic
+      // Free if: no free used yet, OR (one free used AND it was rejected)
+      const lastFreeRejected = cases?.some((c: any) => c.was_free === true && String(c.status || "").toLowerCase() === "rejected") || false;
+      const canUseFree = freeCasesUsed === 0 || (freeCasesUsed === 1 && lastFreeRejected);
+      const freeDisabled = rejectedCases >= 3 || freeCasesUsed >= MAX_FREE_CASES || !canUseFree;
+
       setIsFreeDisabled(freeDisabled);
 
       const suspensionData = await getUserSuspension(user.id);
@@ -1712,7 +1718,12 @@ export default function SubmitRequestPage() {
       const freshRejections = freshCases?.filter((c: any) => c.status === "rejected").length || 0;
       const freshFreeUsed = freshCases?.filter((c: any) => c.was_free === true).length || 0;
 
-      const freeDisabled = freshRejections >= 3 || freshFreeUsed >= MAX_FREE_CASES || (freshFreeUsed === 1 && !freshCases?.some((c: any) => c.was_free === true && String(c.status || "").toLowerCase() === "rejected"));
+      // 🔥 FIX: Simplified free case logic
+      // Free if: no free used yet, OR (one free used AND it was rejected)
+      const lastFreeRejected = freshCases?.some((c: any) => c.was_free === true && String(c.status || "").toLowerCase() === "rejected") || false;
+      const canUseFree = freshFreeUsed === 0 || (freshFreeUsed === 1 && lastFreeRejected);
+      const freeDisabled = freshRejections >= 3 || freshFreeUsed >= MAX_FREE_CASES || !canUseFree;
+
       const userSuspended = freshRejections >= MAX_REJECTIONS_BEFORE_SUSPENSION;
 
       if (userSuspended) {
@@ -1729,7 +1740,8 @@ export default function SubmitRequestPage() {
         return;
       }
 
-      const firstFree = (freshCases?.length || 0) === 0 && !freeDisabled;
+      // First free case: if canUseFree is true
+      const firstFree = canUseFree && !freeDisabled;
 
       let offerFree = false;
       let currentOffer: any = null;
@@ -1934,11 +1946,11 @@ export default function SubmitRequestPage() {
           await sendNotification(
             uid,
             "system",
-            "First Case Submitted FREE 🎉",
-            `Your first case "${title}" was submitted FREE and is under review.`,
+            "Case Submitted FREE 🎉",
+            `Your case "${title}" was submitted FREE and is under review.`,
             "/my-cases"
           );
-        toast.success("🎉 Your first case is FREE! Submitted for review.");
+        toast.success("🎉 Your case is FREE! Submitted for review.");
       } else if (offerFree && currentOffer) {
         await insertOfferClaim({ user_id: uid, category });
         await updateCategoryOfferUsage(category, (currentOffer.used_count ?? 0) + 1);
