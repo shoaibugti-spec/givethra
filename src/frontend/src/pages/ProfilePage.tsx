@@ -1,5 +1,5 @@
 // src/frontend/src/pages/ProfilePage.tsx
-// Givethra - Complete Role-based Profile Page with Correct Layout
+// Givethra - Complete Profile Page with Correct Layout
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -31,8 +31,6 @@ import {
   Award,
   Trophy,
   Sparkles,
-  TrendingUp,
-  TrendingDown,
   Info,
   MoreHorizontal,
   Pin,
