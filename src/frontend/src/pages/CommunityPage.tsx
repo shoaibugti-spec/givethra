@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Heart, MessageCircle, Send, User, Loader2, CheckCircle2, Share2, Repeat, Users, Pin } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -120,6 +121,9 @@ export default function CommunityPage() {
   // New post state
   const [newPost, setNewPost] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [supportPost, setSupportPost] = useState<Post | null>(null);
+  const [supportComment, setSupportComment] = useState("");
+  const [supporting, setSupporting] = useState(false);
 
   // --- پوسٹس لوڈ کریں ---
   const fetchPosts = async (showLoader = false) => {
@@ -312,14 +316,22 @@ export default function CommunityPage() {
     }
   };
 
-  const handleRepost = async (post: Post) => {
-    const comment = window.prompt("Add a comment to your Support (optional):", "");
-    if (comment === null) return;
+  const handleRepost = (post: Post) => {
+    setSupportPost(post);
+    setSupportComment("");
+  };
+
+  const submitSupport = async () => {
+    if (!supportPost || supporting) return;
+    setSupporting(true);
     try {
-      await createCommunityPost({ message: "", role: "hero", repost_id: post.id, repost_comment: comment.trim() });
+      await createCommunityPost({ message: "", role: "hero", repost_id: supportPost.id, repost_comment: supportComment.trim() });
       toast.success("Post supported and shared");
+      setSupportPost(null);
+      setSupportComment("");
       await fetchPosts(false);
     } catch (error: any) { toast.error(error?.message || "Unable to support this post"); }
+    finally { setSupporting(false); }
   };
 
   const handleFollow = async (post: Post) => {
@@ -595,6 +607,37 @@ export default function CommunityPage() {
             ))}
           </div>
         )}
+
+        <Dialog open={Boolean(supportPost)} onOpenChange={(open) => { if (!open && !supporting) { setSupportPost(null); setSupportComment(""); } }}>
+          <DialogContent className="max-w-md rounded-3xl border-primary/20 shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-xl">Support this post</DialogTitle>
+              <DialogDescription>
+                Repost this post to your Community feed. You may add a comment, or leave it empty.
+              </DialogDescription>
+            </DialogHeader>
+            {supportPost && (
+              <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-2">
+                <p className="text-sm font-semibold">{supportPost.display_name || "User"}</p>
+                <p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">{supportPost.message}</p>
+              </div>
+            )}
+            <Textarea
+              value={supportComment}
+              onChange={(event) => setSupportComment(event.target.value)}
+              placeholder="Write an optional comment..."
+              rows={4}
+              className="resize-none rounded-2xl border-border focus:border-primary"
+            />
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button type="button" variant="outline" className="rounded-full" disabled={supporting} onClick={() => { setSupportPost(null); setSupportComment(""); }}>Cancel</Button>
+              <Button type="button" className="rounded-full px-6" disabled={!supportPost || supporting} onClick={submitSupport}>
+                {supporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Repeat className="h-4 w-4 mr-2" />}
+                {supporting ? "Supporting..." : "Support"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

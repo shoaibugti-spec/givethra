@@ -818,7 +818,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
     if (tab === "my-posts" && user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
     const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3)";
     const heroBoost = "(CASE WHEN cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 100 ELSE 0 END)";
-    const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.created_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
+    const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.signed_up_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
     const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
     const orderBy = tab === "my-posts" ? "cp.created_at DESC" : tab === "my-heroes" ? `${heroBoost} DESC, ${engagementScore} DESC, cp.created_at DESC` : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC`;
     if (tab !== "my-posts") binds.push(user?.user_id || actorId);
@@ -826,7 +826,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin) {
       `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),
        comment_counts AS (SELECT post_id, COUNT(*) AS comments_count FROM community_post_comments GROUP BY post_id),
        repost_counts AS (SELECT repost_id, COUNT(*) AS repost_count FROM community_posts WHERE repost_id IS NOT NULL GROUP BY repost_id)
-       SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, u.created_at AS user_created_at, p.avatar_url,
+       SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, u.signed_up_at AS user_created_at, p.avatar_url,
        COALESCE(lc.likes_count,0) AS likes_count, COALESCE(cc.comments_count,0) AS comments_count, COALESCE(lc.is_liked,0) AS is_liked,
        COALESCE(rc.repost_count,0) AS repost_count,
        CASE WHEN cp.user_id IS NOT NULL AND cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 1 ELSE 0 END AS is_following
