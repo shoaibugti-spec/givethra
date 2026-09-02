@@ -14,6 +14,8 @@ import {
   CreditCard,
   Heart,
   MessageCircle,
+  Repeat,
+  UserPlus,
   FileText,
   Trash2,
 } from "lucide-react";
@@ -40,6 +42,10 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   system: { icon: Bell, color: "text-primary", bg: "bg-primary/10" },
   like: { icon: Heart, color: "text-red-500", bg: "bg-red-500/10" },
   comment: { icon: MessageCircle, color: "text-blue-500", bg: "bg-blue-500/10" },
+  new_follower: { icon: UserPlus, color: "text-primary", bg: "bg-primary/10" },
+  follow: { icon: UserPlus, color: "text-primary", bg: "bg-primary/10" },
+  repost: { icon: Repeat, color: "text-violet-500", bg: "bg-violet-500/10" },
+  support: { icon: Repeat, color: "text-violet-500", bg: "bg-violet-500/10" },
 };
 
 function relativeTime(iso: string): string {
