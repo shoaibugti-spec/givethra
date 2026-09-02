@@ -8,8 +8,19 @@ import KindnessWall from "@/components/KindnessWall";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Heart, HandHelping, ShieldCheck, Users, Globe, Sparkles, Facebook, Instagram, Linkedin, Mail, MessageCircle } from "lucide-react";
+import { Heart, HandHelping, ShieldCheck, Users, Globe, Sparkles, Facebook, Instagram, Linkedin, Mail, MessageCircle, Bell, Battery, Flame, Droplets, GraduationCap, Stethoscope, ShoppingCart, FileText } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { getApprovedCases } from "@/lib/api";
+
+const ROLE_CATEGORY_STYLES: Record<string, { icon: typeof Battery; color: string; bg: string }> = {
+  "Electricity Bill": { icon: Battery, color: "text-amber-600", bg: "bg-amber-500/10" },
+  "Gas Bill": { icon: Flame, color: "text-orange-600", bg: "bg-orange-500/10" },
+  "Water Bill": { icon: Droplets, color: "text-sky-600", bg: "bg-sky-500/10" },
+  "School Fees": { icon: GraduationCap, color: "text-indigo-600", bg: "bg-indigo-500/10" },
+  "Medical & Treatment": { icon: Stethoscope, color: "text-rose-600", bg: "bg-rose-500/10" },
+  "Business / Work Help": { icon: ShoppingCart, color: "text-emerald-600", bg: "bg-emerald-500/10" },
+};
 
 const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
@@ -21,6 +32,26 @@ export default function RoleSelectionPage() {
   const { isAuthenticated, user, setRole: setAuthRole } = useAuth();
   const { setRole } = useRole();
   const navigate = useNavigate();
+  const [activeCases, setActiveCases] = useState<any[]>([]);
+  const [activeCaseSlide, setActiveCaseSlide] = useState(-1);
+
+  useEffect(() => {
+    getApprovedCases().then((rows) => setActiveCases(Array.isArray(rows) ? rows : [])).catch(() => setActiveCases([]));
+  }, []);
+
+  const activeCaseCategories = Object.entries(activeCases.reduce<Record<string, number>>((counts, currentCase) => {
+    const category = String(currentCase?.category || "Other");
+    counts[category] = (counts[category] || 0) + 1;
+    return counts;
+  }, {})).map(([category, count]) => ({ category, count }));
+  const activeCaseSlideData = activeCaseSlide >= 0 ? activeCaseCategories[activeCaseSlide] : null;
+
+  useEffect(() => {
+    setActiveCaseSlide(-1);
+    if (activeCaseCategories.length === 0) return;
+    const timer = setInterval(() => setActiveCaseSlide((previous) => previous >= activeCaseCategories.length - 1 ? -1 : previous + 1), 3500);
+    return () => clearInterval(timer);
+  }, [activeCases.length, activeCaseCategories.length]);
 
   const handleRoleSelect = async (role: "hero" | "requester") => {
     setRole(role);
@@ -53,64 +84,25 @@ export default function RoleSelectionPage() {
           <p className="text-sm text-muted-foreground">How are you today?</p>
         </div>
 
-        {/* Compact public Community entry above the role cards */}
-        <Link to="/community" className="group mx-auto block w-full max-w-2xl rounded-2xl border border-primary/20 bg-primary/5 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"><MessageCircle className="h-5 w-5" aria-hidden="true" /></div>
-            <div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Givethra Community</p><p className="mt-1 text-sm font-semibold text-foreground sm:text-base">Share, discuss, and make an impact together.</p><p className="mt-1 text-xs text-muted-foreground">Guests and signed-in users can post, like, comment, and share.</p></div>
-            <span className="shrink-0 text-xl text-primary transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
-          </div>
-        </Link>
-
-        {/* Role Cards */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Become a Hero (دل کا آئیکن ہٹا دیا) */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="rounded-2xl border border-border bg-card p-6 hover:shadow-lg transition-shadow"
-          >
-            <div className="flex flex-col items-center text-center space-y-4">
-              <h2 className="text-2xl font-bold text-foreground">Become a Hero</h2>
-              <p className="text-sm text-muted-foreground">
-                Support someone in need and change a life. Be a part of a trusted community of helpers. Even a small help can make a big difference.
-              </p>
-              <Button
-                size="lg"
-                className="w-full h-12 text-base font-semibold"
-                onClick={() => handleRoleSelect("hero")}
-              >
-                Become a Hero
-              </Button>
-            </div>
-          </motion.div>
-
-          {/* Request Help → اب عنوان "Requester" ہے */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="rounded-2xl border border-border bg-card p-6 hover:shadow-lg transition-shadow"
-          >
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <HandHelping className="h-8 w-8 text-primary" />
-              </div>
-              <h2 className="text-2xl font-bold text-foreground">Requester</h2>
-              <p className="text-sm text-muted-foreground">
-                Facing a difficult time? You are not alone. Submit your request with complete details. Get help from verified Heroes around the world.
-              </p>
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full h-12 text-base font-semibold border-primary/50 hover:bg-primary/10"
-                onClick={() => handleRoleSelect("requester")}
-              >
-                <HandHelping className="h-5 w-5 mr-2" /> Request Help
-              </Button>
-            </div>
-          </motion.div>
+        <div className="grid grid-cols-2 gap-3 md:gap-5">
+          <Link to="/community" className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-primary/15 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg md:p-7 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-transform group-hover:scale-105 md:h-16 md:w-16"><Users className="h-7 w-7 md:h-8 md:w-8" /></div>
+            <span className="text-base font-bold text-foreground md:text-xl">Community</span>
+            <span className="mt-1 text-xs text-muted-foreground md:text-sm">My Heroes · Share & Discuss</span>
+          </Link>
+          <button type="button" onClick={() => { if (activeCases.length > 0) navigate({ to: "/home" }); }} className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-3xl border border-rose-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-300 hover:shadow-lg md:p-7 dark:border-rose-900/50">
+            {activeCaseSlideData ? (() => { const style = ROLE_CATEGORY_STYLES[activeCaseSlideData.category] || { icon: FileText, color: "text-primary", bg: "bg-primary/10" }; const Icon = style.icon; return <><div className={`mb-3 flex h-14 w-14 items-center justify-center rounded-2xl ${style.bg} ${style.color}`}><Icon className="h-7 w-7 md:h-8 md:w-8" /></div><span className="max-w-full truncate text-base font-bold text-foreground md:text-xl">{activeCaseSlideData.category}</span><span className="mt-1 text-xs text-muted-foreground md:text-sm">{activeCaseSlideData.count} active case{activeCaseSlideData.count === 1 ? "" : "s"}</span></>; })() : <><div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600"><Bell className="h-7 w-7 md:h-8 md:w-8" /></div><span className="text-base font-bold text-foreground md:text-xl">{activeCases.length} Active Cases</span><span className="mt-1 text-xs text-muted-foreground md:text-sm">{activeCases.length ? "Tap to help now" : "No active needs right now"}</span></>}
+          </button>
+          <button type="button" onClick={() => handleRoleSelect("hero")} className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-emerald-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-lg md:p-7 dark:border-emerald-900/50">
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 transition-transform group-hover:scale-105 md:h-16 md:w-16"><Heart className="h-7 w-7 md:h-8 md:w-8" /></div>
+            <span className="text-base font-bold text-foreground md:text-xl">Become a Hero</span>
+            <span className="mt-1 text-xs text-muted-foreground md:text-sm">Support someone</span>
+          </button>
+          <button type="button" onClick={() => handleRoleSelect("requester")} className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-amber-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-lg md:p-7 dark:border-amber-900/50">
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 transition-transform group-hover:scale-105 md:h-16 md:w-16"><HandHelping className="h-7 w-7 md:h-8 md:w-8" /></div>
+            <span className="text-base font-bold text-foreground md:text-xl">Requester</span>
+            <span className="mt-1 text-xs text-muted-foreground md:text-sm">Submit a request</span>
+          </button>
         </div>
 
         {/* Public impact walls: available to guests and signed-in users */}
