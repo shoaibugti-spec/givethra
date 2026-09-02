@@ -142,6 +142,7 @@ export default function ProfilePage() {
   const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
   const [heroesCount, setHeroesCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [supportsCount, setSupportsCount] = useState(0);
   const [relationshipType, setRelationshipType] = useState<"heroes" | "requesters" | null>(null);
   const [relationshipUsers, setRelationshipUsers] = useState<any[]>([]);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
@@ -194,6 +195,7 @@ export default function ProfilePage() {
       setProfile(prof);
       setHeroesCount(Number(prof?.heroes_count || prof?.followers_count || 0));
       setFollowingCount(Number(prof?.following_count || 0));
+      setSupportsCount(Number(prof?.supports_count || 0));
       setIsMyHero(Boolean(prof?.is_following));
 
       // --- Requester Stats (for everyone) ---
@@ -372,6 +374,7 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-5 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 shadow-sm">
                   <button onClick={() => openRelationshipList("requesters")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Requesters"><span className="block text-xl font-bold text-primary">{heroesCount}</span><span className="text-xs text-muted-foreground">Requesters</span></button>
                   <button onClick={() => openRelationshipList("heroes")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Heroes"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Heroes</span></button>
+                  <div className="text-center"><span className="block text-xl font-bold text-amber-600">{supportsCount.toLocaleString()}</span><span className="text-xs text-muted-foreground">Supports</span></div>
                 </div>
               </div>
             </div>
