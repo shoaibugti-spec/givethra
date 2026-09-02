@@ -378,6 +378,16 @@ export async function getFollowCounts(userId: string) {
   return readApiResponse(res);
 }
 
+export async function getFollowList(userId: string, type: "heroes" | "requesters") {
+  const res = await fetch(`${WORKER_URL}/api/follow/list?user=${encodeURIComponent(userId)}&type=${type}`, { headers: headers(), cache: "no-store" });
+  return readApiResponse(res);
+}
+
+export async function removeRequester(userId: string) {
+  const res = await fetch(`${WORKER_URL}/api/follow/requester`, { method: "DELETE", headers: headers(), body: JSON.stringify({ target_user_id: userId }) });
+  return readApiResponse(res);
+}
+
 export async function pinCommunityPost(postId: string) {
   const res = await fetch(`${WORKER_URL}/api/community/posts/pin`, { method: "POST", headers: headers(), body: JSON.stringify({ post_id: postId }) });
   return readApiResponse(res);

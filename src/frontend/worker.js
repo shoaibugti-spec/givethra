@@ -954,13 +954,27 @@ async function handleCommunityComments(request, env, user, url, parts, origin, c
 
 
 async function handleFollow(request, env, user, url, parts, origin, ctx) {
-  const targetId = (await readJson(request).catch(() => ({})))?.target_user_id || url.searchParams.get("target") || url.searchParams.get("user");
+  const body = await readJson(request).catch(() => ({}));
+  const targetId = body?.target_user_id || url.searchParams.get("target") || url.searchParams.get("user");
+  if (request.method === "GET" && parts[2] === "list") {
+    const userId = url.searchParams.get("user") || user?.user_id;
+    const type = url.searchParams.get("type") === "requesters" ? "requesters" : "heroes";
+    if (!userId) return json([], 200, origin);
+    const where = type === "requesters" ? "f.follower_id = ?" : "f.following_id = ?";
+    const selected = type === "requesters" ? "f.follower_id" : "f.following_id";
+    const rows = await env.DB.prepare(`SELECT f.created_at, u.user_id, COALESCE(p.full_name, u.full_name, u.email, 'User') AS full_name, p.avatar_url, u.kyc_status FROM follows f LEFT JOIN users u ON u.user_id = ${selected} LEFT JOIN profiles p ON p.user_id = ${selected} WHERE ${where} ORDER BY f.created_at DESC`).bind(userId).all();
+    return json((rows.results || []).map((row) => ({ ...row, is_verified: String(row.kyc_status || '').toLowerCase() === 'approved' })), 200, origin);
+  }
   if (!targetId) return json({ error: "Target user ID required" }, 400, origin);
   if (request.method === "GET") {
     if (parts[2] === "status") { const row = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,targetId).first() : null; return json({ isFollowing: Boolean(row) },200,origin); }
     const followers = await env.DB.prepare("SELECT COUNT(*) AS count FROM follows WHERE following_id=?").bind(targetId).first(); const following = await env.DB.prepare("SELECT COUNT(*) AS count FROM follows WHERE follower_id=?").bind(targetId).first(); return json({ followers:Number(followers?.count||0), following:Number(following?.count||0) },200,origin);
   }
   if (!user) return json({ error: "Authentication required" }, 401, origin);
+  if (parts[2] === "requester" && request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM follows WHERE follower_id = ? AND following_id = ?").bind(targetId, user.user_id).run();
+    return json({ success: true, removed: targetId }, 200, origin);
+  }
   if (targetId === user.user_id) return json({ error: "Cannot follow yourself" }, 400, origin);
   if (request.method === "POST") { await env.DB.prepare("INSERT OR IGNORE INTO follows (id,follower_id,following_id,created_at) VALUES (?,?,?,?)").bind(id(),user.user_id,targetId,now()).run(); await insertCommunityNotification(env,ctx,targetId,user.user_id,user.full_name,"new_follower","New Hero","became your Hero"); return json({ success:true, isFollowing:true },201,origin); }
   if (request.method === "DELETE") { await env.DB.prepare("DELETE FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,targetId).run(); return json({ success:true, isFollowing:false },200,origin); }
