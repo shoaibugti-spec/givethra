@@ -53,6 +53,15 @@ export default function RoleSelectionPage() {
           <p className="text-sm text-muted-foreground">How are you today?</p>
         </div>
 
+        {/* Compact public Community entry above the role cards */}
+        <Link to="/community" className="group mx-auto block w-full max-w-2xl rounded-2xl border border-primary/20 bg-primary/5 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"><MessageCircle className="h-5 w-5" aria-hidden="true" /></div>
+            <div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Givethra Community</p><p className="mt-1 text-sm font-semibold text-foreground sm:text-base">Share, discuss, and make an impact together.</p><p className="mt-1 text-xs text-muted-foreground">Guests and signed-in users can post, like, comment, and share.</p></div>
+            <span className="shrink-0 text-xl text-primary transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+          </div>
+        </Link>
+
         {/* Role Cards */}
         <div className="grid md:grid-cols-2 gap-6">
           {/* Become a Hero (دل کا آئیکن ہٹا دیا) */}
@@ -67,13 +76,6 @@ export default function RoleSelectionPage() {
               <p className="text-sm text-muted-foreground">
                 Support someone in need and change a life. Be a part of a trusted community of helpers. Even a small help can make a big difference.
               </p>
-              <Link to="/community" className="group w-full rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left transition-all hover:border-primary/50 hover:bg-primary/10 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"><MessageCircle className="h-5 w-5" aria-hidden="true" /></div>
-                  <div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Givethra Community</p><p className="mt-1 text-sm font-semibold text-foreground">Share, discuss, and make an impact together.</p><p className="mt-1 text-xs text-muted-foreground">Open to guests and signed-in users: post, like, comment, and share.</p></div>
-                  <span className="text-primary transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
-                </div>
-              </Link>
               <Button
                 size="lg"
                 className="w-full h-12 text-base font-semibold"
