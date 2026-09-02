@@ -361,28 +361,24 @@ export default function ProfilePage() {
                   <span className="text-white font-bold text-3xl">{initials}</span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-              {!isOwnProfile && <Button type="button" onClick={toggleHero} disabled={heroUpdating} className={`rounded-full px-4 h-9 font-semibold shadow-sm ${isMyHero ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
-                <HeartHandshake className="h-4 w-4 mr-1.5" />{heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
-              </Button>}
-              <div className="flex items-center gap-3 mr-2">
-                <button onClick={() => openRelationshipList("requesters")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Requesters"><span className="block text-xl font-bold text-primary">{heroesCount}</span><span className="text-xs text-muted-foreground">Requesters</span></button>
-                <button onClick={() => openRelationshipList("heroes")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Heroes"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Heroes</span></button>
-              </div>
-              <button
-  onClick={() => navigate({ to: "/edit-profile" })} disabled={!isOwnProfile}
-  className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors"
-  aria-label="Edit Profile"
->
-  <Pencil className="h-4 w-4 text-muted-foreground" />
-</button>
-              {isOwnProfile && <button aria-label="Profile menu" className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" onClick={() => setShowMenu(true)}><MoreHorizontal className="h-4 w-4" /></button>}
+              <div className="flex min-w-0 flex-1 flex-col items-end gap-3 pt-14">
+                <div className="flex items-center gap-2">
+                  {!isOwnProfile && <Button type="button" onClick={toggleHero} disabled={heroUpdating} className={`rounded-full px-4 h-9 font-semibold shadow-sm ${isMyHero ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                    <HeartHandshake className="h-4 w-4 mr-1.5" />{heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
+                  </Button>}
+                  {isOwnProfile && <button aria-label="Profile menu" className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" onClick={() => setShowMenu(true)}><MoreHorizontal className="h-4 w-4" /></button>}
+                </div>
+                <div className="flex items-center gap-5 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 shadow-sm">
+                  <button onClick={() => openRelationshipList("requesters")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Requesters"><span className="block text-xl font-bold text-primary">{heroesCount}</span><span className="text-xs text-muted-foreground">Requesters</span></button>
+                  <button onClick={() => openRelationshipList("heroes")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Heroes"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Heroes</span></button>
+                </div>
               </div>
             </div>
 
             <div className="space-y-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-xl font-bold text-foreground">{displayName}</h1>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap min-w-0">
+                  <h1 className="text-xl font-bold text-foreground">{displayName}</h1>
                 {badge && role === "hero" && (
                   <div className="flex items-center gap-1">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
@@ -407,6 +403,8 @@ export default function ProfilePage() {
                     </TooltipProvider>
                   </div>
                 )}
+                </div>
+                {isOwnProfile && <button type="button" onClick={() => navigate({ to: "/edit-profile" })} className="h-9 w-9 shrink-0 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" aria-label="Edit Profile"><Pencil className="h-4 w-4 text-muted-foreground" /></button>}
               </div>
               {(profile?.city || profile?.country) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
