@@ -675,6 +675,31 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="px-4 py-5 md:py-7 bg-background border-b border-border" aria-labelledby="community-cta-title">
+        <div className="max-w-7xl mx-auto">
+          <Link to="/community" className="group block overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+            <div className="flex flex-col gap-5 p-5 sm:p-6 md:flex-row md:items-center md:justify-between md:p-8">
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md transition-transform duration-300 group-hover:scale-105">
+                  <MessageCircle className="h-7 w-7" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-primary">Givethra Community</p>
+                  <h2 id="community-cta-title" className="font-display text-xl font-bold text-foreground sm:text-2xl">Share your voice. Be part of the change.</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">Join the conversation, post your thoughts, like helpful stories, comment with kindness, and share moments of real impact. <strong className="text-foreground">Anyone can join as a guest or sign in for a personalized experience.</strong></p>
+                </div>
+              </div>
+              <span className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition-colors group-hover:bg-primary/90 md:min-w-44">Enter Community <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-primary/10 bg-primary/5 px-5 py-3 text-xs font-medium text-muted-foreground sm:px-6 md:px-8">
+              <span className="inline-flex items-center gap-1.5"><MessageCircle className="h-3.5 w-3.5 text-primary" /> Post freely</span>
+              <span className="inline-flex items-center gap-1.5"><Heart className="h-3.5 w-3.5 text-rose-500" /> Like and support</span>
+              <span className="inline-flex items-center gap-1.5"><ChevronRight className="h-3.5 w-3.5 text-primary" /> Comment and share</span>
+            </div>
+          </Link>
+        </div>
+      </section>
+
       {/* WhatsApp Channel & Customer Support */}
       <section className="py-4 px-4 bg-background border-b border-border">
         <div className="max-w-7xl mx-auto flex items-center justify-center gap-6 flex-wrap">
