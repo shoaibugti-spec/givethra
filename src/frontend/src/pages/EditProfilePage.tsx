@@ -137,6 +137,10 @@ const LANGUAGES = [
 ];
 
 const BIO_MAX = 200;
+const BIO_CONTACT_REGEX = /\d|@|https?:\/\/|www\.|whats?app|e[- ]?mail|email|phone|contact|telegram|signal|wechat|imo/i;
+function getBioError(value: string): string | null {
+  return BIO_CONTACT_REGEX.test(value) ? "Bio میں نمبر، punctuation/contact details، @، email یا phone information شامل نہیں کر سکتے۔" : null;
+}
 
 function getInitials(name: string): string {
   return name
@@ -163,6 +167,7 @@ export default function EditProfilePage() {
   const [city, setCity] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [bio, setBio] = useState("");
+  const [bioError, setBioError] = useState<string | null>(null);
   const [preferredLanguage, setPreferredLanguage] = useState("en");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -249,6 +254,12 @@ export default function EditProfilePage() {
   async function handleSave() {
     if (!fullName.trim()) {
       toast.error("Please enter your full name.");
+      return;
+    }
+    const validationError = getBioError(bio);
+    if (validationError) {
+      setBioError(validationError);
+      toast.error(validationError);
       return;
     }
     setSaving(true);
@@ -467,15 +478,18 @@ export default function EditProfilePage() {
                       {bioRemaining} / {BIO_MAX}
                     </span>
                   </div>
+                  <p className="text-xs text-muted-foreground">Bio میں نمبر، punctuation، @، email یا phone/contact information نہیں لکھ سکتے۔</p>
                   <Textarea
                     id="bio"
                     value={bio}
-                    onChange={(e) => setBio(e.target.value.slice(0, BIO_MAX))}
+                    onChange={(e) => { const next = e.target.value.slice(0, BIO_MAX); setBio(next); setBioError(getBioError(next)); }}
                     placeholder="Tell others a little about yourself..."
                     rows={3}
-                    className="resize-none"
+                    className={`resize-none ${bioError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                     maxLength={BIO_MAX}
+                    aria-invalid={Boolean(bioError)}
                   />
+                  {bioError && <p role="alert" className="text-xs text-destructive font-medium">{bioError}</p>}
                 </div>
               </CardContent>
             </Card>

@@ -520,31 +520,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Contact Info */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Mail className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Email Address</p>
-              <p className="text-sm font-semibold text-foreground">{user?.email ?? "Not set"}</p>
-            </div>
-            <CheckCircle2 className="h-5 w-5 text-teal-500 ml-auto" />
-          </div>
-          {profile?.phone_number && (
-            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Phone className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Phone Number</p>
-                <p className="text-sm font-semibold text-foreground">{profile.phone_number}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
         <Dialog open={showMenu} onOpenChange={setShowMenu}>
           <DialogContent className="max-w-sm">
             <DialogHeader><DialogTitle>Account menu</DialogTitle><DialogDescription>Manage your profile and account settings.</DialogDescription></DialogHeader>

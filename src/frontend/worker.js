@@ -377,6 +377,21 @@ async function addCredits(env, userId, amount, type, description, referenceId = 
 // ============================================================
 //  PROFILE HANDLER
 // ============================================================
+function hasBioContactInfo(value) {
+  return /\d|@|https?:\/\/|www\.|whats?app|e[- ]?mail|email|phone|contact|telegram|signal|wechat|imo/i.test(String(value || ""));
+}
+
+function withoutPrivateContact(value) {
+  if (!value || typeof value !== "object") return value;
+  const safe = { ...value };
+  delete safe.phone_number;
+  delete safe.email;
+  delete safe.phone;
+  delete safe.mobile;
+  delete safe.contact;
+  return safe;
+}
+
 async function handleProfile(request, env, user, parts, origin) {
   const userId = String(parts[2] || user.user_id || "");
   if (!userId || (request.method !== "GET" && !canAccessUser(user, userId))) return json({ error: "Forbidden" }, 403, origin);
@@ -391,7 +406,8 @@ async function handleProfile(request, env, user, parts, origin) {
         const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
         const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
         const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-        return json({ ...variant, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
+        const profileData = user?.user_id === userId ? variant : withoutPrivateContact(variant);
+        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
       }
     } catch { /* migration is additive; use legacy profile until applied */ }
     const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
@@ -399,12 +415,17 @@ async function handleProfile(request, env, user, parts, origin) {
     const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
     const activeCase = profileRole === "requester" ? await env.DB.prepare("SELECT * FROM case_submissions WHERE user_id=? AND lower(COALESCE(status,'')) IN ('approved','open','in_progress') ORDER BY submitted_at DESC LIMIT 1").bind(userId).first() : null;
     const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-    return json({ ...(profile || {}), user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), is_following:Boolean(following), posts:posts.results||[], active_case:activeCase||null }, 200, origin);
+    const profileData = user?.user_id === userId ? (profile || {}) : withoutPrivateContact(profile || {});
+    const safeCase = user?.user_id === userId ? activeCase : withoutPrivateContact(activeCase);
+    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), is_following:Boolean(following), posts:posts.results||[], active_case:safeCase||null }, 200, origin);
   }
   if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
   const body = await readJson(request);
   const values = pick(body, allowedFields);
   if (Object.keys(values).length === 0) return json({ error: "No valid fields to update" }, 400, origin);
+  if (Object.prototype.hasOwnProperty.call(values, "bio") && hasBioContactInfo(values.bio)) {
+    return json({ error: "Bio cannot contain phone numbers, email addresses, @ symbols, or contact information." }, 422, origin);
+  }
   const timestamp = now();
 
   try {
