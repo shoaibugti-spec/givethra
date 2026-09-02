@@ -43,7 +43,6 @@ import {
   MessageCircle,
   ShieldCheck,
   Gift,
-  Users,
   Battery,
   Flame,
   Droplets,
@@ -203,7 +202,6 @@ export default function HomePage() {
   const [balance, setBalance] = useState(0);
   const [unlockCount, setUnlockCount] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
-  const [activeCaseSlide, setActiveCaseSlide] = useState(-1);
 
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -508,23 +506,6 @@ export default function HomePage() {
   }
 
   const currentSlide = guideSlides[slideIndex] ?? HAND_SLIDE;
-  const activeCaseCategories = Object.entries(
-    cases.reduce<Record<string, number>>((acc, currentCase) => {
-      const category = String(currentCase?.category || "Other");
-      acc[category] = (acc[category] || 0) + 1;
-      return acc;
-    }, {})
-  ).map(([category, count]) => ({ category, count }));
-  const activeCaseSlideData = activeCaseSlide >= 0 ? activeCaseCategories[activeCaseSlide] : null;
-
-  useEffect(() => {
-    setActiveCaseSlide(-1);
-    if (activeCaseCategories.length === 0) return;
-    const timer = setInterval(() => {
-      setActiveCaseSlide((previous) => previous >= activeCaseCategories.length - 1 ? -1 : previous + 1);
-    }, 3500);
-    return () => clearInterval(timer);
-  }, [cases.length, activeCaseCategories.length]);
 
   function renderSlideContent() {
     if (currentSlide.type === "image") {
@@ -639,34 +620,58 @@ export default function HomePage() {
         </div>
       )}
 
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-br from-primary/[0.04] via-background to-primary/[0.08]">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 -left-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative mx-auto max-w-5xl px-4 py-7 md:py-10">
-          <div className="mb-5 text-center">
-            <h1 className="font-display text-3xl font-bold tracking-tight text-foreground md:text-4xl">Real People. <span className="text-primary">Real Help.</span></h1>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground md:text-base">Connect with verified people, support genuine needs, and create meaningful impact.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:gap-5">
-            <button type="button" onClick={() => navigate({ to: "/community" })} className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-primary/15 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg md:p-7">
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-transform group-hover:scale-105 md:h-16 md:w-16"><Users className="h-7 w-7 md:h-8 md:w-8" /></div>
-              <span className="text-base font-bold text-foreground md:text-xl">Community</span>
-              <span className="mt-1 text-xs text-muted-foreground md:text-sm">My Heroes · Share & Discuss</span>
-            </button>
-            <button type="button" onClick={() => { if (cases.length > 0) resultsRef.current?.scrollIntoView({ behavior: "smooth" }); }} className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-3xl border border-rose-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-300 hover:shadow-lg md:p-7 dark:border-rose-900/50">
-              {activeCaseSlideData ? (() => { const style = CATEGORY_SLIDE_STYLE[activeCaseSlideData.category] || { icon: FileText, color: "text-primary", bg: "bg-primary/10" }; const Icon = style.icon; return <><div className={`mb-3 flex h-14 w-14 items-center justify-center rounded-2xl ${style.bg} ${style.color}`}><Icon className="h-7 w-7 md:h-8 md:w-8" /></div><span className="max-w-full truncate text-base font-bold text-foreground md:text-xl">{activeCaseSlideData.category}</span><span className="mt-1 text-xs text-muted-foreground md:text-sm">{activeCaseSlideData.count} active case{activeCaseSlideData.count === 1 ? "" : "s"}</span></>; })() : <><div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600"><Bell className="h-7 w-7 md:h-8 md:w-8" /></div><span className="text-base font-bold text-foreground md:text-xl">{cases.length} Active Cases</span><span className="mt-1 text-xs text-muted-foreground md:text-sm">{cases.length ? "Tap to help now" : "No active needs right now"}</span></>}
-            </button>
-            <button type="button" onClick={() => navigate({ to: "/become-hero" })} className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-emerald-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-lg md:p-7 dark:border-emerald-900/50">
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 transition-transform group-hover:scale-105 md:h-16 md:w-16"><Heart className="h-7 w-7 md:h-8 md:w-8" /></div>
-              <span className="text-base font-bold text-foreground md:text-xl">Become a Hero</span>
-              <span className="mt-1 text-xs text-muted-foreground md:text-sm">Support someone</span>
-            </button>
-            <button type="button" onClick={() => navigate({ to: "/need-help" })} className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-amber-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-lg md:p-7 dark:border-amber-900/50">
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 transition-transform group-hover:scale-105 md:h-16 md:w-16"><FileText className="h-7 w-7 md:h-8 md:w-8" /></div>
-              <span className="text-base font-bold text-foreground md:text-xl">Requester</span>
-              <span className="mt-1 text-xs text-muted-foreground md:text-sm">Submit a request</span>
-            </button>
-          </div>
+      <section className="relative overflow-hidden bg-card border-b border-border">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute bottom-0 -left-16 h-48 w-48 rounded-full bg-primary/8 blur-2xl" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 pt-8 pb-6 md:py-12 flex flex-col md:flex-row items-center gap-6 md:gap-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55 }}
+            className="flex-1 space-y-4 text-center md:text-left"
+          >
+            <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
+              <span className="text-foreground">Real People.</span><br />
+              <span className="text-primary">Real Needs. Real Help.</span>
+            </h1>
+            <p className="text-base text-muted-foreground max-w-md">
+              Connect with verified people, support genuine needs, and create
+              meaningful impact.
+            </p>
+
+            {!isAuthenticated && (
+              <div className="flex gap-3 justify-center md:justify-start">
+                <Button
+                  size="lg"
+                  onClick={() => navigate({ to: "/become-hero" })}
+                  className="h-11 px-6 font-semibold flex-1 sm:flex-none"
+                >
+                  Become a Hero
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate({ to: "/need-help" })}
+                  className="h-11 px-6 font-semibold flex-1 sm:flex-none"
+                >
+                  Request Help
+                </Button>
+              </div>
+            )}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.65, delay: 0.15 }}
+            className="flex-1 w-full space-y-4"
+          >
+              <div id="givethra-help-slider" className="relative h-52 w-full rounded-2xl overflow-hidden shadow-xl touch-pan-y" onTouchStart={handleSliderTouchStart} onTouchEnd={handleSliderTouchEnd}>
+              {renderSlideContent()}
+            </div>
+          </motion.div>
         </div>
       </section>
 
