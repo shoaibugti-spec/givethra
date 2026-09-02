@@ -1,5 +1,6 @@
 // src/frontend/src/pages/ProfilePage.tsx
-// Givethra - Complete Role-based Profile Page with Sandwich Menu, Badges, Stats, and Follow System
+// Givethra - Role-based Profile Page
+// Shows different data for Hero vs Requester
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -35,12 +36,7 @@ import {
   TrendingDown,
   Info,
   HelpCircle,
-  Users,
-  MoreHorizontal,
-  Pin,
-  Heart,
-  Globe,
-  Share2,
+  Users, MoreHorizontal, Pin,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -361,7 +357,6 @@ export default function ProfilePage() {
           {/* Avatar & Name */}
           <div className="px-5 pb-5">
             <div className="flex items-end justify-between -mt-14 mb-3">
-              {/* Avatar */}
               <div className="h-28 w-28 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary relative z-10">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
@@ -369,82 +364,25 @@ export default function ProfilePage() {
                   <span className="text-white font-bold text-3xl">{initials}</span>
                 )}
               </div>
-
-              {/* Right side buttons: Hero toggle + Edit + Sandwich */}
-              <div className="flex min-w-0 flex-1 flex-col items-end gap-2 pt-14">
+              <div className="flex min-w-0 flex-1 flex-col items-end gap-3 pt-14">
                 <div className="flex items-center gap-2">
-                  {/* Follow/Hero button (only for other users) */}
-                  {!isOwnProfile && (
-                    <Button
-                      type="button"
-                      onClick={toggleHero}
-                      disabled={heroUpdating}
-                      className={`rounded-full px-4 h-9 font-semibold shadow-sm ${
-                        isMyHero
-                          ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15"
-                          : "bg-primary text-primary-foreground hover:bg-primary/90"
-                      }`}
-                    >
-                      <HeartHandshake className="h-4 w-4 mr-1.5" />
-                      {heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
-                    </Button>
-                  )}
-
-                  {/* Edit Pencil Icon (only for own profile) */}
-                  {isOwnProfile && (
-                    <button
-                      type="button"
-                      onClick={() => navigate({ to: "/edit-profile" })}
-                      title="Edit Profile"
-                      className="h-9 w-9 shrink-0 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors"
-                      aria-label="Edit Profile"
-                    >
-                      <Pencil className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  )}
-
-                  {/* Sandwich Menu (•••) — only for own profile */}
-                  {isOwnProfile && (
-                    <button
-                      aria-label="Profile menu"
-                      className="h-9 w-9 shrink-0 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors"
-                      onClick={() => setShowMenu(true)}
-                    >
-                      <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  )}
+                  {!isOwnProfile && <Button type="button" onClick={toggleHero} disabled={heroUpdating} className={`rounded-full px-4 h-9 font-semibold shadow-sm ${isMyHero ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                    <HeartHandshake className="h-4 w-4 mr-1.5" />{heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
+                  </Button>}
+                  {isOwnProfile && <button aria-label="Profile menu" className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" onClick={() => setShowMenu(true)}><MoreHorizontal className="h-4 w-4" /></button>}
                 </div>
-
-                {/* Stats Row: Requesters | Heroes | Supports */}
                 <div className="flex items-center gap-5 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 shadow-sm">
-                  <button
-                    onClick={() => openRelationshipList("requesters")}
-                    className="text-center hover:opacity-70 transition-opacity"
-                    aria-label="View Requesters"
-                  >
-                    <span className="block text-xl font-bold text-primary">{heroesCount}</span>
-                    <span className="text-xs text-muted-foreground">Requesters</span>
-                  </button>
-                  <button
-                    onClick={() => openRelationshipList("heroes")}
-                    className="text-center hover:opacity-70 transition-opacity"
-                    aria-label="View Heroes"
-                  >
-                    <span className="block text-xl font-bold text-foreground">{followingCount}</span>
-                    <span className="text-xs text-muted-foreground">Heroes</span>
-                  </button>
-                  <div className="text-center">
-                    <span className="block text-xl font-bold text-amber-600">{supportsCount.toLocaleString()}</span>
-                    <span className="text-xs text-muted-foreground">Supports</span>
-                  </div>
+                  <button onClick={() => openRelationshipList("requesters")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Requesters"><span className="block text-xl font-bold text-primary">{heroesCount}</span><span className="text-xs text-muted-foreground">Requesters</span></button>
+                  <button onClick={() => openRelationshipList("heroes")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Heroes"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Heroes</span></button>
+                  <div className="text-center"><span className="block text-xl font-bold text-amber-600">{supportsCount.toLocaleString()}</span><span className="text-xs text-muted-foreground">Supports</span></div>
                 </div>
               </div>
             </div>
 
-            {/* Name & Badge */}
             <div className="space-y-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-xl font-bold text-foreground truncate">{displayName}</h1>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap min-w-0">
+                  <h1 className="text-xl font-bold text-foreground truncate">{displayName}</h1>
                 {badge && role === "hero" && (
                   <div className="flex items-center gap-1">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
@@ -469,15 +407,15 @@ export default function ProfilePage() {
                     </TooltipProvider>
                   </div>
                 )}
+                </div>
+                {isOwnProfile && <button type="button" onClick={() => navigate({ to: "/edit-profile" })} title="Edit Profile" className="h-9 w-9 shrink-0 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" aria-label="Edit Profile"><Pencil className="h-4 w-4 text-muted-foreground" /></button>}
               </div>
-
               {(profile?.city || profile?.country) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <MapPin className="h-3 w-3" />{" "}
                   {[profile?.city, profile?.country].filter(Boolean).join(", ")}
                 </p>
               )}
-
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" /> Member since 2026
@@ -488,13 +426,11 @@ export default function ProfilePage() {
                   </span>
                 )}
               </div>
-
               {profile?.bio && (
                 <p className="text-sm text-muted-foreground italic pt-1">{profile.bio}</p>
               )}
             </div>
 
-            {/* Verification Badges */}
             <div className="mt-3 flex flex-wrap gap-2">
               {verificationBadges.map((badge) => (
                 <span
@@ -519,9 +455,7 @@ export default function ProfilePage() {
           <>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">
-                  {totalAmountSpent > 0 ? `$${totalAmountSpent.toFixed(2)}` : "—"}
-                </div>
+                <div className="text-2xl font-bold text-foreground">{totalAmountSpent > 0 ? `$${totalAmountSpent.toFixed(2)}` : "—"}</div>
                 <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                   <HandCoins className="h-3 w-3" /> Total Spent
                 </div>
@@ -614,55 +548,28 @@ export default function ProfilePage() {
           </>
         )}
 
-        {/* Community Posts Section */}
+
         {Array.isArray(profile?.posts) && profile.posts.length > 0 && (
           <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold">Community Posts</h2>
-              <span className="text-xs text-muted-foreground">{profile.posts.length} posts</span>
-            </div>
-            {profile.posts.map((post: any) => (
-              <article key={post.id} className="rounded-xl border border-border p-3">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {post.is_pinned ? <Pin className="h-3 w-3 text-primary" /> : null}
-                  <span>{post.is_pinned ? "Pinned" : "Community post"}</span>
-                </div>
-                <p className="mt-2 text-sm whitespace-pre-wrap">{post.message}</p>
-              </article>
-            ))}
+            <div className="flex items-center justify-between"><h2 className="font-semibold">Community Posts</h2><span className="text-xs text-muted-foreground">{profile.posts.length} posts</span></div>
+            {profile.posts.map((post: any) => <article key={post.id} className="rounded-xl border border-border p-3"><div className="flex items-center gap-2 text-xs text-muted-foreground">{post.is_pinned ? <Pin className="h-3 w-3 text-primary" /> : null}<span>{post.is_pinned ? "Pinned" : "Community post"}</span></div><p className="mt-2 text-sm whitespace-pre-wrap">{post.message}</p></article>)}
           </div>
         )}
 
-        {/* Sandwich Menu Dialog */}
         <Dialog open={showMenu} onOpenChange={setShowMenu}>
           <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Account Menu</DialogTitle>
-              <DialogDescription>Manage your profile and account settings.</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Account menu</DialogTitle><DialogDescription>Manage your profile and account settings.</DialogDescription></DialogHeader>
             <div className="rounded-2xl border border-border overflow-hidden">
               {menuItems.map((item, idx) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    setShowMenu(false);
-                    navigate({ to: item.to as "/" });
-                  }}
-                  className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors ${
-                    idx < menuItems.length - 1 ? "border-b border-border" : ""
-                  }`}
-                >
-                  <span className="text-primary">{item.icon}</span>
-                  <span className="flex-1 text-left">{item.label}</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <button key={item.label} type="button" onClick={() => { setShowMenu(false); navigate({ to: item.to as "/" }); }} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors ${idx < menuItems.length - 1 ? "border-b border-border" : ""}`}>
+                  <span className="text-primary">{item.icon}</span><span className="flex-1 text-left">{item.label}</span><ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </button>
               ))}
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Logout Button */}
+        {/* Logout */}
         <button
           type="button"
           onClick={() => setShowLogout(true)}
@@ -750,59 +657,24 @@ export default function ProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Relationship List Dialog (Requesters / Heroes) */}
       <Dialog open={relationshipType !== null} onOpenChange={(open) => !open && setRelationshipType(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{relationshipType === "heroes" ? "Your Heroes" : "Your Requesters"}</DialogTitle>
-            <DialogDescription>
-              {relationshipType === "heroes" ? "People you have chosen as Heroes." : "People who have chosen you as their Hero."}
-            </DialogDescription>
+            <DialogDescription>{relationshipType === "heroes" ? "People you have chosen as Heroes." : "People who have chosen you as their Hero."}</DialogDescription>
           </DialogHeader>
           <div className="max-h-[55vh] overflow-y-auto space-y-2">
-            {relationshipLoading ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
-            ) : relationshipUsers.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">No {relationshipType} yet.</p>
-            ) : (
-              relationshipUsers.map((item) => {
-                const name = item.full_name || "User";
-                const initials = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
-                return (
-                  <div key={item.user_id} className="flex items-center gap-3 rounded-xl border border-border p-3">
-                    <button
-                      onClick={() => {
-                        setRelationshipType(null);
-                        navigate({ to: "/profile/$id", params: { id: String(item.user_id) } });
-                      }}
-                      className="h-10 w-10 rounded-full overflow-hidden bg-primary text-white flex items-center justify-center font-semibold shrink-0"
-                    >
-                      {item.avatar_url ? (
-                        <img src={item.avatar_url} alt={name} className="h-full w-full object-cover" />
-                      ) : (
-                        initials
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setRelationshipType(null);
-                        navigate({ to: "/profile/$id", params: { id: String(item.user_id) } });
-                      }}
-                      className="flex-1 text-left font-medium truncate"
-                    >
-                      {name}
-                      {item.is_verified ? <span className="ml-1 text-teal-600">✓</span> : null}
-                    </button>
-                    {isOwnProfile && (
-                      <Button variant="outline" size="sm" onClick={() => removeRelationship(String(item.user_id))}>
-                        {relationshipType === "heroes" ? "Unhero" : "Remove"}
-                      </Button>
-                    )}
-                  </div>
-                );
-              })
-            )}
+            {relationshipLoading ? <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p> : relationshipUsers.length === 0 ? <p className="text-sm text-muted-foreground py-6 text-center">No {relationshipType} yet.</p> : relationshipUsers.map((item) => {
+              const name = item.full_name || "User";
+              const initials = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
+              return <div key={item.user_id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <button onClick={() => { setRelationshipType(null); navigate({ to: "/profile/$id", params: { id: String(item.user_id) } }); }} className="h-10 w-10 rounded-full overflow-hidden bg-primary text-white flex items-center justify-center font-semibold shrink-0">
+                  {item.avatar_url ? <img src={item.avatar_url} alt={name} className="h-full w-full object-cover" /> : initials}
+                </button>
+                <button onClick={() => { setRelationshipType(null); navigate({ to: "/profile/$id", params: { id: String(item.user_id) } }); }} className="flex-1 text-left font-medium truncate">{name}{item.is_verified ? <span className="ml-1 text-teal-600">✓</span> : null}</button>
+                {isOwnProfile && <Button variant="outline" size="sm" onClick={() => removeRelationship(String(item.user_id))}>{relationshipType === "heroes" ? "Unhero" : "Remove"}</Button>}
+              </div>;
+            })}
           </div>
         </DialogContent>
       </Dialog>
