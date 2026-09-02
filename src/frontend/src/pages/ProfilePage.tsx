@@ -134,6 +134,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null);
   const [showLogout, setShowLogout] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
   const [heroesCount, setHeroesCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -164,6 +165,9 @@ export default function ProfilePage() {
   const [badge, setBadge] = useState<{ title: string; emoji: string; description: string; icon: JSX.Element; color: string } | null>(null);
 
   useEffect(() => {
+    setProfile(null);
+    setKycData(null);
+    setProfileLoading(true);
     if (!profileUserId) {
       navigate({ to: "/sign-in" });
       return;
@@ -172,6 +176,7 @@ export default function ProfilePage() {
   }, [isAuthenticated, location.pathname, role, profileUserId]);
 
   async function loadData() {
+    setProfileLoading(true);
     try {
       const [kyc, cases, prof, resolutions, unlocks] = await Promise.all([
         isOwnProfile && user ? getKycSubmission(user.id) : Promise.resolve(null),
@@ -233,6 +238,8 @@ export default function ProfilePage() {
 
     } catch (err) {
       console.error("Failed to load profile data:", err);
+    } finally {
+      setProfileLoading(false);
     }
   }
 
@@ -291,6 +298,11 @@ export default function ProfilePage() {
       .join("")
       .toUpperCase()
       .slice(0, 2) || "G";
+  const profileReady = !profileLoading && profile && String(profile.user_id || "") === String(profileUserId);
+
+  if (!profileReady) {
+    return <Layout><div className="max-w-xl mx-auto px-4 pt-8 pb-24"><div className="rounded-3xl border border-border bg-card p-8 text-center"><div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted animate-pulse" /><div className="mx-auto h-5 w-40 rounded bg-muted animate-pulse" /><p className="mt-4 text-sm text-muted-foreground">Loading profile...</p></div></div></Layout>;
+  }
 
   return (
     <Layout>
