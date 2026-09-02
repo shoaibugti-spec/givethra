@@ -34,7 +34,7 @@ import { toast } from "sonner";
 function isApprovedResolution(resolution: any): boolean {
   if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
-  if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)) return true;
+  if (["completed", "approved", "verified", "confirmed"].includes(status) && [1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
   if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
   if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
   return false;

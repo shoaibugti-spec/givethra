@@ -3,7 +3,10 @@
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
 
 const PUBLIC_ORIGIN = "https://givethra.org";
-const ADMIN_EMAILS = new Set(["shoaibahmedbugti5@gmail.com"]);
+const ADMIN_EMAILS = new Set([
+  "shoaibugti@gmail.com",
+  "shoaibahmedbugti5@gmail.com",
+]);
 
 function googleClientId(env) {
   return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || "").trim();
@@ -1889,7 +1892,9 @@ async function handleRequest(request, env, ctx) {
             filters.push("r.hero_id = ?");
             bind.push(heroId);
           } else if (String(user?.email || "").trim()) {
-            filters.push("lower(u.email) = lower(?)");
+            // If IDs differ, return only rows owned by that authenticated email.
+  // A helper may read only their own resolution rows.
+  filters.push("lower(u.email) = lower(?)");
             bind.push(String(user.email).trim());
           } else {
             return json({ error: "Forbidden" }, 403, origin);
