@@ -1165,12 +1165,13 @@ async function handleNotifications(request, env, user, url, parts, origin) {
 async function synchronizeCompletedCase(env, resolutionId) {
   // Get the resolution and verify it's truly completed
   const resolution = await env.DB.prepare(
-    "SELECT case_id, paid_to, status, admin_confirmed FROM case_resolutions WHERE id = ?"
+    "SELECT r.case_id, r.hero_id, r.seeker_id, r.paid_to, r.status, r.admin_confirmed, c.title AS case_title FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id WHERE r.id = ?"
   ).bind(resolutionId).first();
   if (!resolution?.case_id) return null;
   
-  const isApproved = String(resolution.status || "").toLowerCase() === "completed" && 
-                      [1, "1", true, "true"].includes(resolution.admin_confirmed);
+  const normalizedStatus = String(resolution.status || "").trim().toLowerCase();
+  const isApproved = ["completed", "approved", "seeker_confirmed"].includes(normalizedStatus) &&
+                      [1, "1", true, "true", "yes"].includes(resolution.admin_confirmed);
   if (!isApproved) return null;
 
   // Sum all approved resolutions for this case
@@ -1179,8 +1180,8 @@ async function synchronizeCompletedCase(env, resolutionId) {
             COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0)) 
                       FROM case_resolutions r
                       WHERE r.case_id = c.id
-                        AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
-                        AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')), 0) AS verified_total
+                        AND lower(COALESCE(r.status, '')) IN ('completed', 'approved', 'seeker_confirmed')
+                        AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true', 'yes')), 0) AS verified_total
      FROM case_submissions c WHERE c.id = ?`
   ).bind(resolution.case_id).first();
   if (!totals) return null;
@@ -1202,6 +1203,15 @@ async function synchronizeCompletedCase(env, resolutionId) {
   }
 
   if (totals.user_id) await syncUserCaseCounters(env, totals.user_id);
+  if (nextStatus === "completed") {
+    const title = resolution.case_title || "your case";
+    if (resolution.hero_id) {
+      await sendNotification(env, resolution.hero_id, "help_completed", "Your help was verified ✅", `Your help for “${title}” was verified and completed.`, `/cases/${resolution.case_id}`);
+    }
+    if (totals.user_id && totals.user_id !== resolution.hero_id) {
+      await sendNotification(env, totals.user_id, "help_completed", "Your case is complete ✅", `Your case “${title}” has received verified help and is now complete.`, `/cases/${resolution.case_id}`);
+    }
+  }
   return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "open" };
 }
 
@@ -2093,7 +2103,7 @@ async function handleRequest(request, env, ctx) {
           const params = fields.map((field) => values[field]);
           await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((f) => `${f} = ?`).join(", ")} WHERE id = ?`).bind(...params, parts[2]).run();
           const updated = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(parts[2]).first();
-          if (updated && String(updated.status || "").toLowerCase() === "completed" && [1, "1", true, "true"].includes(updated.admin_confirmed)) {
+          if (updated && ["completed", "approved", "seeker_confirmed"].includes(String(updated.status || "").trim().toLowerCase()) && [1, "1", true, "true", "yes"].includes(updated.admin_confirmed)) {
             await synchronizeCompletedCase(env, parts[2]);
           }
           return json(updated, 200, origin);

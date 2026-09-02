@@ -34,21 +34,16 @@ import { toast } from "sonner";
 function isApprovedResolution(resolution: any): boolean {
   if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
-  const caseStatus = String(resolution?.case_status || "").trim().toLowerCase();
-  if (caseStatus === "completed") return true;
-  if (["completed", "approved", "verified", "confirmed"].includes(status) && [1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
-  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
-  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
-  return false;
+  return ["completed", "approved", "seeker_confirmed"].includes(status) &&
+    [1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed);
 }
 
 // Helper: Check if resolution is a contribution (paid to Givethra)
 function isContributionResolution(resolution: any): boolean {
   if (!resolution) return false;
-  const marker = String(
-    resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? ""
-  ).trim().toLowerCase();
-  return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
+  const paidTo = String(resolution?.paid_to ?? resolution?.paidTo ?? "").trim().toLowerCase();
+  const paymentType = String(resolution?.payment_type ?? resolution?.paymentType ?? "").trim().toLowerCase();
+  return paidTo === "givethra" || paymentType === "partial";
 }
 
 // Privacy: mask name (first name + middle initial)
@@ -280,10 +275,9 @@ export default function MyHelpPage() {
           category: "Other",
           currency: "PKR",
         };
-        const isPartial = unlock.payment_type === "partial";
         recordList.push({
           id: unlock.id,
-          type: isPartial ? "contribution" : "direct",
+          type: "unlock",
           amount: Number(unlock.pledged_amount ?? 0),
           transactionId: "N/A",
           receiptUrl: null,
@@ -365,7 +359,7 @@ export default function MyHelpPage() {
                 </TabsList>
               </Tabs>
               <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
-                <TabsList className="grid grid-cols-3 w-full">
+                <TabsList className="grid grid-cols-4 w-full">
                   <TabsTrigger value="all">All Status</TabsTrigger>
                   <TabsTrigger value="pending">Pending</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
@@ -407,7 +401,7 @@ export default function MyHelpPage() {
                               {cfg.icon} {cfg.label}
                             </span>
                             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                              {record.type === "contribution" ? "🤝 Contribution" : "🦸 Direct Help"}
+                              {record.type === "contribution" ? "🤝 Contribution" : record.type === "unlock" ? "🔓 Unlock Only" : "🦸 Direct Help"}
                             </span>
                             {isUnlockOnly && (
                               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">

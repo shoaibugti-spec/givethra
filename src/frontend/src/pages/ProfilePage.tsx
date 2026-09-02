@@ -51,7 +51,8 @@ import {
 import {
   getKycSubmission,
   getCasesByUser,
-  getProfile,
+  getFullProfile,
+  getUserSupports,
   getCaseResolutionsByHero,
   getCaseUnlocksByHero,
   getFollowList,
@@ -183,19 +184,20 @@ export default function ProfilePage() {
   async function loadData() {
     setProfileLoading(true);
     try {
-      const [kyc, cases, prof, resolutions, unlocks] = await Promise.all([
+      const [kyc, cases, prof, resolutions, unlocks, supportData] = await Promise.all([
         isOwnProfile && user ? getKycSubmission(user.id) : Promise.resolve(null),
         isOwnProfile && user ? getCasesByUser(user.id) : Promise.resolve([]),
-        getProfile(profileUserId, role),
+        getFullProfile(profileUserId, role),
         isOwnProfile && user ? getCaseResolutionsByHero(user.id) : Promise.resolve([]),
         isOwnProfile && user ? getCaseUnlocksByHero(user.id) : Promise.resolve([]),
+        getUserSupports(profileUserId).catch(() => null),
       ]);
 
       setKycData(kyc);
       setProfile(prof);
       setHeroesCount(Number(prof?.heroes_count || prof?.followers_count || 0));
       setFollowingCount(Number(prof?.following_count || 0));
-      setSupportsCount(Number(prof?.supports_count || 0));
+      setSupportsCount(Number(supportData?.supports || prof?.supports_count || 0));
       setIsMyHero(Boolean(prof?.is_following));
 
       // --- Requester Stats (for everyone) ---
@@ -315,14 +317,9 @@ export default function ProfilePage() {
   ];
 
   const menuItems = [
-    { icon: <Pencil className="h-5 w-5" />, label: "Edit Profile", to: "/edit-profile" },
-    { icon: <Briefcase className="h-5 w-5" />, label: "My Cases Dashboard", to: "/my-cases" },
-    { icon: <Bell className="h-5 w-5" />, label: "Notifications", to: "/notifications" },
-    { icon: <Wallet className="h-5 w-5" />, label: "Wallet", to: "/wallet" },
-    { icon: <ShieldCheck className="h-5 w-5" />, label: "Security", to: "/security" },
-    { icon: <KeyRound className="h-5 w-5" />, label: "Google Account Security", to: "/security" },
-    { icon: <Lock className="h-5 w-5" />, label: "Privacy", to: "/account-privacy" },
     { icon: <Settings className="h-5 w-5" />, label: "Settings", to: "/settings" },
+    { icon: <Lock className="h-5 w-5" />, label: "Privacy", to: "/privacy" },
+    { icon: <ShieldCheck className="h-5 w-5" />, label: "Security", to: "/security" },
   ];
 
   const initials =
