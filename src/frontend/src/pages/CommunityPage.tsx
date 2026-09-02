@@ -311,7 +311,6 @@ export default function CommunityPage() {
   };
 
   const handleRepost = async (post: Post) => {
-    if (!isAuthenticated) { window.location.href = "/sign-in"; return; }
     const comment = window.prompt("Add a comment to your Support (optional):", "");
     if (comment === null) return;
     try {

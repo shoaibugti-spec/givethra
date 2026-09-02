@@ -125,6 +125,8 @@ export default function ProfilePage() {
   const { role } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
+  const profileUserId = location.pathname.match(/^\/profile\/([^/]+)/)?.[1] || user?.id || "";
+  const isOwnProfile = Boolean(user?.id && profileUserId === user.id);
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [showLogout, setShowLogout] = useState(false);
@@ -155,22 +157,21 @@ export default function ProfilePage() {
   const [badge, setBadge] = useState<{ title: string; emoji: string; description: string; icon: JSX.Element; color: string } | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!profileUserId) {
       navigate({ to: "/sign-in" });
       return;
     }
     loadData();
-  }, [isAuthenticated, location.pathname, role]);
+  }, [isAuthenticated, location.pathname, role, profileUserId]);
 
   async function loadData() {
-    if (!user) return;
     try {
       const [kyc, cases, prof, resolutions, unlocks] = await Promise.all([
-        getKycSubmission(user.id),
-        getCasesByUser(user.id),
-        getProfile(user.id, role),
-        getCaseResolutionsByHero(user.id),
-        getCaseUnlocksByHero(user.id),
+        isOwnProfile && user ? getKycSubmission(user.id) : Promise.resolve(null),
+        isOwnProfile && user ? getCasesByUser(user.id) : Promise.resolve([]),
+        getProfile(profileUserId, role),
+        isOwnProfile && user ? getCaseResolutionsByHero(user.id) : Promise.resolve([]),
+        isOwnProfile && user ? getCaseUnlocksByHero(user.id) : Promise.resolve([]),
       ]);
 
       setKycData(kyc);
@@ -290,13 +291,13 @@ export default function ProfilePage() {
                 <button onClick={() => navigate({ to: "/profile/$id", params: { id: user?.id || "" } })} className="text-center hover:opacity-70 transition-opacity"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Following</span></button>
               </div>
               <button
-  onClick={() => navigate({ to: "/edit-profile" })}
+  onClick={() => navigate({ to: "/edit-profile" })} disabled={!isOwnProfile}
   className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors"
   aria-label="Edit Profile"
 >
   <Pencil className="h-4 w-4 text-muted-foreground" />
 </button>
-              <button aria-label="Profile menu" className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" onClick={() => navigate({ to: "/settings" })}><MoreHorizontal className="h-4 w-4" /></button>
+              {isOwnProfile && <button aria-label="Profile menu" className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" onClick={() => navigate({ to: "/settings" })}><MoreHorizontal className="h-4 w-4" /></button>}
               </div>
             </div>
 
