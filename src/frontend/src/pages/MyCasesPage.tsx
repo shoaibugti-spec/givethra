@@ -37,6 +37,12 @@ function sym(cur?: string) {
   return CURRENCY_SYMBOLS[cur || "USD"] ?? (cur || "$");
 }
 
+function maskName(name?: string): string {
+  if (!name) return "—";
+  const parts = String(name).trim().split(/\s+/);
+  return parts.length > 1 ? `${parts[0]} ${parts[1].charAt(0)}.` : parts[0];
+}
+
 function maskCnic(cnic?: string): string {
   if (!cnic) return "—";
   const digits = cnic.replace(/\D/g, "");
@@ -95,13 +101,13 @@ function generateAffidavitFromDashboard(caseData: any, resolution: any, heroName
 
       <h2>Help Seeker (Beneficiary)</h2>
       <div class="grid">
-        <div class="field"><div class="label">Full Name</div><div class="value">${seekerName}</div></div>
+        <div class="field"><div class="label">Full Name</div><div class="value">${maskName(seekerName)}</div></div>
         <div class="field"><div class="label">CNIC (Masked)</div><div class="value">${seekerCnic}</div></div>
       </div>
 
       <h2>Assistance & Method Verification</h2>
       <div class="grid">
-        <div class="field"><div class="label">Helper Name (Hero)</div><div class="value">${heroName}</div></div>
+        <div class="field"><div class="label">Helper Name (Hero)</div><div class="value">${maskName(heroName)}</div></div>
         <div class="field"><div class="label">Help Type</div><div class="value">${isFundraising ? "Contribution (Fundraising)" : "Direct Institute Payment"}</div></div>
         <div class="field"><div class="label">Amount Settled</div><div class="value" style="color:#16a34a; font-weight:bold;">${s} ${paidAmount} ${cur}</div></div>
         <div class="field"><div class="label">TXN Number</div><div class="value">${resolution?.transaction_id || "—"}</div></div>
@@ -141,24 +147,15 @@ function generateAffidavitFromDashboard(caseData: any, resolution: any, heroName
 function isApprovedCompletedResolution(resolution: any): boolean {
   if (!resolution) return false;
   const status = String(resolution?.status || "").trim().toLowerCase();
-  if (["approved", "completed", "verified", "confirmed", "seeker_confirmed"].includes(status)) {
-    return true;
-  }
-  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) {
-    return true;
-  }
-  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) {
-    return true;
-  }
-  return false;
+  return ["completed", "approved", "seeker_confirmed"].includes(status) &&
+    [1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed);
 }
 
 function isContributionResolution(resolution: any): boolean {
   if (!resolution) return false;
-  const marker = String(
-    resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? ""
-  ).trim().toLowerCase();
-  return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
+  const paidTo = String(resolution?.paid_to ?? resolution?.paidTo ?? "").trim().toLowerCase();
+  const paymentType = String(resolution?.payment_type ?? resolution?.paymentType ?? "").trim().toLowerCase();
+  return paidTo === "givethra" || paymentType === "partial";
 }
 
 export default function MyCasesPage() {
@@ -267,8 +264,7 @@ export default function MyCasesPage() {
 
         let helpStatus: string = "pending";
         if (resolution) {
-          const adminConfirmed = [1, "1", true, "true", "yes"].includes(resolution?.admin_confirmed);
-          const isApproved = isApprovedCompletedResolution(resolution) || adminConfirmed;
+          const isApproved = isApprovedCompletedResolution(resolution);
           const status = String(resolution.status || "").toLowerCase();
           if (isApproved) helpStatus = "completed";
           else if (status === "rejected" || status === "disputed") helpStatus = "rejected";
@@ -427,7 +423,7 @@ export default function MyCasesPage() {
   const filteredMyCases = myCases.filter((c) => {
     const status = String(c.status || "").toLowerCase();
     if (myCaseStatusFilter === "approved") {
-      return status === "approved" || status === "published";
+      return ["approved", "published", "active", "open", "in_progress"].includes(status);
     }
     return status === myCaseStatusFilter;
   });
@@ -466,14 +462,17 @@ export default function MyCasesPage() {
 
             {/* My Cases Tab */}
             <TabsContent value="mycases" className="space-y-4 mt-4">
+              <div aria-label="My case status filters">
               <Tabs value={myCaseStatusFilter} onValueChange={setMyCaseStatusFilter} className="w-full">
-                <TabsList className="grid grid-cols-4 w-full">
+                <TabsList className="grid grid-cols-5 w-full">
                   <TabsTrigger value="pending">Pending</TabsTrigger>
                   <TabsTrigger value="rejected">Rejected</TabsTrigger>
                   <TabsTrigger value="approved">Approved</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
+                  <TabsTrigger value="expired">Expired</TabsTrigger>
                 </TabsList>
               </Tabs>
+              </div>
 
               {filteredMyCases.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground"><p>No {myCaseStatusFilter} cases.</p></div>
@@ -491,6 +490,7 @@ export default function MyCasesPage() {
                 </TabsList>
               </Tabs>
 
+              <div aria-label="Help status filters">
               <Tabs value={helpStatusFilter} onValueChange={setHelpStatusFilter} className="w-full">
                 <TabsList className="grid grid-cols-4 w-full">
                   <TabsTrigger value="pending">Pending</TabsTrigger>
@@ -499,6 +499,7 @@ export default function MyCasesPage() {
                   <TabsTrigger value="completed">Completed</TabsTrigger>
                 </TabsList>
               </Tabs>
+              </div>
 
               {filteredHelpCases.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground"><p>No {helpStatusFilter} {helpTypeFilter === "contribution" ? "contributions" : "direct helps"}.</p></div>

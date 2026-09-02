@@ -287,6 +287,16 @@ export async function getProfile(userId: string, profileRole?: "hero" | "request
   return readApiResponse(res);
 }
 
+// The worker's profile response already contains public profile, posts, follow counts, supports, and active-case data.
+export async function getFullProfile(userId: string, profileRole?: "hero" | "requester" | null) {
+  return getProfile(userId, profileRole);
+}
+
+export async function getUserActivities(userId: string) {
+  const profile = await getFullProfile(userId);
+  return Array.isArray(profile?.posts) ? profile.posts : [];
+}
+
 export async function updateProfile(userId: string, data: any, profileRole?: "hero" | "requester" | null) {
   const query = profileRole ? `?profile_role=${encodeURIComponent(profileRole)}` : "";
   const res = await fetch(`${WORKER_URL}/api/profiles/${userId}${query}`, {
