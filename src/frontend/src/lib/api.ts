@@ -72,7 +72,7 @@ export async function getCasesByUser(userId: string) {
 export async function getCaseById(id: string) {
   const res = await fetch(`${WORKER_URL}/api/cases/${id}`, { headers: headers() });
   const data = await res.json();
-  if (!res.ok) throw new Error(data?.error || "Failed to load case details"); // if (!res.ok) throw new Error(data?.error || "Failed to load case details")
+  if (!res.ok) throw new Error(data?.error || "Failed to load case details");
   return data;
 }
 
@@ -887,7 +887,7 @@ export async function deleteUserAccount(userId: string) {
   return res.json();
 }
 
-// ========== EXTRA FUNCTIONS FOR userGuide.ts ==========
+// ========== EXTRA FUNCTIONS ==========
 export async function getKycStatus(userId: string): Promise<{ status: string }> {
   try {
     const submission = await getKycSubmission(userId);
@@ -943,4 +943,39 @@ export async function setOnboardingStatus(userId: string, completed: boolean): P
     body: JSON.stringify({ completed }),
   });
   if (!res.ok) throw new Error("Failed to update onboarding status");
+}
+
+// ============================================================
+//  🆕 ASSISTANT APIs (صرف Assistant کے لیے)
+// ============================================================
+
+/**
+ * Assistant ڈیش بورڈ کے لیے وہ کیسز جن میں رقم جمع ہے لیکن Assistant نے ابھی تک ادائیگی نہیں کی۔
+ */
+export async function getAssistantPendingPayments(): Promise<any[]> {
+  const res = await fetch(`${WORKER_URL}/api/assistant/payments`, {
+    headers: headers(),
+  });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(data?.error || `Failed to fetch pending payments (${res.status})`);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * Assistant کسی کیس کی جمع شدہ رقم خود ادا کرتا ہے (فوری منظور)۔
+ */
+export async function assistantPayCase(caseId: string, amount: number, receiptUrl?: string, transactionId?: string): Promise<any> {
+  const res = await fetch(`${WORKER_URL}/api/assistant/pay`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      case_id: caseId,
+      amount,
+      receipt_url: receiptUrl || null,
+      transaction_id: transactionId || null,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `Assistant payment failed (${res.status})`);
+  return data;
 }
