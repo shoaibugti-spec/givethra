@@ -34,7 +34,7 @@ import {
 import RoleSwitcher from "@/components/RoleSwitcher";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
-const ASSISTANT_EMAIL = "shoaibugti@gmail.com";  // ✅ نیا
+const ASSISTANT_EMAIL = "shoaibugti@gmail.com";
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
@@ -62,7 +62,7 @@ function NavLink({ to, children, onClick }: { to: string; children: React.ReactN
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
-  const { isAuthenticated, logout, user, isAssistant } = useAuth();  // ✅ isAssistant شامل
+  const { isAuthenticated, logout, user, isAssistant } = useAuth();
   const { role } = useRole();
   const navigate = useNavigate();
   const router = useRouterState();
@@ -206,7 +206,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Desktop Navigation Links */}
+        {/* Desktop Navigation Links - Assistant link removed */}
         <div className="hidden md:block border-t border-border/50">
           <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
             <NavLink to="/cases">Browse Cases</NavLink>
@@ -214,13 +214,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {isAuthenticated && role !== "hero" && <NavLink to="/submit-request">Submit a Case</NavLink>}
             {isAuthenticated && <NavLink to="/support">Help & Support</NavLink>}
             {isAdmin && <NavLink to="/admin">Admin</NavLink>}
-            {isAssistant && <NavLink to="/assistant-dashboard">Assistant Dashboard</NavLink>}  {/* ✅ نیا */}
             <NavLink to="/about">About</NavLink>
             <NavLink to="/faq">FAQ</NavLink>
           </div>
         </div>
 
-        {/* ===== MOBILE MENU ===== */}
+        {/* ===== MOBILE MENU (SANDWICH) ===== */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
             <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
@@ -232,7 +231,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </>
             )}
             {isAdmin && <div className="py-1"><NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink></div>}
-            {isAssistant && <div className="py-1"><NavLink to="/assistant-dashboard" onClick={closeMenu}>Assistant Dashboard</NavLink></div>}  {/* ✅ نیا */}
+            {/* ✅ Assistant Dashboard link only in mobile menu */}
+            {isAssistant && (
+              <div className="py-1">
+                <NavLink to="/assistant-dashboard" onClick={closeMenu}>Assistant Dashboard</NavLink>
+              </div>
+            )}
             <div className="py-1"><NavLink to="/about" onClick={closeMenu}>About</NavLink></div>
             <div className="py-1"><NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink></div>
 
