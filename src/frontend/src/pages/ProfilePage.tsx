@@ -463,32 +463,54 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Name + badge, full width now, free to wrap */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-foreground">{displayName}</h1>
-              {badge && role === "hero" && (
-                <div className="flex items-center gap-1">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
-                    {badge.icon}
-                    {badge.title}
-                  </span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => setBadgeInfoOpen(true)}
-                          className="text-muted-foreground hover:text-primary transition-colors"
-                        >
-                          <Info className="h-4 w-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs text-xs">{badge.description}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
+            {/* Name + badge, full width now, free to wrap. The badge is
+                driven purely by this profile's own Hero stats (unlocks /
+                contributions / direct helps) — it no longer depends on
+                which mode (Hero/Requester) the current viewer happens to
+                have toggled, which was why it sometimes failed to show. */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h1 className="text-xl font-bold text-foreground truncate">{displayName}</h1>
+                {badge && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
+                      {badge.icon}
+                      {badge.title}
+                    </span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setBadgeInfoOpen(true)}
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                          >
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-xs">{badge.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
+              </div>
+
+              {/* Second, explicit Edit-Profile entry point — sits in the
+                  empty space directly opposite the name, so it's never
+                  missed even if someone doesn't notice the pencil on the
+                  avatar. Both buttons do the same thing. */}
+              {isOwnProfile && (
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/edit-profile" })}
+                  title="Edit Profile"
+                  aria-label="Edit Profile"
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary px-3 py-1.5 text-xs font-semibold hover:bg-primary/15 transition-colors"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </button>
               )}
             </div>
 
