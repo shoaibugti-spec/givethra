@@ -19,6 +19,9 @@ import {
   MessageCircle,
   Mail,
   MessageSquare,
+  Settings,
+  Lock,
+  KeyRound,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
@@ -27,7 +30,7 @@ import {
   getCommunityPosts,
   getGuestId,
 } from "@/lib/api";
-import RoleSwitcher from "@/components/RoleSwitcher"; // ✅ نیا امپورٹ
+import RoleSwitcher from "@/components/RoleSwitcher";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
 const FACEBOOK_URL =
@@ -157,12 +160,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-display font-bold text-lg text-primary">Givethra</span>
           </Link>
 
-          {/* ✅ Center: Role Switcher */}
+          {/* Center: Role Switcher */}
           <div className="flex-1 flex items-center justify-center">
-            {/* Only show when authenticated and not on public pages */}
-            {isAuthenticated && (
-              <RoleSwitcher />
-            )}
+            {isAuthenticated && <RoleSwitcher />}
           </div>
 
           {/* Right side: language, community, notifications, user */}
@@ -219,7 +219,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* ===== MOBILE MENU (SANDWICH) ===== */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
             <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
@@ -233,6 +233,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {isAdmin && <div className="py-1"><NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink></div>}
             <div className="py-1"><NavLink to="/about" onClick={closeMenu}>About</NavLink></div>
             <div className="py-1"><NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink></div>
+
+            {/* ✅ Account Settings Section */}
+            {isAuthenticated && (
+              <>
+                <div className="pt-3 mt-1 border-t border-border">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Account</p>
+                </div>
+                <div className="py-1 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  <NavLink to="/settings" onClick={closeMenu}>Settings</NavLink>
+                </div>
+                <div className="py-1 flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                  <NavLink to="/privacy" onClick={closeMenu}>Privacy Policy</NavLink>
+                </div>
+                <div className="py-1 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  <NavLink to="/security" onClick={closeMenu}>Security</NavLink>
+                </div>
+                <div className="py-1 flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  <NavLink to="/account-privacy" onClick={closeMenu}>Account Privacy</NavLink>
+                </div>
+              </>
+            )}
+
             <div className="pt-1">
               <button type="button" onClick={() => { toggleTheme(); closeMenu(); }} className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors">
                 {theme === "dark" ? <><Sun className="h-4 w-4" /> Light Mode</> : <><Moon className="h-4 w-4" /> Dark Mode</>}
