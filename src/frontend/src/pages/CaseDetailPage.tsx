@@ -223,7 +223,7 @@ function CopyRow({ label, value, mono }: { label: string; value?: string; mono?:
 export default function CaseDetailPage() {
   const { id } = useParams({ from: "/cases/$id" });
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isAssistant } = useAuth();
   const [caseData, setCaseData] = useState<any>(null);
   const [seekerKyc, setSeekerKyc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -346,8 +346,6 @@ export default function CaseDetailPage() {
         } finally {
           setWalletLoading(false);
         }
-
-        // ✅ Feedback check moved to separate useEffect above
       }
     } catch (err) {
       console.error("Error loading case:", err);
@@ -474,17 +472,12 @@ export default function CaseDetailPage() {
   ].filter((row) => Boolean(row.value));
   const unlockMode = myUnlock?.payment_type || payMode;
   const canHelpAgain = (unlocked || contributionOpen) && !isOwner && !isCompleted && !isRejected && !isExpired;
-  // First-help proof controls: (!showResolution && myResolutions.length > 0) ? ( ... )
-  // Mobile-safe layout: flex min-w-0 flex-col gap-4; break-words whitespace-normal; flex flex-col gap-2 sm:flex-row.
-  // Contribution remains separately gated behind its own media credit.
   const activeUnlock = myUnlock;
   const loadedResolutions = myResolutions;
   const submittedResType = unlockMode === "full" ? String(caseData?.category || "Direct Payment") : resType;
-  // Direct category fallback: {caseData?.category || "Direct Payment"}
   const adminConfirmed = [1, "1", true, "true", "yes"].includes(caseData?.admin_confirmed);
   const verifiedResolutions = getEligibleAffidavitResolutions(myResolutions);
   const visible = myResolutions.filter(r => !isContributionResolution(r));
-  // Each approved contribution remains eligible: const visible = resolutions.filter(r => !isContributionResolution(r));
 
   async function handleUnlock(mode: "full" | "partial") {
     if (!user) { navigate({ to: "/sign-in" }); return; }
@@ -503,8 +496,6 @@ export default function CaseDetailPage() {
     }
     setUnlocking(true);
     try {
-      // Only the first three Contribution/Fundraising helps are free.
-      // Direct Help / Full Payment always requires one credit.
       const isFreeContribution = mode === "partial" && userUnlockCount < 3;
       const charge = isFreeContribution ? 0 : 1;
 
@@ -516,7 +507,7 @@ export default function CaseDetailPage() {
         payment_type: mode,
       });
 
-            if (mode === "partial") {
+      if (mode === "partial") {
         setAmountPaid(String(pledgeNum));
         setContributionOpen(true);
       } else if (amountNeeded > 0) setAmountPaid(String(remaining));
@@ -558,8 +549,6 @@ export default function CaseDetailPage() {
     if (!paidNum || paidNum <= 0) { toast.error("Please enter the total amount you paid."); return; }
     if (unlockMode === "partial" && paidNum < 100) { toast.error(`Contribution must be at least ${sym} 100.`); return; }
     if (unlockMode === "partial" && paidNum > remaining) { toast.error(`Contribution cannot exceed ${sym} ${remaining}.`); return; }
-    // Guards: paidNum < 100; unlockMode === "partial" && paidNum < 100; unlockMode === "partial" && paidNum > remaining.
-  // Unlock this Contribution first. The amount field and Givethra payment details will open after the unlock.
     if (unlockMode === "full" && amountNeeded > 0 && paidNum < amountNeeded) { toast.error(`Direct Help requires the full amount: ${sym} ${amountNeeded} ${cur}.`); return; }
     if (!receiptFile) { toast.error("Please attach your payment receipt before submitting proof."); return; }
     setSubmitting(true);
@@ -649,7 +638,6 @@ export default function CaseDetailPage() {
       setExistingFeedback({ ...(savedFeedback || {}), status: "pending_review" });
       toast.success("Thank you! Your feedback is submitted for Givethra's review. Once approved, it will appear on the wall and you can submit a new case.");
       setFbText(""); setFbVideoFile(null); setFbVideoName(""); setFbVideoBlob(null);
-      // Refresh feedback state
       await checkExistingFeedback();
       loadCase();
     } catch (err) { toast.error(`Error: ${err instanceof Error ? err.message : "Unknown"}`); }
@@ -658,7 +646,6 @@ export default function CaseDetailPage() {
 
   if (loading) return <Layout><div className="text-center py-20">Loading...</div></Layout>;
   if (!caseData) return <Layout><div className="text-center py-20 text-muted-foreground">Case not found.</div></Layout>;
-  // Guard: if (!data || data.error || !data.id), do not pass a 404 payload into the detail renderer.
 
   // ============================================================
   //  REJECTED CASE - FULL PAGE REPLACEMENT
@@ -672,7 +659,6 @@ export default function CaseDetailPage() {
           </button>
 
           <div className="rounded-2xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/20 p-8 space-y-6">
-            {/* Header */}
             <div className="flex items-start gap-4">
               <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-full shrink-0">
                 <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
@@ -685,7 +671,6 @@ export default function CaseDetailPage() {
               </div>
             </div>
 
-            {/* Rejection Reason - MAIN */}
             <div className="bg-white dark:bg-red-950/50 rounded-xl border-2 border-red-200 dark:border-red-800 p-6 space-y-3">
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-red-500" />
@@ -701,7 +686,6 @@ export default function CaseDetailPage() {
               )}
             </div>
 
-            {/* Refund/Free Status */}
             <div className={`rounded-xl border p-4 ${caseData.was_free ? "bg-teal-50 border-teal-200 dark:bg-teal-950/30 dark:border-teal-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800"}`}>
               <div className="flex items-start gap-3">
                 <RefreshCw className={`h-5 w-5 mt-0.5 shrink-0 ${caseData.was_free ? "text-teal-600 dark:text-teal-400" : "text-blue-600 dark:text-blue-400"}`} />
@@ -720,53 +704,27 @@ export default function CaseDetailPage() {
               </div>
             </div>
 
-            {/* What to do next */}
             <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
               <h3 className="font-semibold text-amber-800 dark:text-amber-300 text-sm mb-2">📌 What to do next?</h3>
               <ul className="text-sm text-amber-700 dark:text-amber-400 space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="font-bold">1.</span>
-                  <span>Review the rejection reason above carefully</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold">2.</span>
-                  <span>Fix the issues mentioned in the reason</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold">3.</span>
-                  <span>Submit a new case with corrected information</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="font-bold">4.</span>
-                  <span>If you need help, contact our support team</span>
-                </li>
+                <li className="flex items-start gap-2"><span className="font-bold">1.</span><span>Review the rejection reason above carefully</span></li>
+                <li className="flex items-start gap-2"><span className="font-bold">2.</span><span>Fix the issues mentioned in the reason</span></li>
+                <li className="flex items-start gap-2"><span className="font-bold">3.</span><span>Submit a new case with corrected information</span></li>
+                <li className="flex items-start gap-2"><span className="font-bold">4.</span><span>If you need help, contact our support team</span></li>
               </ul>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <Button
-                className="flex-1 gap-2 bg-red-600 hover:bg-red-700 text-white h-12"
-                onClick={() => navigate({ to: "/submit-request" })}
-              >
-                <RefreshCw className="h-4 w-4" />
-                Submit New Case
+              <Button className="flex-1 gap-2 bg-red-600 hover:bg-red-700 text-white h-12" onClick={() => navigate({ to: "/submit-request" })}>
+                <RefreshCw className="h-4 w-4" /> Submit New Case
               </Button>
-              <Button
-                variant="outline"
-                className="flex-1 gap-2 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-12"
-                onClick={() => navigate({ to: "/support" })}
-              >
-                <AlertCircle className="h-4 w-4" />
-                Contact Support
+              <Button variant="outline" className="flex-1 gap-2 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-12" onClick={() => navigate({ to: "/support" })}>
+                <AlertCircle className="h-4 w-4" /> Contact Support
               </Button>
             </div>
 
-            {/* Note: All case details hidden */}
             <div className="text-center pt-2 border-t border-red-200 dark:border-red-800">
-              <p className="text-xs text-red-400 dark:text-red-500">
-                ⚠️ All case details have been hidden for rejected cases. Please submit a new case.
-              </p>
+              <p className="text-xs text-red-400 dark:text-red-500">⚠️ All case details have been hidden for rejected cases. Please submit a new case.</p>
             </div>
           </div>
         </div>
@@ -811,20 +769,11 @@ export default function CaseDetailPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <Button
-                className="flex-1 gap-2 bg-amber-600 hover:bg-amber-700 text-white h-12"
-                onClick={() => navigate({ to: "/submit-request" })}
-              >
-                <RefreshCw className="h-4 w-4" />
-                Submit New Case
+              <Button className="flex-1 gap-2 bg-amber-600 hover:bg-amber-700 text-white h-12" onClick={() => navigate({ to: "/submit-request" })}>
+                <RefreshCw className="h-4 w-4" /> Submit New Case
               </Button>
-              <Button
-                variant="outline"
-                className="flex-1 gap-2 border-amber-300 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 h-12"
-                onClick={() => navigate({ to: "/cases" })}
-              >
-                <Eye className="h-4 w-4" />
-                Browse Other Cases
+              <Button variant="outline" className="flex-1 gap-2 border-amber-300 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 h-12" onClick={() => navigate({ to: "/cases" })}>
+                <Eye className="h-4 w-4" /> Browse Other Cases
               </Button>
             </div>
           </div>
@@ -833,20 +782,6 @@ export default function CaseDetailPage() {
     );
   }
 
-  // COMPLETED HELP VIEW (helper only): completed helpers see a read-only record.
-  // Contract notes kept beside the implementation: verifiedResolutions.length > 0; Affidavit Download; View & Download Affidavit;
-  // You completed direct help for this case; You unlocked this case, but no completed help was recorded from you;
-  // Thank you for trying to help. Your payment or contribution is still under verification;
-  // You made an approved contribution to this case; Thank you for contributing; Thank you for completing direct help of;
-  // Case: {caseData.title || "Verified case"}; Help: {r.resolution_type || (isContributionResolution(r) ? "Contribution" : "Direct help")};
-  // !isOwner && !isCompleted && unlockMode; !isCompleted && <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
-  // Explicit Admin confirmation: approvedStatus = ["approved", "completed", "verified", "confirmed"],
-  // excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "pending_confirmation", "dispatched"].
-  // getEligibleAffidavitResolutions, verifiedResolutions.map, Your completed case record is ready. Each approved direct-help or contribution resolution has its own affidavit and verified amount.
-  // This was disputed — no affidavit is available. last 4 digits of an account/reference; const last = d.slice(-4);
-  // Public layout keeps two controls: Pay the full bill directly; Contribute any amount (Fundraising).
-  // Feedback remains required and pending_review: Please write a message AND record a 90-second video.
-  // type="button" className="w-full min-h-12 touch-manipulation select-none"
   // ============================================================
   //  NORMAL CASE VIEW (for all non-rejected, non-expired cases)
   // ============================================================
@@ -1072,7 +1007,6 @@ export default function CaseDetailPage() {
                         </div>
                       )}
                       <Button onClick={() => handleUnlock("partial")} disabled={unlocking || walletLoading || remaining < 100} className="w-full gap-2 mt-1 bg-teal-600 hover:bg-teal-700 text-white shadow-md">
-
                         <HandCoins className="h-4 w-4" />
                         Help Now — Contribute
                       </Button>
@@ -1102,7 +1036,64 @@ export default function CaseDetailPage() {
                   </div>
                 )}
 
-
+                {/* ✅ ASSISTANT BUTTONS */}
+                {isAuthenticated && isAssistant && !isOwner && !isCompleted && (
+                  <div className="order-1 min-w-0 overflow-hidden rounded-2xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/20 p-5 space-y-3">
+                    <h3 className="font-bold text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                      <span className="text-xl">🛠️</span> Assistant Actions
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={async () => {
+                          if (!user) return;
+                          const remainingAmt = amountNeeded - (caseData.amount_collected || 0);
+                          if (remainingAmt <= 0) { toast.error("Case already fully funded."); return; }
+                          try {
+                            await insertCaseUnlock({
+                              case_id: id,
+                              hero_id: user.id,
+                              pledged_amount: remainingAmt,
+                              payment_type: "assistant_contribution",
+                            });
+                            toast.success("Assistant contribution submitted for approval.");
+                            loadCase();
+                          } catch (err: any) {
+                            toast.error(err.message || "Failed to submit contribution");
+                          }
+                        }}
+                        className="bg-teal-600 hover:bg-teal-700 text-white"
+                      >
+                        Contribution <br /><span className="text-xs">(Full Amount)</span>
+                      </Button>
+                      <Button
+                        onClick={async () => {
+                          if (!user) return;
+                          const remainingAmt = amountNeeded - (caseData.amount_collected || 0);
+                          if (remainingAmt <= 0) { toast.error("Case already fully funded."); return; }
+                          try {
+                            await insertCaseUnlock({
+                              case_id: id,
+                              hero_id: user.id,
+                              pledged_amount: remainingAmt,
+                              payment_type: "direct_help",
+                            });
+                            toast.success("Direct help submitted for approval.");
+                            loadCase();
+                          } catch (err: any) {
+                            toast.error(err.message || "Failed to submit direct help");
+                          }
+                        }}
+                        variant="outline"
+                        className="border-amber-500 text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                      >
+                        Direct Help <br /><span className="text-xs">(Remaining)</span>
+                      </Button>
+                    </div>
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      These actions will create a new unlock record that needs Admin approval before taking effect.
+                    </p>
+                  </div>
+                )}
 
                 <div className="order-1 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-5 space-y-3">
                   <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">🎥 Verification Media</h2>{mediaUnlocked && <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600">Unlocked</span>}</div>
@@ -1214,7 +1205,6 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
   const [confirmAmount, setConfirmAmount] = useState("");
 
   useEffect(() => {
-    // Load resolutions for this case (all heroes)
     getCaseResolutions(caseId).then(data => {
       setResolutions((data ?? []).slice().reverse());
     }).catch(() => {});
