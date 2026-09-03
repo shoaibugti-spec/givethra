@@ -53,6 +53,8 @@ const OnboardingPage = lazy(() => import("@/pages/OnboardingPage").catch(() => (
 const CommunityPage = lazy(() => import("@/pages/CommunityPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const HeroesWallPage = lazy(() => import("@/pages/HeroesWallPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const KindnessWallPage = lazy(() => import("@/pages/KindnessWallPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
+// ✅ نیا: Assistant Dashboard
+const AssistantDashboard = lazy(() => import("@/pages/AssistantDashboard").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
 // Page loader
 const PageLoader = () => (
@@ -80,8 +82,6 @@ function BottomNavFallback() {
 import BottomNav from "@/components/BottomNav";
 
 // Root layout with BottomNav and authenticated-route guards.
-// This component is rendered inside RouterProvider, so router hooks always have
-// an initialized router store available.
 function RootLayout() {
   const { isAuthenticated, user, role: authRole, isAdmin } = useAuth();
   const { role, setRole } = useRole();
@@ -96,7 +96,7 @@ function RootLayout() {
     if (authRole === "help_seeker" && role !== "requester") setRole("requester");
   }, [authRole, isAuthenticated, role, setRole]);
 
-  // 🔥 FIXED: KYC check - only for Requesters, Heroes bypass KYC
+  // 🔥 KYC check - only for Requesters, Heroes bypass KYC
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setCheckingOnboarding(false);
@@ -131,34 +131,25 @@ function RootLayout() {
         ];
         const isPublicPath = publicPaths.includes(location.pathname);
 
-        // 🔥 FIX: Only Requester needs KYC. Hero bypasses KYC.
         const isRequester = role === "requester";
         const requiresKyc = isRequester && effectiveKycStatus !== "approved";
 
-        // If user is a Requester and KYC is not approved, redirect to KYC
         if (!isAdmin && requiresKyc && !isPublicPath && location.pathname !== "/kyc") {
           if (!cancelled) navigate({ to: "/kyc" });
           return;
         }
 
-        // 🔥 Hero: Always allow access (no KYC check)
-        // Requester: Only proceed if KYC is approved
         if (!isAdmin && role === "hero") {
-          // Heroes can skip KYC entirely
-          // We don't need to check KYC for heroes
-          // But we still allow onboarding if they happen to have KYC approved
           if (effectiveKycStatus === "approved") {
             const onboardingCompleted = await getOnboardingStatus(user.id);
             if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
               navigate({ to: "/onboarding" });
             }
           }
-          // Heroes are done - no further checks needed
           if (!cancelled) setCheckingOnboarding(false);
           return;
         }
 
-        // Requester: If KYC is approved, check onboarding
         if (!isAdmin && isRequester && effectiveKycStatus === "approved") {
           const onboardingCompleted = await getOnboardingStatus(user.id);
           if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
@@ -166,13 +157,11 @@ function RootLayout() {
           }
         }
 
-        // If user has no role yet, don't block
         if (!role) {
           if (!cancelled) setCheckingOnboarding(false);
           return;
         }
 
-        // If user is not requester and not hero (should not happen), redirect to role selection
         if (!isAdmin && role !== "hero" && role !== "requester") {
           if (!cancelled && !isPublicPath && location.pathname !== "/kyc") {
             navigate({ to: "/" });
@@ -225,28 +214,25 @@ const rootRoute = createRootRoute({
 });
 
 // --- Routes ---
-// Index route (/) -> RoleSelectionPage
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: () => <Suspense fallback={<PageLoader />}><RoleSelectionPage /></Suspense>,
 });
 
-// Home route (/home) -> HomePage
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/home",
   component: () => {
     const { role } = useRole();
     if (!role) {
-      // This should not happen as AppShell redirects, but just in case
       return <PageLoader />;
     }
     return <Suspense fallback={<PageLoader />}><HomePage /></Suspense>;
   },
 });
 
-// ----- Define all remaining routes -----
+// ----- All remaining routes -----
 const signUpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-up", component: () => <Suspense fallback={<PageLoader />}><SignUpPage /></Suspense> });
 const signInRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-in", component: () => <Suspense fallback={<PageLoader />}><SignInPage /></Suspense> });
 const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases", component: () => <Suspense fallback={<PageLoader />}><CasesPage /></Suspense> });
@@ -277,6 +263,12 @@ const onboardingRoute = createRoute({ getParentRoute: () => rootRoute, path: "/o
 const communityRoute = createRoute({ getParentRoute: () => rootRoute, path: "/community", component: () => <Suspense fallback={<PageLoader />}><CommunityPage /></Suspense> });
 const heroesWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/heroes-wall", component: () => <Suspense fallback={<PageLoader />}><HeroesWallPage /></Suspense> });
 const kindnessWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/kindness-wall", component: () => <Suspense fallback={<PageLoader />}><KindnessWallPage /></Suspense> });
+// ✅ نیا: Assistant Dashboard روٹ
+const assistantDashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/assistant-dashboard",
+  component: () => <Suspense fallback={<PageLoader />}><AssistantDashboard /></Suspense>,
+});
 
 // Build route tree
 const routeTree = rootRoute.addChildren([
@@ -312,6 +304,7 @@ const routeTree = rootRoute.addChildren([
   communityRoute,
   heroesWallRoute,
   kindnessWallRoute,
+  assistantDashboardRoute,  // ✅ شامل کریں
 ]);
 
 const router = createRouter({ routeTree });
