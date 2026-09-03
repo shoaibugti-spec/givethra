@@ -26,6 +26,7 @@ import {
 import { sendNotification } from "@/lib/notify";
 import { shareCase } from "@/lib/caseSharing";
 import { getApprovedCaseItems } from "@/lib/caseVerification";
+import { getCategoryGratitude } from "@/lib/gratitudeMessages";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   ChevronLeft, Lock, Unlock, MapPin, CheckCircle2,
@@ -87,6 +88,18 @@ function isApprovedCompletedResolution(resolution: any): boolean {
 
 function getEligibleAffidavitResolutions(resolutions: any[]): any[] {
   return resolutions.filter(isApprovedCompletedResolution);
+}
+
+// 🔥 Hero "badge" tier for THIS case's completion card — mirrors the tiers shown
+// on the profile page (Newborn Hero / Young Hero / Hero / Super Hero) but scoped
+// to what this person actually did on this one case.
+function getHeroBadgeForCase(verifiedResolutions: any[]): { label: string; emoji: string } {
+  const hasDirect = verifiedResolutions.some((r) => !isContributionResolution(r));
+  const hasContribution = verifiedResolutions.some((r) => isContributionResolution(r));
+  if (hasDirect && hasContribution) return { label: "Super Hero", emoji: "🦸‍♂️" };
+  if (hasDirect) return { label: "Hero", emoji: "🦸" };
+  if (hasContribution) return { label: "Young Hero", emoji: "🌱" };
+  return { label: "Newborn Hero", emoji: "🐣" };
 }
 
 function generateAffidavit(caseData: any, resolution: any, seekerKyc: any, heroName: string) {
@@ -793,9 +806,11 @@ export default function CaseDetailPage() {
         </button>
 
         {/* === FREE UNLOCK ANNOUNCEMENT - TOP OF PAGE === */}
+        {!isCompleted && (
         <div className="rounded-xl bg-teal-50 dark:bg-teal-950/20 border-2 border-teal-400 p-4 text-sm text-teal-700 dark:text-teal-300 text-center font-medium">
           🎉 Your first <strong>3 contribution helps are FREE</strong>! Direct Help always costs 1 credit.
         </div>
+        )}
 
         <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
           <div className="flex flex-wrap items-start gap-4">
@@ -945,7 +960,7 @@ export default function CaseDetailPage() {
               </div>
             )}
 
-            {!unlocked && !isOwner && !contributionOpen ? (
+            {!isCompleted && !unlocked && !isOwner && !contributionOpen ? (
               <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 p-6 flex flex-col items-center text-center gap-4">
                 <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center"><Lock className="h-6 w-6 text-muted-foreground" /></div>
                 <div>
@@ -1014,7 +1029,7 @@ export default function CaseDetailPage() {
                   </div>
                 )}
               </div>
-            ) : (
+            ) : !isCompleted ? (
               <div className="space-y-4">
                 {!isOwner && unlockMode === "full" && (
                   <div className="order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
@@ -1165,19 +1180,62 @@ export default function CaseDetailPage() {
                   </div>
                 )}
 
-                {!isOwner && isCompleted && myResolutions.length > 0 && (
-                  <div className="rounded-2xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 p-5 text-center space-y-2">
-                    <div className="text-3xl">🤲</div>
-                    <h2 className="font-bold text-teal-700">This case is complete!</h2>
-                    <p className="text-sm text-teal-700">Thank you for your help. May Allah reward you. Your affidavits are above.</p>
-                  </div>
-                )}
-
                 {isOwner && !isCompleted && (
                   <OwnerResolutions caseId={id} caseData={caseData} seekerKyc={seekerKyc} onConfirm={handleSeekerConfirm} onDispute={handleSeekerDispute} sym={sym} cur={cur} />
                 )}
               </div>
-            )}
+            ) : null}
+
+            {/* ============================================================
+                COMPLETED CASE — HERO / HELPER VIEW
+                Only the badge/gratitude message + brief case info + payment
+                proof (if any) + affidavit are shown here. Every "in progress"
+                control (receiver details, contribute-to-Givethra address,
+                verification-media unlock prompt, resolution submission form)
+                is intentionally hidden once the case is completed — those
+                belong to the CaseDetailPage.tsx / MyHelpPage.tsx and are
+                filtered out above and in MyHelpPage's record builder.
+            ============================================================ */}
+            {!isOwner && isCompleted && (myUnlock || myResolutions.length > 0) && (() => {
+              const verified = getEligibleAffidavitResolutions(myResolutions);
+              const badge = getHeroBadgeForCase(verified);
+              const helpedDirect = verified.some(r => !isContributionResolution(r));
+              const totalVerified = verified.reduce(
+                (sum, r) => sum + (Number(r.seeker_confirmed_amount ?? r.amount_paid) || 0), 0
+              );
+              const gratitude = getCategoryGratitude(caseData.category);
+              const message = verified.length > 0
+                ? (helpedDirect ? gratitude.direct : gratitude.contribution).replace(
+                    "{amount}", `${sym} ${totalVerified} ${cur}`
+                  )
+                : gratitude.unlock;
+              return (
+                <div className="rounded-2xl bg-teal-50 dark:bg-teal-950/20 border border-teal-200 p-5 text-center space-y-3">
+                  <div className="text-3xl">🤲</div>
+                  <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-teal-600 text-white">
+                    {badge.emoji} {badge.label}
+                  </span>
+                  <h2 className="font-bold text-teal-700">This case is complete!</h2>
+                  <p className="text-sm text-teal-700">{message}</p>
+                  <p className="text-xs text-muted-foreground">{caseData.title} · {caseData.category}</p>
+                  {verified.length > 0 && (
+                    <div className="space-y-2 pt-1 text-left">
+                      {verified.map((r: any) => (
+                        <div key={r.id} className="rounded-xl border border-teal-200 bg-card p-3 flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-semibold text-foreground">{isContributionResolution(r) ? "Contribution" : "Direct Help"}</p>
+                            <p className="text-xs text-muted-foreground">Payment proof received · {sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</p>
+                          </div>
+                          <Button size="sm" variant="outline" className="shrink-0 gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, heroName)}>
+                            <FileText className="h-3.5 w-3.5" /> Affidavit
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="space-y-4">
