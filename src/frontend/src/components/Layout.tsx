@@ -34,6 +34,7 @@ import {
 import RoleSwitcher from "@/components/RoleSwitcher";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
+const ASSISTANT_EMAIL = "shoaibugti@gmail.com";  // ✅ نیا
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
@@ -61,7 +62,7 @@ function NavLink({ to, children, onClick }: { to: string; children: React.ReactN
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, logout, user, isAssistant } = useAuth();  // ✅ isAssistant شامل
   const { role } = useRole();
   const navigate = useNavigate();
   const router = useRouterState();
@@ -145,7 +146,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* ===== HEADER ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-16 flex items-center gap-2 md:gap-4">
-          {/* Hamburger menu for mobile */}
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
@@ -162,12 +162,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-display font-bold text-lg text-primary">Givethra</span>
           </Link>
 
-          {/* Center: Role Switcher */}
           <div className="flex-1 flex items-center justify-center">
             {isAuthenticated && <RoleSwitcher />}
           </div>
 
-          {/* Right side: language, community, notifications, user */}
           <div className="flex items-center gap-1 shrink-0">
             <LanguageSwitcher />
             <Link to="/community" aria-label="Community" aria-current={isRouteActive("/community") ? "page" : undefined} className={iconLinkClass("/community")}>
@@ -216,12 +214,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {isAuthenticated && role !== "hero" && <NavLink to="/submit-request">Submit a Case</NavLink>}
             {isAuthenticated && <NavLink to="/support">Help & Support</NavLink>}
             {isAdmin && <NavLink to="/admin">Admin</NavLink>}
+            {isAssistant && <NavLink to="/assistant-dashboard">Assistant Dashboard</NavLink>}  {/* ✅ نیا */}
             <NavLink to="/about">About</NavLink>
             <NavLink to="/faq">FAQ</NavLink>
           </div>
         </div>
 
-        {/* ===== MOBILE MENU (SANDWICH) ===== */}
+        {/* ===== MOBILE MENU ===== */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
             <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
@@ -233,10 +232,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </>
             )}
             {isAdmin && <div className="py-1"><NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink></div>}
+            {isAssistant && <div className="py-1"><NavLink to="/assistant-dashboard" onClick={closeMenu}>Assistant Dashboard</NavLink></div>}  {/* ✅ نیا */}
             <div className="py-1"><NavLink to="/about" onClick={closeMenu}>About</NavLink></div>
             <div className="py-1"><NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink></div>
 
-            {/* ✅ Account Settings Section */}
             {isAuthenticated && (
               <>
                 <div className="pt-3 mt-1 border-t border-border">
@@ -283,10 +282,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
-      {/* ===== MAIN CONTENT ===== */}
       <main className="flex-1 has-bottom-nav">{children}</main>
 
-      {/* ===== FOOTER ===== */}
       <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
