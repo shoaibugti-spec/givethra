@@ -42,6 +42,10 @@ export default function RoleSwitcher() {
       
       toast.success(`Switched to ${newRole === "hero" ? "Hero" : "Requester"} mode`);
       
+      // 🔥 FIX: Navigate to home to refresh all components with new role
+      // This forces BottomNav and other components to re-render with the new role
+      navigate({ to: "/home" });
+      
     } catch (error) {
       toast.error("Could not switch role. Please try again.");
     } finally {
