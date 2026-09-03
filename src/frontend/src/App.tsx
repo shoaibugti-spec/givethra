@@ -27,6 +27,7 @@ const SignUpPage = lazy(() => import("@/pages/SignUpPage").catch(() => ({ defaul
 const SignInPage = lazy(() => import("@/pages/SignInPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const CasesPage = lazy(() => import("@/pages/CasesPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const CaseDetailPage = lazy(() => import("@/pages/CaseDetailPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
+const AffidavitPage = lazy(() => import("@/pages/AffidavitPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const SubmitRequestPage = lazy(() => import("@/pages/SubmitRequestPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const MyCasesPage = lazy(() => import("@/pages/MyCasesPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
@@ -250,6 +251,7 @@ const signUpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-
 const signInRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-in", component: () => <Suspense fallback={<PageLoader />}><SignInPage /></Suspense> });
 const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases", component: () => <Suspense fallback={<PageLoader />}><CasesPage /></Suspense> });
 const caseDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases/$id", component: () => <Suspense fallback={<PageLoader />}><CaseDetailPage /></Suspense> });
+const affidavitRoute = createRoute({ getParentRoute: () => rootRoute, path: "/affidavit/$caseId", component: () => <Suspense fallback={<PageLoader />}><AffidavitPage /></Suspense> });
 const submitRequestRoute = createRoute({ getParentRoute: () => rootRoute, path: "/submit-request", component: () => <Suspense fallback={<PageLoader />}><SubmitRequestPage /></Suspense> });
 const profileRoute = createRoute({ getParentRoute: () => rootRoute, path: "/profile/$id", component: () => <Suspense fallback={<PageLoader />}><ProfilePage /></Suspense> });
 const myCasesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/my-cases", component: () => <Suspense fallback={<PageLoader />}><MyCasesPage /></Suspense> });
@@ -284,6 +286,7 @@ const routeTree = rootRoute.addChildren([
   signInRoute,
   casesRoute,
   caseDetailRoute,
+  affidavitRoute,
   submitRequestRoute,
   profileRoute,
   myCasesRoute,

@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRole } from "@/contexts/RoleContext";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
@@ -61,6 +62,7 @@ function NavLink({ to, children, onClick }: { to: string; children: React.ReactN
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
   const { isAuthenticated, logout, user } = useAuth();
+  const { role } = useRole();
   const navigate = useNavigate();
   const router = useRouterState();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -210,8 +212,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="hidden md:block border-t border-border/50">
           <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
             <NavLink to="/cases">Browse Cases</NavLink>
-            {isAuthenticated && <NavLink to="/my-cases">My Cases</NavLink>}
-            {isAuthenticated && <NavLink to="/submit-request">Submit a Case</NavLink>}
+            {isAuthenticated && (role === "hero" ? <NavLink to="/my-help">My Help</NavLink> : <NavLink to="/my-cases">My Cases</NavLink>)}
+            {isAuthenticated && role !== "hero" && <NavLink to="/submit-request">Submit a Case</NavLink>}
             {isAuthenticated && <NavLink to="/support">Help & Support</NavLink>}
             {isAdmin && <NavLink to="/admin">Admin</NavLink>}
             <NavLink to="/about">About</NavLink>
@@ -225,8 +227,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
             {isAuthenticated && (
               <>
-                <div className="py-1"><NavLink to="/my-cases" onClick={closeMenu}>My Cases</NavLink></div>
-                <div className="py-1"><NavLink to="/submit-request" onClick={closeMenu}>Submit a Case</NavLink></div>
+                <div className="py-1"><NavLink to={role === "hero" ? "/my-help" : "/my-cases"} onClick={closeMenu}>{role === "hero" ? "My Help" : "My Cases"}</NavLink></div>
+                {role !== "hero" && <div className="py-1"><NavLink to="/submit-request" onClick={closeMenu}>Submit a Case</NavLink></div>}
                 <div className="py-1"><NavLink to="/support" onClick={closeMenu}>Help & Support</NavLink></div>
               </>
             )}

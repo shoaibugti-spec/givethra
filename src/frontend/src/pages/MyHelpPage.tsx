@@ -447,18 +447,8 @@ export default function MyHelpPage() {
                             size="sm"
                             className="gap-2 bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[120px]"
                             onClick={() => {
-                              generateAffidavitFromRecord(
-                                {
-                                  id: record.caseId,
-                                  title: record.caseTitle,
-                                  category: record.caseCategory,
-                                  currency: record.currency,
-                                  payment_method: record.resolution?.resolution_type,
-                                },
-                                record,
-                                record.seekerName,
-                                record.heroName
-                              );
+                              const affidavitWindow = window.open(`/affidavit/${encodeURIComponent(record.caseId)}`, "_blank", "noopener,noreferrer");
+                              if (!affidavitWindow) toast.error("Please allow pop-ups to view the affidavit.");
                             }}
                           >
                             <FileText className="h-3.5 w-3.5" /> View Affidavit

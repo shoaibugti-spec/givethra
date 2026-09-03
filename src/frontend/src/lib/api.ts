@@ -375,6 +375,15 @@ export async function unfollowUser(targetUserId: string) {
   return readApiResponse(res);
 }
 
+export async function supportPost(postId: string) {
+  const res = await fetch(`${WORKER_URL}/api/support`, {
+    method: "POST",
+    headers: { ...headers(), "X-Guest-ID": getGuestId() },
+    body: JSON.stringify({ post_id: postId, guest_id: getGuestId() }),
+  });
+  return readApiResponse(res);
+}
+
 export async function getFollowStatus(targetUserId: string) {
   const res = await fetch(`${WORKER_URL}/api/follow/status?target=${encodeURIComponent(targetUserId)}`, { headers: headers() });
   return readApiResponse(res);

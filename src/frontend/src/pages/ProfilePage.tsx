@@ -355,7 +355,7 @@ export default function ProfilePage() {
   const menuItems = [
     { icon: <Pencil className="h-5 w-5" />, label: "Edit Profile", to: "/edit-profile" },
     { icon: <MessageCircle className="h-5 w-5" />, label: "Community", to: "/community" },
-    { icon: <Briefcase className="h-5 w-5" />, label: "My Cases Dashboard", to: "/my-cases" },
+    { icon: <Briefcase className="h-5 w-5" />, label: role === "hero" ? "My Help Dashboard" : "My Cases Dashboard", to: role === "hero" ? "/my-help" : "/my-cases" },
     { icon: <Bell className="h-5 w-5" />, label: "Notifications", to: "/notifications" },
     { icon: <Wallet className="h-5 w-5" />, label: "Wallet", to: "/wallet" },
     { icon: <ShieldCheck className="h-5 w-5" />, label: "Security", to: "/security" },

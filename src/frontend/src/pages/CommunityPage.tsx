@@ -4,12 +4,10 @@
 // Posts + Comments + Likes + Share + Hero/Follow + Guest users
 // + For You / My Heroes / My Posts
 // + Community cache
-// + Support Reaction: 🫴🏻 -> 🫳🏻
+// + Persisted Support action with 100 Supports = 1 Credit conversion
 //
 // IMPORTANT:
-// Support is only a reaction/gesture.
-// It is NOT a donation, repost, or Like.
-// No changes are required in api.ts.
+// Support is a one-time community action. It is NOT a donation, repost, or Like.
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,6 +44,7 @@ import {
   getGuestId,
   followUser,
   unfollowUser,
+  supportPost,
 } from "@/lib/api";
 
 interface Post {
@@ -79,8 +78,6 @@ interface Comment {
 }
 
 const COMMUNITY_POSTS_CACHE_KEY = "givethra:community-posts:v1";
-const COMMUNITY_SUPPORT_CACHE_KEY =
-  "givethra:community-support-reactions:v1";
 
 function safeDisplayName(value: unknown, fallback: string): string {
   const name = String(value || "").trim();
@@ -95,44 +92,6 @@ function guestDisplayName(userId: unknown): string {
     "Guest";
 
   return `Guest ${suffix}`;
-}
-
-/**
- * Read locally saved Support reactions.
- *
- * This is intentionally separate from Like.
- * It does not call the Like API and does not change the existing
- * Like/Comment/Follow functionality.
- */
-function readSupportReactions(): Record<
-  string,
-  { supported: boolean; count: number }
-> {
-  if (typeof window === "undefined") return {};
-
-  try {
-    const raw = localStorage.getItem(COMMUNITY_SUPPORT_CACHE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeSupportReactions(
-  reactions: Record<string, { supported: boolean; count: number }>
-) {
-  if (typeof window === "undefined") return;
-
-  try {
-    localStorage.setItem(
-      COMMUNITY_SUPPORT_CACHE_KEY,
-      JSON.stringify(reactions)
-    );
-  } catch {
-    // Local storage failure must never block the Community page.
-  }
 }
 
 function normalizeCachedPost(post: any): Post {
@@ -239,18 +198,7 @@ export default function CommunityPage() {
     "for-you" | "my-heroes" | "my-posts"
   >("for-you");
 
-  /**
-   * Support reactions.
-   *
-   * Separate from Likes.
-   */
-  const [supportReactions, setSupportReactions] = useState<
-    Record<string, { supported: boolean; count: number }>
-  >({});
-
-  const [supportingPostId, setSupportingPostId] = useState<string | null>(
-    null
-  );
+  const [supportingPostId, setSupportingPostId] = useState<string | null>(null);
 
   // New post state
   const [newPost, setNewPost] = useState("");
@@ -258,44 +206,6 @@ export default function CommunityPage() {
 
   const visiblePosts = posts;
 
-  /**
-   * Load locally saved Support reactions once.
-   */
-  useEffect(() => {
-    setSupportReactions(readSupportReactions());
-  }, []);
-
-  /**
-   * Apply local Support reaction data to loaded posts.
-   *
-   * If the backend ever starts returning support_count /
-   * supported_by_me, those values can be used as the initial values.
-   */
-  useEffect(() => {
-    if (!posts.length) return;
-
-    const saved = readSupportReactions();
-
-    setPosts((prev) =>
-      prev.map((post) => {
-        const reaction = saved[post.id];
-
-        if (!reaction) {
-          return {
-            ...post,
-            support_count: Number(post.support_count || 0),
-            supported_by_me: Boolean(post.supported_by_me),
-          };
-        }
-
-        return {
-          ...post,
-          support_count: reaction.count,
-          supported_by_me: reaction.supported,
-        };
-      })
-    );
-  }, [posts.length]);
 
   // ------------------------------------------------------------
   // Posts load
@@ -313,26 +223,12 @@ export default function CommunityPage() {
         ? data.map(normalizeCachedPost)
         : [];
 
-      const savedReactions = readSupportReactions();
-
-      const postsWithSupport = nextPosts.map((post) => {
-        const saved = savedReactions[post.id];
-
-        if (!saved) return post;
-
-        return {
-          ...post,
-          support_count: saved.count,
-          supported_by_me: saved.supported,
-        };
-      });
-
-      setPosts(postsWithSupport);
+      setPosts(nextPosts);
 
       setLikeCounts((prev) => {
         const next = { ...prev };
 
-        postsWithSupport.forEach((post: Post) => {
+        nextPosts.forEach((post: Post) => {
           next[post.id] = Number(post.likes_count || 0);
         });
 
@@ -342,14 +238,14 @@ export default function CommunityPage() {
       setLikedPosts((prev) => {
         const next = { ...prev };
 
-        postsWithSupport.forEach((post: Post) => {
+        nextPosts.forEach((post: Post) => {
           next[post.id] = Boolean(post.is_liked);
         });
 
         return next;
       });
 
-      writeCachedCommunityPosts(postsWithSupport);
+      writeCachedCommunityPosts(nextPosts);
     } catch (error) {
       console.error("Error fetching posts:", error);
       toast.error("Failed to load posts");
@@ -527,83 +423,42 @@ export default function CommunityPage() {
   };
 
   // ------------------------------------------------------------
-  // Support Reaction
+  // Persisted Support action
   //
-  // 🫴🏻 = not reacted
-  // 🫳🏻 = reacted
-  //
-  // This is deliberately NOT connected to toggleLike().
+  // A Support is counted once per person (or stable guest identity) and
+  // cannot be toggled back, so it contributes to the author's 100 Supports
+  // to 1 Credit progress.
   // ------------------------------------------------------------
 
-  const handleSupportReaction = (post: Post) => {
-    if (supportingPostId === post.id) return;
+  const handleSupportReaction = async (post: Post) => {
+    if (supportingPostId === post.id || post.supported_by_me) return;
 
+    const previousCount = Number(post.support_count || 0);
+    const optimisticCount = previousCount + 1;
     setSupportingPostId(post.id);
+    setPosts((prev) => prev.map((item) => item.id === post.id
+      ? { ...item, supported_by_me: true, support_count: optimisticCount }
+      : item));
 
-    const currentSupported = Boolean(post.supported_by_me);
-
-    const currentCount = Number(post.support_count || 0);
-
-    const nextSupported = !currentSupported;
-
-    const nextCount = Math.max(
-      currentCount + (nextSupported ? 1 : -1),
-      0
-    );
-
-    const nextReaction = {
-      supported: nextSupported,
-      count: nextCount,
-    };
-
-    // Immediate UI update.
-    setPosts((prev) =>
-      prev.map((item) =>
-        item.id === post.id
-          ? {
-              ...item,
-              supported_by_me: nextSupported,
-              support_count: nextCount,
-            }
-          : item
-      )
-    );
-
-    // Update reaction state.
-    setSupportReactions((prev) => {
-      const next = {
-        ...prev,
-        [post.id]: nextReaction,
-      };
-
-      writeSupportReactions(next);
-
-      return next;
-    });
-
-    // Update cached posts too.
-    setPosts((prev) => {
-      const next = prev.map((item) =>
-        item.id === post.id
-          ? {
-              ...item,
-              supported_by_me: nextSupported,
-              support_count: nextCount,
-            }
-          : item
-      );
-
-      writeCachedCommunityPosts(next);
-
-      return next;
-    });
-
-    // Small visual lock to prevent double taps.
-    window.setTimeout(() => {
-      setSupportingPostId((current) =>
-        current === post.id ? null : current
-      );
-    }, 220);
+    try {
+      const result = await supportPost(post.id);
+      const confirmedCount = Number(result?.support_count ?? optimisticCount);
+      setPosts((prev) => {
+        const next = prev.map((item) => item.id === post.id
+          ? { ...item, supported_by_me: true, support_count: confirmedCount }
+          : item);
+        writeCachedCommunityPosts(next);
+        return next;
+      });
+      toast.success(result?.alreadySupported ? "You already supported this post." : "Support sent!");
+    } catch (error: any) {
+      setPosts((prev) => prev.map((item) => item.id === post.id
+        ? { ...item, supported_by_me: false, support_count: previousCount }
+        : item));
+      toast.error(error?.message || "Failed to send Support.");
+    } finally {
+      setSupportingPostId(null);
+    }
   };
 
   // ------------------------------------------------------------
@@ -1151,12 +1006,10 @@ export default function CommunityPage() {
                       onClick={() =>
                         handleSupportReaction(post)
                       }
-                      disabled={
-                        supportingPostId === post.id
-                      }
+                      disabled={supportingPostId === post.id || isSupported}
                       aria-label={
                         isSupported
-                          ? "Remove support reaction"
+                          ? "Supported"
                           : "Support this post"
                       }
                       aria-pressed={isSupported}
@@ -1179,9 +1032,7 @@ export default function CommunityPage() {
                       </span>
 
                       <span>
-                        {isSupported
-                          ? "Supported"
-                          : "Support"}
+                        {isSupported ? "Supported" : "Support"}
                       </span>
 
                       <span

@@ -325,18 +325,11 @@ export default function MyCasesPage() {
     const isExpired = !isHelping && c.status === "expired";
     const [triggerLoading, setTriggerLoading] = useState(false);
 
-    async function handleAffidavit() {
+    function handleAffidavit() {
       setTriggerLoading(true);
-      try {
-        const kyc = await getKycSubmission(c.user_id);
-        const seekerCnic = maskCnic(kyc?.cnic_number);
-        const seekerName = kyc?.full_name || c.full_name || "Verified Beneficiary";
-        generateAffidavitFromDashboard(c, c.resolution, heroName, seekerCnic, seekerName);
-      } catch {
-        toast.error("Error generating affidavit.");
-      } finally {
-        setTriggerLoading(false);
-      }
+      const affidavitWindow = window.open(`/affidavit/${encodeURIComponent(c.id)}`, "_blank", "noopener,noreferrer");
+      if (!affidavitWindow) toast.error("Please allow pop-ups to view the affidavit.");
+      setTriggerLoading(false);
     }
 
     return (
