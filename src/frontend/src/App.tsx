@@ -1,5 +1,6 @@
 // src/frontend/src/App.tsx
 // Givethra - Full App with Role Selection, Onboarding, and Role-based routing
+// 🔥 FIXED: Heroes bypass KYC, Requesters must complete KYC
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -87,12 +88,14 @@ function RootLayout() {
   const location = useLocation();
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
+  // Sync role from auth context to role context
   useEffect(() => {
     if (!isAuthenticated) return;
     if (authRole === "hero" && role !== "hero") setRole("hero");
     if (authRole === "help_seeker" && role !== "requester") setRole("requester");
   }, [authRole, isAuthenticated, role, setRole]);
 
+  // 🔥 FIXED: KYC check - only for Requesters, Heroes bypass KYC
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setCheckingOnboarding(false);
@@ -119,24 +122,64 @@ function RootLayout() {
             // Storage is optional; the API status remains authoritative.
           }
         }
+
         const publicPaths = [
           "/", "/sign-in", "/sign-up", "/about", "/account-privacy", "/privacy",
           "/terms", "/community-guidelines", "/faq", "/contact", "/community",
           "/heroes-wall", "/kindness-wall",
         ];
         const isPublicPath = publicPaths.includes(location.pathname);
-        if (!isAdmin && effectiveKycStatus !== "approved" && !isPublicPath && location.pathname !== "/kyc") {
+
+        // 🔥 FIX: Only Requester needs KYC. Hero bypasses KYC.
+        const isRequester = role === "requester";
+        const requiresKyc = isRequester && effectiveKycStatus !== "approved";
+
+        // If user is a Requester and KYC is not approved, redirect to KYC
+        if (!isAdmin && requiresKyc && !isPublicPath && location.pathname !== "/kyc") {
           if (!cancelled) navigate({ to: "/kyc" });
           return;
         }
-        if (!isAdmin && effectiveKycStatus === "approved") {
+
+        // 🔥 Hero: Always allow access (no KYC check)
+        // Requester: Only proceed if KYC is approved
+        if (!isAdmin && role === "hero") {
+          // Heroes can skip KYC entirely
+          // We don't need to check KYC for heroes
+          // But we still allow onboarding if they happen to have KYC approved
+          if (effectiveKycStatus === "approved") {
+            const onboardingCompleted = await getOnboardingStatus(user.id);
+            if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
+              navigate({ to: "/onboarding" });
+            }
+          }
+          // Heroes are done - no further checks needed
+          if (!cancelled) setCheckingOnboarding(false);
+          return;
+        }
+
+        // Requester: If KYC is approved, check onboarding
+        if (!isAdmin && isRequester && effectiveKycStatus === "approved") {
           const onboardingCompleted = await getOnboardingStatus(user.id);
           if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
             navigate({ to: "/onboarding" });
           }
         }
+
+        // If user has no role yet, don't block
+        if (!role) {
+          if (!cancelled) setCheckingOnboarding(false);
+          return;
+        }
+
+        // If user is not requester and not hero (should not happen), redirect to role selection
+        if (!isAdmin && role !== "hero" && role !== "requester") {
+          if (!cancelled && !isPublicPath && location.pathname !== "/kyc") {
+            navigate({ to: "/" });
+          }
+        }
+
       } catch (err) {
-        console.error("Error checking onboarding:", err);
+        console.error("Error checking status:", err);
       } finally {
         if (!cancelled) setCheckingOnboarding(false);
       }
@@ -146,8 +189,9 @@ function RootLayout() {
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, isAuthenticated, user, location.pathname, navigate]);
+  }, [isAdmin, isAuthenticated, user, role, location.pathname, navigate]);
 
+  // Role guard: If no role selected, redirect to role selection page
   useEffect(() => {
     if (!role && !isAdmin && !checkingOnboarding && isAuthenticated) {
       const publicPaths = [
