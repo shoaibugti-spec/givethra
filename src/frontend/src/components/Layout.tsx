@@ -27,6 +27,7 @@ import {
   getCommunityPosts,
   getGuestId,
 } from "@/lib/api";
+import RoleSwitcher from "@/components/RoleSwitcher"; // ✅ نیا امپورٹ
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
 const FACEBOOK_URL =
@@ -84,7 +85,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
   }, [isAuthenticated, user]);
 
-    const fetchPostCount = async () => {
+  const fetchPostCount = async () => {
     try {
       const data = await getCommunityPosts();
       if (!Array.isArray(data)) { setPostCount(0); return; }
@@ -139,7 +140,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* ===== HEADER ===== */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-16 flex items-center gap-2 md:gap-4">
-          {/* Reference layout: hamburger, brand, centered search */}
+          {/* Hamburger menu for mobile */}
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
@@ -156,9 +157,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-display font-bold text-lg text-primary">Givethra</span>
           </Link>
 
-          <div className="flex-1" aria-hidden="true" />
+          {/* ✅ Center: Role Switcher */}
+          <div className="flex-1 flex items-center justify-center">
+            {/* Only show when authenticated and not on public pages */}
+            {isAuthenticated && (
+              <RoleSwitcher />
+            )}
+          </div>
 
-          {/* Reference layout: translation, Community, notifications */}
+          {/* Right side: language, community, notifications, user */}
           <div className="flex items-center gap-1 shrink-0">
             <LanguageSwitcher />
             <Link to="/community" aria-label="Community" aria-current={isRouteActive("/community") ? "page" : undefined} className={iconLinkClass("/community")}>
