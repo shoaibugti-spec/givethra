@@ -1,17 +1,21 @@
 // src/frontend/src/pages/ProfilePage.tsx
-// Givethra — Production Profile Page
-//
-// Key fixes:
-// - Own and public profiles are handled separately.
-// - Viewed user's data is used for profile statistics.
-// - Hero/Requester display is based on the viewed profile where possible.
-// - Mobile layout avoids horizontal overflow.
-// - Relationship lists use the viewed profile's relationships.
-// - Edit/Logout actions are available only on the owner's profile.
-// - Follow/Unfollow updates the correct relationship count.
-// - KYC and trust information belongs to the viewed user.
-// - Credits are calculated from Supports.
-// - Hero badges are calculated from actual Hero activity.
+// Givethra — Complete Public + Own Profile Page
+// Merged version:
+// - Own/Public profile support
+// - Hero / Requester stats
+// - Hero badges
+// - Supports -> Credits
+// - Trust level
+// - KYC / verification badges
+// - Heroes / Requesters lists
+// - My Hero / Unhero
+// - Case history
+// - Helped cases
+// - Community posts
+// - Multi-currency amount display
+// - Mobile responsive layout
+// - Profile refresh on focus
+// - Account menu + logout
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -30,6 +34,7 @@ import {
   Circle,
   Coins,
   Gift,
+  HandCoins,
   HeartHandshake,
   Info,
   KeyRound,
@@ -50,10 +55,9 @@ import {
   Users,
   Wallet,
   XCircle,
-  HandCoins,
 } from "lucide-react";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -84,34 +88,40 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
+// ============================================================================
+// CONFIG
+// ============================================================================
 
 const SUPPORTS_PER_CREDIT = 100;
 const CREDITS_PER_REWARD = 5;
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+// ============================================================================
+// TYPES
+// ============================================================================
 
-type RelationshipType =
-  | "heroes"
-  | "requesters"
-  | "supporters"
-  | null;
+type RelationshipType = "heroes" | "requesters" | null;
 
 type BadgeInfo = {
   title: string;
   emoji: string;
   description: string;
-  icon: JSX.Element;
   color: string;
+  icon: JSX.Element;
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+type CaseStats = {
+  submitted: number;
+  completed: number;
+  approved: number;
+  rejected: number;
+  expired: number;
+};
+
+type AmountMap = Record<string, number>;
+
+// ============================================================================
+// HELPERS
+// ============================================================================
 
 function normalizeStatus(value: unknown): string {
   return String(value || "")
@@ -122,7 +132,7 @@ function normalizeStatus(value: unknown): string {
 function isApprovedResolution(resolution: any): boolean {
   if (!resolution) return false;
 
-  const status = normalizeStatus(resolution.status);
+  const status = normalizeStatus(resolution?.status);
 
   if (
     [
@@ -131,6 +141,7 @@ function isApprovedResolution(resolution: any): boolean {
       "verified",
       "confirmed",
       "seeker_confirmed",
+      "admin_confirmed",
     ].includes(status)
   ) {
     return true;
@@ -138,18 +149,18 @@ function isApprovedResolution(resolution: any): boolean {
 
   if (
     [1, true, "1", "true", "yes"].includes(
-      resolution.admin_confirmed,
+      resolution?.admin_confirmed
     )
   ) {
     return true;
   }
 
   if (
-    resolution.admin_approved_at ||
-    resolution.approved_at ||
-    resolution.verified_at ||
-    resolution.completed_at ||
-    resolution.admin_confirmed_at
+    resolution?.admin_approved_at ||
+    resolution?.approved_at ||
+    resolution?.verified_at ||
+    resolution?.completed_at ||
+    resolution?.admin_confirmed_at
   ) {
     return true;
   }
@@ -157,10 +168,97 @@ function isApprovedResolution(resolution: any): boolean {
   return false;
 }
 
+function getCurrencySymbol(currency?: string): string {
+  const code = String(currency || "USD").toUpperCase();
+
+  const symbols: Record<string, string> = {
+    PKR: "Rs",
+    USD: "$",
+    AED: "د.إ",
+    SAR: "﷼",
+    GBP: "£",
+    EUR: "€",
+    INR: "₹",
+    BDT: "৳",
+    CNY: "¥",
+    CAD: "C$",
+    AUD: "A$",
+    NZD: "NZ$",
+    JPY: "¥",
+    TRY: "₺",
+    MYR: "RM",
+    IDR: "Rp",
+    QAR: "﷼",
+    KWD: "د.ك",
+    OMR: "﷼",
+    BHD: ".د.ب",
+  };
+
+  return symbols[code] || code;
+}
+
+function formatMoney(
+  amount: number,
+  currency?: string
+): string {
+  const value = Number(amount || 0);
+  if (!Number.isFinite(value) || value <= 0) return "—";
+
+  const code = String(currency || "USD").toUpperCase();
+  const symbol = getCurrencySymbol(code);
+
+  return `${symbol} ${value.toLocaleString(undefined, {
+    minimumFractionDigits: code === "USD" || code === "EUR" || code === "GBP" ? 2 : 0,
+    maximumFractionDigits: code === "USD" || code === "EUR" || code === "GBP" ? 2 : 0,
+  })}`;
+}
+
+function addAmount(
+  target: AmountMap,
+  currency: string,
+  amount: number
+) {
+  const code = String(currency || "USD").toUpperCase();
+  const value = Number(amount || 0);
+
+  if (!Number.isFinite(value) || value <= 0) return;
+
+  target[code] = (target[code] || 0) + value;
+}
+
+function formatAmountMap(amounts: AmountMap): string {
+  const entries = Object.entries(amounts);
+
+  if (!entries.length) return "—";
+
+  return entries
+    .map(([currency, amount]) =>
+      formatMoney(amount, currency)
+    )
+    .join(" · ");
+}
+
+function getResolutionAmount(resolution: any): number {
+  return Number(
+    resolution?.seeker_confirmed_amount ??
+      resolution?.amount_paid ??
+      resolution?.amount ??
+      0
+  );
+}
+
+function getResolutionCurrency(resolution: any): string {
+  return String(
+    resolution?.currency ||
+      resolution?.case_currency ||
+      "USD"
+  ).toUpperCase();
+}
+
 function getBadge(
   unlockCount: number,
   contributionCount: number,
-  directHelpCount: number,
+  directHelpCount: number
 ): BadgeInfo | null {
   if (
     directHelpCount > 0 &&
@@ -171,8 +269,10 @@ function getBadge(
       title: "Super Hero",
       emoji: "🌟",
       description:
-        "You have unlocked cases, contributed, and provided direct help. You are the ultimate Hero!",
-      icon: <Trophy className="h-4 w-4" />,
+        "You have unlocked cases, contributed, and provided direct help. You are an ultimate Hero!",
+      icon: (
+        <Trophy className="h-4 w-4 text-yellow-500" />
+      ),
       color:
         "bg-gradient-to-r from-yellow-400 to-orange-500 text-white",
     };
@@ -183,8 +283,10 @@ function getBadge(
       title: "Hero",
       emoji: "🦸",
       description:
-        "You paid directly for someone's need. You are a true Hero!",
-      icon: <Award className="h-4 w-4" />,
+        "You have directly helped someone with their verified need.",
+      icon: (
+        <Award className="h-4 w-4 text-blue-500" />
+      ),
       color:
         "bg-gradient-to-r from-blue-400 to-indigo-500 text-white",
     };
@@ -195,8 +297,10 @@ function getBadge(
       title: "Young Hero",
       emoji: "⭐",
       description:
-        "You contributed to a fundraising pool. Every contribution counts! Keep going to become a full Hero.",
-      icon: <Sparkles className="h-4 w-4" />,
+        "You have contributed to a fundraising pool. Every contribution counts!",
+      icon: (
+        <Sparkles className="h-4 w-4 text-green-500" />
+      ),
       color:
         "bg-gradient-to-r from-green-400 to-emerald-500 text-white",
     };
@@ -207,10 +311,12 @@ function getBadge(
       title: "Newborn Hero",
       emoji: "🆕",
       description:
-        "You unlocked a case. Take the next step to become a full Hero!",
-      icon: <Sparkles className="h-4 w-4" />,
+        "You have unlocked a case. Take the next step and complete the help!",
+      icon: (
+        <Sparkles className="h-4 w-4 text-purple-500" />
+      ),
       color:
-        "bg-gradient-to-r from-purple-400 to-pink-500 text-white",
+        "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
     };
   }
 
@@ -219,13 +325,13 @@ function getBadge(
 
 function calculateTrustLevel(
   rejected: number,
-  approved: number,
-  expired: number,
+  completed: number,
+  expired: number
 ): number {
   let trust = 100;
 
   trust -= rejected * 10;
-  trust += approved * 5;
+  trust += completed * 5;
   trust -= expired * 5;
 
   return Math.max(0, Math.min(100, trust));
@@ -235,7 +341,7 @@ function getCaseStatusStyle(status: string) {
   const value = normalizeStatus(status);
 
   if (value === "completed") {
-    return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900";
+    return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800";
   }
 
   if (
@@ -243,66 +349,35 @@ function getCaseStatusStyle(status: string) {
     value === "approved" ||
     value === "live"
   ) {
-    return "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900";
+    return "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800";
   }
 
   if (value === "rejected") {
-    return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900";
+    return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800";
   }
 
   if (value === "expired") {
-    return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900";
+    return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800";
+  }
+
+  if (value === "pending") {
+    return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800";
   }
 
   return "bg-muted text-muted-foreground border-border";
 }
 
-function getDisplayRole(profile: any, fallbackRole: string | null) {
-  const raw =
-    profile?.role ??
-    profile?.user_role ??
-    profile?.account_role ??
-    profile?.type ??
-    fallbackRole ??
-    "";
+function getCaseStatusLabel(status: string) {
+  const value = normalizeStatus(status);
 
-  const value = normalizeStatus(raw);
+  if (!value) return "Pending";
 
-  if (
-    value === "hero" ||
-    value === "helper" ||
-    value === "donor"
-  ) {
-    return "hero";
-  }
-
-  if (
-    value === "requester" ||
-    value === "help_seeker" ||
-    value === "seeker"
-  ) {
-    return "requester";
-  }
-
-  return fallbackRole === "hero" ? "hero" : "requester";
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function getInitials(name: string): string {
-  const initials = String(name || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
-  return initials || "G";
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 export default function ProfilePage() {
   const { isAuthenticated, user, logout } = useAuth();
@@ -311,52 +386,38 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // -------------------------------------------------------------------------
-  // Determine whose profile is being viewed
-  // -------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // PROFILE ID
+  // --------------------------------------------------------------------------
 
   const profileUserId =
     location.pathname.match(/^\/profile\/([^/]+)/)?.[1] ||
     user?.id ||
     "";
 
-  const isOwnProfile =
-    Boolean(user?.id) &&
-    String(profileUserId) === String(user.id);
+  const isOwnProfile = Boolean(
+    user?.id &&
+      String(profileUserId) === String(user.id)
+  );
 
-  // -------------------------------------------------------------------------
-  // Main state
-  // -------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // STATE
+  // --------------------------------------------------------------------------
 
   const [profile, setProfile] = useState<any>(null);
   const [kycData, setKycData] = useState<any>(null);
   const [cases, setCases] = useState<any[]>([]);
 
-  const [profileLoading, setProfileLoading] =
-    useState(true);
+  const [resolutions, setResolutions] = useState<any[]>([]);
+  const [unlocks, setUnlocks] = useState<any[]>([]);
+
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const [showMenu, setShowMenu] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
 
-  const [badgeInfoOpen, setBadgeInfoOpen] =
-    useState(false);
-
-  const [creditsInfoOpen, setCreditsInfoOpen] =
-    useState(false);
-
-  // -------------------------------------------------------------------------
-  // Relationship state
-  // -------------------------------------------------------------------------
-
-  const [heroesCount, setHeroesCount] = useState(0);
-  const [followingCount, setFollowingCount] =
-    useState(0);
-  const [supportsCount, setSupportsCount] =
-    useState(0);
-
-  const [isMyHero, setIsMyHero] = useState(false);
-  const [heroUpdating, setHeroUpdating] =
-    useState(false);
+  const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
+  const [creditsInfoOpen, setCreditsInfoOpen] = useState(false);
 
   const [relationshipType, setRelationshipType] =
     useState<RelationshipType>(null);
@@ -367,357 +428,604 @@ export default function ProfilePage() {
   const [relationshipLoading, setRelationshipLoading] =
     useState(false);
 
-  // -------------------------------------------------------------------------
-  // Case stats
-  // -------------------------------------------------------------------------
+  const [isMyHero, setIsMyHero] = useState(false);
+  const [heroUpdating, setHeroUpdating] = useState(false);
 
-  const [caseStats, setCaseStats] = useState({
-    submitted: 0,
-    completed: 0,
-    rejected: 0,
-    expired: 0,
-  });
+  // --------------------------------------------------------------------------
+  // COUNTS
+  // --------------------------------------------------------------------------
+
+  const [heroesCount, setHeroesCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [supportsCount, setSupportsCount] = useState(0);
+
+  // --------------------------------------------------------------------------
+  // CASE STATS
+  // --------------------------------------------------------------------------
+
+  const [caseStats, setCaseStats] =
+    useState<CaseStats>({
+      submitted: 0,
+      completed: 0,
+      approved: 0,
+      rejected: 0,
+      expired: 0,
+    });
 
   const [totalHelpReceived, setTotalHelpReceived] =
-    useState(0);
+    useState<AmountMap>({});
 
-  const [trustLevel, setTrustLevel] = useState(100);
-
-  // -------------------------------------------------------------------------
-  // Hero stats
-  // -------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // HERO STATS
+  // --------------------------------------------------------------------------
 
   const [helpedCount, setHelpedCount] = useState(0);
   const [directHelps, setDirectHelps] = useState(0);
-  const [contributions, setContributions] =
-    useState(0);
-
-  const [unlockCount, setUnlockCount] =
-    useState(0);
+  const [contributions, setContributions] = useState(0);
+  const [unlockCount, setUnlockCount] = useState(0);
 
   const [totalAmountSpent, setTotalAmountSpent] =
-    useState(0);
+    useState<AmountMap>({});
 
   const [helpedCases, setHelpedCases] =
     useState<any[]>([]);
 
+  // --------------------------------------------------------------------------
+  // BADGE
+  // --------------------------------------------------------------------------
+
   const [badge, setBadge] =
     useState<BadgeInfo | null>(null);
 
-  // -------------------------------------------------------------------------
-  // Load profile
-  // -------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // LOAD PROFILE
+  // --------------------------------------------------------------------------
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadData() {
-      if (!profileUserId) {
-        navigate({ to: "/sign-in" });
-        return;
-      }
-
-      setProfileLoading(true);
-
-      // Reset old profile data immediately when navigating
-      // from one profile to another.
-      setProfile(null);
-      setKycData(null);
-      setCases([]);
-      setRelationshipUsers([]);
-      setRelationshipType(null);
-
-      setCaseStats({
-        submitted: 0,
-        completed: 0,
-        rejected: 0,
-        expired: 0,
-      });
-
-      setTotalHelpReceived(0);
-      setTrustLevel(100);
-
-      setHelpedCount(0);
-      setDirectHelps(0);
-      setContributions(0);
-      setUnlockCount(0);
-      setTotalAmountSpent(0);
-      setHelpedCases([]);
-      setBadge(null);
-
-      try {
-        const [
-          kyc,
-          caseList,
-          prof,
-          resolutions,
-          unlocks,
-        ] = await Promise.all([
-          getKycSubmission(profileUserId),
-          getCasesByUser(profileUserId),
-          getProfile(profileUserId, role),
-          getCaseResolutionsByHero(profileUserId),
-          getCaseUnlocksByHero(profileUserId),
-        ]);
-
-        if (cancelled) return;
-
-        const list = Array.isArray(caseList)
-          ? caseList
-          : [];
-
-        const resolutionList = Array.isArray(resolutions)
-          ? resolutions
-          : [];
-
-        const unlockList = Array.isArray(unlocks)
-          ? unlocks
-          : [];
-
-        setKycData(kyc);
-        setProfile(prof);
-        setCases(list);
-
-        // ---------------------------------------------------------------
-        // Relationships
-        // ---------------------------------------------------------------
-
-        setHeroesCount(
-          Number(
-            prof?.requesters_count ??
-              prof?.heroes_count ??
-              prof?.followers_count ??
-              0,
-          ),
-        );
-
-        setFollowingCount(
-          Number(
-            prof?.heroes_count ??
-              prof?.following_count ??
-              0,
-          ),
-        );
-
-        setSupportsCount(
-          Number(
-            prof?.supports_count ??
-              prof?.support_count ??
-              0,
-          ),
-        );
-
-        setIsMyHero(
-          Boolean(
-            prof?.is_following ??
-              prof?.is_my_hero ??
-              false,
-          ),
-        );
-
-        // ---------------------------------------------------------------
-        // Requester / Case statistics
-        // ---------------------------------------------------------------
-
-        const submitted = list.length;
-
-        const completed = list.filter(
-          (item: any) =>
-            normalizeStatus(item.status) ===
-            "completed",
-        ).length;
-
-        const rejected = list.filter(
-          (item: any) =>
-            normalizeStatus(item.status) ===
-            "rejected",
-        ).length;
-
-        const expired = list.filter(
-          (item: any) =>
-            normalizeStatus(item.status) ===
-            "expired",
-        ).length;
-
-        setCaseStats({
-          submitted,
-          completed,
-          rejected,
-          expired,
-        });
-
-        const totalReceived = list
-          .filter(
-            (item: any) =>
-              normalizeStatus(item.status) ===
-              "completed",
-          )
-          .reduce(
-            (sum: number, item: any) =>
-              sum +
-              (Number(
-                item.amount_collected ??
-                  item.collected_amount ??
-                  item.amount_received ??
-                  0,
-              ) || 0),
-            0,
-          );
-
-        setTotalHelpReceived(totalReceived);
-
-        setTrustLevel(
-          calculateTrustLevel(
-            rejected,
-            completed,
-            expired,
-          ),
-        );
-
-        // ---------------------------------------------------------------
-        // Hero statistics
-        // ---------------------------------------------------------------
-
-        const validResolutions =
-          resolutionList.filter(
-            isApprovedResolution,
-          );
-
-        setHelpedCount(validResolutions.length);
-
-        setHelpedCases(
-          validResolutions.slice(0, 5),
-        );
-
-        const direct = validResolutions.filter(
-          (item: any) =>
-            normalizeStatus(item.paid_to) !==
-            "givethra",
-        );
-
-        const contribution =
-          validResolutions.filter(
-            (item: any) =>
-              normalizeStatus(item.paid_to) ===
-              "givethra",
-          );
-
-        setDirectHelps(direct.length);
-        setContributions(contribution.length);
-
-        const totalSpent = validResolutions.reduce(
-          (sum: number, item: any) =>
-            sum +
-            (Number(
-              item.seeker_confirmed_amount ??
-                item.amount_paid ??
-                item.paid_amount ??
-                item.amount ??
-                0,
-            ) || 0),
-          0,
-        );
-
-        setTotalAmountSpent(totalSpent);
-
-        setUnlockCount(unlockList.length);
-
-        setBadge(
-          getBadge(
-            unlockList.length,
-            contribution.length,
-            direct.length,
-          ),
-        );
-      } catch (error) {
-        if (!cancelled) {
-          console.error(
-            "Failed to load profile:",
-            error,
-          );
-          toast.error(
-            "Unable to load profile information.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setProfileLoading(false);
-        }
-      }
+  const loadData = useCallback(async () => {
+    if (!profileUserId) {
+      navigate({ to: "/sign-in" });
+      return;
     }
 
-    loadData();
+    setProfileLoading(true);
 
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const [
+        kyc,
+        caseList,
+        prof,
+        resolutionResult,
+        unlockResult,
+      ] = await Promise.all([
+        getKycSubmission(profileUserId),
+        getCasesByUser(profileUserId),
+        getProfile(profileUserId, role),
+        getCaseResolutionsByHero(profileUserId),
+        getCaseUnlocksByHero(profileUserId),
+      ]);
+
+      // ------------------------------------------------------------
+      // PROFILE
+      // ------------------------------------------------------------
+
+      setKycData(kyc);
+      setProfile(prof);
+
+      setHeroesCount(
+        Number(
+          prof?.heroes_count ??
+            prof?.followers_count ??
+            0
+        )
+      );
+
+      setFollowingCount(
+        Number(prof?.following_count || 0)
+      );
+
+      setSupportsCount(
+        Number(prof?.supports_count || 0)
+      );
+
+      setIsMyHero(Boolean(prof?.is_following));
+
+      // ------------------------------------------------------------
+      // CASES
+      // ------------------------------------------------------------
+
+      const list = Array.isArray(caseList)
+        ? caseList
+        : [];
+
+      setCases(list);
+
+      const submitted = list.length;
+
+      const completed = list.filter(
+        (c: any) =>
+          normalizeStatus(c.status) === "completed"
+      ).length;
+
+      const approved = list.filter(
+        (c: any) =>
+          ["approved", "active", "live"].includes(
+            normalizeStatus(c.status)
+          )
+      ).length;
+
+      const rejected = list.filter(
+        (c: any) =>
+          normalizeStatus(c.status) === "rejected"
+      ).length;
+
+      const expired = list.filter(
+        (c: any) =>
+          normalizeStatus(c.status) === "expired"
+      ).length;
+
+      setCaseStats({
+        submitted,
+        completed,
+        approved,
+        rejected,
+        expired,
+      });
+
+      // ------------------------------------------------------------
+      // TOTAL HELP RECEIVED
+      // ------------------------------------------------------------
+
+      const received: AmountMap = {};
+
+      list
+        .filter(
+          (c: any) =>
+            normalizeStatus(c.status) === "completed"
+        )
+        .forEach((c: any) => {
+          const amount = Number(
+            c.amount_collected ??
+              c.amount_needed ??
+              0
+          );
+
+          const currency = String(
+            c.currency || "USD"
+          ).toUpperCase();
+
+          addAmount(
+            received,
+            currency,
+            amount
+          );
+        });
+
+      setTotalHelpReceived(received);
+
+      // ------------------------------------------------------------
+      // RESOLUTIONS
+      // ------------------------------------------------------------
+
+      const resolutionList = Array.isArray(
+        resolutionResult
+      )
+        ? resolutionResult
+        : [];
+
+      setResolutions(resolutionList);
+
+      const validResolutions =
+        resolutionList.filter(
+          (resolution: any) =>
+            isApprovedResolution(resolution)
+        );
+
+      setHelpedCount(validResolutions.length);
+
+      setHelpedCases(
+        validResolutions.slice(0, 5)
+      );
+
+      // ------------------------------------------------------------
+      // DIRECT HELP VS CONTRIBUTION
+      // ------------------------------------------------------------
+
+      const direct = validResolutions.filter(
+        (resolution: any) =>
+          String(
+            resolution?.paid_to || ""
+          ).toLowerCase() !== "givethra"
+      );
+
+      const contribution =
+        validResolutions.filter(
+          (resolution: any) =>
+            String(
+              resolution?.paid_to || ""
+            ).toLowerCase() === "givethra"
+        );
+
+      setDirectHelps(direct.length);
+      setContributions(contribution.length);
+
+      // ------------------------------------------------------------
+      // TOTAL SPENT
+      // ------------------------------------------------------------
+
+      const spent: AmountMap = {};
+
+      validResolutions.forEach(
+        (resolution: any) => {
+          addAmount(
+            spent,
+            getResolutionCurrency(
+              resolution
+            ),
+            getResolutionAmount(
+              resolution
+            )
+          );
+        }
+      );
+
+      setTotalAmountSpent(spent);
+
+      // ------------------------------------------------------------
+      // UNLOCKS
+      // ------------------------------------------------------------
+
+      const unlockList = Array.isArray(
+        unlockResult
+      )
+        ? unlockResult
+        : [];
+
+      setUnlocks(unlockList);
+      setUnlockCount(unlockList.length);
+
+      // ------------------------------------------------------------
+      // BADGE
+      // ------------------------------------------------------------
+
+      setBadge(
+        getBadge(
+          unlockList.length,
+          contribution.length,
+          direct.length
+        )
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load profile data:",
+        error
+      );
+
+      toast.error(
+        "Unable to load profile information."
+      );
+    } finally {
+      setProfileLoading(false);
+    }
   }, [
     profileUserId,
     role,
-    isAuthenticated,
     navigate,
   ]);
 
-  // -------------------------------------------------------------------------
-  // Derived values
-  // -------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // INITIAL LOAD + FOCUS REFRESH
+  // --------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!profileUserId) {
+      navigate({ to: "/sign-in" });
+      return;
+    }
+
+    setProfile(null);
+    setKycData(null);
+
+    loadData();
+
+    const handleFocus = () => {
+      loadData();
+    };
+
+    window.addEventListener(
+      "focus",
+      handleFocus
+    );
+
+    return () => {
+      window.removeEventListener(
+        "focus",
+        handleFocus
+      );
+    };
+  }, [
+    profileUserId,
+    location.pathname,
+    isAuthenticated,
+    loadData,
+    navigate,
+  ]);
+
+  // ==========================================================================
+  // HERO FOLLOW
+  // ==========================================================================
+
+  async function toggleHero() {
+    if (!isAuthenticated || !user?.id) {
+      navigate({ to: "/sign-in" });
+      return;
+    }
+
+    if (
+      isOwnProfile ||
+      heroUpdating
+    ) {
+      return;
+    }
+
+    setHeroUpdating(true);
+
+    try {
+      if (isMyHero) {
+        await unfollowUser(
+          profileUserId
+        );
+
+        setIsMyHero(false);
+
+        setHeroesCount(
+          (count) =>
+            Math.max(0, count - 1)
+        );
+
+        toast.success(
+          "Removed from My Heroes"
+        );
+      } else {
+        await followUser(
+          profileUserId
+        );
+
+        setIsMyHero(true);
+
+        setHeroesCount(
+          (count) => count + 1
+        );
+
+        toast.success(
+          "Added to My Heroes"
+        );
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not update Hero status"
+      );
+    } finally {
+      setHeroUpdating(false);
+    }
+  }
+
+  // ==========================================================================
+  // RELATIONSHIP LIST
+  // ==========================================================================
+
+  async function openRelationshipList(
+    type: "heroes" | "requesters"
+  ) {
+    setRelationshipType(type);
+    setRelationshipLoading(true);
+
+    try {
+      const result =
+        await getFollowList(
+          profileUserId,
+          type
+        );
+
+      setRelationshipUsers(
+        Array.isArray(result)
+          ? result
+          : []
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load relationship list:",
+        error
+      );
+
+      setRelationshipUsers([]);
+    } finally {
+      setRelationshipLoading(false);
+    }
+  }
+
+  async function removeRelationship(
+    targetId: string
+  ) {
+    if (!isOwnProfile) return;
+
+    try {
+      if (
+        relationshipType === "heroes"
+      ) {
+        await unfollowUser(
+          targetId
+        );
+
+        setFollowingCount(
+          (count) =>
+            Math.max(0, count - 1)
+        );
+      }
+
+      if (
+        relationshipType === "requesters"
+      ) {
+        await removeRequester(
+          targetId
+        );
+
+        setHeroesCount(
+          (count) =>
+            Math.max(0, count - 1)
+        );
+      }
+
+      setRelationshipUsers(
+        (items) =>
+          items.filter(
+            (item) =>
+              String(
+                item.user_id ??
+                  item.id ??
+                  item.hero_id ??
+                  item.requester_id ??
+                  ""
+              ) !==
+              String(targetId)
+          )
+      );
+
+      toast.success(
+        relationshipType === "heroes"
+          ? "Hero removed"
+          : "Requester removed"
+      );
+    } catch (error) {
+      console.error(
+        "Failed to remove relationship:",
+        error
+      );
+
+      toast.error(
+        "Could not update relationship."
+      );
+    }
+  }
+
+  // ==========================================================================
+  // DERIVED DATA
+  // ==========================================================================
 
   const kycApproved =
-    normalizeStatus(kycData?.status) ===
-    "approved";
+    normalizeStatus(
+      kycData?.status
+    ) === "approved";
 
   const displayName =
     profile?.full_name ||
-    profile?.name ||
-    (isOwnProfile
-      ? user?.fullName
-      : null) ||
+    user?.fullName ||
     "Givethra User";
 
   const avatarUrl =
-    profile?.avatar_url ||
-    profile?.profile_image ||
-    null;
+    profile?.avatar_url || null;
 
   const coverUrl =
-    profile?.cover_url ||
-    profile?.cover_image ||
-    null;
+    profile?.cover_url || null;
 
-  const initials = getInitials(displayName);
+  const initials = useMemo(() => {
+    return (
+      displayName
+        .split(" ")
+        .filter(Boolean)
+        .map(
+          (name: string) =>
+            name[0]
+        )
+        .join("")
+        .toUpperCase()
+        .slice(0, 2) || "G"
+    );
+  }, [displayName]);
 
-  const viewedRole = useMemo(
-    () => getDisplayRole(profile, role),
-    [profile, role],
-  );
+  // --------------------------------------------------------------------------
+  // IMPORTANT:
+  // Use the profile's own role when available.
+  // This prevents a Hero's public profile from incorrectly showing
+  // Requester stats just because the visitor is a requester.
+  // --------------------------------------------------------------------------
 
-  // -------------------------------------------------------------------------
-  // Credits
-  // -------------------------------------------------------------------------
+  const profileRole = String(
+    profile?.role ||
+      profile?.user_role ||
+      profile?.account_role ||
+      role ||
+      ""
+  ).toLowerCase();
+
+  const isHeroProfile =
+    profileRole === "hero" ||
+    profile?.is_hero === true;
+
+  const isRequesterProfile =
+    profileRole === "requester" ||
+    profileRole === "seeker" ||
+    profile?.is_requester === true;
+
+  const showHeroStats =
+    isHeroProfile ||
+    (!isRequesterProfile &&
+      role === "hero");
+
+  // --------------------------------------------------------------------------
+  // CREDITS
+  // --------------------------------------------------------------------------
 
   const creditCount = Math.floor(
-    supportsCount / SUPPORTS_PER_CREDIT,
+    supportsCount /
+      SUPPORTS_PER_CREDIT
   );
 
   const supportsIntoCurrentCredit =
-    supportsCount % SUPPORTS_PER_CREDIT;
+    supportsCount %
+    SUPPORTS_PER_CREDIT;
 
-  const creditProgressPct = Math.round(
-    (supportsIntoCurrentCredit /
-      SUPPORTS_PER_CREDIT) *
-      100,
+  const creditProgressPct = Math.min(
+    100,
+    Math.round(
+      (supportsIntoCurrentCredit /
+        SUPPORTS_PER_CREDIT) *
+        100
+    )
   );
 
-  const rewardsUnlocked = Math.floor(
-    creditCount / CREDITS_PER_REWARD,
-  );
+  const rewardsUnlocked =
+    Math.floor(
+      creditCount /
+        CREDITS_PER_REWARD
+    );
 
   const creditsIntoCurrentReward =
-    creditCount % CREDITS_PER_REWARD;
+    creditCount %
+    CREDITS_PER_REWARD;
 
-  // -------------------------------------------------------------------------
-  // Verification badges
-  // -------------------------------------------------------------------------
+  const supportsToNextCredit =
+    supportsIntoCurrentCredit === 0 &&
+    supportsCount > 0
+      ? SUPPORTS_PER_CREDIT
+      : SUPPORTS_PER_CREDIT -
+        supportsIntoCurrentCredit;
+
+  // --------------------------------------------------------------------------
+  // TRUST
+  // --------------------------------------------------------------------------
+
+  const trustLevel =
+    calculateTrustLevel(
+      caseStats.rejected,
+      caseStats.completed,
+      caseStats.expired
+    );
+
+  // --------------------------------------------------------------------------
+  // VERIFICATION
+  // --------------------------------------------------------------------------
 
   const verificationBadges = [
     {
@@ -727,7 +1035,9 @@ export default function ProfilePage() {
       ),
       active: isOwnProfile
         ? Boolean(user?.email)
-        : Boolean(profile?.email_verified),
+        : Boolean(
+            profile?.email_verified
+          ),
     },
     {
       label: "Mobile Verified",
@@ -735,8 +1045,8 @@ export default function ProfilePage() {
         <Phone className="h-3 w-3" />
       ),
       active: Boolean(
-        profile?.phone_verified ??
-          profile?.phone_number,
+        profile?.phone_verified ||
+          profile?.phone_number
       ),
     },
     {
@@ -752,18 +1062,20 @@ export default function ProfilePage() {
         <Building2 className="h-3 w-3" />
       ),
       active: Boolean(
-        profile?.institution_verified,
+        profile?.institution_verified
       ),
     },
   ];
 
-  // -------------------------------------------------------------------------
-  // Account menu
-  // -------------------------------------------------------------------------
+  // ==========================================================================
+  // ACCOUNT MENU
+  // ==========================================================================
 
   const menuItems = [
     {
-      icon: <Pencil className="h-5 w-5" />,
+      icon: (
+        <Pencil className="h-5 w-5" />
+      ),
       label: "Edit Profile",
       to: "/edit-profile",
     },
@@ -782,12 +1094,16 @@ export default function ProfilePage() {
       to: "/my-cases",
     },
     {
-      icon: <Bell className="h-5 w-5" />,
+      icon: (
+        <Bell className="h-5 w-5" />
+      ),
       label: "Notifications",
       to: "/notifications",
     },
     {
-      icon: <Wallet className="h-5 w-5" />,
+      icon: (
+        <Wallet className="h-5 w-5" />
+      ),
       label: "Wallet",
       to: "/wallet",
     },
@@ -799,222 +1115,54 @@ export default function ProfilePage() {
       to: "/security",
     },
     {
-      icon: <KeyRound className="h-5 w-5" />,
+      icon: (
+        <KeyRound className="h-5 w-5" />
+      ),
       label: "Google Account Security",
       to: "/security",
     },
     {
-      icon: <Lock className="h-5 w-5" />,
+      icon: (
+        <Lock className="h-5 w-5" />
+      ),
       label: "Privacy",
       to: "/account-privacy",
     },
     {
-      icon: <Settings className="h-5 w-5" />,
+      icon: (
+        <Settings className="h-5 w-5" />
+      ),
       label: "Settings",
       to: "/settings",
     },
   ];
 
-  // -------------------------------------------------------------------------
-  // Hero toggle
-  // -------------------------------------------------------------------------
+  // ==========================================================================
+  // LOADING
+  // ==========================================================================
 
-  async function toggleHero() {
-    if (!isAuthenticated || !user?.id) {
-      navigate({ to: "/sign-in" });
-      return;
-    }
+  const profileReady =
+    !profileLoading &&
+    profile &&
+    String(
+      profile.user_id ??
+        profile.id ??
+        ""
+    ) ===
+      String(profileUserId);
 
-    if (
-      isOwnProfile ||
-      heroUpdating ||
-      !profileUserId
-    ) {
-      return;
-    }
-
-    setHeroUpdating(true);
-
-    try {
-      if (isMyHero) {
-        await unfollowUser(profileUserId);
-
-        setIsMyHero(false);
-
-        // This is the number of people who have selected
-        // this profile as Hero.
-        setHeroesCount((count) =>
-          Math.max(0, count - 1),
-        );
-
-        toast.success(
-          "Removed from My Heroes",
-        );
-      } else {
-        await followUser(profileUserId);
-
-        setIsMyHero(true);
-
-        setHeroesCount(
-          (count) => count + 1,
-        );
-
-        toast.success(
-          "Added to My Heroes",
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Failed to update Hero:",
-        error,
-      );
-
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not update Hero status.",
-      );
-    } finally {
-      setHeroUpdating(false);
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Relationship list
-  // -------------------------------------------------------------------------
-
-  async function openRelationshipList(
-    type: Exclude<
-      RelationshipType,
-      null
-    >,
-  ) {
-    setRelationshipType(type);
-    setRelationshipUsers([]);
-    setRelationshipLoading(true);
-
-    try {
-      const result =
-        await getFollowList(
-          profileUserId,
-          type,
-        );
-
-      setRelationshipUsers(
-        Array.isArray(result)
-          ? result
-          : [],
-      );
-    } catch (error) {
-      console.error(
-        "Failed to load relationship list:",
-        error,
-      );
-
-      setRelationshipUsers([]);
-
-      toast.error(
-        "Could not load this list.",
-      );
-    } finally {
-      setRelationshipLoading(false);
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Remove relationship
-  // -------------------------------------------------------------------------
-
-  async function removeRelationship(
-    targetId: string,
-  ) {
-    if (!isOwnProfile || !relationshipType) {
-      return;
-    }
-
-    try {
-      if (
-        relationshipType === "heroes"
-      ) {
-        await unfollowUser(targetId);
-
-        setFollowingCount((count) =>
-          Math.max(0, count - 1),
-        );
-      }
-
-      if (
-        relationshipType ===
-        "requesters"
-      ) {
-        await removeRequester(targetId);
-
-        setHeroesCount((count) =>
-          Math.max(0, count - 1),
-        );
-      }
-
-      setRelationshipUsers(
-        (items) =>
-          items.filter(
-            (item) =>
-              String(
-                item.user_id ??
-                  item.id ??
-                  item.hero_id ??
-                  item.requester_id ??
-                  item.supporter_id,
-              ) !== String(targetId),
-          ),
-      );
-
-      toast.success(
-        relationshipType === "heroes"
-          ? "Hero removed."
-          : "Requester removed.",
-      );
-    } catch (error) {
-      console.error(
-        "Failed to remove relationship:",
-        error,
-      );
-
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not remove relationship.",
-      );
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Loading state
-  // -------------------------------------------------------------------------
-
-  if (!profileUserId) {
-    return null;
-  }
-
-  if (profileLoading) {
+  if (!profileReady) {
     return (
       <Layout>
-        <div className="max-w-xl mx-auto px-4 pt-6 pb-24">
-          <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-            <div className="h-32 bg-muted animate-pulse" />
+        <div className="max-w-xl mx-auto px-4 pt-8 pb-24">
+          <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-sm">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted animate-pulse" />
 
-            <div className="px-5 pb-6">
-              <div className="-mt-12 mb-4 h-24 w-24 rounded-3xl border-4 border-card bg-muted animate-pulse" />
+            <div className="mx-auto h-5 w-40 rounded bg-muted animate-pulse" />
 
-              <div className="h-6 w-44 rounded bg-muted animate-pulse" />
+            <div className="mx-auto mt-3 h-3 w-28 rounded bg-muted animate-pulse" />
 
-              <div className="mt-3 h-4 w-32 rounded bg-muted animate-pulse" />
-
-              <div className="mt-5 h-20 rounded-2xl bg-muted animate-pulse" />
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-border bg-card p-5">
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="mt-5 text-sm text-muted-foreground">
               Loading profile...
             </p>
           </div>
@@ -1023,82 +1171,60 @@ export default function ProfilePage() {
     );
   }
 
-  if (!profile) {
-    return (
-      <Layout>
-        <div className="max-w-xl mx-auto px-4 pt-8 pb-24">
-          <div className="rounded-3xl border border-border bg-card p-8 text-center">
-            <XCircle className="mx-auto h-10 w-10 text-muted-foreground" />
-
-            <h2 className="mt-4 font-semibold">
-              Profile unavailable
-            </h2>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              This profile could not be loaded.
-            </p>
-
-            <Button
-              className="mt-5"
-              onClick={() =>
-                navigate({ to: "/" })
-              }
-            >
-              Go Home
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
+  // ==========================================================================
+  // UI
+  // ==========================================================================
 
   return (
     <Layout>
-      <div className="mx-auto w-full max-w-xl min-w-0 space-y-4 px-4 pb-24 pt-0">
-        {/* ================================================================
-            PROFILE HEADER
-        ================================================================= */}
+      <div className="max-w-xl mx-auto px-4 pt-0 pb-24 space-y-4">
 
-        <section className="overflow-hidden rounded-b-3xl border border-border bg-card shadow-sm">
-          {/* Cover */}
-          <div className="relative h-32 bg-gradient-to-br from-primary via-primary/80 to-primary/40">
+        {/* ================================================================== */}
+        {/* PROFILE HEADER */}
+        {/* ================================================================== */}
+
+        <div className="rounded-b-3xl bg-card border border-border shadow-sm overflow-hidden">
+
+          {/* COVER */}
+          <div className="h-32 relative bg-gradient-to-br from-primary via-primary/80 to-primary/40">
+
             {coverUrl ? (
               <img
                 src={coverUrl}
                 alt="Profile cover"
-                className="absolute inset-0 h-full w-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover"
               />
             ) : (
               <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute right-5 top-2 h-20 w-20 rounded-full bg-white/10 blur-2xl" />
-                <div className="absolute bottom-0 left-10 h-16 w-16 rounded-full bg-white/10 blur-xl" />
+                <div className="absolute top-2 right-4 h-20 w-20 rounded-full bg-white/10 blur-2xl" />
+                <div className="absolute bottom-0 left-8 h-16 w-16 rounded-full bg-white/10 blur-xl" />
               </div>
             )}
 
-            {/* Own profile menu */}
             {isOwnProfile && (
               <button
                 type="button"
-                aria-label="Profile menu"
+                aria-label="Open profile menu"
                 onClick={() =>
                   setShowMenu(true)
                 }
-                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm transition hover:bg-black/40"
+                className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur-sm flex items-center justify-center hover:bg-black/40 transition-colors"
               >
-                <MoreHorizontal className="h-5 w-5" />
+                <MoreHorizontal className="h-5 w-5 text-white" />
               </button>
             )}
           </div>
 
-          <div className="min-w-0 px-5 pb-5">
-            {/* Avatar + Hero action */}
-            <div className="-mt-12 mb-4 flex min-w-0 items-end justify-between gap-3">
+          {/* PROFILE CONTENT */}
+          <div className="px-5 pb-5">
+
+            {/* AVATAR + HERO BUTTON */}
+            <div className="flex items-end justify-between -mt-12 mb-3">
+
               <div className="relative shrink-0">
-                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl border-4 border-card bg-primary shadow-xl ring-1 ring-border">
+
+                <div className="h-24 w-24 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary">
+
                   {avatarUrl ? (
                     <img
                       src={avatarUrl}
@@ -1106,23 +1232,24 @@ export default function ProfilePage() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <span className="text-2xl font-bold text-white">
+                    <span className="text-white font-bold text-2xl">
                       {initials}
                     </span>
                   )}
+
                 </div>
 
                 {isOwnProfile && (
                   <button
                     type="button"
-                    title="Edit Profile"
-                    aria-label="Edit Profile"
                     onClick={() =>
                       navigate({
                         to: "/edit-profile",
                       })
                     }
-                    className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-md transition hover:bg-primary/90"
+                    title="Edit Profile"
+                    aria-label="Edit Profile"
+                    className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full border-2 border-card bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -1132,69 +1259,70 @@ export default function ProfilePage() {
               {!isOwnProfile && (
                 <Button
                   type="button"
-                  disabled={heroUpdating}
                   onClick={toggleHero}
-                  className={`h-9 shrink-0 rounded-full px-4 font-semibold ${
+                  disabled={heroUpdating}
+                  className={`rounded-full px-4 h-9 font-semibold shadow-sm shrink-0 ${
                     isMyHero
-                      ? "border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
+                      ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15"
                       : "bg-primary text-primary-foreground hover:bg-primary/90"
                   }`}
                 >
-                  <HeartHandshake className="mr-1.5 h-4 w-4" />
+                  <HeartHandshake className="h-4 w-4 mr-1.5" />
 
                   {heroUpdating
                     ? "Updating..."
                     : isMyHero
-                      ? "My Hero"
-                      : "Hero"}
+                    ? "My Hero"
+                    : "Hero"}
                 </Button>
               )}
             </div>
 
-            {/* Name + edit */}
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <h1 className="max-w-full break-words text-xl font-bold text-foreground">
-                    {displayName}
-                  </h1>
+            {/* NAME + BADGE + EDIT */}
+            <div className="flex items-start justify-between gap-2">
 
-                  {badge && (
-                    <div className="flex shrink-0 items-center gap-1">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${badge.color}`}
-                      >
-                        {badge.icon}
-                        {badge.title}
-                      </span>
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
 
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label="Badge information"
-                              onClick={() =>
-                                setBadgeInfoOpen(
-                                  true,
-                                )
-                              }
-                              className="text-muted-foreground transition hover:text-primary"
-                            >
-                              <Info className="h-4 w-4" />
-                            </button>
-                          </TooltipTrigger>
+                <h1 className="text-xl font-bold text-foreground break-words">
+                  {displayName}
+                </h1>
 
-                          <TooltipContent>
-                            <p className="max-w-xs text-xs">
-                              {badge.description}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  )}
-                </div>
+                {badge && (
+                  <div className="flex items-center gap-1 shrink-0">
+
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}
+                    >
+                      {badge.icon}
+                      {badge.title}
+                    </span>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setBadgeInfoOpen(
+                                true
+                              )
+                            }
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                          >
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+
+                        <TooltipContent>
+                          <p className="max-w-xs text-xs">
+                            {badge.description}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                  </div>
+                )}
               </div>
 
               {isOwnProfile && (
@@ -1205,7 +1333,9 @@ export default function ProfilePage() {
                       to: "/edit-profile",
                     })
                   }
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15"
+                  title="Edit Profile"
+                  aria-label="Edit Profile"
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary px-3 py-1.5 text-xs font-semibold hover:bg-primary/15 transition-colors"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
@@ -1213,64 +1343,71 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Location */}
+            {/* LOCATION */}
             {(profile?.city ||
               profile?.country) && (
-              <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                 <MapPin className="h-3 w-3 shrink-0" />
-                <span className="break-words">
-                  {[
-                    profile?.city,
-                    profile?.country,
-                  ]
-                    .filter(Boolean)
-                    .join(", ")}
-                </span>
+
+                {[
+                  profile?.city,
+                  profile?.country,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
               </p>
             )}
 
-            {/* Member / verification */}
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {/* MEMBER + KYC */}
+            <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground mt-1">
+
               <span className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
+
                 Member since{" "}
                 {profile?.member_since ||
-                  profile?.created_year ||
-                  2026}
+                  profile?.created_at
+                    ? new Date(
+                        profile?.member_since ||
+                          profile?.created_at
+                      ).getFullYear()
+                    : 2026}
               </span>
 
               {kycApproved && (
-                <span className="flex items-center gap-1 font-medium text-teal-600">
+                <span className="flex items-center gap-1 text-teal-600 font-medium">
                   <CheckCircle2 className="h-3 w-3" />
                   KYC Verified
                 </span>
               )}
             </div>
 
-            {/* Bio */}
+            {/* BIO */}
             {profile?.bio && (
-              <p className="break-words pt-2 text-sm italic text-muted-foreground">
+              <p className="text-sm text-muted-foreground italic pt-2">
                 {profile.bio}
               </p>
             )}
 
-            {/* ============================================================
-                RELATIONSHIP COUNTS
-            ============================================================ */}
+            {/* ================================================================ */}
+            {/* RELATIONSHIP COUNTS */}
+            {/* ================================================================ */}
 
-            <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-2xl border border-border/70 bg-background/70 shadow-sm">
+            <div className="grid grid-cols-3 gap-2 mt-4 rounded-2xl border border-border/70 bg-background/70 px-2 py-3 shadow-sm">
+
+              {/* REQUESTERS */}
               <button
                 type="button"
                 onClick={() =>
                   openRelationshipList(
-                    "requesters",
+                    "requesters"
                   )
                 }
-                className="flex min-w-0 flex-col items-center gap-0.5 px-1 py-3 transition hover:bg-muted/40"
+                className="flex flex-col items-center gap-0.5 hover:opacity-70 transition-opacity"
               >
                 <Users className="h-3.5 w-3.5 text-primary" />
 
-                <span className="text-lg font-bold leading-tight text-primary">
+                <span className="text-lg font-bold text-primary leading-tight">
                   {heroesCount.toLocaleString()}
                 </span>
 
@@ -1279,18 +1416,19 @@ export default function ProfilePage() {
                 </span>
               </button>
 
+              {/* HEROES */}
               <button
                 type="button"
                 onClick={() =>
                   openRelationshipList(
-                    "heroes",
+                    "heroes"
                   )
                 }
-                className="flex min-w-0 flex-col items-center gap-0.5 border-x border-border/60 px-1 py-3 transition hover:bg-muted/40"
+                className="flex flex-col items-center gap-0.5 hover:opacity-70 transition-opacity border-x border-border/60"
               >
                 <HeartHandshake className="h-3.5 w-3.5 text-foreground" />
 
-                <span className="text-lg font-bold leading-tight text-foreground">
+                <span className="text-lg font-bold text-foreground leading-tight">
                   {followingCount.toLocaleString()}
                 </span>
 
@@ -1299,40 +1437,35 @@ export default function ProfilePage() {
                 </span>
               </button>
 
-              <button
-                type="button"
-                onClick={() =>
-                  openRelationshipList(
-                    "supporters",
-                  )
-                }
-                className="flex min-w-0 flex-col items-center gap-0.5 px-1 py-3 transition hover:bg-muted/40"
-              >
+              {/* SUPPORTS */}
+              <div className="flex flex-col items-center gap-0.5">
                 <Gift className="h-3.5 w-3.5 text-amber-600" />
 
-                <span className="text-lg font-bold leading-tight text-amber-600">
+                <span className="text-lg font-bold text-amber-600 leading-tight">
                   {supportsCount.toLocaleString()}
                 </span>
 
                 <span className="text-[11px] text-muted-foreground">
                   Supports
                 </span>
-              </button>
+              </div>
+
             </div>
 
-            {/* ============================================================
-                VERIFICATION BADGES
-            ============================================================ */}
+            {/* ================================================================ */}
+            {/* VERIFICATION BADGES */}
+            {/* ================================================================ */}
 
             <div className="mt-3 flex flex-wrap gap-2">
+
               {verificationBadges.map(
                 (item) => (
                   <span
                     key={item.label}
-                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
                       item.active
-                        ? "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-400"
-                        : "border-border bg-muted text-muted-foreground"
+                        ? "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800"
+                        : "bg-muted text-muted-foreground border-border"
                     }`}
                   >
                     {item.active ? (
@@ -1343,18 +1476,20 @@ export default function ProfilePage() {
 
                     {item.label}
                   </span>
-                ),
+                )
               )}
+
             </div>
           </div>
-        </section>
+        </div>
 
-        {/* ================================================================
-            TRUST LEVEL
-        ================================================================= */}
+        {/* ================================================================== */}
+        {/* TRUST LEVEL */}
+        {/* ================================================================== */}
 
-        <section className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between gap-3">
+        <div className="rounded-2xl bg-card border border-border p-4 space-y-2">
+
+          <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
               Trust Level
             </span>
@@ -1364,14 +1499,14 @@ export default function ProfilePage() {
             </span>
           </div>
 
-          <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-muted">
+          <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
             <div
               className={`h-3 rounded-full transition-all ${
                 trustLevel >= 70
                   ? "bg-green-500"
                   : trustLevel >= 40
-                    ? "bg-amber-500"
-                    : "bg-red-500"
+                  ? "bg-amber-500"
+                  : "bg-red-500"
               }`}
               style={{
                 width: `${trustLevel}%`,
@@ -1379,12 +1514,12 @@ export default function ProfilePage() {
             />
           </div>
 
-          <div className="mt-2 flex flex-wrap justify-between gap-1 text-[10px] text-muted-foreground">
+          <div className="flex justify-between gap-2 text-[10px] text-muted-foreground">
             <span>
               Based on case history
             </span>
 
-            <span>
+            <span className="text-right">
               +{caseStats.completed * 5} approvals
               {" · "}
               -{caseStats.rejected * 10} rejections
@@ -1392,14 +1527,16 @@ export default function ProfilePage() {
               -{caseStats.expired * 5} expired
             </span>
           </div>
-        </section>
+        </div>
 
-        {/* ================================================================
-            CREDITS
-        ================================================================= */}
+        {/* ================================================================== */}
+        {/* CREDITS */}
+        {/* ================================================================== */}
 
-        <section className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between gap-3">
+        <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+
+          <div className="flex items-center justify-between">
+
             <div className="flex items-center gap-2">
               <Coins className="h-4 w-4 text-amber-600" />
 
@@ -1409,26 +1546,28 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex items-center gap-1.5">
+
               <span className="text-lg font-bold text-amber-600">
                 {creditCount}
               </span>
 
               <button
                 type="button"
-                aria-label="How credits work"
                 onClick={() =>
                   setCreditsInfoOpen(
-                    true,
+                    true
                   )
                 }
-                className="text-muted-foreground transition hover:text-primary"
+                className="text-muted-foreground hover:text-primary transition-colors"
+                aria-label="How credits work"
               >
                 <Info className="h-3.5 w-3.5" />
               </button>
+
             </div>
           </div>
 
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
             <div
               className="h-2 rounded-full bg-amber-500 transition-all"
               style={{
@@ -1437,152 +1576,169 @@ export default function ProfilePage() {
             />
           </div>
 
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            {SUPPORTS_PER_CREDIT -
-              supportsIntoCurrentCredit}{" "}
-            more Supports to your next Credit
+          <p className="text-[11px] text-muted-foreground">
+            {supportsToNextCredit} more Supports to your next Credit
             {" · "}
             {creditsIntoCurrentReward}/
-            {CREDITS_PER_REWARD} Credits toward
-            your next reward
-            {rewardsUnlocked > 0
-              ? ` (${rewardsUnlocked} unlocked so far)`
-              : ""}
+            {CREDITS_PER_REWARD} Credits toward your next reward
+
+            {rewardsUnlocked > 0 &&
+              ` · ${rewardsUnlocked} reward${
+                rewardsUnlocked > 1
+                  ? "s"
+                  : ""
+              } unlocked`}
           </p>
-        </section>
+        </div>
 
-        {/* ================================================================
-            ROLE STATS
-        ================================================================= */}
+        {/* ================================================================== */}
+        {/* STATS */}
+        {/* ================================================================== */}
 
-        {viewedRole === "hero" ? (
-          <section className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold">
-                {totalAmountSpent > 0
-                  ? `$${totalAmountSpent.toFixed(2)}`
-                  : "—"}
+        {showHeroStats ? (
+          <div className="grid grid-cols-2 gap-3">
+
+            {/* TOTAL SPENT */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-lg sm:text-2xl font-bold text-foreground break-words">
+                {formatAmountMap(
+                  totalAmountSpent
+                )}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <HandCoins className="h-3 w-3" />
                 Total Spent
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold">
+            {/* HELPED */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">
                 {helpedCount}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <HeartHandshake className="h-3 w-3" />
                 Helped
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold">
+            {/* DIRECT */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">
                 {directHelps}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <Building2 className="h-3 w-3" />
                 Direct Helps
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold">
+            {/* CONTRIBUTIONS */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">
                 {contributions}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <HandCoins className="h-3 w-3" />
                 Contributions
               </div>
             </div>
 
-            <div className="col-span-2 rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold">
+            {/* UNLOCKS */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
+              <div className="text-2xl font-bold text-foreground">
                 {unlockCount}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <Unlock className="h-3 w-3" />
                 Total Unlocks
               </div>
             </div>
-          </section>
+
+          </div>
         ) : (
-          <section className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold">
+          <div className="grid grid-cols-2 gap-3">
+
+            {/* SUBMITTED */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">
                 {caseStats.submitted}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <Briefcase className="h-3 w-3" />
                 Submitted
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold">
+            {/* COMPLETED */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">
                 {caseStats.completed}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3 text-blue-600" />
                 Completed
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold">
+            {/* REJECTED */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">
                 {caseStats.rejected}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <XCircle className="h-3 w-3 text-red-600" />
                 Rejected
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold">
+            {/* EXPIRED */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">
                 {caseStats.expired}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <Calendar className="h-3 w-3 text-amber-600" />
                 Expired
               </div>
             </div>
 
-            <div className="col-span-2 rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
-              <div className="text-2xl font-bold text-green-600">
-                {totalHelpReceived > 0
-                  ? `$${totalHelpReceived.toFixed(2)}`
-                  : "—"}
+            {/* HELP RECEIVED */}
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
+              <div className="text-lg sm:text-2xl font-bold text-green-600">
+                {formatAmountMap(
+                  totalHelpReceived
+                )}
               </div>
 
-              <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] leading-tight text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground leading-tight mt-1 flex items-center gap-1">
                 <HeartHandshake className="h-3 w-3" />
                 Total Help Received
               </div>
             </div>
-          </section>
+
+          </div>
         )}
 
-        {/* ================================================================
-            CASES
-        ================================================================= */}
+        {/* ================================================================== */}
+        {/* CASES */}
+        {/* ================================================================== */}
 
         {cases.length > 0 && (
-          <section className="rounded-2xl border border-border bg-card p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-1.5 font-semibold">
+          <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+
+            <div className="flex items-center justify-between">
+
+              <h2 className="font-semibold flex items-center gap-1.5">
                 <Briefcase className="h-4 w-4 text-primary" />
                 Cases
               </h2>
@@ -1595,7 +1751,7 @@ export default function ProfilePage() {
                       to: "/my-cases",
                     })
                   }
-                  className="flex shrink-0 items-center text-xs font-medium text-primary hover:underline"
+                  className="text-xs text-primary font-medium flex items-center hover:underline"
                 >
                   View all
                   <ChevronRight className="h-3 w-3" />
@@ -1603,144 +1759,185 @@ export default function ProfilePage() {
               )}
             </div>
 
-            <div className="mt-3 space-y-2">
+            <div className="space-y-2">
+
               {cases
                 .slice(0, 5)
                 .map((item: any) => (
-                  <button
-                    key={String(item.id)}
-                    type="button"
-                    onClick={() => {
-                      if (item.id) {
-                        navigate({
-                          to: "/cases/$id",
-                          params: {
-                            id: String(
-                              item.id,
-                            ),
-                          },
-                        });
-                      }
-                    }}
-                    className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-border p-3 text-left transition hover:bg-muted/40"
+                  <div
+                    key={String(
+                      item.id
+                    )}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border p-3"
                   >
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                      {item.title ||
-                        `Case #${item.id}`}
-                    </span>
+                    <div className="min-w-0 flex-1">
+
+                      <p className="text-sm font-medium truncate">
+                        {item.title ||
+                          `Case #${item.id}`}
+                      </p>
+
+                      {(item.city ||
+                        item.country) && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                          {[
+                            item.city,
+                            item.country,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </p>
+                      )}
+                    </div>
 
                     <span
-                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${getCaseStatusStyle(
-                        item.status,
+                      className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getCaseStatusStyle(
+                        item.status
                       )}`}
                     >
-                      {item.status ||
-                        "pending"}
+                      {getCaseStatusLabel(
+                        item.status
+                      )}
                     </span>
-                  </button>
+                  </div>
                 ))}
+
             </div>
-          </section>
+          </div>
         )}
 
-        {/* ================================================================
-            CASES HELPED
-        ================================================================= */}
+        {/* ================================================================== */}
+        {/* HELPED CASES */}
+        {/* ================================================================== */}
 
-        {viewedRole === "hero" &&
+        {showHeroStats &&
           helpedCases.length > 0 && (
-            <section className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="flex items-center gap-1.5 font-semibold">
+            <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+
+              <h2 className="font-semibold flex items-center gap-1.5">
                 <HeartHandshake className="h-4 w-4 text-primary" />
                 Cases You Helped
               </h2>
 
-              <div className="mt-3 space-y-2">
-                {helpedCases.map(
-                  (item: any) => (
-                    <div
-                      key={String(
-                        item.id ??
-                          item.case_id,
-                      )}
-                      className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-border p-3"
-                    >
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                        {item.case_title ||
-                          `Case #${
-                            item.case_id ??
-                            item.id
-                          }`}
-                      </span>
+              <div className="space-y-2">
 
-                      <span className="shrink-0 text-xs font-semibold text-green-600">
-                        {item.seeker_confirmed_amount ??
-                        item.amount_paid
-                          ? `$${Number(
-                              item.seeker_confirmed_amount ??
-                                item.amount_paid,
-                            ).toFixed(2)}`
-                          : ""}
-                      </span>
-                    </div>
-                  ),
+                {helpedCases.map(
+                  (resolution: any) => {
+                    const amount =
+                      getResolutionAmount(
+                        resolution
+                      );
+
+                    const currency =
+                      getResolutionCurrency(
+                        resolution
+                      );
+
+                    return (
+                      <div
+                        key={String(
+                          resolution.id ??
+                            resolution.case_id
+                        )}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border p-3"
+                      >
+
+                        <div className="min-w-0 flex-1">
+
+                          <p className="text-sm font-medium truncate">
+                            {resolution.case_title ||
+                              `Case #${
+                                resolution.case_id ??
+                                resolution.id
+                              }`}
+                          </p>
+
+                          {resolution.case_category && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {resolution.case_category}
+                            </p>
+                          )}
+
+                        </div>
+
+                        {amount > 0 && (
+                          <span className="shrink-0 text-xs font-semibold text-green-600">
+                            {formatMoney(
+                              amount,
+                              currency
+                            )}
+                          </span>
+                        )}
+
+                      </div>
+                    );
+                  }
                 )}
+
               </div>
-            </section>
+            </div>
           )}
 
-        {/* ================================================================
-            COMMUNITY POSTS
-        ================================================================= */}
+        {/* ================================================================== */}
+        {/* COMMUNITY POSTS */}
+        {/* ================================================================== */}
 
         {Array.isArray(
-          profile?.posts,
+          profile?.posts
         ) &&
           profile.posts.length > 0 && (
-            <section className="rounded-2xl border border-border bg-card p-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="flex items-center gap-1.5 font-semibold">
+            <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+
+              <div className="flex items-center justify-between">
+
+                <h2 className="font-semibold flex items-center gap-1.5">
                   <MessageCircle className="h-4 w-4 text-primary" />
                   Community Posts
                 </h2>
 
-                <span className="shrink-0 text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   {profile.posts.length} posts
                 </span>
+
               </div>
 
-              <div className="mt-3 space-y-3">
-                {profile.posts.map(
-                  (post: any) => (
-                    <article
-                      key={String(post.id)}
-                      className="rounded-xl border border-border p-3"
-                    >
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {post.is_pinned ? (
-                          <Pin className="h-3 w-3 text-primary" />
-                        ) : null}
+              {profile.posts.map(
+                (post: any) => (
+                  <article
+                    key={String(
+                      post.id
+                    )}
+                    className="rounded-xl border border-border p-3"
+                  >
 
-                        <span>
-                          {post.is_pinned
-                            ? "Pinned"
-                            : "Community post"}
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
 
-                      <p className="mt-2 whitespace-pre-wrap break-words text-sm">
-                        {post.message}
-                      </p>
-                    </article>
-                  ),
-                )}
-              </div>
-            </section>
+                      {post.is_pinned && (
+                        <Pin className="h-3 w-3 text-primary" />
+                      )}
+
+                      <span>
+                        {post.is_pinned
+                          ? "Pinned"
+                          : "Community post"}
+                      </span>
+
+                    </div>
+
+                    <p className="mt-2 text-sm whitespace-pre-wrap break-words">
+                      {post.message}
+                    </p>
+
+                  </article>
+                )
+              )}
+
+            </div>
           )}
 
-        {/* ================================================================
-            LOGOUT
-        ================================================================= */}
+        {/* ================================================================== */}
+        {/* LOGOUT */}
+        {/* ================================================================== */}
 
         {isOwnProfile && (
           <button
@@ -1748,406 +1945,500 @@ export default function ProfilePage() {
             onClick={() =>
               setShowLogout(true)
             }
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 py-3.5 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/20"
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/20 font-medium text-sm transition-colors"
           >
             <LogOut className="h-4 w-4" />
             Logout
           </button>
         )}
 
-        <p className="pb-2 text-center text-xs text-muted-foreground">
+        <p className="text-center text-xs text-muted-foreground pb-2">
           Givethra v2.0 · Built with ❤️
         </p>
+      </div>
 
-        {/* ================================================================
-            ACCOUNT MENU
-        ================================================================= */}
+      {/* ==================================================================== */}
+      {/* ACCOUNT MENU */}
+      {/* ==================================================================== */}
 
-        <Dialog
-          open={showMenu}
-          onOpenChange={setShowMenu}
-        >
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>
-                Account Menu
-              </DialogTitle>
+      <Dialog
+        open={showMenu}
+        onOpenChange={setShowMenu}
+      >
+        <DialogContent className="max-w-sm">
 
-              <DialogDescription>
-                Manage your profile and account
-                settings.
-              </DialogDescription>
-            </DialogHeader>
+          <DialogHeader>
+            <DialogTitle>
+              Account Menu
+            </DialogTitle>
 
-            <div className="overflow-hidden rounded-2xl border border-border">
-              {menuItems.map(
-                (item, index) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => {
-                      setShowMenu(false);
+            <DialogDescription>
+              Manage your profile and account settings.
+            </DialogDescription>
+          </DialogHeader>
 
+          <div className="rounded-2xl border border-border overflow-hidden">
+
+            {menuItems.map(
+              (item, index) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    setShowMenu(false);
+
+                    navigate({
+                      to: item.to as any,
+                    });
+                  }}
+                  className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors ${
+                    index <
+                    menuItems.length - 1
+                      ? "border-b border-border"
+                      : ""
+                  }`}
+                >
+                  <span className="text-primary">
+                    {item.icon}
+                  </span>
+
+                  <span className="flex-1 text-left">
+                    {item.label}
+                  </span>
+
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )
+            )}
+
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ==================================================================== */}
+      {/* LOGOUT DIALOG */}
+      {/* ==================================================================== */}
+
+      <Dialog
+        open={showLogout}
+        onOpenChange={setShowLogout}
+      >
+        <DialogContent className="max-w-sm">
+
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LogOut className="h-5 w-5 text-red-500" />
+              Logout
+            </DialogTitle>
+
+            <DialogDescription>
+              Are you sure you want to logout?
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex-row gap-2">
+
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() =>
+                setShowLogout(false)
+              }
+            >
+              Cancel
+            </Button>
+
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={() => {
+                logout();
+                setShowLogout(false);
+
+                navigate({
+                  to: "/",
+                });
+              }}
+            >
+              <LogOut className="h-4 w-4 mr-1.5" />
+              Logout
+            </Button>
+
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ==================================================================== */}
+      {/* BADGE INFO */}
+      {/* ==================================================================== */}
+
+      <Dialog
+        open={badgeInfoOpen}
+        onOpenChange={setBadgeInfoOpen}
+      >
+        <DialogContent className="max-w-sm">
+
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-primary" />
+              Hero Badges
+            </DialogTitle>
+
+            <DialogDescription>
+              Your Hero badge grows as you help the Givethra community.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30">
+              <div className="text-xl">
+                🆕
+              </div>
+
+              <div>
+                <p className="font-semibold text-sm">
+                  Newborn Hero
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  You unlocked a case but have not completed a verified help yet.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30">
+              <div className="text-xl">
+                ⭐
+              </div>
+
+              <div>
+                <p className="font-semibold text-sm">
+                  Young Hero
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  You contributed to a fundraising pool.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30">
+              <div className="text-xl">
+                🦸
+              </div>
+
+              <div>
+                <p className="font-semibold text-sm">
+                  Hero
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  You directly paid for someone's verified need.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/30">
+              <div className="text-xl">
+                🌟
+              </div>
+
+              <div>
+                <p className="font-semibold text-sm">
+                  Super Hero
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  You have unlocked, contributed and provided direct help.
+                </p>
+              </div>
+            </div>
+
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() =>
+                setBadgeInfoOpen(
+                  false
+                )
+              }
+            >
+              Got it
+            </Button>
+          </DialogFooter>
+
+        </DialogContent>
+      </Dialog>
+
+      {/* ==================================================================== */}
+      {/* CREDITS INFO */}
+      {/* ==================================================================== */}
+
+      <Dialog
+        open={creditsInfoOpen}
+        onOpenChange={setCreditsInfoOpen}
+      >
+        <DialogContent className="max-w-sm">
+
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-amber-600" />
+              How Credits Work
+            </DialogTitle>
+
+            <DialogDescription>
+              Community Supports can unlock platform rewards.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-sm text-muted-foreground">
+
+            <p>
+              Every{" "}
+              <span className="font-semibold text-foreground">
+                {SUPPORTS_PER_CREDIT} Supports
+              </span>{" "}
+              received by your posts or cases gives you{" "}
+              <span className="font-semibold text-foreground">
+                1 Credit
+              </span>.
+            </p>
+
+            <p>
+              Collect{" "}
+              <span className="font-semibold text-foreground">
+                {CREDITS_PER_REWARD} Credits
+              </span>{" "}
+              to unlock a reward such as submitting another case, unlocking a case, or clearing an eligible suspension.
+            </p>
+
+            <p className="text-xs">
+              Credits shown here are calculated from the Supports reported by your account.
+            </p>
+
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() =>
+                setCreditsInfoOpen(
+                  false
+                )
+              }
+            >
+              Got it
+            </Button>
+          </DialogFooter>
+
+        </DialogContent>
+      </Dialog>
+
+      {/* ==================================================================== */}
+      {/* HERO / REQUESTER LIST */}
+      {/* ==================================================================== */}
+
+      <Dialog
+        open={relationshipType !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRelationshipType(
+              null
+            );
+            setRelationshipUsers(
+              []
+            );
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+
+          <DialogHeader>
+
+            <DialogTitle>
+              {relationshipType ===
+              "heroes"
+                ? "Your Heroes"
+                : "Your Requesters"}
+            </DialogTitle>
+
+            <DialogDescription>
+              {relationshipType ===
+              "heroes"
+                ? "People you have chosen as Heroes."
+                : "People who have chosen you as their Hero."}
+
+              {!relationshipLoading &&
+                relationshipUsers.length >
+                  0 && (
+                  <span className="block mt-1 text-xs font-medium text-foreground">
+                    {
+                      relationshipUsers.length
+                    } total
+                  </span>
+                )}
+            </DialogDescription>
+
+          </DialogHeader>
+
+          <div className="max-h-[55vh] overflow-y-auto space-y-2 pr-1">
+
+            {relationshipLoading ? (
+              <div className="py-8 text-center">
+                <div className="mx-auto h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+
+                <p className="text-sm text-muted-foreground mt-3">
+                  Loading...
+                </p>
+              </div>
+            ) : relationshipUsers.length ===
+              0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                No{" "}
+                {relationshipType} yet.
+              </p>
+            ) : (
+              relationshipUsers.map(
+                (
+                  item: any,
+                  index: number
+                ) => {
+                  const userId =
+                    item.user_id ??
+                    item.id ??
+                    item.hero_id ??
+                    item.requester_id ??
+                    "";
+
+                  const name =
+                    item.full_name ??
+                    item.name ??
+                    item.user_name ??
+                    "Givethra User";
+
+                  const initials2 =
+                    name
+                      .split(" ")
+                      .filter(Boolean)
+                      .map(
+                        (part: string) =>
+                          part[0]
+                      )
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase();
+
+                  function openProfile() {
+                    setRelationshipType(
+                      null
+                    );
+
+                    if (userId) {
                       navigate({
-                        to: item.to as any,
+                        to: "/profile/$id",
+                        params: {
+                          id: String(
+                            userId
+                          ),
+                        },
                       });
-                    }}
-                    className={`flex w-full items-center gap-3 px-5 py-4 text-sm font-medium text-foreground transition hover:bg-muted/50 ${
-                      index <
-                      menuItems.length - 1
-                        ? "border-b border-border"
-                        : ""
-                    }`}
-                  >
-                    <span className="text-primary">
-                      {item.icon}
-                    </span>
-
-                    <span className="min-w-0 flex-1 text-left">
-                      {item.label}
-                    </span>
-
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </button>
-                ),
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* ================================================================
-            LOGOUT DIALOG
-        ================================================================= */}
-
-        <Dialog
-          open={showLogout}
-          onOpenChange={setShowLogout}
-        >
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <LogOut className="h-5 w-5 text-red-500" />
-                Logout
-              </DialogTitle>
-
-              <DialogDescription>
-                Are you sure you want to logout?
-              </DialogDescription>
-            </DialogHeader>
-
-            <DialogFooter className="flex-row gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() =>
-                  setShowLogout(false)
-                }
-              >
-                Cancel
-              </Button>
-
-              <Button
-                variant="destructive"
-                className="flex-1"
-                onClick={() => {
-                  logout();
-                  setShowLogout(false);
-                  navigate({
-                    to: "/",
-                  });
-                }}
-              >
-                <LogOut className="mr-1.5 h-4 w-4" />
-                Logout
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* ================================================================
-            BADGE INFO
-        ================================================================= */}
-
-        <Dialog
-          open={badgeInfoOpen}
-          onOpenChange={setBadgeInfoOpen}
-        >
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-primary" />
-                Hero Badges
-              </DialogTitle>
-
-              <DialogDescription>
-                Understand what each Hero badge means.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3 py-2">
-              <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-2">
-                <span className="mt-0.5 text-xl">
-                  🆕
-                </span>
-
-                <div>
-                  <p className="text-sm font-semibold">
-                    Newborn Hero
-                  </p>
-
-                  <p className="text-xs text-muted-foreground">
-                    You unlocked a case but did
-                    not complete a payment.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-2">
-                <span className="mt-0.5 text-xl">
-                  ⭐
-                </span>
-
-                <div>
-                  <p className="text-sm font-semibold">
-                    Young Hero
-                  </p>
-
-                  <p className="text-xs text-muted-foreground">
-                    You contributed to a
-                    fundraising pool.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-2">
-                <span className="mt-0.5 text-xl">
-                  🦸
-                </span>
-
-                <div>
-                  <p className="text-sm font-semibold">
-                    Hero
-                  </p>
-
-                  <p className="text-xs text-muted-foreground">
-                    You paid directly for
-                    someone's need.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-2">
-                <span className="mt-0.5 text-xl">
-                  🌟
-                </span>
-
-                <div>
-                  <p className="text-sm font-semibold">
-                    Super Hero
-                  </p>
-
-                  <p className="text-xs text-muted-foreground">
-                    You have unlocked,
-                    contributed, and provided
-                    direct help.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                onClick={() =>
-                  setBadgeInfoOpen(false)
-                }
-              >
-                Got it
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* ================================================================
-            CREDITS INFO
-        ================================================================= */}
-
-        <Dialog
-          open={creditsInfoOpen}
-          onOpenChange={setCreditsInfoOpen}
-        >
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Coins className="h-5 w-5 text-amber-600" />
-                How Credits Work
-              </DialogTitle>
-
-              <DialogDescription>
-                Turn community Supports into Givethra
-                perks.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3 py-2 text-sm text-muted-foreground">
-              <p>
-                Every{" "}
-                <span className="font-semibold text-foreground">
-                  {SUPPORTS_PER_CREDIT} Supports
-                </span>{" "}
-                your posts and cases receive from
-                the community earn you{" "}
-                <span className="font-semibold text-foreground">
-                  1 Credit
-                </span>
-                .
-              </p>
-
-              <p>
-                Collect{" "}
-                <span className="font-semibold text-foreground">
-                  {CREDITS_PER_REWARD} Credits
-                </span>{" "}
-                to unlock a reward such as
-                submitting a new case, unlocking a
-                case, or clearing an account
-                suspension.
-              </p>
-            </div>
-
-            <DialogFooter>
-              <Button
-                onClick={() =>
-                  setCreditsInfoOpen(false)
-                }
-              >
-                Got it
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* ================================================================
-            RELATIONSHIP LIST
-        ================================================================= */}
-
-        <Dialog
-          open={relationshipType !== null}
-          onOpenChange={(open) => {
-            if (!open) {
-              setRelationshipType(null);
-              setRelationshipUsers([]);
-            }
-          }}
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {relationshipType ===
-                "heroes"
-                  ? "Your Heroes"
-                  : relationshipType ===
-                      "supporters"
-                    ? "Your Supporters"
-                    : "Your Requesters"}
-              </DialogTitle>
-
-              <DialogDescription>
-                {relationshipType ===
-                "heroes"
-                  ? "People you have chosen as Heroes."
-                  : relationshipType ===
-                      "supporters"
-                    ? "People who have sent Support to your posts."
-                    : "People who have chosen you as their Hero."}
-
-                {!relationshipLoading &&
-                  relationshipUsers.length >
-                    0 && (
-                    <span className="mt-0.5 block text-xs font-medium text-foreground">
-                      {
-                        relationshipUsers.length
-                      }{" "}
-                      total
-                    </span>
-                  )}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
-              {relationshipLoading ? (
-                <div className="py-8 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Loading...
-                  </p>
-                </div>
-              ) : relationshipUsers.length ===
-                0 ? (
-                <div className="py-8 text-center">
-                  <Users className="mx-auto h-8 w-8 text-muted-foreground" />
-
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    No{" "}
-                    {relationshipType ||
-                      "relationships"}{" "}
-                    yet.
-                  </p>
-                </div>
-              ) : (
-                relationshipUsers.map(
-                  (item, index) => {
-                    const userId =
-                      item.user_id ??
-                      item.id ??
-                      item.hero_id ??
-                      item.requester_id ??
-                      item.supporter_id ??
-                      "";
-
-                    const name =
-                      item.full_name ??
-                      item.name ??
-                      item.user_name ??
-                      "Givethra User";
-
-                    const initials2 =
-                      getInitials(name);
-
-                    const supportCount =
-                      item.support_count ??
-                      item.supports ??
-                      null;
-
-                    function openUserProfile() {
-                      setRelationshipType(
-                        null,
-                      );
-
-                      if (userId) {
-                        navigate({
-                          to: "/profile/$id",
-                          params: {
-                            id: String(
-                              userId,
-                            ),
-                          },
-                        });
-                      }
                     }
+                  }
 
-                    return (
-                      <div
-                        key={String(
-                          userId ||
-                            index,
-                        )}
-                        className="flex min-w-0 items-center gap-3 rounded-xl border border-border p-3"
+                  return (
+                    <div
+                      key={`${String(
+                        userId
+                      )}-${index}`}
+                      className="flex items-center gap-3 rounded-xl border border-border p-3"
+                    >
+
+                      <button
+                        type="button"
+                        onClick={
+                          openProfile
+                        }
+                        className="h-10 w-10 rounded-full overflow-hidden bg-primary text-white flex items-center justify-center font-semibold shrink-0"
                       >
-                        <button
+                        {item.avatar_url ? (
+                          <img
+                            src={
+                              item.avatar_url
+                            }
+                            alt={name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          initials2 ||
+                          "G"
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={
+                          openProfile
+                        }
+                        className="flex-1 text-left min-w-0"
+                      >
+                        <span className="font-medium truncate block">
+                          {name}
+
+                          {item.is_verified && (
+                            <span className="ml-1 text-teal-600">
+                              ✓
+                            </span>
+                          )}
+                        </span>
+
+                        {item.city ||
+                        item.country ? (
+                          <span className="text-[10px] text-muted-foreground truncate block mt-0.5">
+                            {[
+                              item.city,
+                              item.country,
+                            ]
+                              .filter(
+                                Boolean
+                              )
+                              .join(
+                                ", "
+                              )}
+                          </span>
+                        ) : null}
+                      </button>
+
+                      {isOwnProfile && (
+                        <Button
                           type="button"
-                          aria-label={`Open ${name}'s profile`}
-                          onClick={
-                            openUserProfile
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            removeRelationship(
+                              String(
+                                userId
+                              )
+                            )
                           }
-                          className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary font-semibold text-white"
                         >
-                          {item.avatar_url ? (
+                          {relationshipType ===
+                          "heroes"
+                            ? "Unhero"
+                            : "Remove"}
+                        </Button>
+                      )}
+
+                    </div>
+                  );
+                }
+              )
+            )}
+
+          </div>
+        </DialogContent>
+      </Dialog>
+
+    </Layout>
+  );
+}
