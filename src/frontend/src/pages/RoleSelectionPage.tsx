@@ -11,7 +11,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Heart, HandHelping, ShieldCheck, Users, Globe, Sparkles, Facebook, Instagram, Linkedin, Mail, MessageCircle, Bell, Battery, Flame, Droplets, GraduationCap, Stethoscope, ShoppingCart, FileText } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { getApprovedCases } from "@/lib/api";
+import { getApprovedCases, getKycStatus } from "@/lib/api"; // ✅ getKycStatus شامل کیا
 
 const ROLE_CATEGORY_STYLES: Record<string, { icon: typeof Battery; color: string; bg: string }> = {
   "Electricity Bill": { icon: Battery, color: "text-amber-600", bg: "bg-amber-500/10" },
@@ -53,27 +53,46 @@ export default function RoleSelectionPage() {
     return () => clearInterval(timer);
   }, [activeCases.length, activeCaseCategories.length]);
 
-  // 🔥 FIXED: Role selection with proper redirects
+  // ✅ مکمل درست شدہ handleRoleSelect
   const handleRoleSelect = async (role: "hero" | "requester") => {
+    // پہلے رول سیٹ کریں (تاکہ اگر کوئی اور چیک ہو تو وہ اس کو دیکھ سکے)
     setRole(role);
     setAuthRole(role === "requester" ? "help_seeker" : "hero");
-    
+
+    // اگر صارف لاگ ان نہیں ہے
     if (!isAuthenticated) {
-      // If not authenticated, go to sign-in with role and redirect info
-      navigate({ 
-        to: "/sign-in", 
-        search: { 
-          role, 
-          redirect: role === "requester" ? "/kyc" : "/home" 
-        } 
+      // سائن ان پیج پر بھیجیں، اور رول اور ری ڈائریکٹ پاس کریں
+      navigate({
+        to: "/sign-in",
+        search: {
+          role,
+          redirect: role === "requester" ? "/kyc" : "/home",
+        },
       });
-    } else {
-      // Already authenticated - go directly
-      if (role === "requester") {
-        navigate({ to: "/kyc" }); // 🔥 Requester → KYC page immediately
-      } else {
-        navigate({ to: "/home" }); // 🔥 Hero → Home page (no KYC needed)
+      return;
+    }
+
+    // صارف پہلے سے لاگ ان ہے
+    if (role === "requester") {
+      try {
+        // KYC اسٹیٹس چیک کریں
+        const kyc = await getKycStatus(user!.id);
+        const status = String(kyc?.status || 'none').trim().toLowerCase();
+        if (status === "approved") {
+          // اگر KYC منظور ہے تو براہِ راست ہوم (جہاں RootLayout Onboarding سنبھال لے گا)
+          navigate({ to: "/home" });
+        } else {
+          // ورنہ KYC پیج پر بھیجیں
+          navigate({ to: "/kyc" });
+        }
+      } catch (error) {
+        // اگر کوئی خرابی ہو تو محفوظ راستہ: KYC پیج
+        console.error("KYC status check failed:", error);
+        navigate({ to: "/kyc" });
       }
+    } else {
+      // Hero کے لیے ہمیشہ ہوم (KYC کی ضرورت نہیں)
+      navigate({ to: "/home" });
     }
   };
 
@@ -104,14 +123,42 @@ export default function RoleSelectionPage() {
             <span className="text-base font-bold text-foreground md:text-xl">Community</span>
             <span className="mt-1 text-xs text-muted-foreground md:text-sm">My Heroes · Share & Discuss</span>
           </Link>
-          <button type="button" onClick={() => { if (!activeCases.length) return; if (!isAuthenticated) { navigate({ to: "/sign-in", search: { role: "hero", redirect: "/home" } }); return; } setRole("hero"); setAuthRole("hero"); navigate({ to: "/home" }); }} className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-3xl border border-rose-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-300 hover:shadow-lg md:p-7 dark:border-rose-900/50">
-            {activeCaseSlideData ? (() => { const style = ROLE_CATEGORY_STYLES[activeCaseSlideData.category] || { icon: FileText, color: "text-primary", bg: "bg-primary/10" }; const Icon = style.icon; return <><div className={`mb-3 flex h-14 w-14 items-center justify-center rounded-2xl ${style.bg} ${style.color}`}><Icon className="h-7 w-7 md:h-8 md:w-8" /></div><span className="max-w-full truncate text-base font-bold text-foreground md:text-xl">{activeCaseSlideData.category}</span><span className="mt-1 text-xs text-muted-foreground md:text-sm">{activeCaseSlideData.count} active case{activeCaseSlideData.count === 1 ? "" : "s"}</span></>; })() : <><div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600"><Bell className="h-7 w-7 md:h-8 md:w-8" /></div><span className="text-base font-bold text-foreground md:text-xl">{activeCases.length} Active Cases</span><span className="mt-1 text-xs text-muted-foreground md:text-sm">{activeCases.length ? "Tap to help now" : "No active needs right now"}</span></>}
+
+          {/* ✅ Active Cases Button - اب handleRoleSelect("hero") استعمال کرتا ہے */}
+          <button
+            type="button"
+            onClick={() => handleRoleSelect("hero")}
+            className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-3xl border border-rose-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-300 hover:shadow-lg md:p-7 dark:border-rose-900/50"
+          >
+            {activeCaseSlideData ? (() => {
+              const style = ROLE_CATEGORY_STYLES[activeCaseSlideData.category] || { icon: FileText, color: "text-primary", bg: "bg-primary/10" };
+              const Icon = style.icon;
+              return (
+                <>
+                  <div className={`mb-3 flex h-14 w-14 items-center justify-center rounded-2xl ${style.bg} ${style.color}`}>
+                    <Icon className="h-7 w-7 md:h-8 md:w-8" />
+                  </div>
+                  <span className="max-w-full truncate text-base font-bold text-foreground md:text-xl">{activeCaseSlideData.category}</span>
+                  <span className="mt-1 text-xs text-muted-foreground md:text-sm">{activeCaseSlideData.count} active case{activeCaseSlideData.count === 1 ? "" : "s"}</span>
+                </>
+              );
+            })() : (
+              <>
+                <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600">
+                  <Bell className="h-7 w-7 md:h-8 md:w-8" />
+                </div>
+                <span className="text-base font-bold text-foreground md:text-xl">{activeCases.length} Active Cases</span>
+                <span className="mt-1 text-xs text-muted-foreground md:text-sm">{activeCases.length ? "Tap to help now" : "No active needs right now"}</span>
+              </>
+            )}
           </button>
+
           <button type="button" onClick={() => handleRoleSelect("hero")} className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-emerald-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-lg md:p-7 dark:border-emerald-900/50">
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 transition-transform group-hover:scale-105 md:h-16 md:w-16"><Heart className="h-7 w-7 md:h-8 md:w-8" /></div>
             <span className="text-base font-bold text-foreground md:text-xl">Become a Hero</span>
             <span className="mt-1 text-xs text-muted-foreground md:text-sm">Support someone</span>
           </button>
+
           <button type="button" onClick={() => handleRoleSelect("requester")} className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-amber-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-lg md:p-7 dark:border-amber-900/50">
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 transition-transform group-hover:scale-105 md:h-16 md:w-16"><HandHelping className="h-7 w-7 md:h-8 md:w-8" /></div>
             <span className="text-base font-bold text-foreground md:text-xl">Requester</span>
