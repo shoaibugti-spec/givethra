@@ -53,13 +53,27 @@ export default function RoleSelectionPage() {
     return () => clearInterval(timer);
   }, [activeCases.length, activeCaseCategories.length]);
 
+  // 🔥 FIXED: Role selection with proper redirects
   const handleRoleSelect = async (role: "hero" | "requester") => {
     setRole(role);
     setAuthRole(role === "requester" ? "help_seeker" : "hero");
+    
     if (!isAuthenticated) {
-      navigate({ to: "/sign-in", search: { role } });
+      // If not authenticated, go to sign-in with role and redirect info
+      navigate({ 
+        to: "/sign-in", 
+        search: { 
+          role, 
+          redirect: role === "requester" ? "/kyc" : "/home" 
+        } 
+      });
     } else {
-      navigate({ to: "/home" });
+      // Already authenticated - go directly
+      if (role === "requester") {
+        navigate({ to: "/kyc" }); // 🔥 Requester → KYC page immediately
+      } else {
+        navigate({ to: "/home" }); // 🔥 Hero → Home page (no KYC needed)
+      }
     }
   };
 
