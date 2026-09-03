@@ -37,6 +37,10 @@ function now() {
   return new Date().toISOString();
 }
 
+function id() {
+  return crypto.randomUUID();
+}
+
 async function ensureUserCoreRows(env, user) {
   if (!env.DB || !user?.user_id) return { kyc_status: user?.kyc_status || 'none' };
   const timestamp = now();
@@ -89,9 +93,6 @@ async function sendNotification(env, userId, type, title, message, link = null) 
      VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
   ).bind(notificationId, String(userId), String(type), String(title), String(message), link, createdAt).run();
   return { id: notificationId, user_id: String(userId), type, title, message, link, is_read: 0, created_at: createdAt };
-}
-function id() {
-  return crypto.randomUUID();
 }
 
 function base64UrlEncode(value) {
@@ -700,7 +701,6 @@ async function handleCases(request, env, user, url, parts, origin) {
 
     const freeAttempts = await env.DB.prepare("SELECT was_free, status FROM case_submissions WHERE user_id = ? AND COALESCE(was_free, 0) = 1 ORDER BY submitted_at ASC").bind(user.user_id).all();
     const freeHistory = freeAttempts.results || [];
-    const lastFreeWasRejected = freeHistory.length === 1 && String(freeHistory[0]?.status || "").toLowerCase() === "rejected";
     const isFree = freeHistory.length < 2;
     if (!isFree) {
       const balance = await getWalletBalance(env, user.user_id);
