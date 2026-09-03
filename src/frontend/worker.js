@@ -1,13 +1,16 @@
 // src/frontend/worker.js
 // Givethra - Complete Cloudflare Worker with all APIs including Onboarding Status
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
+// Assistant: shoaibugti@gmail.com | Admin: shoaibahmedbugti5@gmail.com
 
 const PUBLIC_ORIGIN = "https://givethra.org";
-// Supports only count for posts created after the V2 Support feature launch.
 const SUPPORTS_LAUNCH_AT = "2026-09-03T00:00:00.000Z";
+
 const ADMIN_EMAILS = new Set([
-  "shoaibugti@gmail.com",
   "shoaibahmedbugti5@gmail.com",
+]);
+const ASSISTANT_EMAILS = new Set([
+  "shoaibugti@gmail.com",
 ]);
 
 function googleClientId(env) {
@@ -139,6 +142,10 @@ async function verifySession(token, secret) {
 
 function isAdmin(user) {
   return Boolean(user && ADMIN_EMAILS.has(String(user.email).toLowerCase()));
+}
+
+function isAssistant(user) {
+  return Boolean(user && ASSISTANT_EMAILS.has(String(user.email).toLowerCase()));
 }
 
 function bearer(request) {
@@ -1367,6 +1374,133 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
+    // ============================================================
+    //  ASSISTANT APIs (صرف Assistant کو رسائی)
+    // ============================================================
+    if (parts[1] === "assistant") {
+      if (!isAssistant(user)) {
+        return json({ error: "Forbidden. Assistant access required." }, 403, origin);
+      }
+
+      // GET /api/assistant/payments
+      if (parts[2] === "payments" && request.method === "GET") {
+        const rows = await env.DB.prepare(`
+          SELECT 
+            c.id, 
+            c.title, 
+            c.amount_needed, 
+            c.amount_collected,
+            COALESCE(
+              (SELECT SUM(COALESCE(pledged_amount, 0)) 
+               FROM case_unlocks 
+               WHERE case_id = c.id 
+                 AND status = 'approved' 
+                 AND source = 'user'
+                 AND payment_type IN ('contribution', 'direct_help')
+              ), 0
+            ) AS total_contributions,
+            c.user_id AS requester_id
+          FROM case_submissions c
+          WHERE c.status != 'completed' 
+            AND c.amount_collected > 0
+            AND NOT EXISTS (
+              SELECT 1 FROM case_unlocks 
+              WHERE case_id = c.id 
+                AND source = 'assistant_manual'
+            )
+          ORDER BY c.submitted_at DESC
+        `).all();
+
+        const result = (rows.results || []).map(row => ({
+          ...row,
+          remaining_to_pay: Number(row.amount_collected || 0) - Number(row.total_contributions || 0),
+        })).filter(item => item.remaining_to_pay > 0);
+
+        return json(result, 200, origin);
+      }
+
+      // ✅ NEW: GET /api/assistant/active-cases
+      if (parts[2] === "active-cases" && request.method === "GET") {
+        const rows = await env.DB.prepare(
+          `SELECT id, title, category, country, city, urgency, amount_needed, amount_collected, status, submitted_at, user_id
+           FROM case_submissions
+           WHERE lower(status) IN ('approved', 'published', 'active', 'open')
+           ORDER BY submitted_at DESC`
+        ).all();
+        return json(rows.results || [], 200, origin);
+      }
+
+      // POST /api/assistant/pay
+      if (parts[2] === "pay" && request.method === "POST") {
+        const body = await readJson(request);
+        const caseId = String(body.case_id || "").trim();
+        const amount = Number(body.amount);
+        const receiptUrl = String(body.receipt_url || "").trim();
+        const txId = String(body.transaction_id || "").trim();
+
+        if (!caseId || !Number.isFinite(amount) || amount <= 0) {
+          return json({ error: "Valid case_id and positive amount required" }, 400, origin);
+        }
+
+        const existing = await env.DB.prepare(
+          "SELECT id FROM case_unlocks WHERE case_id = ? AND source = 'assistant_manual'"
+        ).bind(caseId).first();
+        if (existing) {
+          return json({ error: "This case has already been paid by Assistant" }, 409, origin);
+        }
+
+        const caseRow = await env.DB.prepare(
+          "SELECT amount_needed, amount_collected, user_id FROM case_submissions WHERE id = ?"
+        ).bind(caseId).first();
+        if (!caseRow) return json({ error: "Case not found" }, 404, origin);
+
+        const currentCollected = Number(caseRow.amount_collected || 0);
+        const payAmount = Math.min(amount, currentCollected);
+        if (payAmount <= 0) {
+          return json({ error: "No amount to pay" }, 400, origin);
+        }
+
+        const unlockId = id();
+        await env.DB.prepare(
+          `INSERT INTO case_unlocks 
+            (id, case_id, hero_id, pledged_amount, payment_type, source, status, unlocked_at, receipt_url, transaction_id)
+           VALUES (?, ?, ?, ?, 'assistant_payment', 'assistant_manual', 'approved', ?, ?, ?)`
+        ).bind(
+          unlockId,
+          caseId,
+          user.user_id,
+          payAmount,
+          now(),
+          receiptUrl || null,
+          txId || null
+        ).run();
+
+        if (currentCollected >= Number(caseRow.amount_needed || 0)) {
+          await env.DB.prepare(
+            "UPDATE case_submissions SET status = 'completed', updated_at = ? WHERE id = ?"
+          ).bind(now(), caseId).run();
+        }
+
+        await sendNotification(
+          env,
+          caseRow.user_id,
+          'assistant_paid',
+          'Assistant has processed payment for your case',
+          `The Assistant has paid the collected contributions for your case.`,
+          `/cases/${caseId}`
+        );
+
+        return json({ 
+          success: true, 
+          unlock_id: unlockId,
+          amount_paid: payAmount,
+          case_id: caseId
+        }, 201, origin);
+      }
+
+      return json({ error: "Assistant endpoint not found" }, 404, origin);
+    }
+
     // ✅ PROFILES
     if (parts[1] === "profiles") {
       return handleProfile(request, env, user, parts, origin);
@@ -2071,9 +2205,7 @@ async function handleRequest(request, env, ctx) {
             filters.push("r.hero_id = ?");
             bind.push(heroId);
           } else if (String(user?.email || "").trim()) {
-            // If IDs differ, return only rows owned by that authenticated email.
-  // A helper may read only their own resolution rows.
-  filters.push("lower(u.email) = lower(?)");
+            filters.push("lower(u.email) = lower(?)");
             bind.push(String(user.email).trim());
           } else {
             return json({ error: "Forbidden" }, 403, origin);
@@ -2094,7 +2226,6 @@ async function handleRequest(request, env, ctx) {
           const suspension = await getActiveSuspension(env, user.user_id);
           if (suspension) return suspendedActionResponse(origin, suspension);
         }
-        // Ensure paid_to is correctly set: if not provided, default to "institute" (direct help)
         const paidTo = body.paid_to === "givethra" ? "givethra" : "institute";
         await env.DB.prepare(
           `INSERT INTO case_resolutions
