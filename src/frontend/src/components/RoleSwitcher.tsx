@@ -9,7 +9,7 @@ import { getKycStatus } from "@/lib/api";
 
 export default function RoleSwitcher() {
   const { role, setRole } = useRole();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, setRole: setAuthRole } = useAuth();
   const navigate = useNavigate();
   const [switching, setSwitching] = useState(false);
 
@@ -18,22 +18,28 @@ export default function RoleSwitcher() {
     
     setSwitching(true);
     try {
+      // Convert role to AuthContext format
+      const authRole = newRole === "requester" ? "help_seeker" : "hero";
+      
       // If switching to Requester, check KYC
       if (newRole === "requester" && user?.id) {
         const kyc = await getKycStatus(user.id);
         const status = String(kyc?.status || "none").toLowerCase();
         
         if (status !== "approved") {
-          // Store the new role temporarily, but redirect to KYC
+          // Set role to requester before redirect so after KYC they become requester
           setRole("requester");
+          setAuthRole("help_seeker");
           navigate({ to: "/kyc" });
           toast.info("Please complete KYC verification to become a Requester.");
           return;
         }
       }
       
-      // Switch role
+      // Switch role in both contexts
       setRole(newRole);
+      setAuthRole(authRole);
+      
       toast.success(`Switched to ${newRole === "hero" ? "Hero" : "Requester"} mode`);
       
     } catch (error) {
