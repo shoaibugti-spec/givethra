@@ -7,7 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { toast } from "sonner";
 import Layout from "@/components/Layout";
-import { getAssistantPendingPayments, assistantPayCase } from "@/lib/api";
+import { 
+  getAssistantPendingPayments, 
+  assistantPayCase,
+  getAssistantActiveCases 
+} from "@/lib/api";
 
 interface PaymentCase {
   id: string;
@@ -19,10 +23,27 @@ interface PaymentCase {
   requester_id: string;
 }
 
+interface ActiveCase {
+  id: string;
+  title: string;
+  category: string;
+  country: string;
+  city: string;
+  urgency: string;
+  amount_needed: number;
+  amount_collected: number;
+  status: string;
+  submitted_at: string;
+}
+
+type Tab = "pending" | "active";
+
 export default function AssistantDashboard() {
   const { user, isAuthenticated, isAssistant } = useAuth();
   const navigate = useNavigate();
-  const [cases, setCases] = useState<PaymentCase[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>("pending");
+  const [pendingCases, setPendingCases] = useState<PaymentCase[]>([]);
+  const [activeCases, setActiveCases] = useState<ActiveCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
 
@@ -35,16 +56,21 @@ export default function AssistantDashboard() {
       navigate({ to: "/" });
       return;
     }
-    fetchPayments();
+    fetchData();
   }, [isAuthenticated, isAssistant, navigate]);
 
-  const fetchPayments = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const data = await getAssistantPendingPayments();
-      setCases(data);
+      const [pending, active] = await Promise.all([
+        getAssistantPendingPayments(),
+        getAssistantActiveCases(),
+      ]);
+      setPendingCases(pending);
+      setActiveCases(active);
     } catch (error) {
-      console.error("Failed to fetch payments:", error);
-      toast.error("Failed to load pending payments");
+      console.error("Failed to fetch data:", error);
+      toast.error("Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -54,10 +80,9 @@ export default function AssistantDashboard() {
     if (!confirm(`Are you sure you want to pay ${amount} for this case?`)) return;
     setProcessing(caseId);
     try {
-      // آپ چاہیں تو یہاں ایک موڈل بنا سکتے ہیں تاکہ رسید اور TXN ID ڈالی جا سکے
-      const result = await assistantPayCase(caseId, amount);
+      await assistantPayCase(caseId, amount);
       toast.success(`Payment of ${amount} successful!`);
-      setCases(prev => prev.filter(c => c.id !== caseId));
+      setPendingCases(prev => prev.filter(c => c.id !== caseId));
     } catch (error: any) {
       toast.error(error?.message || "Payment failed");
     } finally {
@@ -70,40 +95,117 @@ export default function AssistantDashboard() {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <h1 className="text-2xl font-bold mb-6">Assistant Dashboard – Pending Payments</h1>
-        {cases.length === 0 ? (
-          <p className="text-muted-foreground">No pending payments. All contributions have been processed.</p>
-        ) : (
-          <div className="space-y-4">
-            {cases.map((c) => (
-              <Card key={c.id}>
-                <CardHeader>
-                  <CardTitle>{c.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Amount Collected:</span>
-                    <span className="font-medium">{c.amount_collected}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Total Contributions:</span>
-                    <span className="font-medium">{c.total_contributions}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold text-primary">
-                    <span>Remaining to Pay:</span>
-                    <span>{c.remaining_to_pay}</span>
-                  </div>
-                  <Button
-                    onClick={() => handlePay(c.id, c.remaining_to_pay)}
-                    disabled={processing === c.id}
-                    className="w-full mt-2"
-                  >
-                    {processing === c.id ? "Processing..." : "Pay Now"}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        <h1 className="text-2xl font-bold mb-6">Assistant Dashboard</h1>
+
+        {/* Tabs */}
+        <div className="flex border-b border-border mb-6">
+          <button
+            onClick={() => setActiveTab("pending")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "pending"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Pending Payments ({pendingCases.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("active")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "active"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Active Cases ({activeCases.length})
+          </button>
+        </div>
+
+        {/* Content */}
+        {activeTab === "pending" && (
+          <>
+            {pendingCases.length === 0 ? (
+              <p className="text-muted-foreground">No pending payments. All contributions have been processed.</p>
+            ) : (
+              <div className="space-y-4">
+                {pendingCases.map((c) => (
+                  <Card key={c.id}>
+                    <CardHeader>
+                      <CardTitle>{c.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Amount Collected:</span>
+                        <span className="font-medium">{c.amount_collected}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Total Contributions:</span>
+                        <span className="font-medium">{c.total_contributions}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-bold text-primary">
+                        <span>Remaining to Pay:</span>
+                        <span>{c.remaining_to_pay}</span>
+                      </div>
+                      <Button
+                        onClick={() => handlePay(c.id, c.remaining_to_pay)}
+                        disabled={processing === c.id}
+                        className="w-full mt-2"
+                      >
+                        {processing === c.id ? "Processing..." : "Pay Now"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === "active" && (
+          <>
+            {activeCases.length === 0 ? (
+              <p className="text-muted-foreground">No active cases available at the moment.</p>
+            ) : (
+              <div className="space-y-4">
+                {activeCases.map((c) => (
+                  <Card key={c.id}>
+                    <CardHeader>
+                      <CardTitle>{c.title}</CardTitle>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          c.urgency === "Emergency" ? "bg-red-100 text-red-700" :
+                          c.urgency === "High" ? "bg-orange-100 text-orange-700" :
+                          "bg-muted text-muted-foreground"
+                        }`}>{c.urgency}</span>
+                        <span className="text-xs text-muted-foreground">{c.city}, {c.country}</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Amount Needed:</span>
+                        <span className="font-medium">{c.amount_needed}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Amount Collected:</span>
+                        <span className="font-medium">{c.amount_collected || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Status:</span>
+                        <span className="font-medium capitalize">{c.status}</span>
+                      </div>
+                      <Button
+                        onClick={() => navigate({ to: `/cases/${c.id}` })}
+                        className="w-full mt-2"
+                      >
+                        View Case & Help
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </Layout>
