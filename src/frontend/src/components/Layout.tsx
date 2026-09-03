@@ -187,7 +187,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </Link>
-                {/* Support remains available from the hamburger menu, not in the compact top bar. */}
                 <button type="button" onClick={toggleTheme} aria-label="Toggle theme" className="hidden md:flex h-10 w-10 rounded-full items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                   {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>
