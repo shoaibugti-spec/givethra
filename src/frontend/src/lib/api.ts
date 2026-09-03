@@ -979,3 +979,15 @@ export async function assistantPayCase(caseId: string, amount: number, receiptUr
   if (!res.ok) throw new Error(data?.error || `Assistant payment failed (${res.status})`);
   return data;
 }
+
+/**
+ * Assistant کے لیے تمام ایکٹو کیسز (جہاں وہ مدد کر سکتا ہے)۔
+ */
+export async function getAssistantActiveCases(): Promise<any[]> {
+  const res = await fetch(`${WORKER_URL}/api/assistant/active-cases`, {
+    headers: headers(),
+  });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(data?.error || `Failed to fetch active cases (${res.status})`);
+  return Array.isArray(data) ? data : [];
+}
