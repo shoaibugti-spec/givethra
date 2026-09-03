@@ -1,3 +1,4 @@
+// src/frontend/src/contexts/AuthContext.tsx
 import {
   type ReactNode,
   createContext,
@@ -40,11 +41,13 @@ interface AuthContextValue {
   isHero: boolean;
   isHelpSeeker: boolean;
   isAdmin: boolean;
+  isAssistant: boolean;  // ✅ نیا
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const ROLE_KEY = "givethra_role";
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
+const ASSISTANT_EMAIL = "shoaibugti@gmail.com";  // ✅ نیا
 
 function safeLocalGet(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -100,7 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loginError, setLoginError] = useState<string | null>(null);
   const googleInitializedRef = useRef(false);
 
-  // ✅ Worker کو verify کریں
   useEffect(() => {
     clearLegacyBrowserState();
     const token = getTokenFromLocation();
@@ -232,7 +234,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-
     if (!googleInitializedRef.current) {
       googleIdentity.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
@@ -282,6 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = !!userId && !!user;
   const role: UserRole = isAuthenticated ? storedRole : null;
   const isAdmin = isAuthenticated && user?.email === ADMIN_EMAIL;
+  const isAssistant = isAuthenticated && user?.email === ASSISTANT_EMAIL;  // ✅ نیا
 
   const value: AuthContextValue = {
     user,
@@ -299,6 +301,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isHero: role === "hero",
     isHelpSeeker: role === "help_seeker",
     isAdmin,
+    isAssistant,  // ✅ نیا
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -323,6 +326,7 @@ export function useAuth(): AuthContextValue {
       isHero: false,
       isHelpSeeker: false,
       isAdmin: false,
+      isAssistant: false,  // ✅ نیا
     };
   }
   return ctx;
