@@ -707,9 +707,23 @@ async function handleCases(request, env, user, url, parts, origin) {
     const photoUrls = Array.isArray(record.photo_urls) || (record.photo_urls && typeof record.photo_urls === "object") ? JSON.stringify(record.photo_urls) : (record.photo_urls || null);
     const categoryDetails = Array.isArray(record.category_details) || (record.category_details && typeof record.category_details === "object") ? JSON.stringify(record.category_details) : (record.category_details || null);
 
-    const freeAttempts = await env.DB.prepare("SELECT was_free, status FROM case_submissions WHERE user_id = ? AND COALESCE(was_free, 0) = 1 ORDER BY submitted_at ASC").bind(user.user_id).all();
+    // =====================================================
+    // 🔥 FIX #1: Free Case logic corrected
+    // =====================================================
+    // Get free case history for this user
+    const freeAttempts = await env.DB.prepare(
+      "SELECT was_free, status FROM case_submissions WHERE user_id = ? AND COALESCE(was_free, 0) = 1 ORDER BY submitted_at ASC"
+    ).bind(user.user_id).all();
     const freeHistory = freeAttempts.results || [];
-    const isFree = freeHistory.length < 2;
+
+    // Determine if this case should be free:
+    // - If no free case yet -> free (first)
+    // - If exactly one free case AND it was rejected -> free (second chance)
+    // - Otherwise -> not free
+    const firstFreeRejected = freeHistory.some((c) => String(c.status || "").toLowerCase() === "rejected");
+    const isFree = freeHistory.length === 0 || (freeHistory.length === 1 && firstFreeRejected);
+    // =====================================================
+
     if (!isFree) {
       const balance = await getWalletBalance(env, user.user_id);
       if (balance < 1) {
@@ -2115,9 +2129,10 @@ async function handleRequest(request, env, ctx) {
         }
         const unlockId = body?.id || id();
         try {
+          // 🔥 FIX #2: Added status and source columns for assistant compatibility
           await env.DB.prepare(
-            `INSERT INTO case_unlocks (id, case_id, hero_id, pledged_amount, credits_charged, payment_type, unlocked_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
+            `INSERT INTO case_unlocks (id, case_id, hero_id, pledged_amount, credits_charged, payment_type, status, source, unlocked_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'approved', 'user', ?)`
           ).bind(unlockId, caseId, heroId, body.pledged_amount ?? null, creditsCharged, paymentType, now()).run();
         } catch (error) {
           if (creditsCharged > 0) await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(creditsCharged, now(), heroId).run();
@@ -2129,7 +2144,7 @@ async function handleRequest(request, env, ctx) {
           await addTransaction(env, heroId, -creditsCharged, type, desc, unlockId);
         }
         const saved = await env.DB.prepare("SELECT * FROM case_unlocks WHERE id = ?").bind(unlockId).first();
-        return json(saved || { id: unlockId, case_id: caseId, hero_id: heroId, pledged_amount: body.pledged_amount ?? null, credits_charged: creditsCharged, payment_type: paymentType, unlocked_at: now() }, 201, origin);
+        return json(saved || { id: unlockId, case_id: caseId, hero_id: heroId, pledged_amount: body.pledged_amount ?? null, credits_charged: creditsCharged, payment_type: paymentType, status: 'approved', source: 'user', unlocked_at: now() }, 201, origin);
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }
