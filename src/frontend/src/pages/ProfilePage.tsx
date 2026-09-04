@@ -1,6 +1,5 @@
 // src/frontend/src/pages/ProfilePage.tsx
-// Givethra - Complete Profile Page with Optimized Loading and New Sections
-// 🔥 FIXED: Loading optimized with limit, sections for Active Cases & Active Helps
+// Givethra - Complete Profile Page with All Features + Loading Optimization
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -61,6 +60,7 @@ import {
   followUser,
   unfollowUser,
   removeRequester,
+  getCasesByIds,
 } from "@/lib/api";
 import {
   Tooltip,
@@ -73,14 +73,12 @@ import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolution
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-
 const SUPPORTS_PER_CREDIT = 100;
 const CREDITS_PER_REWARD = 5;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
 function getBadge(unlockCount: number, contributionCount: number, directHelpCount: number) {
   if (directHelpCount > 0 && contributionCount > 0 && unlockCount > 0) {
     return {
@@ -141,7 +139,6 @@ function getCaseStatusStyle(status: string) {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-
 export default function ProfilePage() {
   const { isAuthenticated, user, logout } = useAuth();
   const { role } = useRole();
@@ -183,7 +180,7 @@ export default function ProfilePage() {
   const [trustLevel, setTrustLevel] = useState(100);
   const [badge, setBadge] = useState<{ title: string; emoji: string; description: string; icon: JSX.Element; color: string } | null>(null);
 
-  // New state for active cases and active helps
+  // New state for active cases and active helps (these are separate sections)
   const [activeCases, setActiveCases] = useState<any[]>([]);
   const [activeHelps, setActiveHelps] = useState<any[]>([]);
 
@@ -201,7 +198,7 @@ export default function ProfilePage() {
   async function loadData() {
     setProfileLoading(true);
     try {
-      // Use Promise.allSettled with limits to speed up
+      // 🔥 Use limits to reduce load
       const [
         kycResult,
         casesResult,
@@ -210,10 +207,10 @@ export default function ProfilePage() {
         unlocksResult,
       ] = await Promise.allSettled([
         getKycSubmission(profileUserId),
-        getCasesByUser(profileUserId, 10), // limit to 10 recent cases
+        getCasesByUser(profileUserId, 10), // limit 10 recent cases
         getProfile(profileUserId, role),
-        getCaseResolutionsByHero(profileUserId, 10), // limit to 10
-        getCaseUnlocksByHero(profileUserId, 10), // limit to 10
+        getCaseResolutionsByHero(profileUserId, 10), // limit 10
+        getCaseUnlocksByHero(profileUserId, 10), // limit 10
       ]);
 
       const kyc = kycResult.status === "fulfilled" ? kycResult.value : null;
@@ -229,36 +226,29 @@ export default function ProfilePage() {
       setSupportsCount(Number(prof?.supports_count || 0));
       setIsMyHero(Boolean(prof?.is_following));
 
-      // --- Cases (for requester) ---
+      // --- Cases (requester) ---
       const list = Array.isArray(caseList) ? caseList : [];
       setCases(list);
-      // Compute stats from the full list? We only have 10. For stats, we need accurate counts, but we can't get all.
-      // We'll compute based on what we have, but it might be inaccurate. However, we can rely on the user object counts?
-      // We can fetch counts separately if needed, but for now we'll use the limited list.
-      // Better: use the user table counts that are updated by the backend? Not sure.
-      // Let's keep stats but we can use the limited data for display only.
-      // Actually, we can compute stats from the limited list, but it's not accurate.
-      // For simplicity, we'll just set them from the list we have.
       const submitted = list.length;
       const completed = list.filter((c: any) => c.status === "completed").length;
       const rejected = list.filter((c: any) => c.status === "rejected").length;
       const expired = list.filter((c: any) => c.status === "expired").length;
       setCaseStats({ submitted, completed, rejected, expired });
 
-      // Total help received from completed cases in the list
       const totalReceived = list
         .filter((c: any) => c.status === "completed")
         .reduce((sum: number, c: any) => sum + (Number(c.amount_collected) || 0), 0);
       setTotalHelpReceived(totalReceived);
+
       setTrustLevel(getTrustLevel(rejected, completed, expired));
 
-      // --- Active Cases (for requester) - only status active/approved/published, not rejected/expired/completed
+      // --- Active Cases (only active/approved/published) ---
       const active = list.filter((c: any) => 
         ["approved", "published", "active", "open"].includes(String(c.status || "").toLowerCase())
       );
       setActiveCases(active);
 
-      // --- Hero Stats ---
+      // --- Hero Stats (resolutions) ---
       const resolutionList = Array.isArray(resolutions) ? resolutions : [];
       const validResolutions = resolutionList.filter((r: any) => isTrulyCompletedHelp(r));
       setHelpedCount(validResolutions.length);
@@ -278,29 +268,10 @@ export default function ProfilePage() {
       const unlockList = Array.isArray(unlocks) ? unlocks : [];
       setUnlockCount(unlockList.length);
 
-      // --- Active Helps (for hero) - unlocks where the case is still active (not completed)
-      // We need to get the case status for each unlock. We have the unlocks list but we need to get case status.
-      // We can get the cases from the unlocks by fetching the case IDs? But we already have caseList for the profile owner? Not all.
-      // For hero, the profile is the hero, not the case owner. So we need to fetch the cases that these unlocks belong to.
-      // To avoid extra calls, we can use the resolutions list (which contains case_status) to infer status.
-      // But we want to show active helps regardless of whether they have completed resolution.
-      // We can simply show the cases that the hero has unlocked and are still active (based on the case status).
-      // Since we don't have the case status for unlocks, we need to fetch them.
-      // We can do a second fetch for the case IDs from unlocks, but that would add load.
-      // For now, we'll skip active helps and just show "Cases You Helped" (completed) as before.
-      // However, the user wants to show active helps. I'll implement it by fetching the cases for the unlocks.
-      // But to keep it simple, I'll only show active helps if we have the case data.
-
-      // We'll implement active helps by fetching the cases for unlock IDs.
-      // Since we already have the unlocks list, we can extract case IDs and fetch them via getCasesByIds.
-      // But we can't do that within this loadData because we want to avoid too many calls.
-      // I'll add a separate useEffect for active helps.
-
-      // For now, set activeHelps to empty.
-      setActiveHelps([]);
-
-      // Badge
+      // Badge based on hero stats
       setBadge(getBadge(unlockList.length, contrib.length, direct.length));
+
+      // --- We'll load active helps in a separate effect below ---
     } catch (err) {
       console.error("Failed to load profile data:", err);
     } finally {
@@ -308,28 +279,23 @@ export default function ProfilePage() {
     }
   }
 
-  // Separate effect to load active helps (hero) - fetch cases for unlocks
+  // Separate effect to load active helps (for hero)
   useEffect(() => {
     async function loadActiveHelps() {
       if (!profileUserId || role !== "hero") return;
       try {
-        // Fetch unlocks again with a higher limit if needed, but we already have some.
-        // We'll use the same unlocks list but we need more? We have up to 10.
-        // Let's fetch all active unlocks (unlimited) to show all active helps? That could be heavy.
-        // We'll limit to 10.
+        // Fetch unlocks with a limit
         const unlocks = await getCaseUnlocksByHero(profileUserId, 20);
         const caseIds = unlocks.map((u: any) => String(u.case_id)).filter(Boolean);
         if (caseIds.length === 0) {
           setActiveHelps([]);
           return;
         }
-        // Fetch cases for these IDs
         const casesData = await getCasesByIds(caseIds);
         const caseMap = new Map<string, any>();
         (Array.isArray(casesData) ? casesData : []).forEach((c: any) => {
           if (c?.id) caseMap.set(String(c.id), c);
         });
-        // Filter to only active cases (not completed, not rejected, not expired)
         const active = unlocks
           .map((u: any) => {
             const c = caseMap.get(String(u.case_id));
@@ -348,6 +314,7 @@ export default function ProfilePage() {
     loadActiveHelps();
   }, [profileUserId, role]);
 
+  // ---- Rest of the component (helpers, handlers, etc.) ----
   async function toggleHero() {
     if (!isAuthenticated || !user?.id) {
       navigate({ to: "/sign-in" });
@@ -453,10 +420,11 @@ export default function ProfilePage() {
     );
   }
 
+  // ============================= RENDER =============================
   return (
     <Layout>
       <div className="max-w-xl mx-auto px-4 pt-0 pb-24 space-y-4">
-        {/* ============================= Header Card ============================= */}
+        {/* Header Card */}
         <div className="rounded-b-3xl bg-card border border-border shadow-sm overflow-hidden">
           {/* Cover */}
           <div className="h-32 relative bg-gradient-to-br from-primary via-primary/80 to-primary/40">
@@ -468,7 +436,6 @@ export default function ProfilePage() {
                 <div className="absolute bottom-0 left-8 h-12 w-12 rounded-full bg-white/10 blur-lg" />
               </div>
             )}
-
             {isOwnProfile && (
               <button
                 aria-label="Profile menu"
@@ -521,7 +488,7 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Name + Badge - first row */}
+            {/* Name + Badge (first row) */}
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-foreground break-words">{displayName}</h1>
               {badge && (
@@ -550,7 +517,7 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Edit button - second row */}
+            {/* Edit button (second row) - always visible */}
             {isOwnProfile && (
               <div className="flex justify-end mt-1.5">
                 <button
@@ -586,7 +553,7 @@ export default function ProfilePage() {
               {profile?.bio && <p className="text-sm text-muted-foreground italic pt-1">{profile.bio}</p>}
             </div>
 
-            {/* Stats row */}
+            {/* Stats Row: Requesters, Heroes, Supports */}
             <div className="grid grid-cols-3 gap-2 mt-4 rounded-2xl border border-border/70 bg-background/70 px-2 py-3 shadow-sm">
               <button
                 onClick={() => openRelationshipList("requesters")}
@@ -632,7 +599,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ============================= Trust Level ============================= */}
+        {/* Trust Level */}
         <div className="rounded-2xl bg-card border border-border p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Trust Level</span>
@@ -654,7 +621,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ============================= Credits ============================= */}
+        {/* Credits from Supports */}
         <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -682,7 +649,7 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        {/* ============================= Role-based Stats ============================= */}
+        {/* Role-based Stats */}
         {role === "hero" ? (
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
@@ -755,7 +722,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ============================= Active Cases (Requester) ============================= */}
+        {/* Active Cases (Requester) */}
         {role !== "hero" && activeCases.length > 0 && (
           <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -782,7 +749,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ============================= Active Helps (Hero) ============================= */}
+        {/* Active Helps (Hero) */}
         {role === "hero" && activeHelps.length > 0 && (
           <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -812,7 +779,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ============================= Cases List (excluding rejected) ============================= */}
+        {/* Cases List (excluding rejected) */}
         {cases.filter(c => c.status !== "rejected").length > 0 && (
           <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -850,7 +817,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ============================= Helped Cases (Hero view) ============================= */}
+        {/* Helped Cases (Hero view) */}
         {role === "hero" && helpedCases.length > 0 && (
           <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
             <h2 className="font-semibold flex items-center gap-1.5">
@@ -869,7 +836,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ============================= Community Posts ============================= */}
+        {/* Community Posts */}
         {Array.isArray(profile?.posts) && profile.posts.length > 0 && (
           <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -890,7 +857,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Sandwich Menu Dialog */}
+        {/* Dialogs, Menu, etc. */}
         <Dialog open={showMenu} onOpenChange={setShowMenu}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
@@ -919,7 +886,6 @@ export default function ProfilePage() {
           </DialogContent>
         </Dialog>
 
-        {/* Logout Button */}
         {isOwnProfile && (
           <button
             type="button"
