@@ -2,6 +2,7 @@
 // Givethra - Complete Cloudflare Worker with all APIs including Onboarding Status
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
 // Assistant: shoaibugti@gmail.com | Admin: shoaibahmedbugti5@gmail.com
+// 🔥 NEW: Added limit parameter to /api/cases, /api/case-resolutions, /api/case-unlocks GET endpoints
 
 const PUBLIC_ORIGIN = "https://givethra.org";
 // ✅ Fix #2: SUPPORTS_LAUNCH_AT کو غیر فعال کیا جا رہا ہے (اب استعمال نہیں ہوگا)
@@ -693,8 +694,14 @@ async function handleCases(request, env, user, url, parts, origin) {
       const counts = Object.fromEntries((rows.results || []).filter((row) => row.category).map((row) => [row.category, Number(row.count || 0)]));
       return json(counts, 200, origin);
     }
-    const sql = target ? "SELECT * FROM case_submissions WHERE user_id = ? ORDER BY submitted_at DESC" : "SELECT * FROM case_submissions ORDER BY submitted_at DESC";
-    const rows = target ? await env.DB.prepare(sql).bind(target).all() : await env.DB.prepare(sql).all();
+    // 🔥 NEW: Accept limit parameter
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 50), 1), 100);
+    const sql = target 
+      ? "SELECT * FROM case_submissions WHERE user_id = ? ORDER BY submitted_at DESC LIMIT ?" 
+      : "SELECT * FROM case_submissions ORDER BY submitted_at DESC LIMIT ?";
+    const rows = target 
+      ? await env.DB.prepare(sql).bind(target, limit).all() 
+      : await env.DB.prepare(sql).bind(limit).all();
     return json((rows.results || []).map(decodeCaseRow), 200, origin);
   }
   if (request.method === "POST" && !parts[2]) {
@@ -2138,6 +2145,7 @@ async function handleRequest(request, env, ctx) {
         const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM case_unlocks WHERE hero_id = ? AND payment_type = 'partial'").bind(heroId).first();
         return json({ count: Number(row?.count || 0) }, 200, origin);
       }
+      // 🔥 NEW: Accept limit parameter
       if (request.method === "GET") {
         const caseId = url.searchParams.get("case_id");
         const heroId = url.searchParams.get("hero_id");
@@ -2148,8 +2156,9 @@ async function handleRequest(request, env, ctx) {
         if (caseId) { filters.push("case_id = ?"); bind.push(caseId); }
         if (heroId) { filters.push("hero_id = ?"); bind.push(heroId); }
         if (paymentType) { filters.push("payment_type = ?"); bind.push(paymentType); }
-        const sql = `SELECT * FROM case_unlocks${filters.length ? ` WHERE ${filters.join(" AND ")}` : ""} ORDER BY unlocked_at DESC`;
-        const rows = await env.DB.prepare(sql).bind(...bind).all();
+        const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 20), 1), 100);
+        const sql = `SELECT * FROM case_unlocks${filters.length ? ` WHERE ${filters.join(" AND ")}` : ""} ORDER BY unlocked_at DESC LIMIT ?`;
+        const rows = await env.DB.prepare(sql).bind(...bind, limit).all();
         return json(rows.results || [], 200, origin);
       }
       if (request.method === "POST") {
@@ -2224,8 +2233,10 @@ async function handleRequest(request, env, ctx) {
           }
         }
         if (!filters.length) return json({ error: "case_id or hero_id is required" }, 400, origin);
-        const sql = "SELECT r.*, c.status AS case_status, c.title AS case_title, c.category AS case_category, c.city AS case_city, c.country AS case_country, c.institute_name AS case_institute_name, c.payment_method AS case_payment_method, c.account_number AS case_account_number, c.account_iban AS case_account_iban, c.reference_number AS case_reference_number, COALESCE(p.full_name, u.full_name) AS hero_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.hero_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS hero_cnic_number, COALESCE(sp.full_name, su.full_name) AS seeker_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.seeker_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS seeker_cnic_number FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id LEFT JOIN profiles p ON p.user_id = r.hero_id LEFT JOIN users u ON u.user_id = r.hero_id LEFT JOIN profiles sp ON sp.user_id = r.seeker_id LEFT JOIN users su ON su.user_id = r.seeker_id WHERE " + filters.join(" AND ") + " ORDER BY r.submitted_at DESC";
-        const rows = await env.DB.prepare(sql).bind(...bind).all();
+        // 🔥 NEW: Accept limit parameter
+        const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 20), 1), 100);
+        const sql = "SELECT r.*, c.status AS case_status, c.title AS case_title, c.category AS case_category, c.city AS case_city, c.country AS case_country, c.institute_name AS case_institute_name, c.payment_method AS case_payment_method, c.account_number AS case_account_number, c.account_iban AS case_account_iban, c.reference_number AS case_reference_number, COALESCE(p.full_name, u.full_name) AS hero_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.hero_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS hero_cnic_number, COALESCE(sp.full_name, su.full_name) AS seeker_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.seeker_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS seeker_cnic_number FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id LEFT JOIN profiles p ON p.user_id = r.hero_id LEFT JOIN users u ON u.user_id = r.hero_id LEFT JOIN profiles sp ON sp.user_id = r.seeker_id LEFT JOIN users su ON su.user_id = r.seeker_id WHERE " + filters.join(" AND ") + " ORDER BY r.submitted_at DESC LIMIT ?";
+        const rows = await env.DB.prepare(sql).bind(...bind, limit).all();
         return json(rows.results || [], 200, origin);
       }
       if (request.method === "POST") {
