@@ -1205,12 +1205,12 @@ async function handleNotifications(request, env, user, url, parts, origin) {
 }
 
 // ============================================================
-//  SYNC COMPLETED CASE (FIXED)
+//  SYNC COMPLETED CASE (FIXED - handles Assistant Payout)
 // ============================================================
 async function synchronizeCompletedCase(env, resolutionId) {
   // Get the resolution and verify it's truly completed
   const resolution = await env.DB.prepare(
-    "SELECT case_id, paid_to, status, admin_confirmed FROM case_resolutions WHERE id = ?"
+    "SELECT case_id, paid_to, status, admin_confirmed, resolution_type FROM case_resolutions WHERE id = ?"
   ).bind(resolutionId).first();
   if (!resolution?.case_id) return null;
   
@@ -1218,7 +1218,10 @@ async function synchronizeCompletedCase(env, resolutionId) {
                       [1, "1", true, "true"].includes(resolution.admin_confirmed);
   if (!isApproved) return null;
 
-  // Sum all approved resolutions for this case
+  // Assistant Payout is also approved - we should include it in calculations
+  const isAssistantPayout = String(resolution.resolution_type || "") === "Assistant Payout";
+
+  // Sum all approved resolutions for this case (including Assistant Payout)
   const totals = await env.DB.prepare(
     `SELECT c.user_id, c.amount_needed, c.amount_collected,
             COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0)) 
@@ -1231,7 +1234,7 @@ async function synchronizeCompletedCase(env, resolutionId) {
   if (!totals) return null;
 
   const verifiedTotal = Math.max(Number(totals.verified_total || 0), Number(totals.amount_collected || 0));
-  const directPayment = String(resolution.paid_to || "").toLowerCase() !== "givethra";
+  const directPayment = String(resolution.paid_to || "").toLowerCase() !== "givethra" || isAssistantPayout;
   const goalReached = Number(totals.amount_needed || 0) <= 0 || verifiedTotal >= Number(totals.amount_needed || 0);
 
   // Update case: amount_collected and status if completed
@@ -1267,6 +1270,73 @@ async function handleRequest(request, env, ctx) {
 
   if (parts[0] === "health" && request.method === "GET") {
     return json({ status: "ok", timestamp: now() }, 200, origin);
+  }
+
+  // ============================================================
+  //  APK FILE HANDLING - FIXED MIME TYPE (مکمل طور پر درست)
+  //  یہ کوڈ ASSETS سے پہلے چلے گا
+  // ============================================================
+  if (url.pathname === '/Givethra.apk' || url.pathname.endsWith('.apk')) {
+    try {
+      // پہلے ASSETS سے چیک کریں
+      const assetResponse = await env.ASSETS.fetch(request);
+      
+      if (assetResponse.status === 200) {
+        const headers = new Headers(assetResponse.headers);
+        headers.set('Content-Type', 'application/vnd.android.package-archive');
+        headers.set('Content-Disposition', 'attachment; filename="Givethra.apk"');
+        headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+        headers.set('Accept-Ranges', 'bytes');
+        
+        return new Response(assetResponse.body, {
+          status: 200,
+          headers: headers
+        });
+      }
+      
+      // اگر ASSETS میں نہ ملے تو UPLOADS (R2) سے چیک کریں
+      const uploadObject = await env.UPLOADS.get('Givethra.apk');
+      if (uploadObject) {
+        const headers = new Headers();
+        headers.set('Content-Type', 'application/vnd.android.package-archive');
+        headers.set('Content-Disposition', 'attachment; filename="Givethra.apk"');
+        headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+        headers.set('Content-Length', String(uploadObject.size));
+        headers.set('Accept-Ranges', 'bytes');
+        headers.set('Access-Control-Allow-Origin', '*');
+        
+        return new Response(uploadObject.body, {
+          status: 200,
+          headers: headers
+        });
+      }
+      
+      // اگر فائل نہ ملے تو تفصیلی 404
+      return new Response(JSON.stringify({
+        error: 'APK file not found',
+        message: 'Please contact support or try again later.',
+        path: url.pathname
+      }), {
+        status: 404,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+    } catch (error) {
+      console.error('APK fetch error:', error);
+      return new Response(JSON.stringify({
+        error: 'APK download failed',
+        message: 'An unexpected error occurred. Please try again later.'
+      }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+    }
   }
 
   if (parts[0] === "auth" && parts[1] === "google" && request.method === "POST") {
@@ -2248,8 +2318,6 @@ async function handleRequest(request, env, ctx) {
 
     // ============================================================
     //  ASSISTANT APIs (صرف Assistant کو رسائی)
-    //  NOTE: پرانا بلاک ہٹا دیا گیا ہے، نیا بلاک (جو آپ نے شامل کیا)
-    //  یہاں برقرار ہے۔ اس میں `pending-payments`، `active-cases` اور `pay` ہیں۔
     // ============================================================
     if (parts[1] === "assistant") {
       if (!isAssistant(user) && !isAdmin(user)) {
@@ -2258,72 +2326,159 @@ async function handleRequest(request, env, ctx) {
 
       // GET /api/assistant/pending-payments
       if (parts[2] === "pending-payments" && request.method === "GET") {
-        const rows = await env.DB.prepare(
-          `SELECT c.id, c.title, c.amount_needed, c.user_id AS requester_id,
-                  COALESCE(SUM(CASE
-                    WHEN lower(COALESCE(r.status,'')) = 'completed'
-                     AND r.paid_to = 'givethra'
-                     AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
-                    THEN r.amount_paid ELSE 0 END), 0) AS amount_collected,
-                  COALESCE(SUM(CASE
-                    WHEN lower(COALESCE(r.status,'')) = 'completed'
-                     AND r.paid_to = 'givethra'
-                     AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
-                    THEN r.amount_paid ELSE 0 END), 0) AS total_contributions,
-                  COALESCE(SUM(CASE
-                    WHEN r.resolution_type = 'Assistant Payout'
-                    THEN r.amount_paid ELSE 0 END), 0) AS already_paid_out
-           FROM case_submissions c
-           LEFT JOIN case_resolutions r ON r.case_id = c.id
-           GROUP BY c.id
-           HAVING total_contributions > already_paid_out`
-        ).all();
-        const results = (rows.results || []).map((r) => ({
-          id: r.id,
-          title: r.title,
-          amount_needed: Number(r.amount_needed || 0),
-          amount_collected: Number(r.amount_collected || 0),
-          total_contributions: Number(r.total_contributions || 0),
-          remaining_to_pay: Math.max(Number(r.total_contributions || 0) - Number(r.already_paid_out || 0), 0),
-          requester_id: r.requester_id,
-        }));
-        return json(results, 200, origin);
+        try {
+          const rows = await env.DB.prepare(
+            `SELECT c.id, c.title, c.amount_needed, c.user_id AS requester_id,
+                    COALESCE(SUM(CASE
+                      WHEN lower(COALESCE(r.status,'')) = 'completed'
+                       AND r.paid_to = 'givethra'
+                       AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
+                      THEN r.amount_paid ELSE 0 END), 0) AS total_contributions,
+                    COALESCE(SUM(CASE
+                      WHEN r.resolution_type = 'Assistant Payout'
+                      THEN r.amount_paid ELSE 0 END), 0) AS already_paid_out
+             FROM case_submissions c
+             LEFT JOIN case_resolutions r ON r.case_id = c.id
+             GROUP BY c.id
+             HAVING total_contributions > already_paid_out`
+          ).all();
+          
+          const results = (rows.results || []).map((r) => ({
+            id: r.id,
+            title: r.title || 'Untitled Case',
+            amount_needed: Number(r.amount_needed || 0),
+            total_contributions: Number(r.total_contributions || 0),
+            already_paid_out: Number(r.already_paid_out || 0),
+            remaining_to_pay: Math.max(Number(r.total_contributions || 0) - Number(r.already_paid_out || 0), 0),
+            requester_id: r.requester_id,
+          }));
+
+          console.log(`[Assistant] Found ${results.length} pending payments`);
+          return json(results, 200, origin);
+          
+        } catch (error) {
+          console.error('[Assistant] pending-payments error:', error);
+          return json({ error: 'Failed to fetch pending payments', details: String(error) }, 500, origin);
+        }
       }
 
       // GET /api/assistant/active-cases
       if (parts[2] === "active-cases" && request.method === "GET") {
-        const rows = await env.DB.prepare(
-          `SELECT id, title, category, country, city, urgency, amount_needed,
-                  amount_collected, status, submitted_at
-           FROM case_submissions
-           WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active')
-           ORDER BY submitted_at DESC`
-        ).all();
-        return json(rows.results || [], 200, origin);
+        try {
+          const rows = await env.DB.prepare(
+            `SELECT id, title, category, country, city, urgency, amount_needed,
+                    amount_collected, status, submitted_at, user_id
+             FROM case_submissions
+             WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active')
+             ORDER BY submitted_at DESC`
+          ).all();
+          
+          console.log(`[Assistant] Found ${rows.results?.length || 0} active cases`);
+          return json(rows.results || [], 200, origin);
+          
+        } catch (error) {
+          console.error('[Assistant] active-cases error:', error);
+          return json({ error: 'Failed to fetch active cases', details: String(error) }, 500, origin);
+        }
       }
 
       // POST /api/assistant/pay
       if (parts[2] === "pay" && request.method === "POST") {
-        const body = await readJson(request);
-        const caseId = String(body?.case_id || "").trim();
-        const amount = Number(body?.amount);
-        if (!caseId) return json({ error: "case_id is required" }, 400, origin);
-        if (!Number.isFinite(amount) || amount <= 0) return json({ error: "A valid amount is required" }, 400, origin);
+        try {
+          const body = await readJson(request);
+          const caseId = String(body?.case_id || "").trim();
+          const amount = Number(body?.amount);
+          
+          if (!caseId) return json({ error: "case_id is required" }, 400, origin);
+          if (!Number.isFinite(amount) || amount <= 0) return json({ error: "A valid amount is required" }, 400, origin);
 
-        const caseRow = await env.DB.prepare("SELECT id FROM case_submissions WHERE id = ?").bind(caseId).first();
-        if (!caseRow) return json({ error: "Case not found" }, 404, origin);
+          const caseRow = await env.DB.prepare(
+            "SELECT id, title, user_id FROM case_submissions WHERE id = ?"
+          ).bind(caseId).first();
+          
+          if (!caseRow) return json({ error: "Case not found" }, 404, origin);
 
-        const resolutionId = id();
-        const timestamp = now();
-        await env.DB.prepare(
-          `INSERT INTO case_resolutions
-            (id, case_id, hero_id, hero_email, resolution_type, amount_paid, status, paid_to, admin_confirmed, admin_confirmed_at, completed_at, submitted_at)
-           VALUES (?, ?, ?, ?, 'Assistant Payout', ?, 'completed', 'institute', 1, ?, ?, ?)`
-        ).bind(resolutionId, caseId, user.user_id, user.email, amount, timestamp, timestamp, timestamp).run();
+          // Check if already paid
+          const existing = await env.DB.prepare(
+            "SELECT id FROM case_resolutions WHERE case_id = ? AND resolution_type = 'Assistant Payout'"
+          ).bind(caseId).first();
+          
+          if (existing) {
+            return json({ 
+              error: "This case has already been paid out by Assistant",
+              existing_payout_id: existing.id
+            }, 409, origin);
+          }
 
-        await synchronizeCompletedCase(env, resolutionId);
+          // Check total contributions
+          const totals = await env.DB.prepare(
+            `SELECT COALESCE(SUM(COALESCE(r.amount_paid, 0)), 0) AS total_contributions
+             FROM case_resolutions r
+             WHERE r.case_id = ?
+               AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
+               AND r.paid_to = 'givethra'
+               AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')`
+          ).bind(caseId).first();
 
-        return json({ success: true, id: resolutionId, case_id: caseId, amount }, 201, origin);
+          const totalContributions = Number(totals?.total_contributions || 0);
+          
+          if (totalContributions <= 0) {
+            return json({ 
+              error: "No contributions found for this case",
+              total_contributions: 0
+            }, 400, origin);
+          }
+
+          // Don't allow paying more than total contributions
+          const finalAmount = Math.min(amount, totalContributions);
+
+          const resolutionId = id();
+          const timestamp = now();
+          
+          await env.DB.prepare(
+            `INSERT INTO case_resolutions
+              (id, case_id, hero_id, hero_email, resolution_type, 
+               amount_paid, status, paid_to, admin_confirmed, 
+               admin_confirmed_at, completed_at, submitted_at)
+             VALUES (?, ?, ?, ?, 'Assistant Payout', 
+                     ?, 'completed', 'institute', 1, 
+                     ?, ?, ?)`
+          ).bind(
+            resolutionId,
+            caseId,
+            user.user_id,
+            user.email,
+            finalAmount,
+            timestamp,
+            timestamp,
+            timestamp
+          ).run();
+
+          // Update case status via synchronizeCompletedCase
+          await synchronizeCompletedCase(env, resolutionId);
+
+          // Send notification to requester
+          await sendNotification(
+            env,
+            caseRow.user_id,
+            'assistant_payout',
+            'Assistant Payout Completed',
+            `The Assistant has processed a payout of ${finalAmount} for your case.`,
+            `/cases/${caseId}`
+          );
+
+          return json({ 
+            success: true, 
+            id: resolutionId, 
+            case_id: caseId, 
+            amount: finalAmount,
+            total_contributions: totalContributions
+          }, 201, origin);
+          
+        } catch (error) {
+          console.error('[Assistant] pay error:', error);
+          return json({ error: 'Failed to process payout', details: String(error) }, 500, origin);
+        }
       }
 
       return json({ error: "Not found" }, 404, origin);
@@ -2347,24 +2502,3 @@ export default {
     }
   },
 };
-
-// worker.js - ASSETS سے پہلے یہ کوڈ شامل کریں
-if (url.pathname === '/Givethra.apk' || url.pathname.endsWith('.apk')) {
-  try {
-    const assetResponse = await env.ASSETS.fetch(request);
-    
-    if (assetResponse.status === 200) {
-      const headers = new Headers(assetResponse.headers);
-      headers.set('Content-Type', 'application/vnd.android.package-archive');
-      headers.set('Content-Disposition', 'attachment; filename="Givethra.apk"');
-      headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-      
-      return new Response(assetResponse.body, {
-        status: 200,
-        headers: headers
-      });
-    }
-  } catch (error) {
-    // اگر ASSETS میں نہ ملے تو 404
-  }
-}
