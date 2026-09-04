@@ -320,6 +320,7 @@ export default function CaseDetailPage() {
     else if (result === "copied") toast.success("Case message and link copied!");
   }
 
+  // 🔥 FIX #3: Promise.all → Promise.allSettled
   async function loadCase() {
     setLoading(true);
     try {
@@ -328,15 +329,18 @@ export default function CaseDetailPage() {
 
       if (user && data) {
         const owner = data.user_id === user.id;
-        const [fullUnlock, contributionUnlock, mediaUnlock, count, res, kyc, prof] = await Promise.all([
+        const results = await Promise.allSettled([
           getCaseUnlock(id, user.id, "full"),
           getCaseUnlock(id, user.id, "partial"),
           getCaseUnlock(id, user.id, "media"),
           getUserUnlockCount(user.id),
-          getCaseResolutions(id, user.id), // equivalent authenticated lookup to: const res = await getCaseResolutions(id);
+          getCaseResolutions(id, user.id),
           getKycSubmission(data.user_id),
           getProfile(user.id),
         ]);
+        const [fullUnlock, contributionUnlock, mediaUnlock, count, res, kyc, prof] =
+          results.map((r) => (r.status === "fulfilled" ? r.value : null));
+
         const activeUnlock = fullUnlock || contributionUnlock || null;
         setMyUnlock(activeUnlock);
         setUnlocked(!!activeUnlock || owner);
@@ -827,7 +831,8 @@ export default function CaseDetailPage() {
               <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5 border-primary/25 text-primary hover:bg-primary/10" onClick={handleCaseShare} aria-label={`Share ${caseData.title}`}>
                 <Share2 className="h-4 w-4" /> Share
               </Button>
-              {caseData.deadline && (() => {
+              {/* 🔥 FIX #4: only show deadline counter if case is NOT completed */}
+              {!isCompleted && caseData.deadline && (() => {
               const daysLeft = Math.ceil((new Date(caseData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
               if (daysLeft < 0) return null;
               return (
