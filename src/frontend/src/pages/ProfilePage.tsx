@@ -1,5 +1,6 @@
 // src/frontend/src/pages/ProfilePage.tsx
 // Givethra - Complete Profile Page with Corrected, Professional Layout
+// 🔥 FIXED: Uses shared resolutionStatus helpers (Fix #5)
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -66,29 +67,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
-// How many "Supports" equal 1 Credit, and how many Credits unlock a full
-// perk cycle (submit / unlock / clear suspension). Kept as constants so
-// the backend and UI can be lined up easily.
 const SUPPORTS_PER_CREDIT = 100;
 const CREDITS_PER_REWARD = 5;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function isApprovedResolution(resolution: any): boolean {
-  if (!resolution) return false;
-  const status = String(resolution?.status || "").trim().toLowerCase();
-  if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)) return true;
-  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
-  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
-  return false;
-}
 
 function getBadge(unlockCount: number, contributionCount: number, directHelpCount: number) {
   if (directHelpCount > 0 && contributionCount > 0 && unlockCount > 0) {
@@ -175,9 +165,6 @@ export default function ProfilePage() {
   const [relationshipUsers, setRelationshipUsers] = useState<any[]>([]);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
 
-  // Case stats - now computed for WHICHEVER profile is being viewed, not
-  // only the logged-in user's own profile, so a visitor can see another
-  // member's track record and trust level too.
   const [caseStats, setCaseStats] = useState({
     submitted: 0,
     completed: 0,
@@ -185,19 +172,14 @@ export default function ProfilePage() {
     expired: 0,
   });
 
-  // Hero specific stats
   const [helpedCount, setHelpedCount] = useState(0);
   const [directHelps, setDirectHelps] = useState(0);
   const [contributions, setContributions] = useState(0);
   const [unlockCount, setUnlockCount] = useState(0);
   const [totalAmountSpent, setTotalAmountSpent] = useState(0);
   const [helpedCases, setHelpedCases] = useState<any[]>([]);
-
-  // Requester specific stats
   const [totalHelpReceived, setTotalHelpReceived] = useState(0);
   const [trustLevel, setTrustLevel] = useState(100);
-
-  // Badge
   const [badge, setBadge] = useState<{ title: string; emoji: string; description: string; icon: JSX.Element; color: string } | null>(null);
 
   useEffect(() => {
@@ -214,10 +196,6 @@ export default function ProfilePage() {
   async function loadData() {
     setProfileLoading(true);
     try {
-      // NOTE: previously these were only fetched for `isOwnProfile`, which
-      // meant visiting someone else's profile showed all-zero stats and no
-      // trust level. They are now fetched for whichever profile is open so
-      // any visitor can see that account's real history and trust score.
       const [kyc, caseList, prof, resolutions, unlocks] = await Promise.all([
         getKycSubmission(profileUserId),
         getCasesByUser(profileUserId),
@@ -233,7 +211,6 @@ export default function ProfilePage() {
       setSupportsCount(Number(prof?.supports_count || 0));
       setIsMyHero(Boolean(prof?.is_following));
 
-      // --- Requester / Case Stats ---
       const list = Array.isArray(caseList) ? caseList : [];
       setCases(list);
       const submitted = list.length;
@@ -249,18 +226,14 @@ export default function ProfilePage() {
 
       setTrustLevel(getTrustLevel(rejected, completed, expired));
 
-      // --- Hero Stats ---
+      // 🔥 FIX #5: Use isTrulyCompletedHelp from shared helpers
       const resolutionList = Array.isArray(resolutions) ? resolutions : [];
-      const validResolutions = resolutionList.filter((r: any) => isApprovedResolution(r));
+      const validResolutions = resolutionList.filter((r: any) => isTrulyCompletedHelp(r));
       setHelpedCount(validResolutions.length);
       setHelpedCases(validResolutions.slice(0, 5));
 
-      const direct = validResolutions.filter(
-        (r: any) => String(r.paid_to || "").toLowerCase() !== "givethra"
-      );
-      const contrib = validResolutions.filter(
-        (r: any) => String(r.paid_to || "").toLowerCase() === "givethra"
-      );
+      const direct = validResolutions.filter((r: any) => !isContributionResolution(r));
+      const contrib = validResolutions.filter((r: any) => isContributionResolution(r));
       setDirectHelps(direct.length);
       setContributions(contrib.length);
 
@@ -338,7 +311,6 @@ export default function ProfilePage() {
   const avatarUrl = profile?.avatar_url || null;
   const coverUrl = profile?.cover_url || null;
 
-  // Credits derived from Supports (100 Supports = 1 Credit).
   const creditCount = Math.floor(supportsCount / SUPPORTS_PER_CREDIT);
   const supportsIntoCurrentCredit = supportsCount % SUPPORTS_PER_CREDIT;
   const creditProgressPct = Math.round((supportsIntoCurrentCredit / SUPPORTS_PER_CREDIT) * 100);
@@ -403,8 +375,6 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Sandwich menu now lives on the cover, top-right, so it never
-                competes with the name/stats row for space. */}
             {isOwnProfile && (
               <button
                 aria-label="Profile menu"
@@ -417,8 +387,6 @@ export default function ProfilePage() {
           </div>
 
           <div className="px-5 pb-5">
-            {/* Avatar sits on its own row so it never squeezes the name or
-                the stats — avoids the horizontal overflow / cut-off bug. */}
             <div className="flex items-end justify-between -mt-12 mb-3">
               <div className="relative shrink-0">
                 <div className="h-24 w-24 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary">
@@ -428,9 +396,6 @@ export default function ProfilePage() {
                     <span className="text-white font-bold text-2xl">{initials}</span>
                   )}
                 </div>
-                {/* Edit-profile pencil badge, pinned to the avatar corner —
-                    the single, obvious "edit" entry point for your own
-                    profile (photo, cover, bio, name all live behind it). */}
                 {isOwnProfile && (
                   <button
                     type="button"
@@ -444,8 +409,6 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* Hero toggle for other users' profiles — its own slot, no
-                  longer crammed next to the name. */}
               {!isOwnProfile && (
                 <Button
                   type="button"
@@ -463,11 +426,6 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Name + badge, full width now, free to wrap. The badge is
-                driven purely by this profile's own Hero stats (unlocks /
-                contributions / direct helps) — it no longer depends on
-                which mode (Hero/Requester) the current viewer happens to
-                have toggled, which was why it sometimes failed to show. */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-wrap min-w-0">
                 <h1 className="text-xl font-bold text-foreground truncate">{displayName}</h1>
@@ -497,10 +455,6 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* Second, explicit Edit-Profile entry point — sits in the
-                  empty space directly opposite the name, so it's never
-                  missed even if someone doesn't notice the pencil on the
-                  avatar. Both buttons do the same thing. */}
               {isOwnProfile && (
                 <button
                   type="button"
@@ -514,7 +468,6 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Location, Member Since, KYC, Bio */}
             <div className="space-y-1 mt-1">
               {(profile?.city || profile?.country) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -535,8 +488,6 @@ export default function ProfilePage() {
               {profile?.bio && <p className="text-sm text-muted-foreground italic pt-1">{profile.bio}</p>}
             </div>
 
-            {/* Requesters | Heroes | Supports — full-width grid so nothing
-                gets pushed off-screen on narrow phones. */}
             <div className="grid grid-cols-3 gap-2 mt-4 rounded-2xl border border-border/70 bg-background/70 px-2 py-3 shadow-sm">
               <button
                 onClick={() => openRelationshipList("requesters")}
@@ -556,10 +507,6 @@ export default function ProfilePage() {
                 <span className="text-lg font-bold text-foreground leading-tight">{followingCount}</span>
                 <span className="text-[11px] text-muted-foreground">Heroes</span>
               </button>
-              {/* Supports has no follow-list endpoint on the backend yet
-                  (getFollowList only supports "heroes" | "requesters"), so
-                  this stays a plain display for now instead of a broken
-                  button — see note at the end of this reply. */}
               <div className="flex flex-col items-center gap-0.5">
                 <Gift className="h-3.5 w-3.5 text-amber-600" />
                 <span className="text-lg font-bold text-amber-600 leading-tight">{supportsCount.toLocaleString()}</span>
@@ -567,7 +514,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Verification Badges */}
             <div className="mt-3 flex flex-wrap gap-2">
               {verificationBadges.map((b) => (
                 <span
@@ -587,8 +533,6 @@ export default function ProfilePage() {
         </div>
 
         {/* ============================= Trust Level ============================= */}
-        {/* Shown for EVERY profile you visit — not just your own — so
-            visitors can judge how reliable this account has been. */}
         <div className="rounded-2xl bg-card border border-border p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Trust Level</span>
@@ -814,7 +758,7 @@ export default function ProfilePage() {
           </DialogContent>
         </Dialog>
 
-        {/* Logout Button — only ever shown on your OWN profile */}
+        {/* Logout Button */}
         {isOwnProfile && (
           <button
             type="button"
@@ -927,7 +871,7 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Relationship List Dialog (Requesters / Heroes) */}
+      {/* Relationship List Dialog */}
       <Dialog open={relationshipType !== null} onOpenChange={(open) => !open && setRelationshipType(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -939,8 +883,6 @@ export default function ProfilePage() {
               )}
             </DialogDescription>
           </DialogHeader>
-          {/* Scrolls internally — however many people there are, the list
-              stays reachable instead of overflowing the dialog. */}
           <div className="max-h-[55vh] overflow-y-auto space-y-2 pr-1">
             {relationshipLoading ? (
               <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
