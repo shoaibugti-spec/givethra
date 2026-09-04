@@ -1176,26 +1176,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="max-w-3xl mx-auto px-4 pt-8">
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-center sm:text-left">
-            <h3 className="font-bold text-foreground">
-              📱 Get the Givethra Android App
-            </h3>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Verified cases, anytime — right on your phone.
-            </p>
-          </div>
-          <a
-            href="/Givethra.apk"
-            download
-            className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl font-semibold text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
-          >
-            Download App
-          </a>
-        </div>
-      </section>
-
       <section className="py-10 px-4 bg-background">
         <div className="max-w-4xl mx-auto space-y-6">
           <h2 className="font-display text-lg font-bold text-center">
