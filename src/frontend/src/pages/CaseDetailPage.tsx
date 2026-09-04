@@ -27,6 +27,8 @@ import { sendNotification } from "@/lib/notify";
 import { shareCase } from "@/lib/caseSharing";
 import { getApprovedCaseItems } from "@/lib/caseVerification";
 import { getCategoryGratitude } from "@/lib/gratitudeMessages";
+// 🔥 FIX #4: Import shared helpers from resolutionStatus
+import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   ChevronLeft, Lock, Unlock, MapPin, CheckCircle2,
@@ -72,22 +74,10 @@ function copyToClipboard(text: string, label: string) {
   );
 }
 
-function isContributionResolution(resolution: any): boolean {
-  const marker = String(resolution?.paid_to ?? resolution?.payment_type ?? "").trim().toLowerCase();
-  return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
-}
-
-function isApprovedCompletedResolution(resolution: any): boolean {
-  const status = String(resolution?.status || "").trim().toLowerCase();
-  const approvedStatus = ["approved", "completed", "verified", "confirmed"].includes(status);
-  const excludedStatus = ["rejected", "failed", "cancelled", "canceled", "pending", "pending_confirmation", "dispatched"].includes(status);
-  const adminConfirmed = [1, "1", true, "true", "yes"].includes(resolution?.admin_confirmed);
-  const hasApprovalEvidence = Boolean(resolution?.admin_confirmed_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at);
-  return approvedStatus && !excludedStatus && (adminConfirmed || hasApprovalEvidence);
-}
+// 🔥 FIX #4: Use imported isContributionResolution instead of local
 
 function getEligibleAffidavitResolutions(resolutions: any[]): any[] {
-  return resolutions.filter(isApprovedCompletedResolution);
+  return resolutions.filter(isTrulyCompletedHelp);
 }
 
 // 🔥 Hero "badge" tier for THIS case's completion card — mirrors the tiers shown
@@ -271,6 +261,7 @@ export default function CaseDetailPage() {
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);
   const [recTimer, setRecTimer] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0); // 🔥 FIX #3: store video duration
   const [stream, setStream] = useState<MediaStream | null>(null);
   const liveVideoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -398,6 +389,7 @@ export default function CaseDetailPage() {
       setRecording(true);
       setPaused(false);
       setRecTimer(0);
+      setVideoDuration(0); // reset duration
       setFbVideoBlob(null);
       setFbVideoFile(null);
       setFbVideoName("");
@@ -416,6 +408,8 @@ export default function CaseDetailPage() {
       videoChunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) videoChunksRef.current.push(e.data); };
       recorder.onstop = () => {
+        // 🔥 FIX #3: Store the duration when recording stops
+        setVideoDuration(recTimer);
         const recordedType = recorder.mimeType || mimeType;
         const blob = new Blob(videoChunksRef.current, { type: recordedType });
         setFbVideoFile(new File([blob], "feedback.webm", { type: recordedType }));
@@ -452,7 +446,7 @@ export default function CaseDetailPage() {
     if (r && r.state !== "inactive") r.stop();
     if (timerRef.current) clearInterval(timerRef.current);
   }
-  function discardVideo() { setFbVideoBlob(null); setFbVideoFile(null); setFbVideoName(""); }
+  function discardVideo() { setFbVideoBlob(null); setFbVideoFile(null); setFbVideoName(""); setVideoDuration(0); }
 
   const cur = caseData?.currency || "USD";
   const sym = CURRENCY_SYMBOLS[cur] ?? cur;
@@ -493,6 +487,7 @@ export default function CaseDetailPage() {
   const loadedResolutions = myResolutions;
   const submittedResType = unlockMode === "full" ? String(caseData?.category || "Direct Payment") : resType;
   const adminConfirmed = [1, "1", true, "true", "yes"].includes(caseData?.admin_confirmed);
+  // 🔥 FIX #4: Use imported isTrulyCompletedHelp
   const verifiedResolutions = getEligibleAffidavitResolutions(myResolutions);
   const visible = myResolutions.filter(r => !isContributionResolution(r));
 
@@ -633,7 +628,12 @@ export default function CaseDetailPage() {
 
   async function submitFeedback() {
     if (!fbText.trim() || !fbVideoFile) { toast.error("Please write a message AND record a 90-second video — both are required."); return; }
+    // 🔥 FIX #3: Check minimum video duration
     if (recording) { toast.error("Please finish (Done) your video first."); return; }
+    if (videoDuration < 60) {
+      toast.error(`Video must be at least 60 seconds long. Current duration: ${videoDuration}s.`);
+      return;
+    }
     if (!user?.id) {
       toast.error("Please sign in before submitting feedback.");
       return;
@@ -654,7 +654,7 @@ export default function CaseDetailPage() {
       });
       setExistingFeedback({ ...(savedFeedback || {}), status: "pending_review" });
       toast.success("Thank you! Your feedback is submitted for Givethra's review. Once approved, it will appear on the wall and you can submit a new case.");
-      setFbText(""); setFbVideoFile(null); setFbVideoName(""); setFbVideoBlob(null);
+      setFbText(""); setFbVideoFile(null); setFbVideoName(""); setFbVideoBlob(null); setVideoDuration(0);
       await checkExistingFeedback();
       loadCase();
     } catch (err) { toast.error(`Error: ${err instanceof Error ? err.message : "Unknown"}`); }
@@ -831,7 +831,7 @@ export default function CaseDetailPage() {
               <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5 border-primary/25 text-primary hover:bg-primary/10" onClick={handleCaseShare} aria-label={`Share ${caseData.title}`}>
                 <Share2 className="h-4 w-4" /> Share
               </Button>
-              {/* 🔥 FIX #4: only show deadline counter if case is NOT completed */}
+              {/* 🔥 FIX #1: only show deadline counter if case is NOT completed */}
               {!isCompleted && caseData.deadline && (() => {
               const daysLeft = Math.ceil((new Date(caseData.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
               if (daysLeft < 0) return null;
@@ -918,6 +918,9 @@ export default function CaseDetailPage() {
                     <FileText className="h-4 w-4" /> View Payment Receipt
                   </a>
                 )}
+                {/* 🔥 FIX #2: Show completed resolutions for owner */}
+                <OwnerCompletedResolutions caseId={id} caseData={caseData} seekerKyc={seekerKyc} heroName={heroName} sym={sym} cur={cur} />
+
                 {existingFeedback ? (
                   <div className="rounded-xl bg-card border border-border p-4 text-center space-y-1">
                     <Star className="h-6 w-6 text-amber-400 mx-auto" fill="currentColor" />
@@ -936,6 +939,7 @@ export default function CaseDetailPage() {
                       {fbVideoBlob ? (
                         <div className="space-y-2">
                           <video src={fbVideoBlob} controls className="w-full rounded-lg border max-h-48" />
+                          <p className="text-xs text-muted-foreground">Duration: {videoDuration}s {videoDuration < 60 && <span className="text-red-500">(minimum 60s required)</span>}</p>
                           <Button type="button" variant="outline" size="sm" className="w-full" onClick={discardVideo}>Remove / Re-record</Button>
                         </div>
                       ) : recording ? (
@@ -954,12 +958,15 @@ export default function CaseDetailPage() {
                         <div className="space-y-2">
                           <Button type="button" className="w-full min-h-12 touch-manipulation select-none" variant="outline" onClick={startRecording}><Video className="h-4 w-4" /> Record a Video (up to 90s)</Button>
                           <p className="text-[11px] text-muted-foreground text-center">Or upload a video file</p>
-                          <Input type="file" accept="video/*" onChange={e => { const f = e.target.files?.[0] ?? null; setFbVideoFile(f); setFbVideoName(f?.name ?? ""); setFbVideoBlob(f ? URL.createObjectURL(f) : null); }} />
+                          <Input type="file" accept="video/*" onChange={e => { const f = e.target.files?.[0] ?? null; setFbVideoFile(f); setFbVideoName(f?.name ?? ""); setFbVideoBlob(f ? URL.createObjectURL(f) : null); setVideoDuration(0); }} />
                           {fbVideoName && !fbVideoBlob && <p className="text-xs text-teal-600">✓ {fbVideoName}</p>}
                         </div>
                       )}
                     </div>
-                    <Button className="w-full" onClick={submitFeedback} disabled={fbSubmitting || recording}>{fbSubmitting ? "Posting..." : "Post Feedback to Community Wall 🤲"}</Button>
+                    <Button className="w-full" onClick={submitFeedback} disabled={fbSubmitting || recording || (fbVideoFile && videoDuration < 60)}>
+                      {fbSubmitting ? "Posting..." : "Post Feedback to Community Wall 🤲"}
+                    </Button>
+                    {fbVideoFile && videoDuration < 60 && <p className="text-xs text-red-500">⏳ Video must be at least 60 seconds. Current: {videoDuration}s</p>}
                   </div>
                 )}
               </div>
@@ -1259,6 +1266,57 @@ export default function CaseDetailPage() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+// ============================================================
+// 🔥 FIX #2: New component for owner's completed resolutions
+// ============================================================
+function OwnerCompletedResolutions({ caseId, caseData, seekerKyc, heroName, sym, cur }: any) {
+  const [resolutions, setResolutions] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Get ALL resolutions for this case (no heroId filter)
+    getCaseResolutions(caseId)
+      .then((data) => {
+        // Use isTrulyCompletedHelp to filter only truly completed ones
+        const completed = (data ?? []).filter(isTrulyCompletedHelp);
+        setResolutions(completed);
+      })
+      .catch(() => {});
+  }, [caseId]);
+
+  if (resolutions.length === 0) return null;
+
+  return (
+    <div className="space-y-3 pt-2 border-t border-teal-200 dark:border-teal-800">
+      <h3 className="font-semibold text-sm text-teal-700">📄 Help Received (Completed Resolutions)</h3>
+      {resolutions.map((r: any) => (
+        <div key={r.id} className="rounded-xl border border-teal-200 bg-card p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-foreground">
+                {isContributionResolution(r) ? "Contribution" : "Direct Help"} 
+                <span className="ml-2 text-[10px] font-medium text-muted-foreground">{r.resolution_type || "—"}</span>
+              </p>
+              <p className="text-sm font-bold text-primary">{sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</p>
+            </div>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600 bg-teal-100 dark:bg-teal-900/30 px-2 py-1 rounded-full">Completed</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {r.receipt_url && (
+              <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                <ExternalLink className="h-3 w-3" /> View Receipt
+              </a>
+            )}
+            <Button size="sm" variant="outline" className="gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, heroName)}>
+              <FileText className="h-3.5 w-3.5" /> Affidavit
+            </Button>
+          </div>
+          {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
+        </div>
+      ))}
+    </div>
   );
 }
 
