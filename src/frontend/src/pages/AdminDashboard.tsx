@@ -1,3 +1,4 @@
+// src/pages/AdminDashboard.tsx - مکمل فائل
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -428,6 +429,10 @@ export default function AdminPage() {
           await adminUpsertWallet(c.user_id, newBalance);
           await sendNotification(c.user_id, "case_rejected", "Case Rejected", (reason ? `Reason: ${reason}. ` : "") + "Your 1 credit has been refunded — you can submit again.", "/my-cases");
         }
+      } else if (status === "completed") {
+        await sendNotification(c.user_id, "case_completed", "Case Completed ✅", `Your case "${c.title}" has been marked as completed.`, "/my-cases");
+      } else if (status === "expired") {
+        await sendNotification(c.user_id, "case_expired", "Case Expired ⏰", `Your case "${c.title}" has expired. You can submit a new one.`, "/submit-request");
       }
     }
     toast.success(`Case ${status}!`);
@@ -478,7 +483,7 @@ export default function AdminPage() {
     }
   }
 
-    async function confirmResolution(res: any) {
+  async function confirmResolution(res: any) {
     const c = caseList.find((cs) => cs.id === res.case_id);
     if (!c) { toast.error("Case not found"); return; }
     const confirmedAmt = Number(res.seeker_confirmed_amount ?? res.amount_paid ?? 0);
@@ -515,6 +520,7 @@ export default function AdminPage() {
       toast.error(`Failed to verify payment proof: ${error?.message || "Please try again."}`);
     }
   }
+
   async function rejectResolution(res: any, reason: string) {
     const trimmedReason = String(reason || "").trim();
     if (!trimmedReason) { toast.error("Please provide a rejection reason."); return; }
@@ -536,7 +542,6 @@ export default function AdminPage() {
     }
   }
 
-
   async function markAsPaidAndClose(c: any, receiptUrl: string) {
     try {
       await adminCloseCase(c.id, { status: "completed", closed_by_admin: true, paid_receipt_url: receiptUrl || null });
@@ -550,6 +555,7 @@ export default function AdminPage() {
       toast.error(`Failed to close case: ${error?.message || "Please try again."}`);
     }
   }
+
   async function rejectPayClose(c: any, reason: string) {
     const trimmed = String(reason || "").trim();
     if (!trimmed) { toast.error("Please provide a reason before returning this case."); return; }
@@ -615,6 +621,7 @@ export default function AdminPage() {
   const approvedCasesCount = caseList.filter((c) => c.status === "approved").length;
   const rejectedCasesCount = caseList.filter((c) => c.status === "rejected").length;
   const completedCasesCount = caseList.filter((c) => c.status === "completed").length;
+  const expiredCasesCount = caseList.filter((c) => c.status === "expired").length;
 
   const pendingDeposits = deposits.filter((d) => d.status === "pending");
   const approvedDepositsCount = deposits.filter((d) => d.status === "approved").length;
@@ -792,6 +799,7 @@ export default function AdminPage() {
                     <span className="text-red-600">❌ {rejectedCasesCount}</span>
                     <span className="text-blue-600">✅ {completedCasesCount}</span>
                     <span className="text-orange-500">⏳ {pendingCases.length}</span>
+                    <span className="text-gray-500">⌛ {expiredCasesCount}</span>
                   </div>
                 </div>
                 <div className="rounded-xl border bg-card p-3">
@@ -819,8 +827,19 @@ export default function AdminPage() {
               <KycSearchBox kycList={kycList} onUpdate={updateKyc} cnicCounts={cnicCounts} profileMap={profileMap} />
             </TabsContent>
 
+            {/* ===== CASES TAB - UPDATED ===== */}
             <TabsContent value="cases" className="space-y-4 mt-4">
-              <CaseSearchBox caseList={caseList} onUpdate={updateCase} resolutions={resByCaseId} profileMap={profileMap} cnicByUser={cnicByUser} />
+              <CaseSearchBox 
+                caseList={caseList} 
+                onUpdate={updateCase} 
+                resolutions={resByCaseId} 
+                profileMap={profileMap} 
+                cnicByUser={cnicByUser}
+                onConfirmResolution={confirmResolution}
+                onRejectResolution={rejectResolution}
+                onMarkPaidClose={markAsPaidAndClose}
+                onRejectPayClose={rejectPayClose}
+              />
             </TabsContent>
 
             <TabsContent value="verify" className="space-y-4 mt-4">
@@ -842,6 +861,7 @@ export default function AdminPage() {
                     : <ResolutionHistoryCard key={r.id} r={r} c={c} profileMap={profileMap} />;
                 })}
             </TabsContent>
+
             <TabsContent value="contributions" className="space-y-4 mt-4">
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search contributions by case, hero, email, CNIC, or TXN..." value={resolutionSearch} onChange={(e) => setResolutionSearch(e.target.value)} className="pl-9 h-11" /></div>
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Contributions</strong><p className="mt-1">Review every contribution receipt, amount, and transaction ID. Approved contributions remain visible in the completed history.</p></div>
@@ -858,6 +878,7 @@ export default function AdminPage() {
                     : <ResolutionHistoryCard key={r.id} r={r} c={c} profileMap={profileMap} />;
                 })}
             </TabsContent>
+
             <TabsContent value="pay" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-teal-50 dark:bg-teal-950/20 p-4 text-sm text-teal-700 flex items-start gap-2">
                 <HandCoins className="h-4 w-4 shrink-0 mt-0.5" />
@@ -995,11 +1016,14 @@ function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
   );
 }
 
-function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser }: any) {
+// ============================================================
+//  CASE SEARCH BOX (UPDATED WITH PROPS FOR ACTIONS)
+// ============================================================
+function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser, onConfirmResolution, onRejectResolution, onMarkPaidClose, onRejectPayClose }: any) {
   const [search, setSearch] = useState("");
   const sortedCases = [...caseList].sort((a, b) => {
-    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2, completed: 3 };
-    return (order[a.status] ?? 4) - (order[b.status] ?? 4);
+    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2, completed: 3, expired: 4 };
+    return (order[a.status] ?? 5) - (order[b.status] ?? 5);
   });
   const query = search.trim().toLowerCase();
   const digits = search.replace(/\D/g, "");
@@ -1017,38 +1041,790 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
         <Input placeholder="Search cases by title, category, name, CNIC, or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
       </div>
       {filtered.length === 0 ? <Empty text="No matching cases" /> :
-        filtered.map((c: any) => <CaseCard key={c.id} c={c} onUpdate={onUpdate} resolutions={resolutions[c.id] ?? []} profileMap={profileMap} />)
+        filtered.map((c: any) => (
+          <CaseCard 
+            key={c.id} 
+            c={c} 
+            onUpdate={onUpdate} 
+            resolutions={resolutions[c.id] ?? []} 
+            profileMap={profileMap}
+            onConfirmResolution={onConfirmResolution}
+            onRejectResolution={onRejectResolution}
+            onMarkPaidClose={onMarkPaidClose}
+            onRejectPayClose={onRejectPayClose}
+          />
+        ))
       }
     </div>
   );
 }
 
-function DepositSearchBox({ deposits, onApprove, onReject, profileMap = {}, cnicByUser = {} }: any) {
-  const [search, setSearch] = useState("");
-  const sorted = [...deposits].sort((a, b) => {
-    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
-    return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+// ============================================================
+//  CASE CARD (UPDATED WITH FULL ACTIONS)
+// ============================================================
+function CaseCard({ c, onUpdate, resolutions, profileMap, onConfirmResolution, onRejectResolution, onMarkPaidClose, onRejectPayClose }: any) {
+  const [reason, setReason] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const cur = c.currency || "USD";
+  const s = sym(cur);
+  const seeker = profileMap[c.user_id];
+  const hasPayment = c.institute_name || c.account_number || c.account_title || c.account_iban;
+  const parseObject = (value: unknown): any => {
+    if (value && typeof value === "object") return value;
+    if (typeof value === "string") {
+      try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" ? parsed : null; } catch { return null; }
+    }
+    return null;
+  };
+  const catDetails = parseObject(c.category_details);
+  const catDocs = parseObject(catDetails?._documents) || {};
+
+  const allFields: { label: string; value: any }[] = [];
+  if (catDetails) {
+    const excludeKeys = new Set([
+      "_documents", "edu_documents", "edu_sub_fields", "property_ownership",
+      "rental_agreement_url", "landlord_cnic_url", "job_status", "gender",
+      "marital_status", "is_orphan", "orphan_parent", "seeker_name",
+      "seeker_contact", "receiver_name", "receiver_contact", "receiver_bank",
+      "receiver_account", "disability_mode", "disability_type", "disability_reason",
+      "disability_shop_name", "disability_shop_contact", "disability_hospital",
+      "treatment_amount", "treatment_expiry", "treatment_patient_number",
+      "disability_bank_title", "disability_bank_number", "institute_name",
+      "institute_contact", "institute_address", "is_institute_in_list",
+      "reference_type", "reference_number", "due_date", "edu_sub_type",
+      "edu_admission_level",
+    ]);
+    for (const [key, val] of Object.entries(catDetails)) {
+      if (excludeKeys.has(key)) continue;
+      if (key.startsWith("_")) continue;
+      if (typeof val === "string" && val.trim()) {
+        allFields.push({ label: getDocLabel(key), value: val });
+      } else if (typeof val === "number" || typeof val === "boolean") {
+        allFields.push({ label: getDocLabel(key), value: String(val) });
+      }
+    }
+  }
+
+  const eduSubFields = catDetails?.edu_sub_fields || {};
+  const eduFields: { label: string; value: any }[] = [];
+  for (const [key, val] of Object.entries(eduSubFields)) {
+    if (val) eduFields.push({ label: getDocLabel(key), value: val });
+  }
+
+  const personalDetails = [
+    { label: "Job Status", value: catDetails?.job_status || "" },
+    { label: "Gender", value: catDetails?.gender || "" },
+    { label: "Marital Status", value: catDetails?.marital_status || "" },
+    { label: "Orphan", value: catDetails?.is_orphan || "" },
+    { label: "Orphan Parent", value: catDetails?.orphan_parent || "" },
+    { label: "Seeker Name", value: catDetails?.seeker_name || "" },
+    { label: "Seeker Contact", value: catDetails?.seeker_contact || "" },
+  ].filter((d) => d.value);
+
+  const receiverDetails = [
+    { label: "Receiver Name", value: catDetails?.receiver_name || "" },
+    { label: "Receiver Contact", value: catDetails?.receiver_contact || "" },
+    { label: "Receiver Bank", value: catDetails?.receiver_bank || "" },
+    { label: "Receiver Account", value: catDetails?.receiver_account || "" },
+    { label: "Receiver Address", value: catDetails?.receiver_address || "" },
+    { label: "Shop Name", value: catDetails?.receiver_shop_name || "" },
+  ].filter((d) => d.value);
+
+  const disabilityDetails = [
+    { label: "Disability Mode", value: catDetails?.disability_mode || "" },
+    { label: "Disability Type", value: catDetails?.disability_type || "" },
+    { label: "Disability Reason", value: catDetails?.disability_reason || "" },
+    { label: "Shop Name", value: catDetails?.disability_shop_name || "" },
+    { label: "Shop Contact", value: catDetails?.disability_shop_contact || "" },
+    { label: "Hospital", value: catDetails?.disability_hospital || "" },
+    { label: "Treatment Amount", value: catDetails?.treatment_amount || "" },
+    { label: "Treatment Expiry", value: catDetails?.treatment_expiry || "" },
+    { label: "Patient/Bill Number", value: catDetails?.treatment_patient_number || "" },
+    { label: "Bank Title (Stipend)", value: catDetails?.disability_bank_title || "" },
+    { label: "Bank Number (Stipend)", value: catDetails?.disability_bank_number || "" },
+  ].filter((d) => d.value);
+
+  const propertyDetails = [
+    { label: "Property Ownership", value: catDetails?.property_ownership === "rented" ? "Rented" : catDetails?.property_ownership === "owned" ? "Owned" : "" },
+  ].filter((d) => d.value);
+
+  // ---- File extraction ----
+  const fileEntries: { key: string; label: string; url: string }[] = [];
+  
+  function getFileNameFromUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      const key = urlObj.searchParams.get("key");
+      if (key) {
+        const parts = key.split("/");
+        const lastPart = parts[parts.length - 1];
+        if (lastPart) {
+          let name = decodeURIComponent(lastPart)
+            .replace(/^[0-9]+[-_]/, "")
+            .replace(/^[a-f0-9]{8,}[-_]/, "");
+          if (name && name.length > 0 && name !== "null") {
+            return name;
+          }
+        }
+      }
+      const pathParts = urlObj.pathname.split("/");
+      const last = pathParts[pathParts.length - 1];
+      if (last) {
+        let name = decodeURIComponent(last)
+          .replace(/^[0-9]+[-_]/, "")
+          .replace(/^[a-f0-9]{8,}[-_]/, "");
+        if (name && name.length > 0 && name !== "null") {
+          return name;
+        }
+      }
+      return "File";
+    } catch {
+      return "File";
+    }
+  }
+
+  function getFileLabel(key: string, url: string, explicitLabel?: string): string {
+    if (explicitLabel?.trim()) return explicitLabel.trim();
+    if (DOC_LABELS[key]) return DOC_LABELS[key];
+    const fileName = getFileNameFromUrl(url);
+    if (fileName === "File" || fileName === "photo" || fileName === "uploads" || fileName.match(/^[0-9a-f]{8,}$/i)) {
+      const cleanKey = key
+        .replace(/_/g, " ")
+        .replace(/([A-Z])/g, " $1")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim();
+      if (cleanKey && cleanKey !== "Photo" && cleanKey !== "File") {
+        return cleanKey;
+      }
+      return "Uploaded File";
+    }
+    return fileName;
+  }
+
+  const pushFile = (key: string, value: unknown, explicitLabel?: string) => {
+    let url = "";
+    let label = explicitLabel;
+    if (typeof value === "string") {
+      url = value.trim();
+    } else if (value && typeof value === "object") {
+      const file = value as Record<string, unknown>;
+      const candidate = file.url || file.file_url || file.download_url || file.href || file.path;
+      if (typeof candidate === "string") url = candidate.trim();
+      const name = file.original_name || file.filename || file.file_name || file.name;
+      if (!label && typeof name === "string") label = name;
+    }
+    if (!url.startsWith("http")) return;
+    if (fileEntries.some((f) => f.url === url)) return;
+    fileEntries.push({ key, label: getFileLabel(key, url, label), url });
+  };
+
+  pushFile("selfie_url", c.selfie_url);
+  pushFile("video_url", c.video_url);
+  pushFile("paid_receipt_url", c.paid_receipt_url);
+
+  const photoPayload = Array.isArray(c.photo_urls) ? c.photo_urls : parseObject(c.photo_urls);
+  if (Array.isArray(photoPayload)) {
+    photoPayload.forEach((val, idx) => pushFile(`photo_${idx + 1}`, val));
+  } else if (photoPayload && typeof photoPayload === "object") {
+    for (const [k, val] of Object.entries(photoPayload)) pushFile(k, val);
+  }
+
+  const walkFilesDeep = (obj: any, prefix = "") => {
+    if (!obj || typeof obj !== "object") return;
+    if (Array.isArray(obj)) {
+      obj.forEach((item, idx) => walkFilesDeep(item, `${prefix}_${idx + 1}`));
+      return;
+    }
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof v === "string") {
+        const trimmed = v.trim();
+        if (trimmed.startsWith("http")) {
+          pushFile(prefix ? `${prefix}_${k}` : k, trimmed);
+        }
+      } else if (v && typeof v === "object") {
+        const file = v as Record<string, unknown>;
+        const candidate = file.url || file.file_url || file.download_url || file.href || file.path;
+        if (typeof candidate === "string" && candidate.trim().startsWith("http")) {
+          pushFile(prefix ? `${prefix}_${k}` : k, file);
+        } else {
+          walkFilesDeep(v, prefix ? `${prefix}_${k}` : k);
+        }
+      }
+    }
+  };
+  walkFilesDeep(c);
+  walkFilesDeep(catDocs, "documents");
+  walkFilesDeep(parseObject(catDetails?.edu_documents) || {}, "education_documents");
+
+  const seen = new Set<string>();
+  const uniqueFiles = fileEntries.filter((file) => {
+    if (seen.has(file.url)) return false;
+    seen.add(file.url);
+    return true;
   });
-  const filtered = search.trim()
-    ? sorted.filter((d: any) => {
-        const q = search.trim().toLowerCase();
-        const p = profileMap[d.user_id] || {};
-        return [d.id, d.user_id, d.transaction_id, d.amount, d.credits, p.full_name, p.email, cnicByUser[d.user_id]].some((value) => String(value || "").toLowerCase().includes(q));
-      })
-    : sorted;
+
+  const isRejected = c.status === "rejected";
+  const isCompleted = c.status === "completed";
+  const isExpired = c.status === "expired";
+  const isApproved = c.status === "approved";
+  const isPending = c.status === "pending";
+  const isReadyToClose = isApproved && !c.closed_by_admin && Number(c.amount_needed) > 0 && Number(c.amount_collected) >= Number(c.amount_needed);
+
+  // ---- Action handlers ----
+  const handleStatusChange = async (newStatus: string, reasonText = "") => {
+    if (newStatus === "rejected" && !reasonText.trim()) {
+      toast.error("Please provide a rejection reason.");
+      return;
+    }
+    if (newStatus === "expired" && !reasonText.trim()) {
+      toast.error("Please provide an expiry reason (e.g., deadline passed).");
+      return;
+    }
+    if (!confirm(`Are you sure you want to set this case status to "${newStatus.toUpperCase()}"?`)) return;
+    setActionLoading(true);
+    try {
+      await onUpdate(c.id, newStatus, reasonText);
+    } catch (e) {
+      toast.error("Failed to update status.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const [showPayClose, setShowPayClose] = useState(false);
+  const [receiptUrl, setReceiptUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  async function uploadReceipt(file: File | null) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const path = `paid_receipts/${c.id}/${Date.now()}_receipt`;
+      const url = await uploadFileToStorage(file, path);
+      setReceiptUrl(url);
+      toast.success("Receipt uploaded!");
+    } catch { toast.error("Upload failed."); }
+    finally { setUploading(false); }
+  }
+
+  // ---- Render ----
   return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search deposits by user ID or transaction ID..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
+    <div className={`rounded-xl border p-4 space-y-3 ${isRejected ? "border-red-300 bg-red-50/50 dark:bg-red-950/10" : "bg-card"}`}>
+      {/* Status badge */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <StatusBadge status={c.status} />
+        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
+        <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{c.urgency}</span>
+        {c.was_free
+          ? <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-semibold">FREE</span>
+          : <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">PAID</span>}
+        {c.closed_by_admin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">FUNDRAISED & PAID</span>}
+        {isExpired && <span className="text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-semibold">EXPIRED</span>}
       </div>
-      {filtered.length === 0 ? <Empty text="No matching deposits" /> :
-        filtered.map((d: any) => <DepositCard key={d.id} d={d} onApprove={onApprove} onReject={onReject} />)
-      }
+
+      {/* Rejection/Expiry reason */}
+      {(isRejected || isExpired) && c.rejection_reason && (
+        <div className="rounded-lg border-2 border-red-300 bg-red-100 dark:bg-red-950/30 p-4">
+          <div className="flex items-start gap-2">
+            {isRejected ? <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" /> : <AlertTriangle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />}
+            <div>
+              <p className="font-bold text-red-700">{isRejected ? "❌ Case Rejected" : "⏰ Case Expired"}</p>
+              <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{c.rejection_reason}</p>
+              {c.reviewed_at && <p className="text-xs text-red-500 mt-2">Reviewed on: {new Date(c.reviewed_at).toLocaleString()}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Title and description */}
+      <div className="text-sm space-y-1">
+        <p className="font-semibold">{c.title}</p>
+        <p className="text-muted-foreground">{c.short_description}</p>
+        <p className="text-muted-foreground text-xs">📍 {c.city}, {c.country} {c.amount_needed && `· Needs: ${s} ${c.amount_needed} ${cur}`}</p>
+        {c.deadline && (
+          <p className="text-xs font-bold text-red-600 flex items-center gap-1">
+            ⏰ Bill / Case Due (Expiry) Date: {new Date(c.deadline).toLocaleDateString()}
+          </p>
+        )}
+        {c.amount_needed > 0 && <p className="text-xs text-teal-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>}
+
+        <div className="mt-2 rounded-lg bg-primary/5 border border-primary/10 p-3">
+          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">📋 Full Case Description</p>
+          <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+            {c.description || "No description provided"}
+          </p>
+        </div>
+      </div>
+
+      {/* Seeker info */}
+      <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs space-y-0.5">
+        <p className="font-semibold text-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Submitted by</p>
+        <p className="text-muted-foreground">{seeker?.full_name || "—"} · {seeker?.email || c.user_id?.slice(0, 8)}</p>
+      </div>
+
+      {/* Personal details */}
+      {personalDetails.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><User className="h-3 w-3" /> Personal Details</p>
+          {personalDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {/* Receiver details */}
+      {receiverDetails.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><HandCoins className="h-3 w-3" /> Payment Receiver</p>
+          {receiverDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {/* Disability details */}
+      {disabilityDetails.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><Heart className="h-3 w-3" /> Disability Details</p>
+          {disabilityDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {/* Property details */}
+      {propertyDetails.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><Building2 className="h-3 w-3" /> Property Details</p>
+          {propertyDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+          {catDetails?.rental_agreement_url && <Img url={catDetails.rental_agreement_url} label="Rental Agreement" />}
+          {catDetails?.landlord_cnic_url && <Img url={catDetails.landlord_cnic_url} label="Landlord's CNIC" />}
+        </div>
+      )}
+
+      {/* Education details */}
+      {eduFields.length > 0 && (
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 p-3 space-y-1">
+          <p className="text-xs font-semibold text-blue-700 flex items-center gap-1"><BookOpen className="h-3 w-3" /> Education Details</p>
+          {eduFields.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {/* Other fields */}
+      {allFields.length > 0 && (
+        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1"><ClipboardCheck className="h-3 w-3" /> Other Details</p>
+          {allFields.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {/* Files */}
+      {uniqueFiles.length > 0 ? (
+        <div className="rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold flex items-center gap-1"><FileText className="h-4 w-4" /> Uploaded Files ({uniqueFiles.length})</p>
+            <div className="flex gap-1">
+              <button onClick={() => copyText(uniqueFiles.map((f) => f.url).join("\n"))} className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                <Copy className="h-3 w-3" /> Copy URLs
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {uniqueFiles.map(({ key, label, url }) => {
+              const lowerFileName = `${url} ${label}`.toLowerCase();
+              const isVideo = lowerFileName.match(/\.(mp4|webm|mov|avi)(?:$|\?)/i) || lowerFileName.includes("video");
+              const isPdf = lowerFileName.match(/\.pdf(?:$|\?)/i);
+              const isImage = lowerFileName.match(/\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)(?:$|\?)/i) || lowerFileName.includes("image") || lowerFileName.includes("photo") || lowerFileName.includes("selfie");
+              const downloadUrl = (() => {
+                try {
+                  const parsed = new URL(url, window.location.origin);
+                  parsed.searchParams.set("download", "1");
+                  return parsed.toString();
+                } catch {
+                  return url;
+                }
+              })();
+              return (
+                <div key={key + url} className="space-y-1 bg-background/80 p-1.5 rounded border">
+                  <p className="text-[10px] font-medium text-foreground truncate" title={label}>
+                    📎 {label}
+                  </p>
+                  {isVideo ? (
+                    <video src={url} controls className="w-full rounded border max-h-32 bg-black" />
+                  ) : isPdf ? (
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
+                      📄 View PDF
+                    </a>
+                  ) : isImage ? (
+                    <a href={url} target="_blank" rel="noopener noreferrer">
+                      <img src={url} alt={label} className="w-full rounded border max-h-28 object-cover hover:opacity-95" />
+                    </a>
+                  ) : (
+                    <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded border bg-muted/60 p-3 text-center">
+                      <FileText className="h-8 w-8 text-primary" />
+                      <span className="text-[10px] text-muted-foreground">Document file</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-center gap-2 text-[9px]">
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {isImage || isPdf || isVideo ? "Open in Full Size ↗" : "Open File ↗"}
+                    </a>
+                    <a href={downloadUrl} download={label} className="inline-flex items-center gap-0.5 text-primary hover:underline">
+                      <Download className="h-3 w-3" /> Download
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 p-3 text-xs text-yellow-700">
+          ⚠️ No files uploaded for this case.
+        </div>
+      )}
+
+      {/* Institute payment details */}
+      {hasPayment && (
+        <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-3 space-y-1">
+          <p className="font-semibold text-sm flex items-center gap-1 text-amber-700"><Building2 className="h-4 w-4" /> Institute Payment Details</p>
+          <DetailRow label="Institute / Provider" value={c.institute_name} />
+          <DetailRow label="Payment Method" value={c.payment_method} />
+          <DetailRow label="Account Title / Reference" value={c.account_title} />
+          <DetailRow label="Account / Bill Number" value={c.account_number} mono />
+          <DetailRow label="IBAN" value={c.account_iban} mono />
+          <DetailRow label="Institute Contact" value={c.institute_contact} mono />
+          <DetailRow label="Institute Address" value={c.institute_address} />
+        </div>
+      )}
+
+      {/* ===== RESOLUTIONS (Payments) with action buttons ===== */}
+      {resolutions.length > 0 && (
+        <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-3">
+          <p className="font-semibold text-sm flex items-center gap-1"><Heart className="h-4 w-4 text-primary" /> All Helps / Payments</p>
+          {resolutions.map((r: any) => {
+            const isPending = r.status === "pending" || r.status === "pending_confirmation" || r.status === "seeker_confirmed";
+            const isCompleted = r.status === "completed" || r.status === "approved";
+            const isRejected = r.status === "rejected" || r.status === "disputed";
+            const isContribution = isContributionResolution(r);
+            return (
+              <div key={r.id} className="text-xs space-y-1.5 border-b border-border/50 last:border-0 pb-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isCompleted ? "bg-teal-100 text-teal-700" : isRejected ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                    {isCompleted ? "COMPLETED" : isRejected ? "REJECTED" : "PENDING"}
+                  </span>
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isContribution ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"}`}>
+                    {isContribution ? "FUNDRAISING" : "DIRECT"}
+                  </span>
+                  {r.transaction_id && <span className="font-mono text-[10px] text-muted-foreground">TXN: {r.transaction_id}</span>}
+                </div>
+                <p><span className="text-muted-foreground">Amount:</span> {s} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</p>
+                {r.receipt_url && (
+                  <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-[10px]">
+                    <ExternalLink className="h-3 w-3" /> View Receipt
+                  </a>
+                )}
+                {isPending && (
+                  <div className="flex gap-2 pt-1">
+                    <Button 
+                      size="sm" 
+                      className="bg-teal-600 hover:bg-teal-700 text-white h-7 text-[10px]" 
+                      onClick={() => {
+                        if (confirm(`Verify this ${isContribution ? "contribution" : "direct payment"} of ${s} ${r.amount_paid}?`)) {
+                          onConfirmResolution(r);
+                        }
+                      }}
+                    >
+                      <CheckCircle className="h-3 w-3 mr-0.5" /> Verify
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-red-600 border-red-300 h-7 text-[10px]"
+                      onClick={() => {
+                        const reason = prompt("Rejection reason:");
+                        if (reason !== null && reason.trim()) {
+                          onRejectResolution(r, reason.trim());
+                        }
+                      }}
+                    >
+                      <XCircle className="h-3 w-3 mr-0.5" /> Reject
+                    </Button>
+                  </div>
+                )}
+                {isRejected && r.notes && <p className="text-red-600 text-[10px]">Reason: {r.notes}</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ===== CASE ACTIONS (Status buttons) ===== */}
+      <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+        <p className="text-xs font-bold flex items-center gap-1"><ShieldIcon className="h-3.5 w-3.5" /> Case Actions</p>
+        <div className="flex flex-wrap gap-2">
+          {/* Set Pending */}
+          {!isPending && (
+            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => handleStatusChange("pending")} disabled={actionLoading}>
+              Set Pending
+            </Button>
+          )}
+          {/* Approve */}
+          {!isApproved && !isCompleted && !isExpired && (
+            <Button size="sm" variant="default" className="h-7 text-[10px] bg-green-600 hover:bg-green-700" onClick={() => handleStatusChange("approved")} disabled={actionLoading}>
+              <CheckCircle className="h-3 w-3 mr-0.5" /> Approve
+            </Button>
+          )}
+          {/* Reject */}
+          {!isRejected && !isCompleted && !isExpired && (
+            <Button size="sm" variant="destructive" className="h-7 text-[10px]" onClick={() => {
+              const reason = prompt("Rejection reason:");
+              if (reason !== null && reason.trim()) handleStatusChange("rejected", reason.trim());
+            }} disabled={actionLoading}>
+              <XCircle className="h-3 w-3 mr-0.5" /> Reject
+            </Button>
+          )}
+          {/* Complete */}
+          {!isCompleted && !isExpired && (
+            <Button size="sm" variant="outline" className="h-7 text-[10px] border-teal-500 text-teal-600" onClick={() => handleStatusChange("completed")} disabled={actionLoading}>
+              <CheckCircle className="h-3 w-3 mr-0.5" /> Complete
+            </Button>
+          )}
+          {/* Expire */}
+          {!isExpired && !isCompleted && (
+            <Button size="sm" variant="outline" className="h-7 text-[10px] border-orange-400 text-orange-600" onClick={() => {
+              const reason = prompt("Expiry reason (e.g., deadline passed):");
+              if (reason !== null && reason.trim()) handleStatusChange("expired", reason.trim());
+            }} disabled={actionLoading}>
+              <AlertTriangle className="h-3 w-3 mr-0.5" /> Expire
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ===== PAY & CLOSE (if ready) ===== */}
+      {isReadyToClose && (
+        <div className="rounded-lg border-2 border-teal-300 bg-teal-50 dark:bg-teal-950/20 p-3 space-y-2">
+          <p className="text-xs font-bold text-teal-700 flex items-center gap-1"><HandCoins className="h-4 w-4" /> Ready to Pay & Close</p>
+          <p className="text-xs text-teal-600">Goal reached! Pay the institute and upload the receipt to close this case.</p>
+          {!showPayClose ? (
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setShowPayClose(true)}>
+              <HandCoins className="h-3.5 w-3.5 mr-1" /> Pay & Close
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <Input type="file" accept="image/*,.pdf" onChange={(e) => uploadReceipt(e.target.files?.[0] ?? null)} className="text-sm" />
+              {uploading && <p className="text-xs text-amber-600">⏳ Uploading...</p>}
+              {receiptUrl && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Receipt uploaded</p>}
+              <div className="flex gap-2">
+                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!receiptUrl || uploading || actionLoading} onClick={() => onMarkPaidClose(c, receiptUrl)}>
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Mark as Paid
+                </Button>
+                <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => {
+                  const reason = prompt("Reason for returning this Pay & Close request:");
+                  if (reason !== null && reason.trim()) onRejectPayClose(c, reason.trim());
+                }} disabled={actionLoading}>
+                  <XCircle className="h-3.5 w-3.5 mr-1" /> Reject / Return
+                </Button>
+              </div>
+              <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => setShowPayClose(false)}>
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
+// ============================================================
+//  KYC CARD
+// ============================================================
+function KycCard({ kyc, onUpdate, dupCount }: any) {
+  const [reason, setReason] = useState("");
+  const isDuplicate = dupCount > 1;
+  const isPending = kyc.status === "pending";
+  const isApproved = kyc.status === "approved";
+  const isReKyc = kyc.status === "re_kyc";
+  const isDuplicateStatus = kyc.status === "duplicate";
+  const isRejected = kyc.status === "rejected";
+
+  return (
+    <div className={`rounded-xl border bg-card p-4 space-y-3 ${isDuplicate && isPending ? "border-red-300" : ""}`}>
+      {isDuplicate && isPending && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-300 p-2.5 text-xs text-red-700 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <p><strong>⚠️ Duplicate CNIC!</strong> Used in <strong>{dupCount} active KYC submissions</strong>. Review carefully.</p>
+        </div>
+      )}
+      <StatusBadge status={kyc.status} />
+      <div className="text-sm space-y-1">
+        <p className="font-semibold">{kyc.full_name}</p>
+        <p className="text-muted-foreground">Type: {kyc.document_type?.toUpperCase()} {kyc.cnic_number && `· ${kyc.cnic_number}`}</p>
+        <p className="text-muted-foreground">{kyc.address}</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {kyc.cnic_front_url && <Img url={kyc.cnic_front_url} label="CNIC Front" />}
+        {kyc.cnic_back_url && <Img url={kyc.cnic_back_url} label="CNIC Back" />}
+        {kyc.selfie_url && <Img url={kyc.selfie_url} label="Selfie" />}
+        {kyc.passport_url && <a href={kyc.passport_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1"><FileText className="h-3 w-3" /> Passport</a>}
+        {kyc.face_video_url && (
+          <div className="space-y-1">
+            <p className="text-[10px] text-muted-foreground">Face Video</p>
+            <video src={kyc.face_video_url} controls className="w-full rounded border max-h-24" />
+          </div>
+        )}
+      </div>
+
+      {isPending && (
+        <div className="space-y-2">
+          <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(kyc.id, "approved", "", "approve")}>
+              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
+            </Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(kyc.id, "rejected", reason, "reject")}>
+              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isApproved && (
+        <div className="space-y-2">
+          <Textarea placeholder="Reason for Re-KYC or Duplicate" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" className="text-amber-600 border-amber-300" onClick={() => {
+              if (!reason.trim()) { toast.error("Please provide a reason for re-kyc"); return; }
+              onUpdate(kyc.id, "re_kyc", reason, "re_kyc");
+            }}>
+              <RotateCw className="h-3.5 w-3.5 mr-1" /> Re-KYC
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => {
+              if (!confirm("Are you sure you want to mark this as DUPLICATE and BAN the user?")) return;
+              onUpdate(kyc.id, "duplicate", reason || "Duplicate KYC", "duplicate");
+            }}>
+              <Ban className="h-3.5 w-3.5 mr-1" /> Duplicate - Ban
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">⚡ <strong>Re-KYC:</strong> User will be asked to resubmit KYC. <strong>Duplicate - Ban:</strong> Marks as duplicate and bans the user permanently.</p>
+        </div>
+      )}
+
+      {isReKyc && (
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-300 p-3 text-sm text-blue-700">
+          <p><strong>🔄 Re-KYC Requested</strong></p>
+          <p>User has been notified to resubmit KYC. Reason: {kyc.rejection_reason || "CNIC correction needed"}</p>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="outline" className="text-amber-600 border-amber-300" onClick={() => {
+              if (!reason.trim()) { toast.error("Please provide a reason"); return; }
+              onUpdate(kyc.id, "re_kyc", reason, "re_kyc");
+            }}>
+              <RotateCw className="h-3.5 w-3.5 mr-1" /> Re-KYC Again
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => {
+              if (!confirm("Are you sure you want to mark this as DUPLICATE and BAN the user?")) return;
+              onUpdate(kyc.id, "duplicate", reason || "Duplicate KYC", "duplicate");
+            }}>
+              <Ban className="h-3.5 w-3.5 mr-1" /> Duplicate - Ban
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isDuplicateStatus && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-300 p-3 text-sm text-red-700">
+          <p><strong>🚫 Duplicate KYC - User Banned</strong></p>
+          <p>This KYC was marked as duplicate and the user account has been suspended.</p>
+          <p className="text-xs mt-1 text-red-600">User cannot submit any cases.</p>
+        </div>
+      )}
+
+      {isRejected && (
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/20 border border-gray-300 p-3 text-sm text-muted-foreground">
+          <p><strong>❌ KYC Rejected</strong></p>
+          <p>Reason: {kyc.rejection_reason || "No reason provided"}</p>
+          <p className="text-xs mt-1">User can resubmit KYC.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+//  DEPOSIT CARD
+// ============================================================
+function DepositCard({ d, onApprove, onReject }: any) {
+  const [reason, setReason] = useState("");
+  const [credits, setCredits] = useState<string>(String(d.credits ?? d.amount ?? ""));
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <StatusBadge status={d.status} />
+        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{d.method}</span>
+      </div>
+      <div className="text-sm space-y-1">
+        <p className="font-semibold flex items-center gap-1"><Coins className="h-4 w-4 text-primary" /> User claims: ${d.amount} → {d.credits ?? d.amount} Credits</p>
+        <p className="text-muted-foreground text-xs font-mono">TXN: {d.transaction_id}</p>
+        <p className="text-muted-foreground text-xs">User: {d.user_id?.slice(0, 8)}...</p>
+      </div>
+      {d.proof_url && <Img url={d.proof_url} label="Payment Proof" />}
+      {d.status === "pending" && (
+        <div className="space-y-2">
+          <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5 space-y-1.5">
+            <label className="text-xs font-medium text-amber-700 dark:text-amber-400">Credits to add (verify against receipt):</label>
+            <input type="number" step="0.01" min="0" value={credits} onChange={(e) => setCredits(e.target.value)}
+              className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm" placeholder="e.g. 0.99 or 10.1" />
+          </div>
+          <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex gap-2">
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onApprove(d, parseFloat(credits) || 0)}>
+              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Add {credits || 0} Credits
+            </Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onReject(d.id, reason)}>
+              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+//  FEEDBACK CARD
+// ============================================================
+function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
+  const [reason, setReason] = useState("");
+  const p = profileMap[fb.user_id];
+  const c = caseList.find((cs: any) => cs.id === fb.case_id);
+  const status = fb.status || "pending_review";
+  const identityName = fb.user_id === "public" ? "Public" : (p?.full_name || fb.first_name || "—");
+  const identityDetail = fb.user_id === "public" ? "Public Visitor" : (p?.email || fb.user_id?.slice(0, 8));
+
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status === "approved" ? "bg-teal-100 text-teal-700" : status === "rejected" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>{status.replace("_", " ").toUpperCase()}</span>
+        {c && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>}
+      </div>
+      <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs">
+        <p className="font-semibold">{identityName} · {identityDetail}</p>
+        {c && <p className="text-muted-foreground mt-0.5">Case: {c.title}</p>}
+      </div>
+      {fb.text_message && <p className="text-sm whitespace-pre-line">{fb.text_message}</p>}
+      {fb.video_url && <video src={fb.video_url} controls className="w-full rounded border max-h-56" />}
+      {status === "pending_review" && (
+        <div className="space-y-2 pt-1 border-t border-border">
+          <Textarea placeholder="Rejection reason (e.g. 'video too short', 'unrelated content')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <div className="flex gap-2">
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve — Post to Wall</Button>
+            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(fb.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+//  USER SEARCH BOX & USER CARD
+// ============================================================
 function UserSearchBox({ usersList, onSuspendChange, onManualUnlock }: any) {
   const [search, setSearch] = useState("");
   const query = search.trim().toLowerCase();
@@ -1071,9 +1847,6 @@ function UserSearchBox({ usersList, onSuspendChange, onManualUnlock }: any) {
   );
 }
 
-// ============================================================
-//  USER CARD
-// ============================================================
 function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
   const [open, setOpen] = useState(false);
   const [suspending, setSuspending] = useState(false);
@@ -1182,7 +1955,7 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
 }
 
 // ============================================================
-//  PAY & CLOSE CARD
+//  PAY & CLOSE CARD (used in the "Pay" tab)
 // ============================================================
 function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
   const cur = c.currency || "USD";
@@ -1562,12 +2335,10 @@ function OfferRow({ category, offer, onReload }: any) {
 }
 
 // ============================================================
-//  SUPPORT PANEL (FIXED CHAT)
+//  SUPPORT PANEL
 // ============================================================
 function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   const [activeUser, setActiveUser] = useState<string | null>(null);
-
-
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -1710,7 +2481,6 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
               </div>
             );
           })}
-
         </div>
 
         <div className="flex flex-col gap-2 p-3 border-t border-border bg-card">
@@ -1791,7 +2561,7 @@ function Empty({ text }: { text: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const c: any = { pending: "bg-orange-100 text-orange-700", approved: "bg-teal-100 text-teal-700", rejected: "bg-red-100 text-red-700", completed: "bg-blue-100 text-blue-700", none: "bg-gray-100 text-gray-600" };
+  const c: any = { pending: "bg-orange-100 text-orange-700", approved: "bg-teal-100 text-teal-700", rejected: "bg-red-100 text-red-700", completed: "bg-blue-100 text-blue-700", expired: "bg-gray-300 text-gray-700", none: "bg-gray-100 text-gray-600" };
   return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c[status] ?? "bg-gray-100"}`}>{status === "none" ? "NO KYC" : status?.toUpperCase()}</span>;
 }
 
@@ -1807,123 +2577,6 @@ function Stat({ icon, label, value }: any) {
   );
 }
 
-// ============================================================
-//  KYC CARD
-// ============================================================
-function KycCard({ kyc, onUpdate, dupCount }: any) {
-  const [reason, setReason] = useState("");
-  const isDuplicate = dupCount > 1;
-  const isPending = kyc.status === "pending";
-  const isApproved = kyc.status === "approved";
-  const isReKyc = kyc.status === "re_kyc";
-  const isDuplicateStatus = kyc.status === "duplicate";
-  const isRejected = kyc.status === "rejected";
-
-  return (
-    <div className={`rounded-xl border bg-card p-4 space-y-3 ${isDuplicate && isPending ? "border-red-300" : ""}`}>
-      {isDuplicate && isPending && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-300 p-2.5 text-xs text-red-700 flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-          <p><strong>⚠️ Duplicate CNIC!</strong> Used in <strong>{dupCount} active KYC submissions</strong>. Review carefully.</p>
-        </div>
-      )}
-      <StatusBadge status={kyc.status} />
-      <div className="text-sm space-y-1">
-        <p className="font-semibold">{kyc.full_name}</p>
-        <p className="text-muted-foreground">Type: {kyc.document_type?.toUpperCase()} {kyc.cnic_number && `· ${kyc.cnic_number}`}</p>
-        <p className="text-muted-foreground">{kyc.address}</p>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {kyc.cnic_front_url && <Img url={kyc.cnic_front_url} label="CNIC Front" />}
-        {kyc.cnic_back_url && <Img url={kyc.cnic_back_url} label="CNIC Back" />}
-        {kyc.selfie_url && <Img url={kyc.selfie_url} label="Selfie" />}
-        {kyc.passport_url && <a href={kyc.passport_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1"><FileText className="h-3 w-3" /> Passport</a>}
-        {kyc.face_video_url && (
-          <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground">Face Video</p>
-            <video src={kyc.face_video_url} controls className="w-full rounded border max-h-24" />
-          </div>
-        )}
-      </div>
-
-      {isPending && (
-        <div className="space-y-2">
-          <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(kyc.id, "approved", "", "approve")}>
-              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
-            </Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(kyc.id, "rejected", reason, "reject")}>
-              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {isApproved && (
-        <div className="space-y-2">
-          <Textarea placeholder="Reason for Re-KYC or Duplicate" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" className="text-amber-600 border-amber-300" onClick={() => {
-              if (!reason.trim()) { toast.error("Please provide a reason for re-kyc"); return; }
-              onUpdate(kyc.id, "re_kyc", reason, "re_kyc");
-            }}>
-              <RotateCw className="h-3.5 w-3.5 mr-1" /> Re-KYC
-            </Button>
-            <Button size="sm" variant="destructive" onClick={() => {
-              if (!confirm("Are you sure you want to mark this as DUPLICATE and BAN the user?")) return;
-              onUpdate(kyc.id, "duplicate", reason || "Duplicate KYC", "duplicate");
-            }}>
-              <Ban className="h-3.5 w-3.5 mr-1" /> Duplicate - Ban
-            </Button>
-          </div>
-          <p className="text-[10px] text-muted-foreground">⚡ <strong>Re-KYC:</strong> User will be asked to resubmit KYC. <strong>Duplicate - Ban:</strong> Marks as duplicate and bans the user permanently.</p>
-        </div>
-      )}
-
-      {isReKyc && (
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-300 p-3 text-sm text-blue-700">
-          <p><strong>🔄 Re-KYC Requested</strong></p>
-          <p>User has been notified to resubmit KYC. Reason: {kyc.rejection_reason || "CNIC correction needed"}</p>
-          <div className="mt-2 flex gap-2">
-            <Button size="sm" variant="outline" className="text-amber-600 border-amber-300" onClick={() => {
-              if (!reason.trim()) { toast.error("Please provide a reason"); return; }
-              onUpdate(kyc.id, "re_kyc", reason, "re_kyc");
-            }}>
-              <RotateCw className="h-3.5 w-3.5 mr-1" /> Re-KYC Again
-            </Button>
-            <Button size="sm" variant="destructive" onClick={() => {
-              if (!confirm("Are you sure you want to mark this as DUPLICATE and BAN the user?")) return;
-              onUpdate(kyc.id, "duplicate", reason || "Duplicate KYC", "duplicate");
-            }}>
-              <Ban className="h-3.5 w-3.5 mr-1" /> Duplicate - Ban
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {isDuplicateStatus && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-300 p-3 text-sm text-red-700">
-          <p><strong>🚫 Duplicate KYC - User Banned</strong></p>
-          <p>This KYC was marked as duplicate and the user account has been suspended.</p>
-          <p className="text-xs mt-1 text-red-600">User cannot submit any cases.</p>
-        </div>
-      )}
-
-      {isRejected && (
-        <div className="rounded-lg bg-gray-50 dark:bg-gray-900/20 border border-gray-300 p-3 text-sm text-muted-foreground">
-          <p><strong>❌ KYC Rejected</strong></p>
-          <p>Reason: {kyc.rejection_reason || "No reason provided"}</p>
-          <p className="text-xs mt-1">User can resubmit KYC.</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-//  DETAIL ROW
-// ============================================================
 function DetailRow({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
   if (!value) return null;
   return (
@@ -1940,519 +2593,7 @@ function DetailRow({ label, value, mono }: { label: string; value?: string; mono
   );
 }
 
-// ============================================================
-//  CASE CARD (FULLY COMPLETE - با فائل کے نام)
-// ============================================================
-function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
-  const [reason, setReason] = useState("");
-  const cur = c.currency || "USD";
-  const s = sym(cur);
-  const seeker = profileMap[c.user_id];
-  const hasPayment = c.institute_name || c.account_number || c.account_title || c.account_iban;
-  const parseObject = (value: unknown): any => {
-    if (value && typeof value === "object") return value;
-    if (typeof value === "string") {
-      try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" ? parsed : null; } catch { return null; }
-    }
-    return null;
-  };
-  const catDetails = parseObject(c.category_details);
-  const catDocs = parseObject(catDetails?._documents) || {};
-
-  const allFields: { label: string; value: any }[] = [];
-  if (catDetails) {
-    const excludeKeys = new Set([
-      "_documents", "edu_documents", "edu_sub_fields", "property_ownership",
-      "rental_agreement_url", "landlord_cnic_url", "job_status", "gender",
-      "marital_status", "is_orphan", "orphan_parent", "seeker_name",
-      "seeker_contact", "receiver_name", "receiver_contact", "receiver_bank",
-      "receiver_account", "disability_mode", "disability_type", "disability_reason",
-      "disability_shop_name", "disability_shop_contact", "disability_hospital",
-      "treatment_amount", "treatment_expiry", "treatment_patient_number",
-      "disability_bank_title", "disability_bank_number", "institute_name",
-      "institute_contact", "institute_address", "is_institute_in_list",
-      "reference_type", "reference_number", "due_date", "edu_sub_type",
-      "edu_admission_level",
-    ]);
-    for (const [key, val] of Object.entries(catDetails)) {
-      if (excludeKeys.has(key)) continue;
-      if (key.startsWith("_")) continue;
-      if (typeof val === "string" && val.trim()) {
-        allFields.push({ label: getDocLabel(key), value: val });
-      } else if (typeof val === "number" || typeof val === "boolean") {
-        allFields.push({ label: getDocLabel(key), value: String(val) });
-      }
-    }
-  }
-
-  const eduSubFields = catDetails?.edu_sub_fields || {};
-  const eduFields: { label: string; value: any }[] = [];
-  for (const [key, val] of Object.entries(eduSubFields)) {
-    if (val) eduFields.push({ label: getDocLabel(key), value: val });
-  }
-
-  const personalDetails = [
-    { label: "Job Status", value: catDetails?.job_status || "" },
-    { label: "Gender", value: catDetails?.gender || "" },
-    { label: "Marital Status", value: catDetails?.marital_status || "" },
-    { label: "Orphan", value: catDetails?.is_orphan || "" },
-    { label: "Orphan Parent", value: catDetails?.orphan_parent || "" },
-    { label: "Seeker Name", value: catDetails?.seeker_name || "" },
-    { label: "Seeker Contact", value: catDetails?.seeker_contact || "" },
-  ].filter((d) => d.value);
-
-  const receiverDetails = [
-    { label: "Receiver Name", value: catDetails?.receiver_name || "" },
-    { label: "Receiver Contact", value: catDetails?.receiver_contact || "" },
-    { label: "Receiver Bank", value: catDetails?.receiver_bank || "" },
-    { label: "Receiver Account", value: catDetails?.receiver_account || "" },
-    { label: "Receiver Address", value: catDetails?.receiver_address || "" },
-    { label: "Shop Name", value: catDetails?.receiver_shop_name || "" },
-  ].filter((d) => d.value);
-
-  const disabilityDetails = [
-    { label: "Disability Mode", value: catDetails?.disability_mode || "" },
-    { label: "Disability Type", value: catDetails?.disability_type || "" },
-    { label: "Disability Reason", value: catDetails?.disability_reason || "" },
-    { label: "Shop Name", value: catDetails?.disability_shop_name || "" },
-    { label: "Shop Contact", value: catDetails?.disability_shop_contact || "" },
-    { label: "Hospital", value: catDetails?.disability_hospital || "" },
-    { label: "Treatment Amount", value: catDetails?.treatment_amount || "" },
-    { label: "Treatment Expiry", value: catDetails?.treatment_expiry || "" },
-    { label: "Patient/Bill Number", value: catDetails?.treatment_patient_number || "" },
-    { label: "Bank Title (Stipend)", value: catDetails?.disability_bank_title || "" },
-    { label: "Bank Number (Stipend)", value: catDetails?.disability_bank_number || "" },
-  ].filter((d) => d.value);
-
-  const propertyDetails = [
-    { label: "Property Ownership", value: catDetails?.property_ownership === "rented" ? "Rented" : catDetails?.property_ownership === "owned" ? "Owned" : "" },
-  ].filter((d) => d.value);
-
-  // ============================================================
-  // ✅ درست شدہ فائل نام کا کوڈ
-  // ============================================================
-  const fileEntries: { key: string; label: string; url: string }[] = [];
-  
-  function getFileNameFromUrl(url: string): string {
-    try {
-      // URL کو پارس کریں
-      const urlObj = new URL(url);
-      // key parameter نکالیں (اگر موجود ہے)
-      const key = urlObj.searchParams.get("key");
-      if (key) {
-        // key سے آخری حصہ نکالیں (فائل کا اصل نام)
-        const parts = key.split("/");
-        const lastPart = parts[parts.length - 1];
-        if (lastPart) {
-          // ٹائمسٹیمپ اور رینڈم ہیش ہٹائیں
-          let name = decodeURIComponent(lastPart)
-            .replace(/^[0-9]+[-_]/, "") // ٹائمسٹیمپ ہٹائیں
-            .replace(/^[a-f0-9]{8,}[-_]/, ""); // ہیش ہٹائیں
-          // اگر نام خالی نہ ہو تو واپس کریں
-          if (name && name.length > 0 && name !== "null") {
-            return name;
-          }
-        }
-      }
-      // اگر key نہیں ہے تو URL کے آخری حصے سے نام نکالیں
-      const pathParts = urlObj.pathname.split("/");
-      const last = pathParts[pathParts.length - 1];
-      if (last) {
-        let name = decodeURIComponent(last)
-          .replace(/^[0-9]+[-_]/, "")
-          .replace(/^[a-f0-9]{8,}[-_]/, "");
-        if (name && name.length > 0 && name !== "null") {
-          return name;
-        }
-      }
-      // ورنہ ڈیفالٹ نام
-      return "File";
-    } catch {
-      return "File";
-    }
-  }
-
-  function getFileLabel(key: string, url: string, explicitLabel?: string): string {
-    if (explicitLabel?.trim()) return explicitLabel.trim();
-    // اگر DOC_LABELS میں ہے تو وہی استعمال کریں
-    if (DOC_LABELS[key]) return DOC_LABELS[key];
-    
-    // ورنہ URL سے فائل کا نام نکالیں
-    const fileName = getFileNameFromUrl(url);
-    // اگر فائل کا نام "File" یا "photo" یا "uploads" ہے تو بہتر لیبل بنائیں
-    if (fileName === "File" || fileName === "photo" || fileName === "uploads" || fileName.match(/^[0-9a-f]{8,}$/i)) {
-      // key کو صاف کریں
-      const cleanKey = key
-        .replace(/_/g, " ")
-        .replace(/([A-Z])/g, " $1")
-        .replace(/\b\w/g, (c) => c.toUpperCase())
-        .trim();
-      if (cleanKey && cleanKey !== "Photo" && cleanKey !== "File") {
-        return cleanKey;
-      }
-      return "Uploaded File";
-    }
-    return fileName;
-  }
-
-  const pushFile = (key: string, value: unknown, explicitLabel?: string) => {
-    let url = "";
-    let label = explicitLabel;
-    if (typeof value === "string") {
-      url = value.trim();
-    } else if (value && typeof value === "object") {
-      const file = value as Record<string, unknown>;
-      const candidate = file.url || file.file_url || file.download_url || file.href || file.path;
-      if (typeof candidate === "string") url = candidate.trim();
-      const name = file.original_name || file.filename || file.file_name || file.name;
-      if (!label && typeof name === "string") label = name;
-    }
-    if (!url.startsWith("http")) return;
-    if (fileEntries.some((f) => f.url === url)) return;
-    fileEntries.push({ key, label: getFileLabel(key, url, label), url });
-  };
-
-  // Top-level evidence fields
-  pushFile("selfie_url", c.selfie_url);
-  pushFile("video_url", c.video_url);
-  pushFile("paid_receipt_url", c.paid_receipt_url);
-
-  // photo_urls may arrive as an array, object, or JSON string from D1
-  const photoPayload = Array.isArray(c.photo_urls) ? c.photo_urls : parseObject(c.photo_urls);
-  if (Array.isArray(photoPayload)) {
-    photoPayload.forEach((val, idx) => pushFile(`photo_${idx + 1}`, val));
-  } else if (photoPayload && typeof photoPayload === "object") {
-    for (const [k, val] of Object.entries(photoPayload)) pushFile(k, val);
-  }
-
-  // Deep recursive walk over every case payload branch for any document or URL field
-  const walkFilesDeep = (obj: any, prefix = "") => {
-    if (!obj || typeof obj !== "object") return;
-    if (Array.isArray(obj)) {
-      obj.forEach((item, idx) => walkFilesDeep(item, `${prefix}_${idx + 1}`));
-      return;
-    }
-    for (const [k, v] of Object.entries(obj)) {
-      if (typeof v === "string") {
-        const trimmed = v.trim();
-        if (trimmed.startsWith("http")) {
-          pushFile(prefix ? `${prefix}_${k}` : k, trimmed);
-        }
-      } else if (v && typeof v === "object") {
-        const file = v as Record<string, unknown>;
-        const candidate = file.url || file.file_url || file.download_url || file.href || file.path;
-        if (typeof candidate === "string" && candidate.trim().startsWith("http")) {
-          pushFile(prefix ? `${prefix}_${k}` : k, file);
-        } else {
-          walkFilesDeep(v, prefix ? `${prefix}_${k}` : k);
-        }
-      }
-    }
-  };
-  walkFilesDeep(c);
-  // D1 commonly stores these nested document maps as JSON strings; walk their parsed values explicitly.
-  walkFilesDeep(catDocs, "documents");
-  walkFilesDeep(parseObject(catDetails?.edu_documents) || {}, "education_documents");
-
-  // Remove duplicates by URL
-  const seen = new Set<string>();
-  const uniqueFiles = fileEntries.filter((file) => {
-    if (seen.has(file.url)) return false;
-    seen.add(file.url);
-    return true;
-  });
-
-  const isRejected = c.status === "rejected";
-
-  return (
-    <div className={`rounded-xl border p-4 space-y-3 ${isRejected ? "border-red-300 bg-red-50/50 dark:bg-red-950/10" : "bg-card"}`}>
-      <div className="flex items-center gap-2 flex-wrap">
-        <StatusBadge status={c.status} />
-        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
-        <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{c.urgency}</span>
-        {c.was_free
-          ? <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-semibold">FREE</span>
-          : <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">PAID</span>}
-        {c.closed_by_admin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">FUNDRAISED & PAID</span>}
-      </div>
-
-      {isRejected && c.rejection_reason && (
-        <div className="rounded-lg border-2 border-red-300 bg-red-100 dark:bg-red-950/30 p-4">
-          <div className="flex items-start gap-2">
-            <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-red-700">❌ Case Rejected</p>
-              <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{c.rejection_reason}</p>
-              {c.reviewed_at && <p className="text-xs text-red-500 mt-2">Reviewed on: {new Date(c.reviewed_at).toLocaleString()}</p>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="text-sm space-y-1">
-        <p className="font-semibold">{c.title}</p>
-        <p className="text-muted-foreground">{c.short_description}</p>
-        <p className="text-muted-foreground text-xs">📍 {c.city}, {c.country} {c.amount_needed && `· Needs: ${s} ${c.amount_needed} ${cur}`}</p>
-        {c.deadline && (
-          <p className="text-xs font-bold text-red-600 flex items-center gap-1">
-            ⏰ Bill / Case Due (Expiry) Date: {new Date(c.deadline).toLocaleDateString()}
-          </p>
-        )}
-        {c.amount_needed > 0 && <p className="text-xs text-teal-600 font-medium">Collected: {s} {c.amount_collected ?? 0} / {s} {c.amount_needed}</p>}
-
-        {!isRejected && (
-          <div className="mt-2 rounded-lg bg-primary/5 border border-primary/10 p-3">
-            <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">📋 Full Case Description</p>
-            <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
-              {c.description || "No description provided"}
-            </p>
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs space-y-0.5">
-        <p className="font-semibold text-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Submitted by</p>
-        <p className="text-muted-foreground">{seeker?.full_name || "—"} · {seeker?.email || c.user_id?.slice(0, 8)}</p>
-      </div>
-
-      {personalDetails.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><User className="h-3 w-3" /> Personal Details</p>
-          {personalDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {receiverDetails.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><HandCoins className="h-3 w-3" /> Payment Receiver</p>
-          {receiverDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {disabilityDetails.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><Heart className="h-3 w-3" /> Disability Details</p>
-          {disabilityDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {propertyDetails.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><Building2 className="h-3 w-3" /> Property Details</p>
-          {propertyDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-          {catDetails?.rental_agreement_url && <Img url={catDetails.rental_agreement_url} label="Rental Agreement" />}
-          {catDetails?.landlord_cnic_url && <Img url={catDetails.landlord_cnic_url} label="Landlord's CNIC" />}
-        </div>
-      )}
-
-      {eduFields.length > 0 && (
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 p-3 space-y-1">
-          <p className="text-xs font-semibold text-blue-700 flex items-center gap-1"><BookOpen className="h-3 w-3" /> Education Details</p>
-          {eduFields.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {allFields.length > 0 && (
-        <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
-          <p className="text-xs font-semibold text-primary flex items-center gap-1"><ClipboardCheck className="h-3 w-3" /> Other Details</p>
-          {allFields.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
-        </div>
-      )}
-
-      {/* ✅ Uploaded Files with proper names */}
-      {uniqueFiles.length > 0 ? (
-        <div className="rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold flex items-center gap-1"><FileText className="h-4 w-4" /> Uploaded Files ({uniqueFiles.length})</p>
-            <div className="flex gap-1">
-              <button onClick={() => copyText(uniqueFiles.map((f) => f.url).join("\n"))} className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-                <Copy className="h-3 w-3" /> Copy URLs
-              </button>
-              <button onClick={() => copyText(JSON.stringify(c, null, 2))} className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-                <Copy className="h-3 w-3" /> Copy Raw Data
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {uniqueFiles.map(({ key, label, url }) => {
-              const lowerFileName = `${url} ${label}`.toLowerCase();
-              const isVideo = lowerFileName.match(/\.(mp4|webm|mov|avi)(?:$|\?)/i) || lowerFileName.includes("video");
-              const isPdf = lowerFileName.match(/\.pdf(?:$|\?)/i);
-              const isImage = lowerFileName.match(/\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)(?:$|\?)/i) || lowerFileName.includes("image") || lowerFileName.includes("photo") || lowerFileName.includes("selfie");
-              const downloadUrl = (() => {
-                try {
-                  const parsed = new URL(url, window.location.origin);
-                  parsed.searchParams.set("download", "1");
-                  return parsed.toString();
-                } catch {
-                  return url;
-                }
-              })();
-              return (
-                <div key={key + url} className="space-y-1 bg-background/80 p-1.5 rounded border">
-                  <p className="text-[10px] font-medium text-foreground truncate" title={label}>
-                    📎 {label}
-                  </p>
-                  {isVideo ? (
-                    <video src={url} controls className="w-full rounded border max-h-32 bg-black" />
-                  ) : isPdf ? (
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
-                      📄 View PDF
-                    </a>
-                  ) : isImage ? (
-                    <a href={url} target="_blank" rel="noopener noreferrer">
-                      <img src={url} alt={label} className="w-full rounded border max-h-28 object-cover hover:opacity-95" />
-                    </a>
-                  ) : (
-                    <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded border bg-muted/60 p-3 text-center">
-                      <FileText className="h-8 w-8 text-primary" />
-                      <span className="text-[10px] text-muted-foreground">Document file</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-center gap-2 text-[9px]">
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                      {isImage || isPdf || isVideo ? "Open in Full Size ↗" : "Open File ↗"}
-                    </a>
-                    <a href={downloadUrl} download={label} className="inline-flex items-center gap-0.5 text-primary hover:underline">
-                      <Download className="h-3 w-3" /> Download
-                    </a>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-[10px] text-muted-foreground">📌 Images, videos, PDFs and document files can be opened or downloaded from their controls.</p>
-        </div>
-      ) : (
-        <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 p-3 text-xs text-yellow-700">
-          ⚠️ No files uploaded for this case.
-        </div>
-      )}
-
-      {hasPayment && (
-        <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-3 space-y-1">
-          <p className="font-semibold text-sm flex items-center gap-1 text-amber-700"><Building2 className="h-4 w-4" /> Institute Payment Details</p>
-          <DetailRow label="Institute / Provider" value={c.institute_name} />
-          <DetailRow label="Payment Method" value={c.payment_method} />
-          <DetailRow label="Account Title / Reference" value={c.account_title} />
-          <DetailRow label="Account / Bill Number" value={c.account_number} mono />
-          <DetailRow label="IBAN" value={c.account_iban} mono />
-          <DetailRow label="Institute Contact" value={c.institute_contact} mono />
-          <DetailRow label="Institute Address" value={c.institute_address} />
-        </div>
-      )}
-
-      {resolutions.length > 0 && (
-        <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-2">
-          <p className="font-semibold text-sm flex items-center gap-1"><Heart className="h-4 w-4 text-primary" /> All Helps on this case</p>
-          {resolutions.map((r: any) => (
-            <div key={r.id} className="text-xs space-y-0.5 border-b border-border/50 last:border-0 pb-2">
-              <p>
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.status === "completed" ? "bg-teal-100 text-teal-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : r.status === "seeker_confirmed" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"}`}>{r.status?.toUpperCase()}</span>
-                {" "}
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.paid_to === "givethra" ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"}`}>{r.paid_to === "givethra" ? "FUNDRAISING" : "DIRECT"}</span>
-              </p>
-              <p><span className="text-muted-foreground">Amount:</span> {s} {r.seeker_confirmed_amount ?? r.amount_paid} {cur} · <span className="text-muted-foreground">TXN:</span> <span className="font-mono">{r.transaction_id}</span></p>
-              {r.receipt_url && <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary"><ExternalLink className="h-3 w-3" /> Receipt</a>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {c.status === "pending" && (
-        <div className="space-y-2">
-          <Textarea placeholder="Rejection reason (e.g. 'video missing', 'bill not clear', 'account seems personal')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex gap-2">
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(c.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Publish</Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(c.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-//  DEPOSIT CARD
-// ============================================================
-function DepositCard({ d, onApprove, onReject }: any) {
-  const [reason, setReason] = useState("");
-  const [credits, setCredits] = useState<string>(String(d.credits ?? d.amount ?? ""));
-  return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        <StatusBadge status={d.status} />
-        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{d.method}</span>
-      </div>
-      <div className="text-sm space-y-1">
-        <p className="font-semibold flex items-center gap-1"><Coins className="h-4 w-4 text-primary" /> User claims: ${d.amount} → {d.credits ?? d.amount} Credits</p>
-        <p className="text-muted-foreground text-xs font-mono">TXN: {d.transaction_id}</p>
-        <p className="text-muted-foreground text-xs">User: {d.user_id?.slice(0, 8)}...</p>
-      </div>
-      {d.proof_url && <Img url={d.proof_url} label="Payment Proof" />}
-      {d.status === "pending" && (
-        <div className="space-y-2">
-          <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5 space-y-1.5">
-            <label className="text-xs font-medium text-amber-700 dark:text-amber-400">Credits to add (verify against receipt):</label>
-            <input type="number" step="0.01" min="0" value={credits} onChange={(e) => setCredits(e.target.value)}
-              className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm" placeholder="e.g. 0.99 or 10.1" />
-          </div>
-          <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex gap-2">
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onApprove(d, parseFloat(credits) || 0)}>
-              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Add {credits || 0} Credits
-            </Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onReject(d.id, reason)}>
-              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-//  FEEDBACK CARD
-// ============================================================
-function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
-  const [reason, setReason] = useState("");
-  const p = profileMap[fb.user_id];
-  const c = caseList.find((cs: any) => cs.id === fb.case_id);
-  const status = fb.status || "pending_review";
-  const identityName = fb.user_id === "public" ? "Public" : (p?.full_name || fb.first_name || "—");
-  const identityDetail = fb.user_id === "public" ? "Public Visitor" : (p?.email || fb.user_id?.slice(0, 8));
-
-  return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status === "approved" ? "bg-teal-100 text-teal-700" : status === "rejected" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}>{status.replace("_", " ").toUpperCase()}</span>
-        {c && <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>}
-      </div>
-      <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs">
-        <p className="font-semibold">{identityName} · {identityDetail}</p>
-        {c && <p className="text-muted-foreground mt-0.5">Case: {c.title}</p>}
-      </div>
-      {fb.text_message && <p className="text-sm whitespace-pre-line">{fb.text_message}</p>}
-      {fb.video_url && <video src={fb.video_url} controls className="w-full rounded border max-h-56" />}
-      {status === "pending_review" && (
-        <div className="space-y-2 pt-1 border-t border-border">
-          <Textarea placeholder="Rejection reason (e.g. 'video too short', 'unrelated content')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-          <div className="flex gap-2">
-              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve — Post to Wall</Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(fb.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-//  IMAGE COMPONENT
-// ============================================================
 function Img({ url, label }: { url: string; label: string }) {
-  // ✅ تصویر کے لیے بھی فائل کا نام دکھائیں
   let displayLabel = label;
   try {
     const urlObj = new URL(url);
@@ -2492,14 +2633,6 @@ function BookOpen({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-    </svg>
-  );
-}
-
-function Shield({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
     </svg>
   );
 }
