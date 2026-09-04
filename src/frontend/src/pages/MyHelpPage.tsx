@@ -1,6 +1,7 @@
 // src/frontend/src/pages/MyHelpPage.tsx
 // Givethra - My Help Page (for Heroes)
 // 🔥 FIXED: Uses shared resolutionStatus helpers (Fix #5)
+// 🔥 FIXED: Unlock-only records now reflect actual case status (if completed by someone else, show "completed")
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -228,7 +229,7 @@ export default function MyHelpPage() {
         });
       }
 
-      // Unlock-only records (no resolution)
+      // 🔥 FIX: Unlock-only records - now check actual case status
       for (const unlock of unlocks) {
         const caseId = String(unlock.case_id || "");
         if (!caseId) continue;
@@ -238,15 +239,17 @@ export default function MyHelpPage() {
           title: "Unlocked case",
           category: "Other",
           currency: "PKR",
+          status: "pending",
         };
         const isPartial = unlock.payment_type === "partial";
+        const caseIsCompleted = String(caseRecord.status || "").toLowerCase() === "completed";
         recordList.push({
           id: unlock.id,
           type: isPartial ? "contribution" : "direct",
           amount: Number(unlock.pledged_amount ?? 0),
           transactionId: "N/A",
           receiptUrl: null,
-          status: "pending",
+          status: caseIsCompleted ? "completed" : "pending",
           completedAt: unlock.unlocked_at,
           caseId: caseId,
           caseTitle: caseRecord.title || "Unlocked case",
@@ -261,6 +264,7 @@ export default function MyHelpPage() {
           heroName: user.fullName || "You",
           heroCnic: "",
           isUnlockOnly: true,
+          caseCompletedByOther: caseIsCompleted, // 🔥 new flag for UI
         });
       }
 
@@ -425,7 +429,13 @@ export default function MyHelpPage() {
                           </div>
                         )}
 
-                        {isUnlockOnly && (
+                        {/* 🔥 FIX: Two separate messages based on whether case is completed by someone else */}
+                        {isUnlockOnly && record.caseCompletedByOther && (
+                          <div className="w-full mt-1 rounded-lg bg-blue-100 dark:bg-blue-950/30 p-2 text-xs text-blue-700">
+                            ✅ This case has been completed — someone else's help finished it, or your own payment proof was not recorded here.
+                          </div>
+                        )}
+                        {isUnlockOnly && !record.caseCompletedByOther && (
                           <div className="w-full mt-1 rounded-lg bg-amber-100 dark:bg-amber-950/30 p-2 text-xs text-amber-700">
                             💪 You unlocked this case but didn't complete a payment. Browse more cases and become a full Hero!
                           </div>
