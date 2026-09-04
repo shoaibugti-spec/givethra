@@ -2,8 +2,6 @@
 // Givethra - Role Selection Landing Page
 // Only English, no Urdu
 
-import { Button } from "@/components/ui/button";
-import InstallButton from "@/components/InstallButton";
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,7 +28,6 @@ import {
   ShoppingCart,
   FileText,
 } from "lucide-react";
-import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { getApprovedCases, getKycStatus } from "@/lib/api";
 
@@ -72,10 +69,16 @@ const ROLE_CATEGORY_STYLES: Record<
 
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
-const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
-const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
+
+const INSTAGRAM_URL =
+  "https://www.instagram.com/givethra.community";
+
+const LINKEDIN_URL =
+  "https://www.linkedin.com/company/givethra-org/";
+
 const WHATSAPP_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
+
 const CONTACT_EMAIL = "info@givethra.org";
 
 export default function RoleSelectionPage() {
@@ -88,25 +91,22 @@ export default function RoleSelectionPage() {
 
   useEffect(() => {
     getApprovedCases()
-      .then((rows) =>
-        setActiveCases(Array.isArray(rows) ? rows : [])
-      )
-      .catch(() => setActiveCases([]));
+      .then((rows) => {
+        setActiveCases(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        setActiveCases([]);
+      });
   }, []);
 
   const activeCaseCategories = Object.entries(
-    activeCases.reduce<Record<string, number>>(
-      (counts, currentCase) => {
-        const category = String(
-          currentCase?.category || "Other"
-        );
+    activeCases.reduce<Record<string, number>>((counts, currentCase) => {
+      const category = String(currentCase?.category || "Other");
 
-        counts[category] = (counts[category] || 0) + 1;
+      counts[category] = (counts[category] || 0) + 1;
 
-        return counts;
-      },
-      {}
-    )
+      return counts;
+    }, {})
   ).map(([category, count]) => ({
     category,
     count,
@@ -120,49 +120,58 @@ export default function RoleSelectionPage() {
   useEffect(() => {
     setActiveCaseSlide(-1);
 
-    if (activeCaseCategories.length === 0) return;
+    if (activeCaseCategories.length === 0) {
+      return;
+    }
 
-    const timer = setInterval(
-      () =>
-        setActiveCaseSlide((previous) =>
-          previous >= activeCaseCategories.length - 1
-            ? -1
-            : previous + 1
-        ),
-      3500
-    );
+    const timer = setInterval(() => {
+      setActiveCaseSlide((previous) =>
+        previous >= activeCaseCategories.length - 1
+          ? -1
+          : previous + 1
+      );
+    }, 3500);
 
     return () => clearInterval(timer);
   }, [activeCases.length, activeCaseCategories.length]);
 
+  /**
+   * Handle role selection.
+   *
+   * Hero:
+   * - Guest -> Sign In -> Home
+   * - Authenticated -> Home
+   *
+   * Requester:
+   * - Guest -> Sign In -> KYC
+   * - Authenticated + approved KYC -> Home
+   * - Authenticated + other KYC status -> KYC
+   */
   const handleRoleSelect = async (
     role: "hero" | "requester"
   ) => {
+    // Set role first so the next page knows the selected role.
     setRole(role);
 
     setAuthRole(
-      role === "requester"
-        ? "help_seeker"
-        : "hero"
+      role === "requester" ? "help_seeker" : "hero"
     );
 
-    // User is not logged in
+    // Guest user
     if (!isAuthenticated) {
       navigate({
         to: "/sign-in",
         search: {
           role,
           redirect:
-            role === "requester"
-              ? "/kyc"
-              : "/home",
+            role === "requester" ? "/kyc" : "/home",
         },
       });
 
       return;
     }
 
-    // Logged-in user selecting Requester
+    // Authenticated requester
     if (role === "requester") {
       try {
         const kyc = await getKycStatus(user!.id);
@@ -187,7 +196,7 @@ export default function RoleSelectionPage() {
         navigate({ to: "/kyc" });
       }
     } else {
-      // Hero does not require KYC
+      // Hero does not require KYC.
       navigate({ to: "/home" });
     }
   };
@@ -196,10 +205,11 @@ export default function RoleSelectionPage() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <div className="max-w-4xl w-full space-y-12">
 
-        {/* Header with stats */}
+        {/* =========================================================
+            HEADER
+        ========================================================= */}
         <div className="text-center space-y-4">
 
-          {/* Logo */}
           <div className="flex items-center justify-center gap-2">
             <span className="text-3xl font-bold text-foreground">
               Givethra
@@ -226,7 +236,9 @@ export default function RoleSelectionPage() {
           </p>
         </div>
 
-        {/* Role / Navigation Cards */}
+        {/* =========================================================
+            ROLE / ACTION CARDS
+        ========================================================= */}
         <div className="grid grid-cols-2 gap-3 md:gap-5">
 
           {/* Community */}
@@ -328,9 +340,7 @@ export default function RoleSelectionPage() {
           {/* Requester */}
           <button
             type="button"
-            onClick={() =>
-              handleRoleSelect("requester")
-            }
+            onClick={() => handleRoleSelect("requester")}
             className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-amber-200/70 bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-lg md:p-7 dark:border-amber-900/50"
           >
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 transition-transform group-hover:scale-105 md:h-16 md:w-16">
@@ -347,7 +357,9 @@ export default function RoleSelectionPage() {
           </button>
         </div>
 
-        {/* Public impact walls */}
+        {/* =========================================================
+            PUBLIC IMPACT WALLS
+        ========================================================= */}
         <section
           className="space-y-8 bg-background py-8"
           aria-label="Community impact walls"
@@ -355,14 +367,39 @@ export default function RoleSelectionPage() {
           <HeroesWall />
 
           <KindnessWall />
+        </section>
 
-          {/* Android Install / Download */}
-          <div className="flex justify-center pt-2">
-            <InstallButton />
+        {/* =========================================================
+            ANDROID APP DOWNLOAD
+            SAME SECTION AS PREVIOUS HOMEPAGE
+            PLACED DIRECTLY BELOW KINDNESS WALL
+        ========================================================= */}
+        <section className="max-w-3xl mx-auto px-4 pt-8">
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+
+            <div className="text-center sm:text-left">
+              <h3 className="font-bold text-foreground">
+                📱 Get the Givethra Android App
+              </h3>
+
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Verified cases, anytime — right on your phone.
+              </p>
+            </div>
+
+            <a
+              href="/Givethra.apk"
+              download
+              className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl font-semibold text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+            >
+              Download App
+            </a>
           </div>
         </section>
 
-        {/* Trust Badges */}
+        {/* =========================================================
+            TRUST BADGES
+        ========================================================= */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-xs text-muted-foreground pt-4 border-t border-border">
 
           <div className="flex flex-col items-center gap-1">
@@ -398,7 +435,9 @@ export default function RoleSelectionPage() {
           </div>
         </div>
 
-        {/* Footer Section */}
+        {/* =========================================================
+            FOOTER
+        ========================================================= */}
         <section className="py-10 px-4 bg-card border-t border-border">
           <div className="max-w-2xl mx-auto text-center space-y-5">
 
@@ -412,6 +451,7 @@ export default function RoleSelectionPage() {
               </p>
             </div>
 
+            {/* Social icons */}
             <div className="flex items-center justify-center gap-3">
 
               <a
@@ -463,6 +503,7 @@ export default function RoleSelectionPage() {
               </a>
             </div>
 
+            {/* WhatsApp */}
             <a
               href={WHATSAPP_URL}
               target="_blank"
@@ -473,6 +514,7 @@ export default function RoleSelectionPage() {
               Follow our WhatsApp Channel
             </a>
 
+            {/* Email */}
             <div>
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
@@ -483,6 +525,7 @@ export default function RoleSelectionPage() {
               </a>
             </div>
 
+            {/* Footer links */}
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
 
               <Link
@@ -534,7 +577,9 @@ export default function RoleSelectionPage() {
           </div>
         </section>
 
-        {/* Bottom tagline */}
+        {/* =========================================================
+            FINAL TAGLINE
+        ========================================================= */}
         <div className="text-center text-xs text-muted-foreground pt-4">
           <p>
             "Be the reason someone believes in kindness."
