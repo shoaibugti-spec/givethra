@@ -2,7 +2,7 @@
 // Givethra - Complete Profile Page with Corrected, Professional Layout
 // 🔥 FIXED: Promise.allSettled for resilience (Fix #6)
 // 🔥 FIXED: Badge now shows correctly using isTrulyCompletedHelp (Fix #5)
-// 🔥 FIXED: Edit button separated from name/badge to avoid layout collision
+// 🔥 FIXED: Edit button separated from name/badge to avoid layout collision (Fix #7)
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -461,7 +461,7 @@ export default function ProfilePage() {
             </div>
 
             {/* ================================================================
-                🔥 FIXED: Name + Badge (first row) and Edit button (second row)
+                🔥 FIX #7: Name + Badge (first row) and Edit button (second row)
                 ================================================================ */}
 
             {/* Name + Badge — اپنی مکمل قطار، آزادی سے wrap ہو سکتی ہے */}
