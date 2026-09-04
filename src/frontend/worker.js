@@ -2376,7 +2376,100 @@ async function handleRequest(request, env, ctx) {
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }
+// ---------- ADD TO src/frontend/worker.js ----------
+// Paste this block inside the existing:
+//   if (parts[0] === "api") { ... }
+// section (the one that runs AFTER `const user = await authenticate(...)`),
+// anywhere before the final `return json({ error: "API route not found" }, 404, origin);`
+// at the bottom of that block. It uses isAssistant()/isAdmin()/now()/id()/
+// json()/readJson()/synchronizeCompletedCase(), all of which already exist
+// in worker.js, so nothing else needs to change.
+//
+// Design notes (since there's no dedicated "assistant payouts" table yet):
+//   - "Pending Payments" = cases with approved Contribution resolutions
+//     (paid_to = 'givethra') whose total collected amount is greater than
+//     what's already been paid out to the institute by an assistant.
+//   - Paying a case inserts a new case_resolutions row tagged
+//     resolution_type = 'Assistant Payout', paid_to = 'institute',
+//     already approved — which both records the payout AND (via
+//     synchronizeCompletedCase) updates the case's collected total/status
+//     the same way any other approved resolution does.
 
+if (parts[1] === "assistant") {
+  if (!isAssistant(user) && !isAdmin(user)) {
+    return json({ error: "Assistant access required" }, 403, origin);
+  }
+
+  if (parts[2] === "pending-payments" && request.method === "GET") {
+    const rows = await env.DB.prepare(
+      `SELECT c.id, c.title, c.amount_needed, c.user_id AS requester_id,
+              COALESCE(SUM(CASE
+                WHEN lower(COALESCE(r.status,'')) = 'completed'
+                 AND r.paid_to = 'givethra'
+                 AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
+                THEN r.amount_paid ELSE 0 END), 0) AS amount_collected,
+              COALESCE(SUM(CASE
+                WHEN lower(COALESCE(r.status,'')) = 'completed'
+                 AND r.paid_to = 'givethra'
+                 AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
+                THEN r.amount_paid ELSE 0 END), 0) AS total_contributions,
+              COALESCE(SUM(CASE
+                WHEN r.resolution_type = 'Assistant Payout'
+                THEN r.amount_paid ELSE 0 END), 0) AS already_paid_out
+       FROM case_submissions c
+       LEFT JOIN case_resolutions r ON r.case_id = c.id
+       GROUP BY c.id
+       HAVING total_contributions > already_paid_out`
+    ).all();
+    const results = (rows.results || []).map((r) => ({
+      id: r.id,
+      title: r.title,
+      amount_needed: Number(r.amount_needed || 0),
+      amount_collected: Number(r.amount_collected || 0),
+      total_contributions: Number(r.total_contributions || 0),
+      remaining_to_pay: Math.max(Number(r.total_contributions || 0) - Number(r.already_paid_out || 0), 0),
+      requester_id: r.requester_id,
+    }));
+    return json(results, 200, origin);
+  }
+
+  if (parts[2] === "active-cases" && request.method === "GET") {
+    const rows = await env.DB.prepare(
+      `SELECT id, title, category, country, city, urgency, amount_needed,
+              amount_collected, status, submitted_at
+       FROM case_submissions
+       WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active')
+       ORDER BY submitted_at DESC`
+    ).all();
+    return json(rows.results || [], 200, origin);
+  }
+
+  if (parts[2] === "pay" && request.method === "POST") {
+    const body = await readJson(request);
+    const caseId = String(body?.case_id || "").trim();
+    const amount = Number(body?.amount);
+    if (!caseId) return json({ error: "case_id is required" }, 400, origin);
+    if (!Number.isFinite(amount) || amount <= 0) return json({ error: "A valid amount is required" }, 400, origin);
+
+    const caseRow = await env.DB.prepare("SELECT id FROM case_submissions WHERE id = ?").bind(caseId).first();
+    if (!caseRow) return json({ error: "Case not found" }, 404, origin);
+
+    const resolutionId = id();
+    const timestamp = now();
+    await env.DB.prepare(
+      `INSERT INTO case_resolutions
+        (id, case_id, hero_id, hero_email, resolution_type, amount_paid, status, paid_to, admin_confirmed, admin_confirmed_at, completed_at, submitted_at)
+       VALUES (?, ?, ?, ?, 'Assistant Payout', ?, 'completed', 'institute', 1, ?, ?, ?)`
+    ).bind(resolutionId, caseId, user.user_id, user.email, amount, timestamp, timestamp, timestamp).run();
+
+    await synchronizeCompletedCase(env, resolutionId);
+
+    return json({ success: true, id: resolutionId, case_id: caseId, amount }, 201, origin);
+  }
+
+  return json({ error: "Not found" }, 404, origin);
+}
+    
     return json({ error: "API route not found" }, 404, origin);
   }
 
