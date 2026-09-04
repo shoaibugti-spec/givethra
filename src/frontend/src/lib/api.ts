@@ -991,3 +991,24 @@ export async function getAssistantActiveCases(): Promise<any[]> {
   if (!res.ok) throw new Error(data?.error || `Failed to fetch active cases (${res.status})`);
   return Array.isArray(data) ? data : [];
 }
+
+
+// ---------- ASSISTANT ----------
+export async function getAssistantPendingPayments() {
+  const res = await fetch(`${WORKER_URL}/api/assistant/pending-payments`, { headers: headers() });
+  return readArrayResponse(res);
+}
+
+export async function getAssistantActiveCases() {
+  const res = await fetch(`${WORKER_URL}/api/assistant/active-cases`, { headers: headers() });
+  return readArrayResponse(res);
+}
+
+export async function assistantPayCase(caseId: string, amount: number) {
+  const res = await fetch(`${WORKER_URL}/api/assistant/pay`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ case_id: caseId, amount }),
+  });
+  return readApiResponse(res);
+      }
