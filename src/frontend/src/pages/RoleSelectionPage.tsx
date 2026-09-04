@@ -1,6 +1,6 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
 // Givethra - Role Selection Landing Page
-// Only English, no Urdu
+// English only
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -27,6 +27,8 @@ import {
   Stethoscope,
   ShoppingCart,
   FileText,
+  Download,
+  Smartphone,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getApprovedCases, getKycStatus } from "@/lib/api";
@@ -135,29 +137,15 @@ export default function RoleSelectionPage() {
     return () => clearInterval(timer);
   }, [activeCases.length, activeCaseCategories.length]);
 
-  /**
-   * Handle role selection.
-   *
-   * Hero:
-   * - Guest -> Sign In -> Home
-   * - Authenticated -> Home
-   *
-   * Requester:
-   * - Guest -> Sign In -> KYC
-   * - Authenticated + approved KYC -> Home
-   * - Authenticated + other KYC status -> KYC
-   */
   const handleRoleSelect = async (
     role: "hero" | "requester"
   ) => {
-    // Set role first so the next page knows the selected role.
     setRole(role);
 
     setAuthRole(
       role === "requester" ? "help_seeker" : "hero"
     );
 
-    // Guest user
     if (!isAuthenticated) {
       navigate({
         to: "/sign-in",
@@ -171,7 +159,6 @@ export default function RoleSelectionPage() {
       return;
     }
 
-    // Authenticated requester
     if (role === "requester") {
       try {
         const kyc = await getKycStatus(user!.id);
@@ -196,7 +183,6 @@ export default function RoleSelectionPage() {
         navigate({ to: "/kyc" });
       }
     } else {
-      // Hero does not require KYC.
       navigate({ to: "/home" });
     }
   };
@@ -205,11 +191,8 @@ export default function RoleSelectionPage() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <div className="max-w-4xl w-full space-y-12">
 
-        {/* =========================================================
-            HEADER
-        ========================================================= */}
+        {/* Header */}
         <div className="text-center space-y-4">
-
           <div className="flex items-center justify-center gap-2">
             <span className="text-3xl font-bold text-foreground">
               Givethra
@@ -218,10 +201,10 @@ export default function RoleSelectionPage() {
 
           <div className="space-y-2">
             <h1 className="text-4xl md:text-5xl font-bold text-foreground">
-              Real People.{" "}
+              Real People.
               <br className="sm:hidden" />
               <span className="text-primary">
-                Real Needs. Real Help.
+                {" "}Real Needs. Real Help.
               </span>
             </h1>
 
@@ -236,9 +219,7 @@ export default function RoleSelectionPage() {
           </p>
         </div>
 
-        {/* =========================================================
-            ROLE / ACTION CARDS
-        ========================================================= */}
+        {/* Main Role Grid */}
         <div className="grid grid-cols-2 gap-3 md:gap-5">
 
           {/* Community */}
@@ -318,7 +299,7 @@ export default function RoleSelectionPage() {
             )}
           </button>
 
-          {/* Become a Hero */}
+          {/* Become Hero */}
           <button
             type="button"
             onClick={() => handleRoleSelect("hero")}
@@ -357,9 +338,7 @@ export default function RoleSelectionPage() {
           </button>
         </div>
 
-        {/* =========================================================
-            PUBLIC IMPACT WALLS
-        ========================================================= */}
+        {/* Public Impact Walls */}
         <section
           className="space-y-8 bg-background py-8"
           aria-label="Community impact walls"
@@ -369,37 +348,37 @@ export default function RoleSelectionPage() {
           <KindnessWall />
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             ANDROID APP DOWNLOAD
-            SAME SECTION AS PREVIOUS HOMEPAGE
-            PLACED DIRECTLY BELOW KINDNESS WALL
-        ========================================================= */}
-        <section className="max-w-3xl mx-auto px-4 pt-8">
+            SAME SECTION STYLE AS HOMEPAGE
+            ===================================================== */}
+        <section className="max-w-3xl mx-auto w-full px-0 pt-2">
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
 
             <div className="text-center sm:text-left">
-              <h3 className="font-bold text-foreground">
+              <h3 className="font-bold text-foreground flex items-center justify-center sm:justify-start gap-2">
+                <Smartphone className="h-5 w-5 text-primary" />
                 📱 Get the Givethra Android App
               </h3>
 
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-sm text-muted-foreground mt-1">
                 Verified cases, anytime — right on your phone.
               </p>
             </div>
 
             <a
               href="/Givethra.apk"
-              download
+              download="Givethra.apk"
+              type="application/vnd.android.package-archive"
               className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl font-semibold text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
             >
+              <Download className="h-4 w-4" />
               Download App
             </a>
           </div>
         </section>
 
-        {/* =========================================================
-            TRUST BADGES
-        ========================================================= */}
+        {/* Trust Badges */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-xs text-muted-foreground pt-4 border-t border-border">
 
           <div className="flex flex-col items-center gap-1">
@@ -435,9 +414,7 @@ export default function RoleSelectionPage() {
           </div>
         </div>
 
-        {/* =========================================================
-            FOOTER
-        ========================================================= */}
+        {/* Footer */}
         <section className="py-10 px-4 bg-card border-t border-border">
           <div className="max-w-2xl mx-auto text-center space-y-5">
 
@@ -451,7 +428,6 @@ export default function RoleSelectionPage() {
               </p>
             </div>
 
-            {/* Social icons */}
             <div className="flex items-center justify-center gap-3">
 
               <a
@@ -503,7 +479,6 @@ export default function RoleSelectionPage() {
               </a>
             </div>
 
-            {/* WhatsApp */}
             <a
               href={WHATSAPP_URL}
               target="_blank"
@@ -514,7 +489,6 @@ export default function RoleSelectionPage() {
               Follow our WhatsApp Channel
             </a>
 
-            {/* Email */}
             <div>
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
@@ -525,50 +499,15 @@ export default function RoleSelectionPage() {
               </a>
             </div>
 
-            {/* Footer links */}
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
-
-              <Link
-                to="/about"
-                className="hover:text-primary transition-colors"
-              >
-                About
-              </Link>
-
-              <Link
-                to="/faq"
-                className="hover:text-primary transition-colors"
-              >
-                FAQ
-              </Link>
-
-              <Link
-                to="/privacy"
-                className="hover:text-primary transition-colors"
-              >
-                Privacy Policy
-              </Link>
-
-              <Link
-                to="/terms"
-                className="hover:text-primary transition-colors"
-              >
-                Terms
-              </Link>
-
-              <Link
-                to="/community-guidelines"
-                className="hover:text-primary transition-colors"
-              >
+              <Link to="/about">About</Link>
+              <Link to="/faq">FAQ</Link>
+              <Link to="/privacy">Privacy Policy</Link>
+              <Link to="/terms">Terms</Link>
+              <Link to="/community-guidelines">
                 Community Guidelines
               </Link>
-
-              <Link
-                to="/contact"
-                className="hover:text-primary transition-colors"
-              >
-                Contact Us
-              </Link>
+              <Link to="/contact">Contact Us</Link>
             </div>
 
             <p className="text-xs text-muted-foreground pt-1">
@@ -577,9 +516,7 @@ export default function RoleSelectionPage() {
           </div>
         </section>
 
-        {/* =========================================================
-            FINAL TAGLINE
-        ========================================================= */}
+        {/* Bottom Quote */}
         <div className="text-center text-xs text-muted-foreground pt-4">
           <p>
             "Be the reason someone believes in kindness."
