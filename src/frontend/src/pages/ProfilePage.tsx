@@ -3,6 +3,7 @@
 // 🔥 FIXED: Promise.allSettled for resilience (Fix #6)
 // 🔥 FIXED: Badge now shows correctly using isTrulyCompletedHelp (Fix #5)
 // 🔥 FIXED: Edit button separated from name/badge to avoid layout collision (Fix #7)
+// 🔥 FIXED: Profile loading stuck - now shows page even if profile is null (Fix #8)
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -152,6 +153,7 @@ export default function ProfilePage() {
   const isOwnProfile = Boolean(user?.id && profileUserId === user.id);
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [cases, setCases] = useState<any[]>([]);
   const [showLogout, setShowLogout] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -186,6 +188,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     setProfile(null);
+    setProfileError(null);
     setKycData(null);
     setProfileLoading(true);
     if (!profileUserId) {
@@ -198,6 +201,7 @@ export default function ProfilePage() {
   // 🔥 FIX #6: Use Promise.allSettled to prevent single failure from blocking everything
   async function loadData() {
     setProfileLoading(true);
+    setProfileError(null);
     try {
       const results = await Promise.allSettled([
         getKycSubmission(profileUserId),
@@ -218,11 +222,13 @@ export default function ProfilePage() {
       // Log any failures (but don't block the whole page)
       if (kycResult.status === "rejected") {
         console.warn("KYC submission fetch failed (may be permissions):", kycResult.reason);
-        // Keep kycData as null, but don't block
       }
       if (profResult.status === "rejected") {
         console.error("Profile fetch failed:", profResult.reason);
+        setProfileError("Could not load profile details. Please try again later.");
         toast.error("Could not load profile details.");
+      } else {
+        setProfileError(null);
       }
       if (caseResult.status === "rejected") {
         console.warn("Cases fetch failed:", caseResult.reason);
@@ -281,8 +287,10 @@ export default function ProfilePage() {
     } catch (err) {
       // This outer catch should rarely be hit, but just in case
       console.error("Unexpected error in loadData:", err);
+      setProfileError("An unexpected error occurred while loading the profile.");
       toast.error("An unexpected error occurred while loading the profile.");
     } finally {
+      // 🔥 FIX #8: Ensure loading always stops
       setProfileLoading(false);
     }
   }
@@ -376,7 +384,10 @@ export default function ProfilePage() {
       .join("")
       .toUpperCase()
       .slice(0, 2) || "G";
-  const profileReady = !profileLoading && profile && String(profile.user_id || "") === String(profileUserId);
+
+  // 🔥 FIX #8: Show page even if profile is null — just show an error message
+  const profileReady = !profileLoading;
+  const showProfileError = profileError || (!profile && !profileLoading);
 
   if (!profileReady) {
     return (
@@ -386,6 +397,28 @@ export default function ProfilePage() {
             <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted animate-pulse" />
             <div className="mx-auto h-5 w-40 rounded bg-muted animate-pulse" />
             <p className="mt-4 text-sm text-muted-foreground">Loading profile...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // 🔥 FIX #8: If profile is null (failed to load), show error state
+  if (!profile) {
+    return (
+      <Layout>
+        <div className="max-w-xl mx-auto px-4 pt-8 pb-24">
+          <div className="rounded-3xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-8 text-center">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+            </div>
+            <h1 className="text-xl font-bold text-red-700 dark:text-red-300">Profile Not Available</h1>
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+              {profileError || "We could not load this profile. Please try again later."}
+            </p>
+            <Button className="mt-4" onClick={() => loadData()}>
+              Retry
+            </Button>
           </div>
         </div>
       </Layout>
