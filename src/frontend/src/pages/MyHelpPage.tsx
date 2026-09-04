@@ -1,7 +1,6 @@
 // src/frontend/src/pages/MyHelpPage.tsx
 // Givethra - My Help Page (for Heroes)
-// Shows all contributions and direct helps by the hero
-// FIXED: Correctly detects approved resolutions
+// 🔥 FIXED: Uses shared resolutionStatus helpers (Fix #5)
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -10,10 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "@tanstack/react-router";
 import {
   HeartHandshake,
-  HandCoins,
-  Building2,
-  CheckCircle2,
   Clock,
+  CheckCircle2,
   XCircle,
   FileText,
   Eye,
@@ -26,40 +23,18 @@ import {
   getCaseResolutionsByHero,
   getCaseUnlocksByHero,
   getCasesByIds,
-  getKycSubmission,
 } from "@/lib/api";
+import { isTrulyCompletedHelp, isContributionResolution, resolutionDisplayStatus } from "@/lib/resolutionStatus";
 import { toast } from "sonner";
 
-// Helper: Check if a resolution is approved/completed
-function isApprovedResolution(resolution: any): boolean {
-  if (!resolution) return false;
-  const status = String(resolution?.status || "").trim().toLowerCase();
-  const caseStatus = String(resolution?.case_status || "").trim().toLowerCase();
-  if (caseStatus === "completed") return true;
-  if (["completed", "approved", "verified", "confirmed"].includes(status) && [1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
-  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
-  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
-  return false;
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$", PKR: "Rs", SAR: "SAR", AED: "AED", GBP: "£", EUR: "€", INR: "₹",
+};
+
+function sym(cur?: string) {
+  return CURRENCY_SYMBOLS[cur || "USD"] ?? (cur || "$");
 }
 
-// Helper: Check if resolution is a contribution (paid to Givethra)
-function isContributionResolution(resolution: any): boolean {
-  if (!resolution) return false;
-  const marker = String(
-    resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? ""
-  ).trim().toLowerCase();
-  return ["givethra", "contribution", "fundraising", "partial"].includes(marker);
-}
-
-// Privacy: mask name (first name + middle initial)
-function maskName(name?: string): string {
-  if (!name) return "—";
-  const parts = String(name).trim().split(/\s+/);
-  if (parts.length <= 1) return parts[0] || "—";
-  return `${parts[0]} ${parts[1].charAt(0)}.`;
-}
-
-// Privacy: mask CNIC (show first 4 digits)
 function maskCnic(cnic?: string): string {
   if (!cnic) return "—";
   const digits = cnic.replace(/\D/g, "");
@@ -69,16 +44,6 @@ function maskCnic(cnic?: string): string {
   return `${shown}${masked}`;
 }
 
-// Currency symbol helper
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: "$", PKR: "Rs", SAR: "SAR", AED: "AED", GBP: "£", EUR: "€", INR: "₹",
-};
-
-function sym(cur?: string) {
-  return CURRENCY_SYMBOLS[cur || "USD"] ?? (cur || "$");
-}
-
-// Affidavit generator (same as in CaseDetailPage)
 function generateAffidavitFromRecord(caseData: any, record: any, seekerName: string, heroName: string) {
   const resolution = record.resolution;
   const caseId = (caseData.id ?? "").slice(0, 8).toUpperCase();
@@ -127,13 +92,13 @@ function generateAffidavitFromRecord(caseData: any, record: any, seekerName: str
 
       <h2>Help Seeker (Beneficiary)</h2>
       <div class="grid">
-        <div class="field"><div class="label">Full Name</div><div class="value">${maskName(seekerName)}</div></div>
+        <div class="field"><div class="label">Full Name</div><div class="value">${seekerName}</div></div>
         <div class="field"><div class="label">CNIC (Masked)</div><div class="value">${seekerCnic}</div></div>
       </div>
 
       <h2>Assistance & Method Verification</h2>
       <div class="grid">
-        <div class="field"><div class="label">Helper Name (Hero)</div><div class="value">${maskName(heroName)}</div></div>
+        <div class="field"><div class="label">Helper Name (Hero)</div><div class="value">${heroName}</div></div>
         <div class="field"><div class="label">Help Type</div><div class="value">${isFundraising ? "Contribution (Fundraising)" : "Direct Institute Payment"}</div></div>
         <div class="field"><div class="label">Amount Settled</div><div class="value" style="color:#16a34a; font-weight:bold;">${s} ${paidAmount} ${cur}</div></div>
         <div class="field"><div class="label">TXN Number</div><div class="value">${record.transactionId || "—"}</div></div>
@@ -201,7 +166,6 @@ export default function MyHelpPage() {
       const resolutions = Array.isArray(resolutionsResult) ? resolutionsResult : [];
       const unlocks = Array.isArray(unlocksResult) ? unlocksResult : [];
 
-      // Get all case IDs from resolutions and unlocks
       const caseIds = Array.from(
         new Set([
           ...resolutions.map((r: any) => String(r.case_id || "")).filter(Boolean),
@@ -221,9 +185,9 @@ export default function MyHelpPage() {
         if (c?.id) caseMap.set(String(c.id), c);
       });
 
-      // Build records from resolutions (approved ones)
       const recordList: any[] = [];
 
+      // 🔥 FIX #5: Use isTrulyCompletedHelp and isContributionResolution from shared helpers
       for (const resolution of resolutions) {
         const caseId = String(resolution.case_id || "");
         if (!caseId) continue;
@@ -237,10 +201,9 @@ export default function MyHelpPage() {
           amount_needed: resolution.amount_paid || 0,
         };
 
-        const isApproved = isApprovedResolution(resolution);
+        const isApproved = isTrulyCompletedHelp(resolution);
         const isContribution = isContributionResolution(resolution);
-        const status = String(resolution.status || "").toLowerCase();
-        const statusDisplay = isApproved ? "completed" : (status === "rejected" || status === "disputed" ? "rejected" : "pending");
+        const statusDisplay = resolutionDisplayStatus(resolution);
 
         recordList.push({
           id: resolution.id,
@@ -265,14 +228,10 @@ export default function MyHelpPage() {
         });
       }
 
-      // 🔥 صرف ایک لائن کی تبدیلی — یہاں دیکھیں:
-      // Add unlock-only records (no resolution)
+      // Unlock-only records (no resolution)
       for (const unlock of unlocks) {
         const caseId = String(unlock.case_id || "");
         if (!caseId) continue;
-        // 🔥 FIX: Check if there is ANY resolution for this case
-        // پہلے (غلط): if (recordList.some((r) => r.caseId === caseId && r.type !== "unlock")) continue;
-        // اب (صحیح):
         if (resolutions.some((r: any) => String(r.case_id) === caseId)) continue;
         const caseRecord = caseMap.get(caseId) || {
           id: caseId,
@@ -305,7 +264,6 @@ export default function MyHelpPage() {
         });
       }
 
-      // Sort by date (newest first)
       recordList.sort((a, b) => {
         const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
         const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
@@ -321,7 +279,6 @@ export default function MyHelpPage() {
     }
   }
 
-  // Filter records
   const filteredRecords = records.filter((r) => {
     if (filterType !== "all" && r.type !== filterType) return false;
     if (filterStatus !== "all" && r.status !== filterStatus) return false;
@@ -355,7 +312,6 @@ export default function MyHelpPage() {
           </div>
         ) : (
           <>
-            {/* Filters */}
             <div className="space-y-2">
               <Tabs value={filterType} onValueChange={(v) => setFilterType(v as any)}>
                 <TabsList className="grid grid-cols-3 w-full">
@@ -365,7 +321,7 @@ export default function MyHelpPage() {
                 </TabsList>
               </Tabs>
               <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
-                <TabsList className="grid grid-cols-3 w-full">
+                <TabsList className="grid grid-cols-4 w-full">
                   <TabsTrigger value="all">All Status</TabsTrigger>
                   <TabsTrigger value="pending">Pending</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
@@ -374,7 +330,6 @@ export default function MyHelpPage() {
               </Tabs>
             </div>
 
-            {/* Records */}
             <div className="space-y-3">
               {filteredRecords.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
@@ -440,7 +395,6 @@ export default function MyHelpPage() {
                         </div>
                       </div>
 
-                      {/* Action buttons */}
                       <div className="flex flex-wrap gap-2">
                         {isCompleted && record.isApproved && !isUnlockOnly && (
                           <Button
