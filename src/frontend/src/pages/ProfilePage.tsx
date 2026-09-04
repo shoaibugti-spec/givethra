@@ -1,5 +1,6 @@
 // src/frontend/src/pages/ProfilePage.tsx
 // Givethra - Complete Profile Page with Corrected, Professional Layout
+// 🔥 FIXED: Promise.allSettled for resilience (Fix #6)
 // 🔥 FIXED: Badge now shows correctly using isTrulyCompletedHelp (Fix #5)
 // 🔥 FIXED: Edit button separated from name/badge to avoid layout collision
 
@@ -194,16 +195,44 @@ export default function ProfilePage() {
     loadData();
   }, [isAuthenticated, location.pathname, role, profileUserId]);
 
+  // 🔥 FIX #6: Use Promise.allSettled to prevent single failure from blocking everything
   async function loadData() {
     setProfileLoading(true);
     try {
-      const [kyc, caseList, prof, resolutions, unlocks] = await Promise.all([
+      const results = await Promise.allSettled([
         getKycSubmission(profileUserId),
         getCasesByUser(profileUserId),
         getProfile(profileUserId, role),
         getCaseResolutionsByHero(profileUserId),
         getCaseUnlocksByHero(profileUserId),
       ]);
+
+      const [kycResult, caseResult, profResult, resolutionsResult, unlocksResult] = results;
+
+      const kyc = kycResult.status === "fulfilled" ? kycResult.value : null;
+      const caseList = caseResult.status === "fulfilled" ? caseResult.value : [];
+      const prof = profResult.status === "fulfilled" ? profResult.value : null;
+      const resolutions = resolutionsResult.status === "fulfilled" ? resolutionsResult.value : [];
+      const unlocks = unlocksResult.status === "fulfilled" ? unlocksResult.value : [];
+
+      // Log any failures (but don't block the whole page)
+      if (kycResult.status === "rejected") {
+        console.warn("KYC submission fetch failed (may be permissions):", kycResult.reason);
+        // Keep kycData as null, but don't block
+      }
+      if (profResult.status === "rejected") {
+        console.error("Profile fetch failed:", profResult.reason);
+        toast.error("Could not load profile details.");
+      }
+      if (caseResult.status === "rejected") {
+        console.warn("Cases fetch failed:", caseResult.reason);
+      }
+      if (resolutionsResult.status === "rejected") {
+        console.warn("Resolutions fetch failed:", resolutionsResult.reason);
+      }
+      if (unlocksResult.status === "rejected") {
+        console.warn("Unlocks fetch failed:", unlocksResult.reason);
+      }
 
       setKycData(kyc);
       setProfile(prof);
@@ -250,7 +279,9 @@ export default function ProfilePage() {
       // 🔥 Badge calculation now uses the correct counts
       setBadge(getBadge(unlockList.length, contrib.length, direct.length));
     } catch (err) {
-      console.error("Failed to load profile data:", err);
+      // This outer catch should rarely be hit, but just in case
+      console.error("Unexpected error in loadData:", err);
+      toast.error("An unexpected error occurred while loading the profile.");
     } finally {
       setProfileLoading(false);
     }
