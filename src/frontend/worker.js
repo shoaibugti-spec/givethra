@@ -2347,3 +2347,24 @@ export default {
     }
   },
 };
+
+// worker.js - ASSETS سے پہلے یہ کوڈ شامل کریں
+if (url.pathname === '/Givethra.apk' || url.pathname.endsWith('.apk')) {
+  try {
+    const assetResponse = await env.ASSETS.fetch(request);
+    
+    if (assetResponse.status === 200) {
+      const headers = new Headers(assetResponse.headers);
+      headers.set('Content-Type', 'application/vnd.android.package-archive');
+      headers.set('Content-Disposition', 'attachment; filename="Givethra.apk"');
+      headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+      
+      return new Response(assetResponse.body, {
+        status: 200,
+        headers: headers
+      });
+    }
+  } catch (error) {
+    // اگر ASSETS میں نہ ملے تو 404
+  }
+}
