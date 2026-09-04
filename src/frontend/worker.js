@@ -549,15 +549,31 @@ async function handleProfile(request, env, user, parts, origin) {
 async function handleKyc(request, env, user, url, parts, origin) {
   const queryUser = requestedUserId(url);
   const target = queryUser || user.user_id;
-  if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
-
+  // 🔥 FIX: Allow public access to GET (only status) so other users' profiles can load
+  // We'll still check ownership for PUT/POST
   if (request.method === "GET") {
+    const isOwnOrAdmin = canAccessUser(user, target);
     const rows = await env.DB.prepare(
       "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC, rowid DESC LIMIT ?"
     ).bind(target, Number(url.searchParams.get("limit") || 50)).all();
-    return json(rows.results || [], 200, origin);
+    if (isOwnOrAdmin) {
+      return json(rows.results || [], 200, origin);
+    } else {
+      // Return only non-sensitive fields for other users
+      const limited = (rows.results || []).map((r) => ({
+        id: r.id,
+        user_id: r.user_id,
+        status: r.status,
+        submitted_at: r.submitted_at,
+        // Do not include CNIC, addresses, etc.
+      }));
+      return json(limited, 200, origin);
+    }
   }
   if (request.method === "POST") {
+    // POST requires authentication and ownership of the user_id (or admin)
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    if (!canAccessUser(user, user.user_id)) return json({ error: "Forbidden" }, 403, origin);
     const body = await readJson(request);
     const record = pick(body, ["full_name", "date_of_birth", "address", "cnic_number", "cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url", "document_type"]);
     const existing = await env.DB.prepare(
