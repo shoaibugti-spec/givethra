@@ -4,8 +4,6 @@
 // Assistant: shoaibugti@gmail.com | Admin: shoaibahmedbugti5@gmail.com
 
 const PUBLIC_ORIGIN = "https://givethra.org";
-// ✅ Fix #2: SUPPORTS_LAUNCH_AT کو غیر فعال کیا جا رہا ہے (اب استعمال نہیں ہوگا)
-// const SUPPORTS_LAUNCH_AT = "2026-09-03T00:00:00.000Z";
 
 const ADMIN_EMAILS = new Set([
   "shoaibahmedbugti5@gmail.com",
@@ -885,7 +883,6 @@ async function insertCommunityNotification(env, ctx, recipientId, actorId, actor
   ).bind(id(), recipientId, type, title, `${publicDisplayName(actorName, "A Givethra member")}: ${message}`, "/community", now()).run());
 }
 
-// ✅ Fix #2: recordCommunitySupport - SUPPORTS_LAUNCH_AT condition removed
 async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, postId, actorName) {
   if (!originalUserId || !sourceUserId || originalUserId === sourceUserId) return { added: false, supports: 0, creditsEarned: 0 };
   const post = await env.DB.prepare("SELECT created_at FROM community_posts WHERE id = ? AND user_id = ?").bind(postId, originalUserId).first();
@@ -1115,7 +1112,6 @@ async function handleCommunitySupport(request, env, user, origin, ctx) {
   return json({ post_id: postId, supported: Boolean(result.added || result.alreadySupported), support_count: Number(postSupportCount?.count || 0), ...result }, result.added ? 201 : 200, origin);
 }
 
-// ✅ Fix #1: Follow List - corrected where and selected columns
 async function handleFollow(request, env, user, url, parts, origin, ctx) {
   const body = await readJson(request).catch(() => ({}));
   const targetId = body?.target_user_id || url.searchParams.get("target") || url.searchParams.get("user");
@@ -1386,133 +1382,6 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
-    // ============================================================
-    //  ASSISTANT APIs (صرف Assistant کو رسائی)
-    // ============================================================
-    if (parts[1] === "assistant") {
-      if (!isAssistant(user)) {
-        return json({ error: "Forbidden. Assistant access required." }, 403, origin);
-      }
-
-      // GET /api/assistant/payments
-      if (parts[2] === "payments" && request.method === "GET") {
-        const rows = await env.DB.prepare(`
-          SELECT 
-            c.id, 
-            c.title, 
-            c.amount_needed, 
-            c.amount_collected,
-            COALESCE(
-              (SELECT SUM(COALESCE(pledged_amount, 0)) 
-               FROM case_unlocks 
-               WHERE case_id = c.id 
-                 AND status = 'approved' 
-                 AND source = 'user'
-                 AND payment_type IN ('contribution', 'direct_help')
-              ), 0
-            ) AS total_contributions,
-            c.user_id AS requester_id
-          FROM case_submissions c
-          WHERE c.status != 'completed' 
-            AND c.amount_collected > 0
-            AND NOT EXISTS (
-              SELECT 1 FROM case_unlocks 
-              WHERE case_id = c.id 
-                AND source = 'assistant_manual'
-            )
-          ORDER BY c.submitted_at DESC
-        `).all();
-
-        const result = (rows.results || []).map(row => ({
-          ...row,
-          remaining_to_pay: Number(row.amount_collected || 0) - Number(row.total_contributions || 0),
-        })).filter(item => item.remaining_to_pay > 0);
-
-        return json(result, 200, origin);
-      }
-
-      // ✅ NEW: GET /api/assistant/active-cases
-      if (parts[2] === "active-cases" && request.method === "GET") {
-        const rows = await env.DB.prepare(
-          `SELECT id, title, category, country, city, urgency, amount_needed, amount_collected, status, submitted_at, user_id
-           FROM case_submissions
-           WHERE lower(status) IN ('approved', 'published', 'active', 'open')
-           ORDER BY submitted_at DESC`
-        ).all();
-        return json(rows.results || [], 200, origin);
-      }
-
-      // POST /api/assistant/pay
-      if (parts[2] === "pay" && request.method === "POST") {
-        const body = await readJson(request);
-        const caseId = String(body.case_id || "").trim();
-        const amount = Number(body.amount);
-        const receiptUrl = String(body.receipt_url || "").trim();
-        const txId = String(body.transaction_id || "").trim();
-
-        if (!caseId || !Number.isFinite(amount) || amount <= 0) {
-          return json({ error: "Valid case_id and positive amount required" }, 400, origin);
-        }
-
-        const existing = await env.DB.prepare(
-          "SELECT id FROM case_unlocks WHERE case_id = ? AND source = 'assistant_manual'"
-        ).bind(caseId).first();
-        if (existing) {
-          return json({ error: "This case has already been paid by Assistant" }, 409, origin);
-        }
-
-        const caseRow = await env.DB.prepare(
-          "SELECT amount_needed, amount_collected, user_id FROM case_submissions WHERE id = ?"
-        ).bind(caseId).first();
-        if (!caseRow) return json({ error: "Case not found" }, 404, origin);
-
-        const currentCollected = Number(caseRow.amount_collected || 0);
-        const payAmount = Math.min(amount, currentCollected);
-        if (payAmount <= 0) {
-          return json({ error: "No amount to pay" }, 400, origin);
-        }
-
-        const unlockId = id();
-        await env.DB.prepare(
-          `INSERT INTO case_unlocks 
-            (id, case_id, hero_id, pledged_amount, payment_type, source, status, unlocked_at, receipt_url, transaction_id)
-           VALUES (?, ?, ?, ?, 'assistant_payment', 'assistant_manual', 'approved', ?, ?, ?)`
-        ).bind(
-          unlockId,
-          caseId,
-          user.user_id,
-          payAmount,
-          now(),
-          receiptUrl || null,
-          txId || null
-        ).run();
-
-        if (currentCollected >= Number(caseRow.amount_needed || 0)) {
-          await env.DB.prepare(
-            "UPDATE case_submissions SET status = 'completed', updated_at = ? WHERE id = ?"
-          ).bind(now(), caseId).run();
-        }
-
-        await sendNotification(
-          env,
-          caseRow.user_id,
-          'assistant_paid',
-          'Assistant has processed payment for your case',
-          `The Assistant has paid the collected contributions for your case.`,
-          `/cases/${caseId}`
-        );
-
-        return json({ 
-          success: true, 
-          unlock_id: unlockId,
-          amount_paid: payAmount,
-          case_id: caseId
-        }, 201, origin);
-      }
-
-      return json({ error: "Assistant endpoint not found" }, 404, origin);
-    }
-
     // ✅ PROFILES
     if (parts[1] === "profiles") {
       return handleProfile(request, env, user, parts, origin);
@@ -2376,100 +2245,90 @@ async function handleRequest(request, env, ctx) {
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }
-// ---------- ADD TO src/frontend/worker.js ----------
-// Paste this block inside the existing:
-//   if (parts[0] === "api") { ... }
-// section (the one that runs AFTER `const user = await authenticate(...)`),
-// anywhere before the final `return json({ error: "API route not found" }, 404, origin);`
-// at the bottom of that block. It uses isAssistant()/isAdmin()/now()/id()/
-// json()/readJson()/synchronizeCompletedCase(), all of which already exist
-// in worker.js, so nothing else needs to change.
-//
-// Design notes (since there's no dedicated "assistant payouts" table yet):
-//   - "Pending Payments" = cases with approved Contribution resolutions
-//     (paid_to = 'givethra') whose total collected amount is greater than
-//     what's already been paid out to the institute by an assistant.
-//   - Paying a case inserts a new case_resolutions row tagged
-//     resolution_type = 'Assistant Payout', paid_to = 'institute',
-//     already approved — which both records the payout AND (via
-//     synchronizeCompletedCase) updates the case's collected total/status
-//     the same way any other approved resolution does.
 
-if (parts[1] === "assistant") {
-  if (!isAssistant(user) && !isAdmin(user)) {
-    return json({ error: "Assistant access required" }, 403, origin);
-  }
+    // ============================================================
+    //  ASSISTANT APIs (صرف Assistant کو رسائی)
+    //  NOTE: پرانا بلاک ہٹا دیا گیا ہے، نیا بلاک (جو آپ نے شامل کیا)
+    //  یہاں برقرار ہے۔ اس میں `pending-payments`، `active-cases` اور `pay` ہیں۔
+    // ============================================================
+    if (parts[1] === "assistant") {
+      if (!isAssistant(user) && !isAdmin(user)) {
+        return json({ error: "Assistant access required" }, 403, origin);
+      }
 
-  if (parts[2] === "pending-payments" && request.method === "GET") {
-    const rows = await env.DB.prepare(
-      `SELECT c.id, c.title, c.amount_needed, c.user_id AS requester_id,
-              COALESCE(SUM(CASE
-                WHEN lower(COALESCE(r.status,'')) = 'completed'
-                 AND r.paid_to = 'givethra'
-                 AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
-                THEN r.amount_paid ELSE 0 END), 0) AS amount_collected,
-              COALESCE(SUM(CASE
-                WHEN lower(COALESCE(r.status,'')) = 'completed'
-                 AND r.paid_to = 'givethra'
-                 AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
-                THEN r.amount_paid ELSE 0 END), 0) AS total_contributions,
-              COALESCE(SUM(CASE
-                WHEN r.resolution_type = 'Assistant Payout'
-                THEN r.amount_paid ELSE 0 END), 0) AS already_paid_out
-       FROM case_submissions c
-       LEFT JOIN case_resolutions r ON r.case_id = c.id
-       GROUP BY c.id
-       HAVING total_contributions > already_paid_out`
-    ).all();
-    const results = (rows.results || []).map((r) => ({
-      id: r.id,
-      title: r.title,
-      amount_needed: Number(r.amount_needed || 0),
-      amount_collected: Number(r.amount_collected || 0),
-      total_contributions: Number(r.total_contributions || 0),
-      remaining_to_pay: Math.max(Number(r.total_contributions || 0) - Number(r.already_paid_out || 0), 0),
-      requester_id: r.requester_id,
-    }));
-    return json(results, 200, origin);
-  }
+      // GET /api/assistant/pending-payments
+      if (parts[2] === "pending-payments" && request.method === "GET") {
+        const rows = await env.DB.prepare(
+          `SELECT c.id, c.title, c.amount_needed, c.user_id AS requester_id,
+                  COALESCE(SUM(CASE
+                    WHEN lower(COALESCE(r.status,'')) = 'completed'
+                     AND r.paid_to = 'givethra'
+                     AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
+                    THEN r.amount_paid ELSE 0 END), 0) AS amount_collected,
+                  COALESCE(SUM(CASE
+                    WHEN lower(COALESCE(r.status,'')) = 'completed'
+                     AND r.paid_to = 'givethra'
+                     AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
+                    THEN r.amount_paid ELSE 0 END), 0) AS total_contributions,
+                  COALESCE(SUM(CASE
+                    WHEN r.resolution_type = 'Assistant Payout'
+                    THEN r.amount_paid ELSE 0 END), 0) AS already_paid_out
+           FROM case_submissions c
+           LEFT JOIN case_resolutions r ON r.case_id = c.id
+           GROUP BY c.id
+           HAVING total_contributions > already_paid_out`
+        ).all();
+        const results = (rows.results || []).map((r) => ({
+          id: r.id,
+          title: r.title,
+          amount_needed: Number(r.amount_needed || 0),
+          amount_collected: Number(r.amount_collected || 0),
+          total_contributions: Number(r.total_contributions || 0),
+          remaining_to_pay: Math.max(Number(r.total_contributions || 0) - Number(r.already_paid_out || 0), 0),
+          requester_id: r.requester_id,
+        }));
+        return json(results, 200, origin);
+      }
 
-  if (parts[2] === "active-cases" && request.method === "GET") {
-    const rows = await env.DB.prepare(
-      `SELECT id, title, category, country, city, urgency, amount_needed,
-              amount_collected, status, submitted_at
-       FROM case_submissions
-       WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active')
-       ORDER BY submitted_at DESC`
-    ).all();
-    return json(rows.results || [], 200, origin);
-  }
+      // GET /api/assistant/active-cases
+      if (parts[2] === "active-cases" && request.method === "GET") {
+        const rows = await env.DB.prepare(
+          `SELECT id, title, category, country, city, urgency, amount_needed,
+                  amount_collected, status, submitted_at
+           FROM case_submissions
+           WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active')
+           ORDER BY submitted_at DESC`
+        ).all();
+        return json(rows.results || [], 200, origin);
+      }
 
-  if (parts[2] === "pay" && request.method === "POST") {
-    const body = await readJson(request);
-    const caseId = String(body?.case_id || "").trim();
-    const amount = Number(body?.amount);
-    if (!caseId) return json({ error: "case_id is required" }, 400, origin);
-    if (!Number.isFinite(amount) || amount <= 0) return json({ error: "A valid amount is required" }, 400, origin);
+      // POST /api/assistant/pay
+      if (parts[2] === "pay" && request.method === "POST") {
+        const body = await readJson(request);
+        const caseId = String(body?.case_id || "").trim();
+        const amount = Number(body?.amount);
+        if (!caseId) return json({ error: "case_id is required" }, 400, origin);
+        if (!Number.isFinite(amount) || amount <= 0) return json({ error: "A valid amount is required" }, 400, origin);
 
-    const caseRow = await env.DB.prepare("SELECT id FROM case_submissions WHERE id = ?").bind(caseId).first();
-    if (!caseRow) return json({ error: "Case not found" }, 404, origin);
+        const caseRow = await env.DB.prepare("SELECT id FROM case_submissions WHERE id = ?").bind(caseId).first();
+        if (!caseRow) return json({ error: "Case not found" }, 404, origin);
 
-    const resolutionId = id();
-    const timestamp = now();
-    await env.DB.prepare(
-      `INSERT INTO case_resolutions
-        (id, case_id, hero_id, hero_email, resolution_type, amount_paid, status, paid_to, admin_confirmed, admin_confirmed_at, completed_at, submitted_at)
-       VALUES (?, ?, ?, ?, 'Assistant Payout', ?, 'completed', 'institute', 1, ?, ?, ?)`
-    ).bind(resolutionId, caseId, user.user_id, user.email, amount, timestamp, timestamp, timestamp).run();
+        const resolutionId = id();
+        const timestamp = now();
+        await env.DB.prepare(
+          `INSERT INTO case_resolutions
+            (id, case_id, hero_id, hero_email, resolution_type, amount_paid, status, paid_to, admin_confirmed, admin_confirmed_at, completed_at, submitted_at)
+           VALUES (?, ?, ?, ?, 'Assistant Payout', ?, 'completed', 'institute', 1, ?, ?, ?)`
+        ).bind(resolutionId, caseId, user.user_id, user.email, amount, timestamp, timestamp, timestamp).run();
 
-    await synchronizeCompletedCase(env, resolutionId);
+        await synchronizeCompletedCase(env, resolutionId);
 
-    return json({ success: true, id: resolutionId, case_id: caseId, amount }, 201, origin);
-  }
+        return json({ success: true, id: resolutionId, case_id: caseId, amount }, 201, origin);
+      }
 
-  return json({ error: "Not found" }, 404, origin);
-}
-    
+      return json({ error: "Not found" }, 404, origin);
+    }
+
     return json({ error: "API route not found" }, 404, origin);
   }
 
