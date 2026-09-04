@@ -64,9 +64,8 @@ export async function getApprovedCases() {
   return readArrayResponse(res);
 }
 
-// 🔥 Added limit parameter (default 50) to reduce load
-export async function getCasesByUser(userId: string, limit: number = 50) {
-  const res = await fetch(`${WORKER_URL}/api/cases?user_id=${userId}&limit=${limit}`, { headers: headers() });
+export async function getCasesByUser(userId: string) {
+  const res = await fetch(`${WORKER_URL}/api/cases?user_id=${userId}`, { headers: headers() });
   return readArrayResponse(res);
 }
 
@@ -191,10 +190,9 @@ export async function updateCategoryOfferUsage(category: string, usedCount: numb
   return res.json();
 }
 
-// 🔥 Added limit parameter (default 20) to reduce load
-export async function getCaseUnlocksByHero(heroId: string, limit: number = 20) {
+export async function getCaseUnlocksByHero(heroId: string) {
   const res = await fetch(
-    `${WORKER_URL}/api/case-unlocks?hero_id=${heroId}&limit=${limit}`,
+    `${WORKER_URL}/api/case-unlocks?hero_id=${heroId}`,
     { headers: headers() }
   );
   return readArrayResponse(res);
@@ -210,17 +208,15 @@ export async function insertCaseUnlock(data: any) {
 }
 
 // ---------- CASE RESOLUTIONS ----------
-// 🔥 Added limit parameter (default 20) to reduce load
-export async function getCaseResolutions(caseId: string, heroId?: string, limit: number = 20) {
-  let url = `${WORKER_URL}/api/case-resolutions?case_id=${caseId}&limit=${limit}`;
+export async function getCaseResolutions(caseId: string, heroId?: string) {
+  let url = `${WORKER_URL}/api/case-resolutions?case_id=${caseId}`;
   if (heroId) url += `&hero_id=${heroId}`;
   const res = await fetch(url, { headers: headers() });
   return readArrayResponse(res);
 }
 
-// 🔥 Added limit parameter (default 20) to reduce load
-export async function getCaseResolutionsByHero(heroId: string, limit: number = 20) {
-  const res = await fetch(`${WORKER_URL}/api/case-resolutions?hero_id=${encodeURIComponent(heroId)}&limit=${limit}`, { headers: headers() });
+export async function getCaseResolutionsByHero(heroId: string) {
+  const res = await fetch(`${WORKER_URL}/api/case-resolutions?hero_id=${encodeURIComponent(heroId)}`, { headers: headers() });
   return readArrayResponse(res);
 }
 
