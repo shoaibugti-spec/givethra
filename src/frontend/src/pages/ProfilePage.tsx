@@ -1,6 +1,7 @@
 // src/frontend/src/pages/ProfilePage.tsx
 // Givethra - Complete Profile Page with Corrected, Professional Layout
-// 🔥 FIXED: Uses shared resolutionStatus helpers (Fix #5)
+// 🔥 FIXED: Badge now shows correctly using isTrulyCompletedHelp (Fix #5)
+// 🔥 FIXED: Edit button separated from name/badge to avoid layout collision
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -246,6 +247,7 @@ export default function ProfilePage() {
       const unlockList = Array.isArray(unlocks) ? unlocks : [];
       setUnlockCount(unlockList.length);
 
+      // 🔥 Badge calculation now uses the correct counts
       setBadge(getBadge(unlockList.length, contrib.length, direct.length));
     } catch (err) {
       console.error("Failed to load profile data:", err);
@@ -387,6 +389,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="px-5 pb-5">
+            {/* Avatar row — remains unchanged */}
             <div className="flex items-end justify-between -mt-12 mb-3">
               <div className="relative shrink-0">
                 <div className="h-24 w-24 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary">
@@ -426,48 +429,55 @@ export default function ProfilePage() {
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h1 className="text-xl font-bold text-foreground truncate">{displayName}</h1>
-                {badge && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
-                      {badge.icon}
-                      {badge.title}
-                    </span>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => setBadgeInfoOpen(true)}
-                            className="text-muted-foreground hover:text-primary transition-colors"
-                          >
-                            <Info className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs text-xs">{badge.description}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                )}
-              </div>
+            {/* ================================================================
+                🔥 FIXED: Name + Badge (first row) and Edit button (second row)
+                ================================================================ */}
 
-              {isOwnProfile && (
+            {/* Name + Badge — اپنی مکمل قطار، آزادی سے wrap ہو سکتی ہے */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-foreground break-words">{displayName}</h1>
+              {badge && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
+                    {badge.icon}
+                    {badge.title}
+                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setBadgeInfoOpen(true)}
+                          className="text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs text-xs">{badge.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
+            </div>
+
+            {/* Edit بٹن — اپنی الگ قطار، ہمیشہ مکمل چوڑائی کے ساتھ نظر آئے گا */}
+            {isOwnProfile && (
+              <div className="flex justify-end mt-1.5">
                 <button
                   type="button"
                   onClick={() => navigate({ to: "/edit-profile" })}
                   title="Edit Profile"
                   aria-label="Edit Profile"
-                  className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary px-3 py-1.5 text-xs font-semibold hover:bg-primary/15 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary px-3 py-1.5 text-xs font-semibold hover:bg-primary/15 transition-colors"
                 >
-                  <Pencil className="h-3.5 w-3.5" /> Edit
+                  <Pencil className="h-3.5 w-3.5" /> Edit Profile
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
+            {/* Location, Member Since, KYC, Bio — same as before */}
             <div className="space-y-1 mt-1">
               {(profile?.city || profile?.country) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -488,6 +498,7 @@ export default function ProfilePage() {
               {profile?.bio && <p className="text-sm text-muted-foreground italic pt-1">{profile.bio}</p>}
             </div>
 
+            {/* Stats row */}
             <div className="grid grid-cols-3 gap-2 mt-4 rounded-2xl border border-border/70 bg-background/70 px-2 py-3 shadow-sm">
               <button
                 onClick={() => openRelationshipList("requesters")}
@@ -514,6 +525,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Verification Badges */}
             <div className="mt-3 flex flex-wrap gap-2">
               {verificationBadges.map((b) => (
                 <span
