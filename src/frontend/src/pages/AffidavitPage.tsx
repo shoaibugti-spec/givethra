@@ -2,15 +2,19 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCaseById, getCaseResolutions } from "@/lib/api";
+// 🔥 FIX #2: Import shared helpers
+import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+// 🔥 FIX #5: Better maskName: if only one name, show it; else first + last initial
 function maskName(value: unknown): string {
   const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "Protected participant";
-  return parts.length > 1 ? `${parts[0]} ${parts[1].charAt(0).toUpperCase()}.` : parts[0];
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[1].charAt(0).toUpperCase()}.`;
 }
 
 function maskCnic(value: unknown): string {
@@ -21,13 +25,6 @@ function maskCnic(value: unknown): string {
 function maskAccount(value: unknown): string {
   const digits = String(value || "").replace(/\s/g, "");
   return digits ? `****${digits.slice(-4)}` : "Not disclosed";
-}
-
-function isVerifiedResolution(resolution: any): boolean {
-  const status = String(resolution?.status || "").toLowerCase();
-  return ["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)
-    || [1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)
-    || Boolean(resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at);
 }
 
 function formatDate(value: unknown): string {
@@ -55,10 +52,13 @@ export default function AffidavitPage() {
       setLoading(false);
       return () => { active = false; };
     }
-    Promise.all([getCaseById(caseId), getCaseResolutions(caseId, user.id)])
+    // 🔥 FIX #1: Do NOT pass heroId — use the OR-clause in worker
+    Promise.all([getCaseById(caseId), getCaseResolutions(caseId)])
       .then(([nextCase, resolutions]) => {
         if (!active) return;
-        const verified = (Array.isArray(resolutions) ? resolutions : []).find(isVerifiedResolution);
+        // 🔥 FIX #3: Filter all truly completed resolutions, then pick the one with receipt first
+        const completedList = (Array.isArray(resolutions) ? resolutions : []).filter(isTrulyCompletedHelp);
+        const verified = completedList.find((r) => r.receipt_url) || completedList[0] || null;
         setCaseData(nextCase);
         setResolution(verified || null);
       })
@@ -90,7 +90,7 @@ export default function AffidavitPage() {
         </div>
         {loading ? (
           <div className="rounded-3xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading verified affidavit...</div>
-        ) : !resolution || !isVerifiedResolution(resolution) ? (
+        ) : !resolution || !isTrulyCompletedHelp(resolution) ? (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-900/50 dark:bg-amber-950/20">
             <FileText className="mx-auto h-10 w-10 text-amber-600" />
             <h1 className="mt-3 text-xl font-bold">Affidavit not available</h1>
