@@ -1,4 +1,4 @@
-// src/pages/AdminDashboard.tsx - مکمل فائل
+// src/pages/AdminPanel.tsx
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -827,13 +827,13 @@ export default function AdminPage() {
               <KycSearchBox kycList={kycList} onUpdate={updateKyc} cnicCounts={cnicCounts} profileMap={profileMap} />
             </TabsContent>
 
-            {/* ===== CASES TAB - UPDATED ===== */}
+            {/* ===== CASES TAB ===== */}
             <TabsContent value="cases" className="space-y-4 mt-4">
-              <CaseSearchBox 
-                caseList={caseList} 
-                onUpdate={updateCase} 
-                resolutions={resByCaseId} 
-                profileMap={profileMap} 
+              <CaseSearchBox
+                caseList={caseList}
+                onUpdate={updateCase}
+                resolutions={resByCaseId}
+                profileMap={profileMap}
                 cnicByUser={cnicByUser}
                 onConfirmResolution={confirmResolution}
                 onRejectResolution={rejectResolution}
@@ -921,8 +921,10 @@ export default function AdminPage() {
 }
 
 // ============================================================
-//  SUSPENSIONS PANEL
+//  ALL SUB-COMPONENTS
 // ============================================================
+
+// ---------- SUSPENSIONS PANEL ----------
 function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
   const activeSuspensions = suspensions.filter((s: any) => s.is_active);
   const totalSuspensions = suspensions.length;
@@ -972,9 +974,7 @@ function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
   );
 }
 
-// ============================================================
-//  SEARCH BOXES
-// ============================================================
+// ---------- SEARCH BOXES ----------
 function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
@@ -1016,9 +1016,7 @@ function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
   );
 }
 
-// ============================================================
-//  CASE SEARCH BOX (UPDATED WITH PROPS FOR ACTIONS)
-// ============================================================
+// ===== CASE SEARCH BOX =====
 function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser, onConfirmResolution, onRejectResolution, onMarkPaidClose, onRejectPayClose }: any) {
   const [search, setSearch] = useState("");
   const sortedCases = [...caseList].sort((a, b) => {
@@ -1042,11 +1040,11 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
       </div>
       {filtered.length === 0 ? <Empty text="No matching cases" /> :
         filtered.map((c: any) => (
-          <CaseCard 
-            key={c.id} 
-            c={c} 
-            onUpdate={onUpdate} 
-            resolutions={resolutions[c.id] ?? []} 
+          <CaseCard
+            key={c.id}
+            c={c}
+            onUpdate={onUpdate}
+            resolutions={resolutions[c.id] ?? []}
             profileMap={profileMap}
             onConfirmResolution={onConfirmResolution}
             onRejectResolution={onRejectResolution}
@@ -1059,9 +1057,7 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
   );
 }
 
-// ============================================================
-//  CASE CARD (UPDATED WITH FULL ACTIONS)
-// ============================================================
+// ===== CASE CARD =====
 function CaseCard({ c, onUpdate, resolutions, profileMap, onConfirmResolution, onRejectResolution, onMarkPaidClose, onRejectPayClose }: any) {
   const [reason, setReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -1632,9 +1628,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap, onConfirmResolution, o
   );
 }
 
-// ============================================================
-//  KYC CARD
-// ============================================================
+// ---------- KYC CARD ----------
 function KycCard({ kyc, onUpdate, dupCount }: any) {
   const [reason, setReason] = useState("");
   const isDuplicate = dupCount > 1;
@@ -1746,9 +1740,7 @@ function KycCard({ kyc, onUpdate, dupCount }: any) {
   );
 }
 
-// ============================================================
-//  DEPOSIT CARD
-// ============================================================
+// ---------- DEPOSIT CARD ----------
 function DepositCard({ d, onApprove, onReject }: any) {
   const [reason, setReason] = useState("");
   const [credits, setCredits] = useState<string>(String(d.credits ?? d.amount ?? ""));
@@ -1786,9 +1778,7 @@ function DepositCard({ d, onApprove, onReject }: any) {
   );
 }
 
-// ============================================================
-//  FEEDBACK CARD
-// ============================================================
+// ---------- FEEDBACK CARD ----------
 function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
   const [reason, setReason] = useState("");
   const p = profileMap[fb.user_id];
@@ -1822,9 +1812,7 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
   );
 }
 
-// ============================================================
-//  USER SEARCH BOX & USER CARD
-// ============================================================
+// ---------- USER SEARCH BOX & CARD ----------
 function UserSearchBox({ usersList, onSuspendChange, onManualUnlock }: any) {
   const [search, setSearch] = useState("");
   const query = search.trim().toLowerCase();
@@ -1954,9 +1942,7 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
   );
 }
 
-// ============================================================
-//  PAY & CLOSE CARD (used in the "Pay" tab)
-// ============================================================
+// ---------- PAY & CLOSE CARD ----------
 function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
   const cur = c.currency || "USD";
   const s = sym(cur);
@@ -2017,9 +2003,7 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
   );
 }
 
-// ============================================================
-//  RESOLUTION HISTORY CARD
-// ============================================================
+// ---------- RESOLUTION HISTORY CARD ----------
 function ResolutionHistoryCard({ r, c, profileMap }: any) {
   const status = normalizedResolutionStatus(r);
   const isRejected = status === "rejected" || status === "disputed";
@@ -2052,9 +2036,7 @@ function ResolutionHistoryCard({ r, c, profileMap }: any) {
   );
 }
 
-// ============================================================
-//  VERIFY CARD
-// ============================================================
+// ---------- VERIFY CARD ----------
 function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
   const [rejectionReason, setRejectionReason] = useState("");
   const cur = c?.currency || "USD";
@@ -2125,9 +2107,7 @@ function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
   );
 }
 
-// ============================================================
-//  NOTIFY PANEL
-// ============================================================
+// ---------- NOTIFY PANEL ----------
 function NotifyPanel({ profiles, kycList, caseList }: any) {
   const [group, setGroup] = useState("all");
   const [title, setTitle] = useState("");
@@ -2251,9 +2231,7 @@ function NotifyPanel({ profiles, kycList, caseList }: any) {
   );
 }
 
-// ============================================================
-//  OFFERS PANEL
-// ============================================================
+// ---------- OFFERS PANEL ----------
 function OffersPanel({ offers, onReload }: any) {
   const offerMap: Record<string, any> = {};
   for (const o of offers) offerMap[o.category] = o;
@@ -2334,9 +2312,7 @@ function OfferRow({ category, offer, onReload }: any) {
   );
 }
 
-// ============================================================
-//  SUPPORT PANEL
-// ============================================================
+// ---------- SUPPORT PANEL ----------
 function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   const [activeUser, setActiveUser] = useState<string | null>(null);
   const [reply, setReply] = useState("");
@@ -2553,9 +2529,7 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   );
 }
 
-// ============================================================
-//  GENERIC HELPERS
-// ============================================================
+// ---------- GENERIC HELPERS ----------
 function Empty({ text }: { text: string }) {
   return <div className="text-center py-12 text-muted-foreground"><ClipboardCheck className="h-10 w-10 mx-auto opacity-30 mb-2" /><p>{text}</p></div>;
 }
@@ -2626,9 +2600,35 @@ function Img({ url, label }: { url: string; label: string }) {
   );
 }
 
-// ============================================================
-//  ICON HELPERS
-// ============================================================
+// ---------- DEPOSIT SEARCH BOX ----------
+// (This was the missing component – now defined)
+function DepositSearchBox({ deposits, onApprove, onReject, profileMap = {}, cnicByUser = {} }: any) {
+  const [search, setSearch] = useState("");
+  const sorted = [...deposits].sort((a, b) => {
+    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
+    return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+  });
+  const filtered = search.trim()
+    ? sorted.filter((d: any) => {
+        const q = search.trim().toLowerCase();
+        const p = profileMap[d.user_id] || {};
+        return [d.id, d.user_id, d.transaction_id, d.amount, d.credits, p.full_name, p.email, cnicByUser[d.user_id]].some((value) => String(value || "").toLowerCase().includes(q));
+      })
+    : sorted;
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Search deposits by user ID or transaction ID..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
+      </div>
+      {filtered.length === 0 ? <Empty text="No matching deposits" /> :
+        filtered.map((d: any) => <DepositCard key={d.id} d={d} onApprove={onApprove} onReject={onReject} />)
+      }
+    </div>
+  );
+}
+
+// ---------- BOOK OPEN ICON ----------
 function BookOpen({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
