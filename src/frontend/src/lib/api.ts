@@ -48,6 +48,15 @@ async function readArrayResponse(res: Response): Promise<any[]> {
   return [];
 }
 
+async function readApiResponse<T = any>(res: Response): Promise<T> {
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = typeof payload?.error === "string" ? payload.error : `Request failed (HTTP ${res.status}).`;
+    throw new Error(message);
+  }
+  return payload as T;
+}
+
 // ---------- AUTH ----------
 export async function verifyToken(): Promise<{ valid: boolean; user?: any }> {
   const token = getAuthToken();
@@ -269,15 +278,6 @@ export async function updateKycSubmission(id: string, data: any) {
 }
 
 // ---------- PROFILES ----------
-async function readApiResponse<T = any>(res: Response): Promise<T> {
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const message = typeof payload?.error === "string" ? payload.error : `Request failed (HTTP ${res.status}).`;
-    throw new Error(message);
-  }
-  return payload as T;
-}
-
 export async function getProfile(userId: string, profileRole?: "hero" | "requester" | null) {
   const query = profileRole ? `?profile_role=${encodeURIComponent(profileRole)}` : "";
   const res = await fetch(`${WORKER_URL}/api/profiles/${userId}${query}`, {
@@ -953,18 +953,21 @@ export async function setOnboardingStatus(userId: string, completed: boolean): P
  * Assistant ڈیش بورڈ کے لیے وہ کیسز جن میں رقم جمع ہے لیکن Assistant نے ابھی تک ادائیگی نہیں کی۔
  */
 export async function getAssistantPendingPayments(): Promise<any[]> {
-  const res = await fetch(`${WORKER_URL}/api/assistant/payments`, {
+  const res = await fetch(`${WORKER_URL}/api/assistant/pending-payments`, {
     headers: headers(),
   });
-  const data = await res.json().catch(() => []);
-  if (!res.ok) throw new Error(data?.error || `Failed to fetch pending payments (${res.status})`);
-  return Array.isArray(data) ? data : [];
+  return readArrayResponse(res);
 }
 
 /**
  * Assistant کسی کیس کی جمع شدہ رقم خود ادا کرتا ہے (فوری منظور)۔
  */
-export async function assistantPayCase(caseId: string, amount: number, receiptUrl?: string, transactionId?: string): Promise<any> {
+export async function assistantPayCase(
+  caseId: string,
+  amount: number,
+  receiptUrl?: string,
+  transactionId?: string
+): Promise<any> {
   const res = await fetch(`${WORKER_URL}/api/assistant/pay`, {
     method: "POST",
     headers: headers(),
@@ -975,9 +978,7 @@ export async function assistantPayCase(caseId: string, amount: number, receiptUr
       transaction_id: transactionId || null,
     }),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `Assistant payment failed (${res.status})`);
-  return data;
+  return readApiResponse(res);
 }
 
 /**
@@ -987,28 +988,5 @@ export async function getAssistantActiveCases(): Promise<any[]> {
   const res = await fetch(`${WORKER_URL}/api/assistant/active-cases`, {
     headers: headers(),
   });
-  const data = await res.json().catch(() => []);
-  if (!res.ok) throw new Error(data?.error || `Failed to fetch active cases (${res.status})`);
-  return Array.isArray(data) ? data : [];
-}
-
-
-// ---------- ASSISTANT ----------
-export async function getAssistantPendingPayments() {
-  const res = await fetch(`${WORKER_URL}/api/assistant/pending-payments`, { headers: headers() });
   return readArrayResponse(res);
 }
-
-export async function getAssistantActiveCases() {
-  const res = await fetch(`${WORKER_URL}/api/assistant/active-cases`, { headers: headers() });
-  return readArrayResponse(res);
-}
-
-export async function assistantPayCase(caseId: string, amount: number) {
-  const res = await fetch(`${WORKER_URL}/api/assistant/pay`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ case_id: caseId, amount }),
-  });
-  return readApiResponse(res);
-      }
