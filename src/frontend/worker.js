@@ -4,7 +4,8 @@
 // Assistant: shoaibugti@gmail.com | Admin: shoaibahmedbugti5@gmail.com
 
 const PUBLIC_ORIGIN = "https://givethra.org";
-const SUPPORTS_LAUNCH_AT = "2026-09-03T00:00:00.000Z";
+// ✅ Fix #2: SUPPORTS_LAUNCH_AT کو غیر فعال کیا جا رہا ہے (اب استعمال نہیں ہوگا)
+// const SUPPORTS_LAUNCH_AT = "2026-09-03T00:00:00.000Z";
 
 const ADMIN_EMAILS = new Set([
   "shoaibahmedbugti5@gmail.com",
@@ -884,10 +885,11 @@ async function insertCommunityNotification(env, ctx, recipientId, actorId, actor
   ).bind(id(), recipientId, type, title, `${publicDisplayName(actorName, "A Givethra member")}: ${message}`, "/community", now()).run());
 }
 
+// ✅ Fix #2: recordCommunitySupport - SUPPORTS_LAUNCH_AT condition removed
 async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, postId, actorName) {
   if (!originalUserId || !sourceUserId || originalUserId === sourceUserId) return { added: false, supports: 0, creditsEarned: 0 };
   const post = await env.DB.prepare("SELECT created_at FROM community_posts WHERE id = ? AND user_id = ?").bind(postId, originalUserId).first();
-  if (!post || String(post.created_at || "") < SUPPORTS_LAUNCH_AT) return { added: false, supports: 0, creditsEarned: 0, unavailable: true };
+  if (!post) return { added: false, supports: 0, creditsEarned: 0, unavailable: true };
   const existing = await env.DB.prepare("SELECT id FROM user_supports WHERE source_user_id = ? AND post_id = ? LIMIT 1").bind(sourceUserId, postId).first();
   if (existing) {
     const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count FROM users WHERE user_id = ?").bind(originalUserId).first();
@@ -1113,6 +1115,7 @@ async function handleCommunitySupport(request, env, user, origin, ctx) {
   return json({ post_id: postId, supported: Boolean(result.added || result.alreadySupported), support_count: Number(postSupportCount?.count || 0), ...result }, result.added ? 201 : 200, origin);
 }
 
+// ✅ Fix #1: Follow List - corrected where and selected columns
 async function handleFollow(request, env, user, url, parts, origin, ctx) {
   const body = await readJson(request).catch(() => ({}));
   const targetId = body?.target_user_id || url.searchParams.get("target") || url.searchParams.get("user");
@@ -1120,9 +1123,18 @@ async function handleFollow(request, env, user, url, parts, origin, ctx) {
     const userId = url.searchParams.get("user") || user?.user_id;
     const type = url.searchParams.get("type") === "requesters" ? "requesters" : "heroes";
     if (!userId) return json([], 200, origin);
-    const where = type === "requesters" ? "f.follower_id = ?" : "f.following_id = ?";
-    const selected = type === "requesters" ? "f.follower_id" : "f.following_id";
-    const rows = await env.DB.prepare(`SELECT f.created_at, u.user_id, COALESCE(p.full_name, u.full_name, u.email, 'User') AS full_name, p.avatar_url, u.kyc_status FROM follows f LEFT JOIN users u ON u.user_id = ${selected} LEFT JOIN profiles p ON p.user_id = ${selected} WHERE ${where} ORDER BY f.created_at DESC`).bind(userId).all();
+    const where = type === "requesters" ? "f.following_id = ?" : "f.follower_id = ?";
+    const other = type === "requesters" ? "f.follower_id" : "f.following_id";
+    const rows = await env.DB.prepare(
+      `SELECT f.created_at, ${other} AS user_id,
+              COALESCE(p.full_name, u.full_name, u.email, 'User') AS full_name,
+              p.avatar_url, u.kyc_status
+       FROM follows f
+       LEFT JOIN users u ON u.user_id = ${other}
+       LEFT JOIN profiles p ON p.user_id = ${other}
+       WHERE ${where}
+       ORDER BY f.created_at DESC`
+    ).bind(userId).all();
     return json((rows.results || []).map((row) => ({ ...row, is_verified: String(row.kyc_status || '').toLowerCase() === 'approved' })), 200, origin);
   }
   if (!targetId) return json({ error: "Target user ID required" }, 400, origin);
