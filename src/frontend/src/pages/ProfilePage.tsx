@@ -4,6 +4,7 @@
 // 🔥 FIXED: Badge now shows correctly using isTrulyCompletedHelp (Fix #5)
 // 🔥 FIXED: Edit button separated from name/badge to avoid layout collision (Fix #7)
 // 🔥 FIXED: Profile loading stuck - now shows page even if profile is null (Fix #8)
+// 🔥 FIXED: "/profile/me" now uses actual logged-in user id (Critical fix)
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import {
   Info,
   MoreHorizontal,
   Pin,
+  AlertCircle, // ✅ added for error state
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -149,7 +151,11 @@ export default function ProfilePage() {
   const { role } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
-  const profileUserId = location.pathname.match(/^\/profile\/([^/]+)/)?.[1] || user?.id || "";
+
+  // 🔥 CRITICAL FIX: Treat "me" as the logged-in user's ID
+  const rawParam = location.pathname.match(/^\/profile\/([^/]+)/)?.[1];
+  const profileUserId = (!rawParam || rawParam === "me") ? (user?.id || "") : rawParam;
+
   const isOwnProfile = Boolean(user?.id && profileUserId === user.id);
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
