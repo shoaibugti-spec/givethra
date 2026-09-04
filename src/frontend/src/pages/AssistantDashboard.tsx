@@ -59,18 +59,36 @@ export default function AssistantDashboard() {
     fetchData();
   }, [isAuthenticated, isAssistant, navigate]);
 
+  // 🔥 FIX: Use Promise.allSettled for better error handling
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pending, active] = await Promise.all([
+      const [pendingResult, activeResult] = await Promise.allSettled([
         getAssistantPendingPayments(),
         getAssistantActiveCases(),
       ]);
-      setPendingCases(pending);
-      setActiveCases(active);
+
+      // Handle pending payments
+      if (pendingResult.status === "fulfilled") {
+        setPendingCases(pendingResult.value);
+      } else {
+        console.error("Pending payments failed:", pendingResult.reason);
+        toast.error("Could not load pending payments.");
+        setPendingCases([]);
+      }
+
+      // Handle active cases
+      if (activeResult.status === "fulfilled") {
+        setActiveCases(activeResult.value);
+      } else {
+        console.error("Active cases failed:", activeResult.reason);
+        toast.error("Could not load active cases.");
+        setActiveCases([]);
+      }
     } catch (error) {
-      console.error("Failed to fetch data:", error);
-      toast.error("Failed to load data");
+      // This catch shouldn't be reached with allSettled, but just in case
+      console.error("Unexpected error:", error);
+      toast.error("Failed to load dashboard data.");
     } finally {
       setLoading(false);
     }
