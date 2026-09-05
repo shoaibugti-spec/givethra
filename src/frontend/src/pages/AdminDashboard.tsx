@@ -1,9 +1,4 @@
 // src/pages/AdminPage.tsx
-// Givethra Admin Panel - Complete with filters for Pay & Close, Deposits, Feedback
-// 🔥 FIX: Added rejection reason box in CaseCard
-// 🔥 FIX: Pay & Close tab now has filters: Ready, Paid, Rejected, All
-// 🔥 FIX: PayCloseCard displays paid receipt link when available
-
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -272,9 +267,6 @@ function copyText(text?: string) {
   toast.success("Copied!");
 }
 
-// ============================================================
-//  MAIN ADMIN PAGE
-// ============================================================
 export default function AdminPage() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -296,10 +288,7 @@ export default function AdminPage() {
   const [feedbackSearch, setFeedbackSearch] = useState("");
   const [caseStatusFilter, setCaseStatusFilter] = useState<"all" | "pending" | "approved" | "rejected" | "completed" | "expired">("all");
 
-  // 🔥 Filters for Pay & Close
   const [payFilter, setPayFilter] = useState<"ready" | "paid" | "rejected" | "all">("ready");
-
-  // 🔥 Filters for Deposits and Feedback
   const [depositStatusFilter, setDepositStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<"all" | "pending_review" | "approved" | "rejected">("all");
 
@@ -625,7 +614,6 @@ export default function AdminPage() {
     loadData();
   }
 
-  // ---- Counts ----
   const pendingKyc = kycList.filter((k) => k.status === "pending");
   const approvedKycCount = kycList.filter((k) => k.status === "approved").length;
   const rejectedKycCount = kycList.filter((k) => k.status === "rejected").length;
@@ -668,10 +656,7 @@ export default function AdminPage() {
     return needed > 0 && collected >= needed && !c.closed_by_admin;
   });
 
-  // 🔥 Paid (approved pay-close) cases
   const paidPayClose = caseList.filter((c) => c.status === "completed" && c.closed_by_admin === true && c.paid_receipt_url);
-
-  // 🔥 Rejected pay-close cases
   const rejectedPayClose = caseList.filter((c) => c.status === "approved" && c.closed_by_admin === false && c.rejection_reason);
 
   const usersList = profiles.map((p) => {
@@ -895,14 +880,12 @@ export default function AdminPage() {
                 })}
             </TabsContent>
 
-            {/* ===== PAY & CLOSE TAB - WITH FILTERS FOR READY, PAID, REJECTED ===== */}
             <TabsContent value="pay" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-teal-50 dark:bg-teal-950/20 p-4 text-sm text-teal-700 flex items-start gap-2">
                 <HandCoins className="h-4 w-4 shrink-0 mt-0.5" />
                 <p>Fundraising cases that have reached their goal. After paying the institute, upload the receipt and close the case. The seeker will be notified.</p>
               </div>
 
-              {/* Filter buttons */}
               <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="group" aria-label="Pay & Close filters">
                 {[
                   { key: "ready", label: "Ready to Pay", count: readyToClose.length },
@@ -926,7 +909,6 @@ export default function AdminPage() {
                 ))}
               </div>
 
-              {/* Filtered cases */}
               {(() => {
                 let displayCases = [];
                 if (payFilter === "ready") displayCases = readyToClose;
@@ -1027,11 +1009,6 @@ export default function AdminPage() {
   );
 }
 
-// ============================================================
-//  ALL SUB-COMPONENTS
-// ============================================================
-
-// ---------- SUSPENSIONS PANEL ----------
 function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
   const activeSuspensions = suspensions.filter((s: any) => s.is_active);
   const totalSuspensions = suspensions.length;
@@ -1081,7 +1058,6 @@ function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
   );
 }
 
-// ---------- SEARCH BOXES ----------
 function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
@@ -1123,7 +1099,6 @@ function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
   );
 }
 
-// ===== CASE SEARCH BOX =====
 function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser, statusFilter, setStatusFilter }: any) {
   const [search, setSearch] = useState("");
   const sortedCases = [...caseList].sort((a, b) => {
@@ -1185,7 +1160,6 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
   );
 }
 
-// ===== CASE CARD - WITH REJECTION REASON BOX =====
 function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const [reason, setReason] = useState("");
   const [showRejectReason, setShowRejectReason] = useState(false);
@@ -1273,7 +1247,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     { label: "Property Ownership", value: catDetails?.property_ownership === "rented" ? "Rented" : catDetails?.property_ownership === "owned" ? "Owned" : "" },
   ].filter((d) => d.value);
 
-  // ---- File extraction ----
   const fileEntries: { key: string; label: string; url: string }[] = [];
   
   function getFileNameFromUrl(url: string): string {
@@ -1394,7 +1367,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const isApproved = c.status === "approved";
   const isPending = c.status === "pending";
 
-  // ---- Action handlers ----
   const handleApprove = async () => {
     if (!confirm(`Are you sure you want to APPROVE this case: "${c.title}"?`)) return;
     setActionLoading(true);
@@ -1425,10 +1397,8 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     }
   };
 
-  // ---- Render ----
   return (
     <div className={`rounded-xl border p-4 space-y-3 ${isRejected ? "border-red-300 bg-red-50/50 dark:bg-red-950/10" : "bg-card"}`}>
-      {/* Status badge */}
       <div className="flex items-center gap-2 flex-wrap">
         <StatusBadge status={c.status} />
         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
@@ -1440,7 +1410,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         {isExpired && <span className="text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-semibold">EXPIRED</span>}
       </div>
 
-      {/* Rejection reason display */}
       {isRejected && c.rejection_reason && (
         <div className="rounded-lg border-2 border-red-300 bg-red-100 dark:bg-red-950/30 p-4">
           <div className="flex items-start gap-2">
@@ -1456,7 +1425,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Title and description */}
       <div className="text-sm space-y-1">
         <p className="font-semibold">{c.title}</p>
         <p className="text-muted-foreground">{c.short_description}</p>
@@ -1476,13 +1444,11 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       </div>
 
-      {/* Seeker info */}
       <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs space-y-0.5">
         <p className="font-semibold text-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Submitted by</p>
         <p className="text-muted-foreground">{seeker?.full_name || "—"} · {seeker?.email || c.user_id?.slice(0, 8)}</p>
       </div>
 
-      {/* Personal details */}
       {personalDetails.length > 0 && (
         <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
           <p className="text-xs font-semibold text-primary flex items-center gap-1"><User className="h-3 w-3" /> Personal Details</p>
@@ -1490,7 +1456,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Receiver details */}
       {receiverDetails.length > 0 && (
         <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
           <p className="text-xs font-semibold text-primary flex items-center gap-1"><HandCoins className="h-3 w-3" /> Payment Receiver</p>
@@ -1498,7 +1463,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Disability details */}
       {disabilityDetails.length > 0 && (
         <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
           <p className="text-xs font-semibold text-primary flex items-center gap-1"><Heart className="h-3 w-3" /> Disability Details</p>
@@ -1506,7 +1470,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Property details */}
       {propertyDetails.length > 0 && (
         <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
           <p className="text-xs font-semibold text-primary flex items-center gap-1"><Building2 className="h-3 w-3" /> Property Details</p>
@@ -1516,7 +1479,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Education details */}
       {eduFields.length > 0 && (
         <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 p-3 space-y-1">
           <p className="text-xs font-semibold text-blue-700 flex items-center gap-1"><BookOpen className="h-3 w-3" /> Education Details</p>
@@ -1524,7 +1486,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Other fields */}
       {allFields.length > 0 && (
         <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
           <p className="text-xs font-semibold text-primary flex items-center gap-1"><ClipboardCheck className="h-3 w-3" /> Other Details</p>
@@ -1532,7 +1493,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Files */}
       {uniqueFiles.length > 0 ? (
         <div className="rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-3 space-y-2">
           <div className="flex items-center justify-between">
@@ -1598,7 +1558,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Institute payment details */}
       {hasPayment && (
         <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-3 space-y-1">
           <p className="font-semibold text-sm flex items-center gap-1 text-amber-700"><Building2 className="h-4 w-4" /> Institute Payment Details</p>
@@ -1612,7 +1571,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Resolutions (just for info) */}
       {resolutions.length > 0 && (
         <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-2">
           <p className="font-semibold text-sm flex items-center gap-1"><Heart className="h-4 w-4 text-primary" /> All Helps / Payments</p>
@@ -1629,7 +1587,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* ===== ACTIONS: Approve & Reject (only if pending) ===== */}
       {isPending && (
         <div className="space-y-2 pt-2 border-t border-border">
           <div className="flex flex-wrap gap-2">
@@ -1686,7 +1643,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {/* Show status for non-pending cases */}
       {!isPending && (
         <div className="pt-2 border-t border-border text-xs text-muted-foreground">
           This case is <span className="font-semibold capitalize">{c.status}</span>.
@@ -1697,7 +1653,6 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   );
 }
 
-// ---------- KYC CARD ----------
 function KycCard({ kyc, onUpdate, dupCount }: any) {
   const [reason, setReason] = useState("");
   const isDuplicate = dupCount > 1;
@@ -1809,7 +1764,6 @@ function KycCard({ kyc, onUpdate, dupCount }: any) {
   );
 }
 
-// ---------- DEPOSIT CARD ----------
 function DepositCard({ d, onApprove, onReject }: any) {
   const [reason, setReason] = useState("");
   const [credits, setCredits] = useState<string>(String(d.credits ?? d.amount ?? ""));
@@ -1847,7 +1801,6 @@ function DepositCard({ d, onApprove, onReject }: any) {
   );
 }
 
-// ---------- FEEDBACK CARD ----------
 function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
   const [reason, setReason] = useState("");
   const p = profileMap[fb.user_id];
@@ -1881,7 +1834,6 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
   );
 }
 
-// ---------- USER SEARCH BOX & CARD ----------
 function UserSearchBox({ usersList, onSuspendChange, onManualUnlock }: any) {
   const [search, setSearch] = useState("");
   const query = search.trim().toLowerCase();
@@ -2011,7 +1963,6 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
   );
 }
 
-// ---------- PAY & CLOSE CARD ----------
 function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
   const cur = c.currency || "USD";
   const s = sym(cur);
@@ -2033,7 +1984,6 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
     finally { setUploading(false); }
   }
 
-  // 🔥 Show receipt link if already paid
   const paidReceiptUrl = c.paid_receipt_url;
 
   return (
@@ -2058,7 +2008,6 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
         <p className="text-xs font-mono">{c.account_number} {c.account_iban ? `· ${c.account_iban}` : ""}</p>
       </div>
 
-      {/* 🔥 Show uploaded receipt if exists */}
       {paidReceiptUrl && (
         <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-300 p-3">
           <p className="text-xs font-semibold text-green-700 flex items-center gap-1"><CheckCircle className="h-4 w-4" /> Payment Receipt</p>
@@ -2096,7 +2045,6 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
   );
 }
 
-// ---------- RESOLUTION HISTORY CARD ----------
 function ResolutionHistoryCard({ r, c, profileMap }: any) {
   const status = normalizedResolutionStatus(r);
   const isRejected = status === "rejected" || status === "disputed";
@@ -2129,7 +2077,6 @@ function ResolutionHistoryCard({ r, c, profileMap }: any) {
   );
 }
 
-// ---------- VERIFY CARD ----------
 function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
   const [rejectionReason, setRejectionReason] = useState("");
   const cur = c?.currency || "USD";
@@ -2200,7 +2147,6 @@ function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
   );
 }
 
-// ---------- NOTIFY PANEL ----------
 function NotifyPanel({ profiles, kycList, caseList }: any) {
   const [group, setGroup] = useState("all");
   const [title, setTitle] = useState("");
@@ -2324,7 +2270,6 @@ function NotifyPanel({ profiles, kycList, caseList }: any) {
   );
 }
 
-// ---------- OFFERS PANEL ----------
 function OffersPanel({ offers, onReload }: any) {
   const offerMap: Record<string, any> = {};
   for (const o of offers) offerMap[o.category] = o;
@@ -2405,7 +2350,6 @@ function OfferRow({ category, offer, onReload }: any) {
   );
 }
 
-// ---------- SUPPORT PANEL ----------
 function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   const [activeUser, setActiveUser] = useState<string | null>(null);
   const [reply, setReply] = useState("");
@@ -2622,7 +2566,6 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
   );
 }
 
-// ---------- GENERIC HELPERS ----------
 function Empty({ text }: { text: string }) {
   return <div className="text-center py-12 text-muted-foreground"><ClipboardCheck className="h-10 w-10 mx-auto opacity-30 mb-2" /><p>{text}</p></div>;
 }
@@ -2693,7 +2636,6 @@ function Img({ url, label }: { url: string; label: string }) {
   );
 }
 
-// ---------- DEPOSIT SEARCH BOX ----------
 function DepositSearchBox({ deposits, onApprove, onReject, profileMap = {}, cnicByUser = {} }: any) {
   const [search, setSearch] = useState("");
   const filtered = search.trim()
@@ -2716,7 +2658,6 @@ function DepositSearchBox({ deposits, onApprove, onReject, profileMap = {}, cnic
   );
 }
 
-// ---------- BOOK OPEN ICON ----------
 function BookOpen({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
