@@ -1,5 +1,5 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
-// Givethra - Role Selection with Full-Color Auto-Slide Boxes (No Icons, Only Slides)
+// Givethra - Full-Color Auto-Slide Boxes with Icons inside Slides
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -17,37 +17,97 @@ import {
   MessageCircle,
   Download,
   Smartphone,
+  // Icons for slides
+  Users,
+  Share2,
+  HeartHandshake,
+  ThumbsUp,
+  Users as UsersIcon,
+  Star,
+  UserPlus,
+  Lock,
+  Heart,
+  Gift,
+  CheckCircle,
+  Target,
+  FileText,
+  HandHelping,
+  BookOpen,
+  Bell,
+  Battery,
+  Flame,
+  Droplets,
+  GraduationCap,
+  Stethoscope,
+  ShoppingCart,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getApprovedCases, getKycStatus } from "@/lib/api";
 
-// ---------- Slide data (exactly as specified) ----------
+// ---------- Slide data with icons (exactly as per image) ----------
 const COMMUNITY_SLIDES = [
-  { title: "Community", desc: "Connect with people who care" },
-  { title: "Connect & Share", desc: "Share your story, find support" },
-  { title: "Support Others", desc: "Every kind word matters" },
-  { title: "Like • Comment • Share", desc: "Engage with the community" },
-  { title: "Build Your Community", desc: "Grow together, thrive together" },
+  { icon: <Users className="w-8 h-8" />, title: "Community", desc: "Connect with people who care" },
+  { icon: <Share2 className="w-8 h-8" />, title: "Connect & Share", desc: "Share your story, find support" },
+  { icon: <HeartHandshake className="w-8 h-8" />, title: "Support Others", desc: "Every kind word matters" },
+  { icon: <ThumbsUp className="w-8 h-8" />, title: "Like • Comment • Share", desc: "Engage with the community" },
+  { icon: <UsersIcon className="w-8 h-8" />, title: "Build Your Community", desc: "Grow together, thrive together" },
 ];
 
 const HERO_SLIDES = [
-  { title: "Hero", desc: "You can change a life today" },
-  { title: "Become a Hero", desc: "Step up and make a difference" },
-  { title: "Unlock a Case", desc: "Choose a case to support" },
-  { title: "Contribute & Help", desc: "Your contribution counts" },
-  { title: "3 Free Contributions", desc: "Welcome offer — try it now" },
-  { title: "Help Verified People", desc: "Support those who need it most" },
-  { title: "Make a Real Impact", desc: "Be the change you want to see" },
+  { icon: <Star className="w-8 h-8" />, title: "Hero", desc: "You can change a life today" },
+  { icon: <UserPlus className="w-8 h-8" />, title: "Become a Hero", desc: "Step up and make a difference" },
+  { icon: <Lock className="w-8 h-8" />, title: "Unlock a Case", desc: "Choose a case to support" },
+  { icon: <Heart className="w-8 h-8" />, title: "Contribute & Help", desc: "Your contribution counts" },
+  { icon: <Gift className="w-8 h-8" />, title: "3 Free Contributions", desc: "Welcome offer — try it now" },
+  { icon: <CheckCircle className="w-8 h-8" />, title: "Help Verified People", desc: "Support those who need it most" },
+  { icon: <Target className="w-8 h-8" />, title: "Make a Real Impact", desc: "Be the change you want to see" },
 ];
 
 const REQUESTER_SLIDES = [
-  { title: "Requester", desc: "Get the help you deserve" },
-  { title: "Request Help", desc: "Reach out with confidence" },
-  { title: "Submit Your Case", desc: "Tell us your story" },
-  { title: "Complete KYC", desc: "Secure & private verification" },
-  { title: "Get Verified", desc: "Build trust in the community" },
-  { title: "Receive Verified Help", desc: "Support from real people" },
+  { icon: <FileText className="w-8 h-8" />, title: "Requester", desc: "Get the help you deserve" },
+  { icon: <HandHelping className="w-8 h-8" />, title: "Request Help", desc: "Reach out with confidence" },
+  { icon: <BookOpen className="w-8 h-8" />, title: "Submit Your Case", desc: "Tell us your story" },
+  { icon: <ShieldCheck className="w-8 h-8" />, title: "Complete KYC", desc: "Secure & private verification" },
+  { icon: <CheckCircle className="w-8 h-8" />, title: "Get Verified", desc: "Build trust in the community" },
+  { icon: <Heart className="w-8 h-8" />, title: "Receive Verified Help", desc: "Support from real people" },
 ];
+
+// Category styles for Active Cases (to get icons)
+const ROLE_CATEGORY_STYLES: Record<
+  string,
+  { icon: typeof Battery; color: string; bg: string }
+> = {
+  "Electricity Bill": {
+    icon: Battery,
+    color: "text-amber-600",
+    bg: "bg-amber-500/10",
+  },
+  "Gas Bill": {
+    icon: Flame,
+    color: "text-orange-600",
+    bg: "bg-orange-500/10",
+  },
+  "Water Bill": {
+    icon: Droplets,
+    color: "text-sky-600",
+    bg: "bg-sky-500/10",
+  },
+  "School Fees": {
+    icon: GraduationCap,
+    color: "text-indigo-600",
+    bg: "bg-indigo-500/10",
+  },
+  "Medical & Treatment": {
+    icon: Stethoscope,
+    color: "text-rose-600",
+    bg: "bg-rose-500/10",
+  },
+  "Business / Work Help": {
+    icon: ShoppingCart,
+    color: "text-emerald-600",
+    bg: "bg-emerald-500/10",
+  },
+};
 
 // ---------- Social links (unchanged) ----------
 const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61590715263595";
@@ -86,17 +146,22 @@ export default function RoleSelectionPage() {
     count,
   }));
 
-  // Active slides: first a summary, then each category
+  // Active slides: first a summary, then each category with icon
   const activeSlides =
     activeCaseCategories.length > 0
       ? [
-          { title: `${activeCases.length} Active Cases`, desc: "Tap to help now" },
-          ...activeCaseCategories.map((cat) => ({
-            title: cat.category,
-            desc: `${cat.count} case${cat.count === 1 ? "" : "s"}`,
-          })),
+          { icon: <Bell className="w-8 h-8" />, title: `${activeCases.length} Active Cases`, desc: "Tap to help now" },
+          ...activeCaseCategories.map((cat) => {
+            const style = ROLE_CATEGORY_STYLES[cat.category] || { icon: FileText };
+            const Icon = style.icon;
+            return {
+              icon: <Icon className="w-8 h-8" />,
+              title: cat.category,
+              desc: `${cat.count} case${cat.count === 1 ? "" : "s"}`,
+            };
+          }),
         ]
-      : [{ title: "No active cases", desc: "Check back soon" }];
+      : [{ icon: <Bell className="w-8 h-8" />, title: "No active cases", desc: "Check back soon" }];
 
   // ---------- Auto-slide state for each box ----------
   const [communityIndex, setCommunityIndex] = useState(0);
@@ -168,15 +233,12 @@ export default function RoleSelectionPage() {
     }
   };
 
-  // ---------- Render a slide (title + desc, centered) ----------
-  const SlideContent = ({ title, desc }: { title: string; desc: string }) => (
-    <div className="flex flex-col items-center justify-center w-full h-full">
-      <span className="text-lg font-bold text-white md:text-2xl drop-shadow-md">
-        {title}
-      </span>
-      <span className="mt-1 text-sm text-white/90 md:text-base drop-shadow-md">
-        {desc}
-      </span>
+  // ---------- Render a slide (icon + title + desc, centered) ----------
+  const SlideContent = ({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) => (
+    <div className="flex flex-col items-center justify-center w-full h-full text-white">
+      <div className="mb-2">{icon}</div>
+      <span className="text-lg font-bold md:text-xl drop-shadow-md">{title}</span>
+      <span className="mt-0.5 text-sm text-white/90 md:text-base drop-shadow-md">{desc}</span>
     </div>
   );
 
@@ -203,7 +265,7 @@ export default function RoleSelectionPage() {
           <p className="text-sm text-muted-foreground">How are you today?</p>
         </div>
 
-        {/* 4‑Box Grid - Full Color, No Icons, Only Slides */}
+        {/* 4‑Box Grid - Full Color, Icons inside slides, no extra icons */}
         <div className="grid grid-cols-2 gap-3 md:gap-5">
           {/* ---------- Community (Teal) ---------- */}
           <Link
@@ -211,12 +273,13 @@ export default function RoleSelectionPage() {
             className="group flex items-center justify-center rounded-3xl bg-teal-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-teal-700 aspect-square"
           >
             <SlideContent
+              icon={COMMUNITY_SLIDES[communityIndex].icon}
               title={COMMUNITY_SLIDES[communityIndex].title}
               desc={COMMUNITY_SLIDES[communityIndex].desc}
             />
           </Link>
 
-          {/* ---------- Active Cases (Rose) ---------- */}
+          {/* ---------- Active Cases (Coral/Red) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("hero")}
@@ -224,19 +287,21 @@ export default function RoleSelectionPage() {
           >
             {activeSlides.length > 0 && (
               <SlideContent
+                icon={activeSlides[activeIndex].icon}
                 title={activeSlides[activeIndex].title}
                 desc={activeSlides[activeIndex].desc}
               />
             )}
           </button>
 
-          {/* ---------- Become a Hero (Amber) ---------- */}
+          {/* ---------- Become a Hero (Gold/Amber) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("hero")}
             className="group flex items-center justify-center rounded-3xl bg-amber-500 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-amber-600 aspect-square"
           >
             <SlideContent
+              icon={HERO_SLIDES[heroIndex].icon}
               title={HERO_SLIDES[heroIndex].title}
               desc={HERO_SLIDES[heroIndex].desc}
             />
@@ -249,6 +314,7 @@ export default function RoleSelectionPage() {
             className="group flex items-center justify-center rounded-3xl bg-blue-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-blue-700 aspect-square"
           >
             <SlideContent
+              icon={REQUESTER_SLIDES[requesterIndex].icon}
               title={REQUESTER_SLIDES[requesterIndex].title}
               desc={REQUESTER_SLIDES[requesterIndex].desc}
             />
