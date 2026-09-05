@@ -1,5 +1,5 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
-// Givethra - Role Selection with Full-Color Auto-Slide Boxes (Final)
+// Givethra - Role Selection with Full-Color Auto-Slide Boxes (No Icons, Only Slides)
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -7,10 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
-  Heart,
-  HandHelping,
   ShieldCheck,
-  Users,
   Globe,
   Sparkles,
   Facebook,
@@ -18,56 +15,11 @@ import {
   Linkedin,
   Mail,
   MessageCircle,
-  Bell,
-  Battery,
-  Flame,
-  Droplets,
-  GraduationCap,
-  Stethoscope,
-  ShoppingCart,
-  FileText,
   Download,
   Smartphone,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getApprovedCases, getKycStatus } from "@/lib/api";
-
-// ---------- Category styles (unchanged) ----------
-const ROLE_CATEGORY_STYLES: Record<
-  string,
-  { icon: typeof Battery; color: string; bg: string }
-> = {
-  "Electricity Bill": {
-    icon: Battery,
-    color: "text-amber-600",
-    bg: "bg-amber-500/10",
-  },
-  "Gas Bill": {
-    icon: Flame,
-    color: "text-orange-600",
-    bg: "bg-orange-500/10",
-  },
-  "Water Bill": {
-    icon: Droplets,
-    color: "text-sky-600",
-    bg: "bg-sky-500/10",
-  },
-  "School Fees": {
-    icon: GraduationCap,
-    color: "text-indigo-600",
-    bg: "bg-indigo-500/10",
-  },
-  "Medical & Treatment": {
-    icon: Stethoscope,
-    color: "text-rose-600",
-    bg: "bg-rose-500/10",
-  },
-  "Business / Work Help": {
-    icon: ShoppingCart,
-    color: "text-emerald-600",
-    bg: "bg-emerald-500/10",
-  },
-};
 
 // ---------- Slide data (exactly as specified) ----------
 const COMMUNITY_SLIDES = [
@@ -219,10 +171,10 @@ export default function RoleSelectionPage() {
   // ---------- Render a slide (title + desc, centered) ----------
   const SlideContent = ({ title, desc }: { title: string; desc: string }) => (
     <div className="flex flex-col items-center justify-center w-full h-full">
-      <span className="text-base font-bold text-white md:text-xl drop-shadow-md">
+      <span className="text-lg font-bold text-white md:text-2xl drop-shadow-md">
         {title}
       </span>
-      <span className="mt-0.5 text-xs text-white/90 md:text-sm drop-shadow-md">
+      <span className="mt-1 text-sm text-white/90 md:text-base drop-shadow-md">
         {desc}
       </span>
     </div>
@@ -251,87 +203,55 @@ export default function RoleSelectionPage() {
           <p className="text-sm text-muted-foreground">How are you today?</p>
         </div>
 
-        {/* 4‑Box Grid - Full Color, Fixed Layout, Centered Content */}
+        {/* 4‑Box Grid - Full Color, No Icons, Only Slides */}
         <div className="grid grid-cols-2 gap-3 md:gap-5">
           {/* ---------- Community (Teal) ---------- */}
           <Link
             to="/community"
-            className="group flex flex-col items-center justify-center rounded-3xl bg-teal-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-teal-700 aspect-square"
+            className="group flex items-center justify-center rounded-3xl bg-teal-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-teal-700 aspect-square"
           >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white transition-transform group-hover:scale-105 md:h-16 md:w-16">
-              <Users className="h-7 w-7 md:h-8 md:w-8" />
-            </div>
-            <div className="flex-1 flex items-center justify-center w-full py-1">
-              <SlideContent
-                title={COMMUNITY_SLIDES[communityIndex].title}
-                desc={COMMUNITY_SLIDES[communityIndex].desc}
-              />
-            </div>
-            <span className="text-[10px] font-medium text-white/80 md:text-xs">
-              Guest available
-            </span>
+            <SlideContent
+              title={COMMUNITY_SLIDES[communityIndex].title}
+              desc={COMMUNITY_SLIDES[communityIndex].desc}
+            />
           </Link>
 
           {/* ---------- Active Cases (Rose) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("hero")}
-            className="group flex flex-col items-center justify-center rounded-3xl bg-rose-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-rose-700 aspect-square"
+            className="group flex items-center justify-center rounded-3xl bg-rose-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-rose-700 aspect-square"
           >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white transition-transform group-hover:scale-105 md:h-16 md:w-16">
-              <Bell className="h-7 w-7 md:h-8 md:w-8" />
-            </div>
-            <div className="flex-1 flex items-center justify-center w-full py-1">
-              {activeSlides.length > 0 && (
-                <SlideContent
-                  title={activeSlides[activeIndex].title}
-                  desc={activeSlides[activeIndex].desc}
-                />
-              )}
-            </div>
-            <span className="text-[10px] font-medium text-white/80 md:text-xs">
-              {activeCases.length} active cases
-            </span>
+            {activeSlides.length > 0 && (
+              <SlideContent
+                title={activeSlides[activeIndex].title}
+                desc={activeSlides[activeIndex].desc}
+              />
+            )}
           </button>
 
           {/* ---------- Become a Hero (Amber) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("hero")}
-            className="group flex flex-col items-center justify-center rounded-3xl bg-amber-500 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-amber-600 aspect-square"
+            className="group flex items-center justify-center rounded-3xl bg-amber-500 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-amber-600 aspect-square"
           >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white transition-transform group-hover:scale-105 md:h-16 md:w-16">
-              <Heart className="h-7 w-7 md:h-8 md:w-8" />
-            </div>
-            <div className="flex-1 flex items-center justify-center w-full py-1">
-              <SlideContent
-                title={HERO_SLIDES[heroIndex].title}
-                desc={HERO_SLIDES[heroIndex].desc}
-              />
-            </div>
-            <span className="text-[10px] font-medium text-white/80 md:text-xs">
-              3 free contributions
-            </span>
+            <SlideContent
+              title={HERO_SLIDES[heroIndex].title}
+              desc={HERO_SLIDES[heroIndex].desc}
+            />
           </button>
 
           {/* ---------- Requester (Blue) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("requester")}
-            className="group flex flex-col items-center justify-center rounded-3xl bg-blue-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-blue-700 aspect-square"
+            className="group flex items-center justify-center rounded-3xl bg-blue-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-blue-700 aspect-square"
           >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white transition-transform group-hover:scale-105 md:h-16 md:w-16">
-              <HandHelping className="h-7 w-7 md:h-8 md:w-8" />
-            </div>
-            <div className="flex-1 flex items-center justify-center w-full py-1">
-              <SlideContent
-                title={REQUESTER_SLIDES[requesterIndex].title}
-                desc={REQUESTER_SLIDES[requesterIndex].desc}
-              />
-            </div>
-            <span className="text-[10px] font-medium text-white/80 md:text-xs">
-              KYC verified
-            </span>
+            <SlideContent
+              title={REQUESTER_SLIDES[requesterIndex].title}
+              desc={REQUESTER_SLIDES[requesterIndex].desc}
+            />
           </button>
         </div>
 
@@ -372,7 +292,7 @@ export default function RoleSelectionPage() {
             <span className="text-[10px]">100% Transparency</span>
           </div>
           <div className="flex flex-col items-center gap-1">
-            <Heart className="h-5 w-5 text-primary" />
+            <span className="h-5 w-5 text-primary">❤️</span>
             <span>Compassion</span>
             <span className="text-[10px]">Driven by Humanity</span>
           </div>
