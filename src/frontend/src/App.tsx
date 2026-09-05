@@ -1,6 +1,7 @@
 // src/frontend/src/App.tsx
 // Givethra - Full App with Role Selection, Onboarding, and Role-based routing
 // 🔥 FIXED: Heroes bypass KYC, Requesters must complete KYC
+// 🔥 ASSISTANT REMOVED: No assistant routes or imports
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -53,8 +54,7 @@ const OnboardingPage = lazy(() => import("@/pages/OnboardingPage").catch(() => (
 const CommunityPage = lazy(() => import("@/pages/CommunityPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const HeroesWallPage = lazy(() => import("@/pages/HeroesWallPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const KindnessWallPage = lazy(() => import("@/pages/KindnessWallPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
-// ✅ نیا: Assistant Dashboard
-const AssistantDashboard = lazy(() => import("@/pages/AssistantDashboard").catch(() => ({ default: () => <div>Failed to load page</div> })));
+// ❌ AssistantDashboard import REMOVED
 
 // Page loader
 const PageLoader = () => (
@@ -232,7 +232,7 @@ const homeRoute = createRoute({
   },
 });
 
-// ----- All remaining routes -----
+// ----- All remaining routes (Assistant route REMOVED) -----
 const signUpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-up", component: () => <Suspense fallback={<PageLoader />}><SignUpPage /></Suspense> });
 const signInRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-in", component: () => <Suspense fallback={<PageLoader />}><SignInPage /></Suspense> });
 const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases", component: () => <Suspense fallback={<PageLoader />}><CasesPage /></Suspense> });
@@ -263,12 +263,7 @@ const onboardingRoute = createRoute({ getParentRoute: () => rootRoute, path: "/o
 const communityRoute = createRoute({ getParentRoute: () => rootRoute, path: "/community", component: () => <Suspense fallback={<PageLoader />}><CommunityPage /></Suspense> });
 const heroesWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/heroes-wall", component: () => <Suspense fallback={<PageLoader />}><HeroesWallPage /></Suspense> });
 const kindnessWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/kindness-wall", component: () => <Suspense fallback={<PageLoader />}><KindnessWallPage /></Suspense> });
-// ✅ نیا: Assistant Dashboard روٹ
-const assistantDashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/assistant-dashboard",
-  component: () => <Suspense fallback={<PageLoader />}><AssistantDashboard /></Suspense>,
-});
+// ❌ assistantDashboardRoute REMOVED
 
 // Build route tree
 const routeTree = rootRoute.addChildren([
@@ -304,7 +299,7 @@ const routeTree = rootRoute.addChildren([
   communityRoute,
   heroesWallRoute,
   kindnessWallRoute,
-  assistantDashboardRoute,  // ✅ شامل کریں
+  // ❌ assistantDashboardRoute REMOVED
 ]);
 
 const router = createRouter({ routeTree });
