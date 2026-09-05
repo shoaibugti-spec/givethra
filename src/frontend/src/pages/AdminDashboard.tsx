@@ -1,4 +1,9 @@
 // src/pages/AdminPage.tsx
+// Givethra Admin Panel - Complete with filters for Pay & Close, Deposits, Feedback
+// 🔥 FIX: Added rejection reason box in CaseCard
+// 🔥 FIX: Pay & Close tab now has filters: Ready, Paid, Rejected, All
+// 🔥 FIX: PayCloseCard displays paid receipt link when available
+
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -291,10 +296,12 @@ export default function AdminPage() {
   const [feedbackSearch, setFeedbackSearch] = useState("");
   const [caseStatusFilter, setCaseStatusFilter] = useState<"all" | "pending" | "approved" | "rejected" | "completed" | "expired">("all");
 
-  // 🔥 New filter states for Deposits, Feedback, Pay & Close
+  // 🔥 Filters for Pay & Close
+  const [payFilter, setPayFilter] = useState<"ready" | "paid" | "rejected" | "all">("ready");
+
+  // 🔥 Filters for Deposits and Feedback
   const [depositStatusFilter, setDepositStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<"all" | "pending_review" | "approved" | "rejected">("all");
-  const [payStatusFilter, setPayStatusFilter] = useState<"ready" | "all" | "pending" | "approved" | "rejected" | "completed">("ready");
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -661,6 +668,12 @@ export default function AdminPage() {
     return needed > 0 && collected >= needed && !c.closed_by_admin;
   });
 
+  // 🔥 Paid (approved pay-close) cases
+  const paidPayClose = caseList.filter((c) => c.status === "completed" && c.closed_by_admin === true && c.paid_receipt_url);
+
+  // 🔥 Rejected pay-close cases
+  const rejectedPayClose = caseList.filter((c) => c.status === "approved" && c.closed_by_admin === false && c.rejection_reason);
+
   const usersList = profiles.map((p) => {
     const uid = p.user_id;
     const kyc = kycList.find((k) => k.user_id === uid);
@@ -833,7 +846,6 @@ export default function AdminPage() {
               <KycSearchBox kycList={kycList} onUpdate={updateKyc} cnicCounts={cnicCounts} profileMap={profileMap} />
             </TabsContent>
 
-            {/* ===== CASES TAB - with filters ===== */}
             <TabsContent value="cases" className="space-y-4 mt-4">
               <CaseSearchBox
                 caseList={caseList}
@@ -847,7 +859,6 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="verify" className="space-y-4 mt-4">
-              {/* (unchanged) */}
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search direct help by case, hero, email, CNIC, or TXN..." value={resolutionSearch} onChange={(e) => setResolutionSearch(e.target.value)} className="pl-9 h-11" /></div>
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
                 <ShieldIcon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
@@ -868,7 +879,6 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="contributions" className="space-y-4 mt-4">
-              {/* (unchanged) */}
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search contributions by case, hero, email, CNIC, or TXN..." value={resolutionSearch} onChange={(e) => setResolutionSearch(e.target.value)} className="pl-9 h-11" /></div>
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Contributions</strong><p className="mt-1">Review every contribution receipt, amount, and transaction ID. Approved contributions remain visible in the completed history.</p></div>
               <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Contribution status filters">
@@ -885,48 +895,46 @@ export default function AdminPage() {
                 })}
             </TabsContent>
 
-            {/* ===== PAY & CLOSE TAB - WITH FILTERS ===== */}
+            {/* ===== PAY & CLOSE TAB - WITH FILTERS FOR READY, PAID, REJECTED ===== */}
             <TabsContent value="pay" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-teal-50 dark:bg-teal-950/20 p-4 text-sm text-teal-700 flex items-start gap-2">
                 <HandCoins className="h-4 w-4 shrink-0 mt-0.5" />
-                <p>These fundraising cases have reached their goal! Pay the institute's bill yourself, upload the receipt, and close the case. The seeker will be notified that everyone helped together.</p>
+                <p>Fundraising cases that have reached their goal. After paying the institute, upload the receipt and close the case. The seeker will be notified.</p>
               </div>
 
               {/* Filter buttons */}
               <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="group" aria-label="Pay & Close filters">
-                {["ready", "all", "pending", "approved", "rejected", "completed"].map((filter) => {
-                  let label = filter === "ready" ? "Ready to Pay" : filter === "all" ? "All" : filter.charAt(0).toUpperCase() + filter.slice(1);
-                  let count = 0;
-                  if (filter === "ready") count = readyToClose.length;
-                  else if (filter === "all") count = caseList.length;
-                  else count = caseList.filter((c: any) => c.status === filter).length;
-
-                  return (
-                    <button
-                      key={filter}
-                      type="button"
-                      onClick={() => setPayStatusFilter(filter as typeof payStatusFilter)}
-                      className={`px-4 py-1.5 text-sm font-medium rounded-full border transition-colors ${
-                        payStatusFilter === filter
-                          ? "bg-primary text-white border-primary"
-                          : "bg-card text-muted-foreground border-border hover:bg-muted"
-                      }`}
-                    >
-                      {label}
-                      <span className="ml-1 text-xs bg-muted/30 px-1.5 py-0.5 rounded-full">{count}</span>
-                    </button>
-                  );
-                })}
+                {[
+                  { key: "ready", label: "Ready to Pay", count: readyToClose.length },
+                  { key: "paid", label: "Paid", count: paidPayClose.length },
+                  { key: "rejected", label: "Rejected", count: rejectedPayClose.length },
+                  { key: "all", label: "All", count: caseList.length },
+                ].map(({ key, label, count }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setPayFilter(key as typeof payFilter)}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full border transition-colors ${
+                      payFilter === key
+                        ? "bg-primary text-white border-primary"
+                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {label}
+                    <span className="ml-1 text-xs bg-muted/30 px-1.5 py-0.5 rounded-full">{count}</span>
+                  </button>
+                ))}
               </div>
 
               {/* Filtered cases */}
               {(() => {
                 let displayCases = [];
-                if (payStatusFilter === "ready") displayCases = readyToClose;
-                else if (payStatusFilter === "all") displayCases = caseList;
-                else displayCases = caseList.filter((c: any) => c.status === payStatusFilter);
+                if (payFilter === "ready") displayCases = readyToClose;
+                else if (payFilter === "paid") displayCases = paidPayClose;
+                else if (payFilter === "rejected") displayCases = rejectedPayClose;
+                else displayCases = caseList;
 
-                if (displayCases.length === 0) return <Empty text={`No cases matching "${payStatusFilter}"`} />;
+                if (displayCases.length === 0) return <Empty text={`No cases matching "${payFilter}"`} />;
                 return displayCases.map((c) => (
                   <PayCloseCard
                     key={c.id}
@@ -939,7 +947,6 @@ export default function AdminPage() {
               })()}
             </TabsContent>
 
-            {/* ===== DEPOSITS TAB - WITH FILTERS ===== */}
             <TabsContent value="deposits" className="space-y-4 mt-4">
               <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="group" aria-label="Deposit status filters">
                 {["all", "pending", "approved", "rejected"].map((status) => (
@@ -981,7 +988,6 @@ export default function AdminPage() {
               <SupportPanel allMsgs={supportMsgs} profileMap={profileMap} onNewMessage={loadSupportMessages} unreadCount={unreadSupport} />
             </TabsContent>
 
-            {/* ===== FEEDBACK TAB - WITH FILTERS ===== */}
             <TabsContent value="feedback" className="space-y-4 mt-4">
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search feedback by case, user, email, name, or text..." value={feedbackSearch} onChange={(e) => setFeedbackSearch(e.target.value)} className="pl-9 h-11" /></div>
 
@@ -1022,7 +1028,7 @@ export default function AdminPage() {
 }
 
 // ============================================================
-//  ALL SUB-COMPONENTS (unchanged except as noted)
+//  ALL SUB-COMPONENTS
 // ============================================================
 
 // ---------- SUSPENSIONS PANEL ----------
@@ -1117,7 +1123,7 @@ function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
   );
 }
 
-// ===== CASE SEARCH BOX - CORRECTED =====
+// ===== CASE SEARCH BOX =====
 function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser, statusFilter, setStatusFilter }: any) {
   const [search, setSearch] = useState("");
   const sortedCases = [...caseList].sort((a, b) => {
@@ -1141,7 +1147,6 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
 
   return (
     <div className="space-y-3">
-      {/* Filters */}
       <div className="flex flex-wrap gap-2" role="group" aria-label="Case status filters">
         {["all", "pending", "approved", "rejected", "completed", "expired"].map((status) => (
           <button
@@ -1160,13 +1165,11 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
         ))}
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input placeholder="Search cases by title, category, name, CNIC, or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
       </div>
 
-      {/* Cases */}
       {filtered.length === 0 ? <Empty text={`No matching cases (${statusFilter})`} /> :
         filtered.map((c: any) => (
           <CaseCard
@@ -1182,7 +1185,7 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
   );
 }
 
-// ===== CASE CARD - CORRECTED (only Approve/Reject) =====
+// ===== CASE CARD - WITH REJECTION REASON BOX =====
 function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const [reason, setReason] = useState("");
   const [showRejectReason, setShowRejectReason] = useState(false);
@@ -1437,7 +1440,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         {isExpired && <span className="text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-semibold">EXPIRED</span>}
       </div>
 
-      {/* Rejection reason */}
+      {/* Rejection reason display */}
       {isRejected && c.rejection_reason && (
         <div className="rounded-lg border-2 border-red-300 bg-red-100 dark:bg-red-950/30 p-4">
           <div className="flex items-start gap-2">
@@ -2030,11 +2033,16 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
     finally { setUploading(false); }
   }
 
+  // 🔥 Show receipt link if already paid
+  const paidReceiptUrl = c.paid_receipt_url;
+
   return (
     <div className="rounded-xl border-2 border-teal-300 bg-card p-4 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">GOAL REACHED 🎉</span>
         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
+        {c.closed_by_admin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">PAID</span>}
+        {c.rejection_reason && c.status !== "completed" && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">REJECTED</span>}
       </div>
       <p className="font-semibold text-sm">{c.title}</p>
       <p className="text-xs text-teal-600 font-medium">Raised: {s} {c.amount_collected} of {s} {c.amount_needed} ✅</p>
@@ -2050,21 +2058,40 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
         <p className="text-xs font-mono">{c.account_number} {c.account_iban ? `· ${c.account_iban}` : ""}</p>
       </div>
 
-      <div className="space-y-2 pt-1 border-t border-border">
-        <label className="text-xs font-medium">Upload your payment receipt (after you pay the bill):</label>
-        <Input type="file" accept="image/*,.pdf" onChange={(e) => uploadReceipt(e.target.files?.[0] ?? null)} className="text-sm" />
-        {uploading && <p className="text-xs text-amber-600">⏳ Uploading...</p>}
-        {receiptUrl && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Receipt uploaded</p>}
-        <Button type="button" size="sm" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={closing || uploading}
-          onClick={async () => { setClosing(true); await onClose(c, receiptUrl); setClosing(false); }}>
-          <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Mark as Paid
-        </Button>
-        <Textarea placeholder="Reason for returning this Pay & Close request" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
-        <Button type="button" size="sm" variant="outline" className="w-full text-red-600 border-red-300" disabled={closing || uploading} onClick={async () => { setClosing(true); await onReject(c, reason); setClosing(false); }}>
-          <XCircle className="h-3.5 w-3.5 mr-1" /> Reject / Return to Review
-        </Button>
-        <p className="text-[11px] text-muted-foreground">Pay the institute, upload the receipt, then close. The seeker sees the receipt and gets a thank-you notification.</p>
-      </div>
+      {/* 🔥 Show uploaded receipt if exists */}
+      {paidReceiptUrl && (
+        <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-300 p-3">
+          <p className="text-xs font-semibold text-green-700 flex items-center gap-1"><CheckCircle className="h-4 w-4" /> Payment Receipt</p>
+          <a href={paidReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1">
+            <ExternalLink className="h-4 w-4" /> View Receipt
+          </a>
+        </div>
+      )}
+
+      {c.rejection_reason && c.status !== "completed" && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-300 p-3">
+          <p className="text-xs font-semibold text-red-700 flex items-center gap-1"><XCircle className="h-4 w-4" /> Rejected</p>
+          <p className="text-sm text-red-600">{c.rejection_reason}</p>
+        </div>
+      )}
+
+      {!c.closed_by_admin && !c.rejection_reason && (
+        <div className="space-y-2 pt-1 border-t border-border">
+          <label className="text-xs font-medium">Upload your payment receipt (after you pay the bill):</label>
+          <Input type="file" accept="image/*,.pdf" onChange={(e) => uploadReceipt(e.target.files?.[0] ?? null)} className="text-sm" />
+          {uploading && <p className="text-xs text-amber-600">⏳ Uploading...</p>}
+          {receiptUrl && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Receipt uploaded</p>}
+          <Button type="button" size="sm" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={closing || uploading}
+            onClick={async () => { setClosing(true); await onClose(c, receiptUrl); setClosing(false); }}>
+            <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Mark as Paid
+          </Button>
+          <Textarea placeholder="Reason for returning this Pay & Close request" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
+          <Button type="button" size="sm" variant="outline" className="w-full text-red-600 border-red-300" disabled={closing || uploading} onClick={async () => { setClosing(true); await onReject(c, reason); setClosing(false); }}>
+            <XCircle className="h-3.5 w-3.5 mr-1" /> Reject / Return to Review
+          </Button>
+          <p className="text-[11px] text-muted-foreground">Pay the institute, upload the receipt, then close. The seeker sees the receipt and gets a thank-you notification.</p>
+        </div>
+      )}
     </div>
   );
 }
