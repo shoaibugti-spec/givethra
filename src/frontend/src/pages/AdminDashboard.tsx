@@ -289,6 +289,7 @@ export default function AdminPage() {
   const [resolutionView, setResolutionView] = useState<"pending" | "rejected" | "completed">("pending");
   const [resolutionSearch, setResolutionSearch] = useState("");
   const [feedbackSearch, setFeedbackSearch] = useState("");
+  const [caseStatusFilter, setCaseStatusFilter] = useState<"all" | "pending" | "approved" | "rejected" | "completed" | "expired">("all");
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -827,7 +828,7 @@ export default function AdminPage() {
               <KycSearchBox kycList={kycList} onUpdate={updateKyc} cnicCounts={cnicCounts} profileMap={profileMap} />
             </TabsContent>
 
-            {/* ===== CASES TAB ===== */}
+            {/* ===== CASES TAB - CORRECTED ===== */}
             <TabsContent value="cases" className="space-y-4 mt-4">
               <CaseSearchBox
                 caseList={caseList}
@@ -835,10 +836,8 @@ export default function AdminPage() {
                 resolutions={resByCaseId}
                 profileMap={profileMap}
                 cnicByUser={cnicByUser}
-                onConfirmResolution={confirmResolution}
-                onRejectResolution={rejectResolution}
-                onMarkPaidClose={markAsPaidAndClose}
-                onRejectPayClose={rejectPayClose}
+                statusFilter={caseStatusFilter}
+                setStatusFilter={setCaseStatusFilter}
               />
             </TabsContent>
 
@@ -1016,29 +1015,57 @@ function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
   );
 }
 
-// ===== CASE SEARCH BOX =====
-function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser, onConfirmResolution, onRejectResolution, onMarkPaidClose, onRejectPayClose }: any) {
+// ===== CASE SEARCH BOX - CORRECTED =====
+function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser, statusFilter, setStatusFilter }: any) {
   const [search, setSearch] = useState("");
   const sortedCases = [...caseList].sort((a, b) => {
     const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2, completed: 3, expired: 4 };
     return (order[a.status] ?? 5) - (order[b.status] ?? 5);
   });
+
+  const filteredByStatus = statusFilter === "all" 
+    ? sortedCases 
+    : sortedCases.filter((c: any) => c.status === statusFilter);
+
   const query = search.trim().toLowerCase();
   const digits = search.replace(/\D/g, "");
-  const filtered = sortedCases.filter((c: any) => {
+  const filtered = filteredByStatus.filter((c: any) => {
     if (!query) return true;
     return [c.title, c.category, c.user_id, profileMap[c.user_id]?.full_name, profileMap[c.user_id]?.email]
       .some((value) => String(value || "").toLowerCase().includes(query))
       || (!!digits && [c.cnic_number, cnicByUser?.[c.user_id]]
         .some((value) => String(value || "").replace(/\D/g, "").includes(digits)));
   });
+
   return (
     <div className="space-y-3">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Case status filters">
+        {["all", "pending", "approved", "rejected", "completed", "expired"].map((status) => (
+          <button
+            key={status}
+            type="button"
+            onClick={() => setStatusFilter(status)}
+            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+              statusFilter === status ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted"
+            }`}
+          >
+            {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
+            <span className="ml-1 text-[10px] opacity-70">
+              ({caseList.filter((c: any) => status === "all" || c.status === status).length})
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input placeholder="Search cases by title, category, name, CNIC, or email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-11" />
       </div>
-      {filtered.length === 0 ? <Empty text="No matching cases" /> :
+
+      {/* Cases */}
+      {filtered.length === 0 ? <Empty text={`No matching cases (${statusFilter})`} /> :
         filtered.map((c: any) => (
           <CaseCard
             key={c.id}
@@ -1046,10 +1073,6 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
             onUpdate={onUpdate}
             resolutions={resolutions[c.id] ?? []}
             profileMap={profileMap}
-            onConfirmResolution={onConfirmResolution}
-            onRejectResolution={onRejectResolution}
-            onMarkPaidClose={onMarkPaidClose}
-            onRejectPayClose={onRejectPayClose}
           />
         ))
       }
@@ -1057,9 +1080,10 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
   );
 }
 
-// ===== CASE CARD =====
-function CaseCard({ c, onUpdate, resolutions, profileMap, onConfirmResolution, onRejectResolution, onMarkPaidClose, onRejectPayClose }: any) {
+// ===== CASE CARD - CORRECTED (only Approve/Reject) =====
+function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const [reason, setReason] = useState("");
+  const [showRejectReason, setShowRejectReason] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const cur = c.currency || "USD";
   const s = sym(cur);
@@ -1264,44 +1288,37 @@ function CaseCard({ c, onUpdate, resolutions, profileMap, onConfirmResolution, o
   const isExpired = c.status === "expired";
   const isApproved = c.status === "approved";
   const isPending = c.status === "pending";
-  const isReadyToClose = isApproved && !c.closed_by_admin && Number(c.amount_needed) > 0 && Number(c.amount_collected) >= Number(c.amount_needed);
 
   // ---- Action handlers ----
-  const handleStatusChange = async (newStatus: string, reasonText = "") => {
-    if (newStatus === "rejected" && !reasonText.trim()) {
-      toast.error("Please provide a rejection reason.");
-      return;
-    }
-    if (newStatus === "expired" && !reasonText.trim()) {
-      toast.error("Please provide an expiry reason (e.g., deadline passed).");
-      return;
-    }
-    if (!confirm(`Are you sure you want to set this case status to "${newStatus.toUpperCase()}"?`)) return;
+  const handleApprove = async () => {
+    if (!confirm(`Are you sure you want to APPROVE this case: "${c.title}"?`)) return;
     setActionLoading(true);
     try {
-      await onUpdate(c.id, newStatus, reasonText);
+      await onUpdate(c.id, "approved");
     } catch (e) {
-      toast.error("Failed to update status.");
+      toast.error("Failed to approve case.");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const [showPayClose, setShowPayClose] = useState(false);
-  const [receiptUrl, setReceiptUrl] = useState("");
-  const [uploading, setUploading] = useState(false);
-
-  async function uploadReceipt(file: File | null) {
-    if (!file) return;
-    setUploading(true);
+  const handleReject = async () => {
+    if (!reason.trim()) {
+      toast.error("Please enter a rejection reason.");
+      return;
+    }
+    if (!confirm(`Are you sure you want to REJECT this case: "${c.title}"?`)) return;
+    setActionLoading(true);
     try {
-      const path = `paid_receipts/${c.id}/${Date.now()}_receipt`;
-      const url = await uploadFileToStorage(file, path);
-      setReceiptUrl(url);
-      toast.success("Receipt uploaded!");
-    } catch { toast.error("Upload failed."); }
-    finally { setUploading(false); }
-  }
+      await onUpdate(c.id, "rejected", reason.trim());
+      setReason("");
+      setShowRejectReason(false);
+    } catch (e) {
+      toast.error("Failed to reject case.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // ---- Render ----
   return (
@@ -1318,14 +1335,16 @@ function CaseCard({ c, onUpdate, resolutions, profileMap, onConfirmResolution, o
         {isExpired && <span className="text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-semibold">EXPIRED</span>}
       </div>
 
-      {/* Rejection/Expiry reason */}
-      {(isRejected || isExpired) && c.rejection_reason && (
+      {/* Rejection reason */}
+      {isRejected && c.rejection_reason && (
         <div className="rounded-lg border-2 border-red-300 bg-red-100 dark:bg-red-950/30 p-4">
           <div className="flex items-start gap-2">
-            {isRejected ? <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" /> : <AlertTriangle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />}
+            <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-red-700">{isRejected ? "❌ Case Rejected" : "⏰ Case Expired"}</p>
-              <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{c.rejection_reason}</p>
+              <p className="font-bold text-red-700">❌ Rejected</p>
+              <div className="mt-1 max-h-32 overflow-y-auto whitespace-pre-line text-sm text-red-700 bg-red-50 p-2 rounded border border-red-200">
+                {c.rejection_reason}
+              </div>
               {c.reviewed_at && <p className="text-xs text-red-500 mt-2">Reviewed on: {new Date(c.reviewed_at).toLocaleString()}</p>}
             </div>
           </div>
@@ -1488,140 +1507,85 @@ function CaseCard({ c, onUpdate, resolutions, profileMap, onConfirmResolution, o
         </div>
       )}
 
-      {/* ===== RESOLUTIONS (Payments) with action buttons ===== */}
+      {/* Resolutions (just for info) */}
       {resolutions.length > 0 && (
-        <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-3">
+        <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-2">
           <p className="font-semibold text-sm flex items-center gap-1"><Heart className="h-4 w-4 text-primary" /> All Helps / Payments</p>
-          {resolutions.map((r: any) => {
-            const isPending = r.status === "pending" || r.status === "pending_confirmation" || r.status === "seeker_confirmed";
-            const isCompleted = r.status === "completed" || r.status === "approved";
-            const isRejected = r.status === "rejected" || r.status === "disputed";
-            const isContribution = isContributionResolution(r);
-            return (
-              <div key={r.id} className="text-xs space-y-1.5 border-b border-border/50 last:border-0 pb-2">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isCompleted ? "bg-teal-100 text-teal-700" : isRejected ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
-                    {isCompleted ? "COMPLETED" : isRejected ? "REJECTED" : "PENDING"}
-                  </span>
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isContribution ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"}`}>
-                    {isContribution ? "FUNDRAISING" : "DIRECT"}
-                  </span>
-                  {r.transaction_id && <span className="font-mono text-[10px] text-muted-foreground">TXN: {r.transaction_id}</span>}
-                </div>
-                <p><span className="text-muted-foreground">Amount:</span> {s} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</p>
-                {r.receipt_url && (
-                  <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-[10px]">
-                    <ExternalLink className="h-3 w-3" /> View Receipt
-                  </a>
-                )}
-                {isPending && (
-                  <div className="flex gap-2 pt-1">
-                    <Button 
-                      size="sm" 
-                      className="bg-teal-600 hover:bg-teal-700 text-white h-7 text-[10px]" 
-                      onClick={() => {
-                        if (confirm(`Verify this ${isContribution ? "contribution" : "direct payment"} of ${s} ${r.amount_paid}?`)) {
-                          onConfirmResolution(r);
-                        }
-                      }}
-                    >
-                      <CheckCircle className="h-3 w-3 mr-0.5" /> Verify
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="text-red-600 border-red-300 h-7 text-[10px]"
-                      onClick={() => {
-                        const reason = prompt("Rejection reason:");
-                        if (reason !== null && reason.trim()) {
-                          onRejectResolution(r, reason.trim());
-                        }
-                      }}
-                    >
-                      <XCircle className="h-3 w-3 mr-0.5" /> Reject
-                    </Button>
-                  </div>
-                )}
-                {isRejected && r.notes && <p className="text-red-600 text-[10px]">Reason: {r.notes}</p>}
-              </div>
-            );
-          })}
+          {resolutions.map((r: any) => (
+            <div key={r.id} className="text-xs space-y-0.5 border-b border-border/50 last:border-0 pb-2">
+              <p>
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${r.status === "completed" ? "bg-teal-100 text-teal-700" : r.status === "disputed" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{r.status?.toUpperCase()}</span>
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ml-1 ${isContributionResolution(r) ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"}`}>{isContributionResolution(r) ? "FUNDRAISING" : "DIRECT"}</span>
+              </p>
+              <p><span className="text-muted-foreground">Amount:</span> {s} {r.seeker_confirmed_amount ?? r.amount_paid} {cur} · <span className="text-muted-foreground">TXN:</span> <span className="font-mono">{r.transaction_id}</span></p>
+              {r.receipt_url && <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-[10px]"><ExternalLink className="h-3 w-3" /> Receipt</a>}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* ===== CASE ACTIONS (Status buttons) ===== */}
-      <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-        <p className="text-xs font-bold flex items-center gap-1"><ShieldIcon className="h-3.5 w-3.5" /> Case Actions</p>
-        <div className="flex flex-wrap gap-2">
-          {/* Set Pending */}
-          {!isPending && (
-            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => handleStatusChange("pending")} disabled={actionLoading}>
-              Set Pending
+      {/* ===== ACTIONS: Approve & Reject (only if pending) ===== */}
+      {isPending && (
+        <div className="space-y-2 pt-2 border-t border-border">
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              size="sm" 
+              className="bg-teal-600 hover:bg-teal-700 text-white" 
+              onClick={handleApprove} 
+              disabled={actionLoading}
+            >
+              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
             </Button>
-          )}
-          {/* Approve */}
-          {!isApproved && !isCompleted && !isExpired && (
-            <Button size="sm" variant="default" className="h-7 text-[10px] bg-green-600 hover:bg-green-700" onClick={() => handleStatusChange("approved")} disabled={actionLoading}>
-              <CheckCircle className="h-3 w-3 mr-0.5" /> Approve
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-red-600 border-red-300" 
+              onClick={() => setShowRejectReason(!showRejectReason)}
+              disabled={actionLoading}
+            >
+              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
             </Button>
-          )}
-          {/* Reject */}
-          {!isRejected && !isCompleted && !isExpired && (
-            <Button size="sm" variant="destructive" className="h-7 text-[10px]" onClick={() => {
-              const reason = prompt("Rejection reason:");
-              if (reason !== null && reason.trim()) handleStatusChange("rejected", reason.trim());
-            }} disabled={actionLoading}>
-              <XCircle className="h-3 w-3 mr-0.5" /> Reject
-            </Button>
-          )}
-          {/* Complete */}
-          {!isCompleted && !isExpired && (
-            <Button size="sm" variant="outline" className="h-7 text-[10px] border-teal-500 text-teal-600" onClick={() => handleStatusChange("completed")} disabled={actionLoading}>
-              <CheckCircle className="h-3 w-3 mr-0.5" /> Complete
-            </Button>
-          )}
-          {/* Expire */}
-          {!isExpired && !isCompleted && (
-            <Button size="sm" variant="outline" className="h-7 text-[10px] border-orange-400 text-orange-600" onClick={() => {
-              const reason = prompt("Expiry reason (e.g., deadline passed):");
-              if (reason !== null && reason.trim()) handleStatusChange("expired", reason.trim());
-            }} disabled={actionLoading}>
-              <AlertTriangle className="h-3 w-3 mr-0.5" /> Expire
-            </Button>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* ===== PAY & CLOSE (if ready) ===== */}
-      {isReadyToClose && (
-        <div className="rounded-lg border-2 border-teal-300 bg-teal-50 dark:bg-teal-950/20 p-3 space-y-2">
-          <p className="text-xs font-bold text-teal-700 flex items-center gap-1"><HandCoins className="h-4 w-4" /> Ready to Pay & Close</p>
-          <p className="text-xs text-teal-600">Goal reached! Pay the institute and upload the receipt to close this case.</p>
-          {!showPayClose ? (
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setShowPayClose(true)}>
-              <HandCoins className="h-3.5 w-3.5 mr-1" /> Pay & Close
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <Input type="file" accept="image/*,.pdf" onChange={(e) => uploadReceipt(e.target.files?.[0] ?? null)} className="text-sm" />
-              {uploading && <p className="text-xs text-amber-600">⏳ Uploading...</p>}
-              {receiptUrl && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Receipt uploaded</p>}
+          {showRejectReason && (
+            <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:bg-red-950/20 p-3 space-y-2">
+              <label className="text-sm font-medium text-red-700">Rejection Reason *</label>
+              <Textarea 
+                value={reason} 
+                onChange={(e) => setReason(e.target.value)} 
+                rows={3} 
+                placeholder="Explain why this case is being rejected (e.g. insufficient documents, invalid details, etc.)..."
+                className="text-sm"
+              />
               <div className="flex gap-2">
-                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!receiptUrl || uploading || actionLoading} onClick={() => onMarkPaidClose(c, receiptUrl)}>
-                  <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Mark as Paid
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  onClick={handleReject} 
+                  disabled={actionLoading || !reason.trim()}
+                >
+                  <XCircle className="h-3.5 w-3.5 mr-1" /> Confirm Reject
                 </Button>
-                <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => {
-                  const reason = prompt("Reason for returning this Pay & Close request:");
-                  if (reason !== null && reason.trim()) onRejectPayClose(c, reason.trim());
-                }} disabled={actionLoading}>
-                  <XCircle className="h-3.5 w-3.5 mr-1" /> Reject / Return
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={() => { setShowRejectReason(false); setReason(""); }}
+                  disabled={actionLoading}
+                >
+                  Cancel
                 </Button>
               </div>
-              <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => setShowPayClose(false)}>
-                Cancel
-              </Button>
+              {!reason.trim() && <p className="text-xs text-red-500">Please enter a reason before rejecting.</p>}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Show status for non-pending cases */}
+      {!isPending && (
+        <div className="pt-2 border-t border-border text-xs text-muted-foreground">
+          This case is <span className="font-semibold capitalize">{c.status}</span>.
+          {isRejected && " The rejection reason is shown above."}
         </div>
       )}
     </div>
@@ -2601,7 +2565,6 @@ function Img({ url, label }: { url: string; label: string }) {
 }
 
 // ---------- DEPOSIT SEARCH BOX ----------
-// (This was the missing component – now defined)
 function DepositSearchBox({ deposits, onApprove, onReject, profileMap = {}, cnicByUser = {} }: any) {
   const [search, setSearch] = useState("");
   const sorted = [...deposits].sort((a, b) => {
