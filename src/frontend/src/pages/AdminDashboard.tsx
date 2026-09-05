@@ -1160,9 +1160,9 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
   );
 }
 
+// ========== MODIFIED CaseCard ==========
 function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const [reason, setReason] = useState("");
-  const [showRejectReason, setShowRejectReason] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const cur = c.currency || "USD";
   const s = sym(cur);
@@ -1384,12 +1384,10 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
       toast.error("Please enter a rejection reason.");
       return;
     }
-    if (!confirm(`Are you sure you want to REJECT this case: "${c.title}"?`)) return;
     setActionLoading(true);
     try {
       await onUpdate(c.id, "rejected", reason.trim());
       setReason("");
-      setShowRejectReason(false);
     } catch (e) {
       toast.error("Failed to reject case.");
     } finally {
@@ -1589,6 +1587,14 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
 
       {isPending && (
         <div className="space-y-2 pt-2 border-t border-border">
+          {/* ہمیشہ موجود Textarea – بالکل KYC کی طرح */}
+          <Textarea 
+            placeholder="Rejection reason (if rejecting)" 
+            value={reason} 
+            onChange={(e) => setReason(e.target.value)} 
+            rows={2} 
+            className="text-sm" 
+          />
           <div className="flex flex-wrap gap-2">
             <Button 
               size="sm" 
@@ -1602,44 +1608,12 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
               size="sm" 
               variant="outline" 
               className="text-red-600 border-red-300" 
-              onClick={() => setShowRejectReason(!showRejectReason)}
+              onClick={handleReject}
               disabled={actionLoading}
             >
               <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
             </Button>
           </div>
-
-          {showRejectReason && (
-            <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:bg-red-950/20 p-3 space-y-2">
-              <label className="text-sm font-medium text-red-700">Rejection Reason *</label>
-              <Textarea 
-                value={reason} 
-                onChange={(e) => setReason(e.target.value)} 
-                rows={3} 
-                placeholder="Explain why this case is being rejected (e.g. insufficient documents, invalid details, etc.)..."
-                className="text-sm"
-              />
-              <div className="flex gap-2">
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
-                  onClick={handleReject} 
-                  disabled={actionLoading || !reason.trim()}
-                >
-                  <XCircle className="h-3.5 w-3.5 mr-1" /> Confirm Reject
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={() => { setShowRejectReason(false); setReason(""); }}
-                  disabled={actionLoading}
-                >
-                  Cancel
-                </Button>
-              </div>
-              {!reason.trim() && <p className="text-xs text-red-500">Please enter a reason before rejecting.</p>}
-            </div>
-          )}
         </div>
       )}
 
@@ -1652,6 +1626,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     </div>
   );
 }
+// ========== END OF MODIFIED CaseCard ==========
 
 function KycCard({ kyc, onUpdate, dupCount }: any) {
   const [reason, setReason] = useState("");
