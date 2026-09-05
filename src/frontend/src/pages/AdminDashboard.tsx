@@ -1,4 +1,4 @@
-// src/pages/AdminPanel.tsx
+// src/pages/AdminPage.tsx
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -290,6 +290,11 @@ export default function AdminPage() {
   const [resolutionSearch, setResolutionSearch] = useState("");
   const [feedbackSearch, setFeedbackSearch] = useState("");
   const [caseStatusFilter, setCaseStatusFilter] = useState<"all" | "pending" | "approved" | "rejected" | "completed" | "expired">("all");
+
+  // 🔥 New filter states for Deposits, Feedback, Pay & Close
+  const [depositStatusFilter, setDepositStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<"all" | "pending_review" | "approved" | "rejected">("all");
+  const [payStatusFilter, setPayStatusFilter] = useState<"ready" | "all" | "pending" | "approved" | "rejected" | "completed">("ready");
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -828,7 +833,7 @@ export default function AdminPage() {
               <KycSearchBox kycList={kycList} onUpdate={updateKyc} cnicCounts={cnicCounts} profileMap={profileMap} />
             </TabsContent>
 
-            {/* ===== CASES TAB - CORRECTED ===== */}
+            {/* ===== CASES TAB - with filters ===== */}
             <TabsContent value="cases" className="space-y-4 mt-4">
               <CaseSearchBox
                 caseList={caseList}
@@ -842,6 +847,7 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="verify" className="space-y-4 mt-4">
+              {/* (unchanged) */}
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search direct help by case, hero, email, CNIC, or TXN..." value={resolutionSearch} onChange={(e) => setResolutionSearch(e.target.value)} className="pl-9 h-11" /></div>
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground flex items-start gap-2">
                 <ShieldIcon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
@@ -862,6 +868,7 @@ export default function AdminPage() {
             </TabsContent>
 
             <TabsContent value="contributions" className="space-y-4 mt-4">
+              {/* (unchanged) */}
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search contributions by case, hero, email, CNIC, or TXN..." value={resolutionSearch} onChange={(e) => setResolutionSearch(e.target.value)} className="pl-9 h-11" /></div>
               <div className="rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Contributions</strong><p className="mt-1">Review every contribution receipt, amount, and transaction ID. Approved contributions remain visible in the completed history.</p></div>
               <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Contribution status filters">
@@ -878,17 +885,88 @@ export default function AdminPage() {
                 })}
             </TabsContent>
 
+            {/* ===== PAY & CLOSE TAB - WITH FILTERS ===== */}
             <TabsContent value="pay" className="space-y-4 mt-4">
               <div className="rounded-xl border bg-teal-50 dark:bg-teal-950/20 p-4 text-sm text-teal-700 flex items-start gap-2">
                 <HandCoins className="h-4 w-4 shrink-0 mt-0.5" />
                 <p>These fundraising cases have reached their goal! Pay the institute's bill yourself, upload the receipt, and close the case. The seeker will be notified that everyone helped together.</p>
               </div>
-              {readyToClose.length === 0 ? <Empty text="No cases ready to pay yet" /> :
-                readyToClose.map((c) => <PayCloseCard key={c.id} c={c} profileMap={profileMap} onClose={markAsPaidAndClose} onReject={rejectPayClose} />)}
+
+              {/* Filter buttons */}
+              <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="group" aria-label="Pay & Close filters">
+                {["ready", "all", "pending", "approved", "rejected", "completed"].map((filter) => {
+                  let label = filter === "ready" ? "Ready to Pay" : filter === "all" ? "All" : filter.charAt(0).toUpperCase() + filter.slice(1);
+                  let count = 0;
+                  if (filter === "ready") count = readyToClose.length;
+                  else if (filter === "all") count = caseList.length;
+                  else count = caseList.filter((c: any) => c.status === filter).length;
+
+                  return (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setPayStatusFilter(filter as typeof payStatusFilter)}
+                      className={`px-4 py-1.5 text-sm font-medium rounded-full border transition-colors ${
+                        payStatusFilter === filter
+                          ? "bg-primary text-white border-primary"
+                          : "bg-card text-muted-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {label}
+                      <span className="ml-1 text-xs bg-muted/30 px-1.5 py-0.5 rounded-full">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Filtered cases */}
+              {(() => {
+                let displayCases = [];
+                if (payStatusFilter === "ready") displayCases = readyToClose;
+                else if (payStatusFilter === "all") displayCases = caseList;
+                else displayCases = caseList.filter((c: any) => c.status === payStatusFilter);
+
+                if (displayCases.length === 0) return <Empty text={`No cases matching "${payStatusFilter}"`} />;
+                return displayCases.map((c) => (
+                  <PayCloseCard
+                    key={c.id}
+                    c={c}
+                    profileMap={profileMap}
+                    onClose={markAsPaidAndClose}
+                    onReject={rejectPayClose}
+                  />
+                ));
+              })()}
             </TabsContent>
 
+            {/* ===== DEPOSITS TAB - WITH FILTERS ===== */}
             <TabsContent value="deposits" className="space-y-4 mt-4">
-              <DepositSearchBox deposits={deposits} onApprove={approveDeposit} onReject={rejectDeposit} profileMap={profileMap} cnicByUser={cnicByUser} />
+              <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="group" aria-label="Deposit status filters">
+                {["all", "pending", "approved", "rejected"].map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setDepositStatusFilter(status as typeof depositStatusFilter)}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full border transition-colors ${
+                      depositStatusFilter === status
+                        ? "bg-primary text-white border-primary"
+                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
+                    <span className="ml-1 text-xs bg-muted/30 px-1.5 py-0.5 rounded-full">
+                      {deposits.filter((d: any) => status === "all" || d.status === status).length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <DepositSearchBox
+                deposits={deposits.filter((d: any) => depositStatusFilter === "all" || d.status === depositStatusFilter)}
+                onApprove={approveDeposit}
+                onReject={rejectDeposit}
+                profileMap={profileMap}
+                cnicByUser={cnicByUser}
+              />
             </TabsContent>
 
             <TabsContent value="notify" className="mt-4">
@@ -903,10 +981,34 @@ export default function AdminPage() {
               <SupportPanel allMsgs={supportMsgs} profileMap={profileMap} onNewMessage={loadSupportMessages} unreadCount={unreadSupport} />
             </TabsContent>
 
+            {/* ===== FEEDBACK TAB - WITH FILTERS ===== */}
             <TabsContent value="feedback" className="space-y-4 mt-4">
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search feedback by case, user, email, name, or text..." value={feedbackSearch} onChange={(e) => setFeedbackSearch(e.target.value)} className="pl-9 h-11" /></div>
-              {visibleFeedbacks.filter((f) => !!f.case_id).length === 0 ? <Empty text="No seeker feedback submitted yet. A completed case appears here after the seeker sends the required caption and video." /> :
-                visibleFeedbacks.filter((f) => !!f.case_id).map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} />)}
+
+              <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="group" aria-label="Feedback status filters">
+                {["all", "pending_review", "approved", "rejected"].map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setFeedbackStatusFilter(status as typeof feedbackStatusFilter)}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full border transition-colors ${
+                      feedbackStatusFilter === status
+                        ? "bg-primary text-white border-primary"
+                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {status === "all" ? "All" : status === "pending_review" ? "Pending Review" : status.charAt(0).toUpperCase() + status.slice(1)}
+                    <span className="ml-1 text-xs bg-muted/30 px-1.5 py-0.5 rounded-full">
+                      {feedbacks.filter((f: any) => status === "all" || f.status === status).length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {visibleFeedbacks.filter((f) => !!f.case_id && (feedbackStatusFilter === "all" || f.status === feedbackStatusFilter)).length === 0 ? <Empty text="No matching feedback" /> :
+                visibleFeedbacks
+                  .filter((f) => !!f.case_id && (feedbackStatusFilter === "all" || f.status === feedbackStatusFilter))
+                  .map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} />)}
             </TabsContent>
 
             <TabsContent value="suspensions" className="space-y-4 mt-4">
@@ -920,7 +1022,7 @@ export default function AdminPage() {
 }
 
 // ============================================================
-//  ALL SUB-COMPONENTS
+//  ALL SUB-COMPONENTS (unchanged except as noted)
 // ============================================================
 
 // ---------- SUSPENSIONS PANEL ----------
@@ -2567,17 +2669,13 @@ function Img({ url, label }: { url: string; label: string }) {
 // ---------- DEPOSIT SEARCH BOX ----------
 function DepositSearchBox({ deposits, onApprove, onReject, profileMap = {}, cnicByUser = {} }: any) {
   const [search, setSearch] = useState("");
-  const sorted = [...deposits].sort((a, b) => {
-    const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
-    return (order[a.status] ?? 3) - (order[b.status] ?? 3);
-  });
   const filtered = search.trim()
-    ? sorted.filter((d: any) => {
+    ? deposits.filter((d: any) => {
         const q = search.trim().toLowerCase();
         const p = profileMap[d.user_id] || {};
         return [d.id, d.user_id, d.transaction_id, d.amount, d.credits, p.full_name, p.email, cnicByUser[d.user_id]].some((value) => String(value || "").toLowerCase().includes(q));
       })
-    : sorted;
+    : deposits;
   return (
     <div className="space-y-3">
       <div className="relative">
