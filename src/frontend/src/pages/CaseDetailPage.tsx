@@ -226,7 +226,7 @@ function CopyRow({ label, value, mono }: { label: string; value?: string; mono?:
 export default function CaseDetailPage() {
   const { id } = useParams({ from: "/cases/$id" });
   const navigate = useNavigate();
-  const { user, isAuthenticated, isAssistant } = useAuth();
+  const { user, isAuthenticated } = useAuth(); // isAssistant removed
   const [caseData, setCaseData] = useState<any>(null);
   const [seekerKyc, setSeekerKyc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -1063,64 +1063,7 @@ export default function CaseDetailPage() {
                   </div>
                 )}
 
-                {/* ✅ ASSISTANT BUTTONS */}
-                {isAuthenticated && isAssistant && !isOwner && !isCompleted && (
-                  <div className="order-1 min-w-0 overflow-hidden rounded-2xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/20 p-5 space-y-3">
-                    <h3 className="font-bold text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                      <span className="text-xl">🛠️</span> Assistant Actions
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        onClick={async () => {
-                          if (!user) return;
-                          const remainingAmt = amountNeeded - (caseData.amount_collected || 0);
-                          if (remainingAmt <= 0) { toast.error("Case already fully funded."); return; }
-                          try {
-                            await insertCaseUnlock({
-                              case_id: id,
-                              hero_id: user.id,
-                              pledged_amount: remainingAmt,
-                              payment_type: "assistant_contribution",
-                            });
-                            toast.success("Assistant contribution submitted for approval.");
-                            loadCase();
-                          } catch (err: any) {
-                            toast.error(err.message || "Failed to submit contribution");
-                          }
-                        }}
-                        className="bg-teal-600 hover:bg-teal-700 text-white"
-                      >
-                        Contribution <br /><span className="text-xs">(Full Amount)</span>
-                      </Button>
-                      <Button
-                        onClick={async () => {
-                          if (!user) return;
-                          const remainingAmt = amountNeeded - (caseData.amount_collected || 0);
-                          if (remainingAmt <= 0) { toast.error("Case already fully funded."); return; }
-                          try {
-                            await insertCaseUnlock({
-                              case_id: id,
-                              hero_id: user.id,
-                              pledged_amount: remainingAmt,
-                              payment_type: "direct_help",
-                            });
-                            toast.success("Direct help submitted for approval.");
-                            loadCase();
-                          } catch (err: any) {
-                            toast.error(err.message || "Failed to submit direct help");
-                          }
-                        }}
-                        variant="outline"
-                        className="border-amber-500 text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-                      >
-                        Direct Help <br /><span className="text-xs">(Remaining)</span>
-                      </Button>
-                    </div>
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      These actions will create a new unlock record that needs Admin approval before taking effect.
-                    </p>
-                  </div>
-                )}
+                {/* ✅ ASSISTANT BUTTONS - REMOVED */}
 
                 <div className="order-1 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-5 space-y-3">
                   <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">🎥 Verification Media</h2>{mediaUnlocked && <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600">Unlocked</span>}</div>
