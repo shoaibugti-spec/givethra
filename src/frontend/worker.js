@@ -1,16 +1,14 @@
 // src/frontend/worker.js
 // Givethra - Complete Cloudflare Worker with all APIs including Onboarding Status
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
-// Assistant: shoaibugti@gmail.com | Admin: shoaibahmedbugti5@gmail.com
+// Assistant REMOVED - shoaibugti@gmail.com is no longer assistant.
 
 const PUBLIC_ORIGIN = "https://givethra.org";
 
 const ADMIN_EMAILS = new Set([
   "shoaibahmedbugti5@gmail.com",
 ]);
-const ASSISTANT_EMAILS = new Set([
-  "shoaibugti@gmail.com",
-]);
+// ASSISTANT_EMAILS REMOVED
 
 function googleClientId(env) {
   return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || "").trim();
@@ -143,9 +141,7 @@ function isAdmin(user) {
   return Boolean(user && ADMIN_EMAILS.has(String(user.email).toLowerCase()));
 }
 
-function isAssistant(user) {
-  return Boolean(user && ASSISTANT_EMAILS.has(String(user.email).toLowerCase()));
-}
+// isAssistant() REMOVED
 
 function bearer(request) {
   const value = request.headers.get("Authorization") || "";
@@ -1235,7 +1231,7 @@ async function handleNotifications(request, env, user, url, parts, origin) {
 }
 
 // ============================================================
-//  SYNC COMPLETED CASE (FIXED - handles Assistant Payout)
+//  SYNC COMPLETED CASE (FIXED - correct contribution/direct logic)
 // ============================================================
 async function synchronizeCompletedCase(env, resolutionId) {
   // Get the resolution and verify it's truly completed
@@ -1248,27 +1244,35 @@ async function synchronizeCompletedCase(env, resolutionId) {
                       [1, "1", true, "true"].includes(resolution.admin_confirmed);
   if (!isApproved) return null;
 
-  // Assistant Payout is also approved - we should include it in calculations
-  const isAssistantPayout = String(resolution.resolution_type || "") === "Assistant Payout";
-
-  // Sum all approved resolutions for this case (including Assistant Payout)
+  // 🔥 FIX: Instead of using just the current resolution, we compute totals per case
   const totals = await env.DB.prepare(
     `SELECT c.user_id, c.amount_needed, c.amount_collected,
             COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0)) 
                       FROM case_resolutions r
                       WHERE r.case_id = c.id
                         AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
-                        AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')), 0) AS verified_total
+                        AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')
+                        AND lower(COALESCE(r.paid_to, '')) = 'givethra'), 0) AS contribution_total,
+            COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0)) 
+                      FROM case_resolutions r
+                      WHERE r.case_id = c.id
+                        AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
+                        AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')
+                        AND lower(COALESCE(r.paid_to, '')) != 'givethra'), 0) AS direct_total
      FROM case_submissions c WHERE c.id = ?`
   ).bind(resolution.case_id).first();
   if (!totals) return null;
 
-  const verifiedTotal = Math.max(Number(totals.verified_total || 0), Number(totals.amount_collected || 0));
-  const directPayment = String(resolution.paid_to || "").toLowerCase() !== "givethra" || isAssistantPayout;
+  const contributionTotal = Number(totals.contribution_total || 0);
+  const directTotal = Number(totals.direct_total || 0);
+  const verifiedTotal = Math.max(contributionTotal + directTotal, Number(totals.amount_collected || 0));
   const goalReached = Number(totals.amount_needed || 0) <= 0 || verifiedTotal >= Number(totals.amount_needed || 0);
 
-  // Update case: amount_collected and status if completed
-  const nextStatus = directPayment && goalReached ? "completed" : undefined;
+  // 🔥 CRITICAL FIX: Only mark as completed if there is no contribution amount remaining.
+  // If any contribution exists, case stays as 'approved' (or 'open') until Admin pays it via Pay & Close.
+  const nextStatus = (contributionTotal === 0 && goalReached) ? "completed" : undefined;
+
+  // Update case: amount_collected always, status only if completed
   if (nextStatus) {
     await env.DB.prepare(
       "UPDATE case_submissions SET amount_collected = ?, status = ? WHERE id = ?"
@@ -1280,7 +1284,7 @@ async function synchronizeCompletedCase(env, resolutionId) {
   }
 
   if (totals.user_id) await syncUserCaseCounters(env, totals.user_id);
-  return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "open" };
+  return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "approved" };
 }
 
 // ============================================================
@@ -2348,172 +2352,10 @@ async function handleRequest(request, env, ctx) {
     }
 
     // ============================================================
-    //  ASSISTANT APIs (صرف Assistant کو رسائی)
+    //  ASSISTANT APIs — REMOVED (was here)
     // ============================================================
-    if (parts[1] === "assistant") {
-      if (!isAssistant(user) && !isAdmin(user)) {
-        return json({ error: "Assistant access required" }, 403, origin);
-      }
-
-      // GET /api/assistant/pending-payments
-      if (parts[2] === "pending-payments" && request.method === "GET") {
-        try {
-          const rows = await env.DB.prepare(
-            `SELECT c.id, c.title, c.amount_needed, c.user_id AS requester_id,
-                    COALESCE(SUM(CASE
-                      WHEN lower(COALESCE(r.status,'')) = 'completed'
-                       AND r.paid_to = 'givethra'
-                       AND COALESCE(r.admin_confirmed,0) IN (1,'1','true')
-                      THEN r.amount_paid ELSE 0 END), 0) AS total_contributions,
-                    COALESCE(SUM(CASE
-                      WHEN r.resolution_type = 'Assistant Payout'
-                      THEN r.amount_paid ELSE 0 END), 0) AS already_paid_out
-             FROM case_submissions c
-             LEFT JOIN case_resolutions r ON r.case_id = c.id
-             GROUP BY c.id
-             HAVING total_contributions > already_paid_out`
-          ).all();
-          
-          const results = (rows.results || []).map((r) => ({
-            id: r.id,
-            title: r.title || 'Untitled Case',
-            amount_needed: Number(r.amount_needed || 0),
-            total_contributions: Number(r.total_contributions || 0),
-            already_paid_out: Number(r.already_paid_out || 0),
-            remaining_to_pay: Math.max(Number(r.total_contributions || 0) - Number(r.already_paid_out || 0), 0),
-            requester_id: r.requester_id,
-          }));
-
-          console.log(`[Assistant] Found ${results.length} pending payments`);
-          return json(results, 200, origin);
-          
-        } catch (error) {
-          console.error('[Assistant] pending-payments error:', error);
-          return json({ error: 'Failed to fetch pending payments', details: String(error) }, 500, origin);
-        }
-      }
-
-      // GET /api/assistant/active-cases
-      if (parts[2] === "active-cases" && request.method === "GET") {
-        try {
-          const rows = await env.DB.prepare(
-            `SELECT id, title, category, country, city, urgency, amount_needed,
-                    amount_collected, status, submitted_at, user_id
-             FROM case_submissions
-             WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active')
-             ORDER BY submitted_at DESC`
-          ).all();
-          
-          console.log(`[Assistant] Found ${rows.results?.length || 0} active cases`);
-          return json(rows.results || [], 200, origin);
-          
-        } catch (error) {
-          console.error('[Assistant] active-cases error:', error);
-          return json({ error: 'Failed to fetch active cases', details: String(error) }, 500, origin);
-        }
-      }
-
-      // POST /api/assistant/pay
-      if (parts[2] === "pay" && request.method === "POST") {
-        try {
-          const body = await readJson(request);
-          const caseId = String(body?.case_id || "").trim();
-          const amount = Number(body?.amount);
-          
-          if (!caseId) return json({ error: "case_id is required" }, 400, origin);
-          if (!Number.isFinite(amount) || amount <= 0) return json({ error: "A valid amount is required" }, 400, origin);
-
-          const caseRow = await env.DB.prepare(
-            "SELECT id, title, user_id FROM case_submissions WHERE id = ?"
-          ).bind(caseId).first();
-          
-          if (!caseRow) return json({ error: "Case not found" }, 404, origin);
-
-          // Check if already paid
-          const existing = await env.DB.prepare(
-            "SELECT id FROM case_resolutions WHERE case_id = ? AND resolution_type = 'Assistant Payout'"
-          ).bind(caseId).first();
-          
-          if (existing) {
-            return json({ 
-              error: "This case has already been paid out by Assistant",
-              existing_payout_id: existing.id
-            }, 409, origin);
-          }
-
-          // Check total contributions
-          const totals = await env.DB.prepare(
-            `SELECT COALESCE(SUM(COALESCE(r.amount_paid, 0)), 0) AS total_contributions
-             FROM case_resolutions r
-             WHERE r.case_id = ?
-               AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
-               AND r.paid_to = 'givethra'
-               AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')`
-          ).bind(caseId).first();
-
-          const totalContributions = Number(totals?.total_contributions || 0);
-          
-          if (totalContributions <= 0) {
-            return json({ 
-              error: "No contributions found for this case",
-              total_contributions: 0
-            }, 400, origin);
-          }
-
-          // Don't allow paying more than total contributions
-          const finalAmount = Math.min(amount, totalContributions);
-
-          const resolutionId = id();
-          const timestamp = now();
-          
-          await env.DB.prepare(
-            `INSERT INTO case_resolutions
-              (id, case_id, hero_id, hero_email, resolution_type, 
-               amount_paid, status, paid_to, admin_confirmed, 
-               admin_confirmed_at, completed_at, submitted_at)
-             VALUES (?, ?, ?, ?, 'Assistant Payout', 
-                     ?, 'completed', 'institute', 1, 
-                     ?, ?, ?)`
-          ).bind(
-            resolutionId,
-            caseId,
-            user.user_id,
-            user.email,
-            finalAmount,
-            timestamp,
-            timestamp,
-            timestamp
-          ).run();
-
-          // Update case status via synchronizeCompletedCase
-          await synchronizeCompletedCase(env, resolutionId);
-
-          // Send notification to requester
-          await sendNotification(
-            env,
-            caseRow.user_id,
-            'assistant_payout',
-            'Assistant Payout Completed',
-            `The Assistant has processed a payout of ${finalAmount} for your case.`,
-            `/cases/${caseId}`
-          );
-
-          return json({ 
-            success: true, 
-            id: resolutionId, 
-            case_id: caseId, 
-            amount: finalAmount,
-            total_contributions: totalContributions
-          }, 201, origin);
-          
-        } catch (error) {
-          console.error('[Assistant] pay error:', error);
-          return json({ error: 'Failed to process payout', details: String(error) }, 500, origin);
-        }
-      }
-
-      return json({ error: "Not found" }, 404, origin);
-    }
+    // NOTE: Assistant functionality has been completely removed.
+    // No /api/assistant endpoints exist anymore.
 
     return json({ error: "API route not found" }, 404, origin);
   }
