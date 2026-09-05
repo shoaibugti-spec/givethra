@@ -1,5 +1,5 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
-// Givethra - Role Selection with Auto-Slide Boxes (Colorful & Professional)
+// Givethra - Role Selection with Full-Color Auto-Slide Boxes
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -69,32 +69,32 @@ const ROLE_CATEGORY_STYLES: Record<
   },
 };
 
-// ---------- Slide data (exactly as you described) ----------
+// ---------- Slide definitions (exactly as you specified) ----------
 const COMMUNITY_SLIDES = [
-  { text: "Community", desc: "Connect with people who care" },
-  { text: "Connect & Share", desc: "Share your story, find support" },
-  { text: "Support Others", desc: "Every kind word matters" },
-  { text: "Like • Comment • Share", desc: "Engage with the community" },
-  { text: "Build Your Community", desc: "Grow together, thrive together" },
+  { title: "Community", desc: "Connect with people who care" },
+  { title: "Connect & Share", desc: "Share your story, find support" },
+  { title: "Support Others", desc: "Every kind word matters" },
+  { title: "Like • Comment • Share", desc: "Engage with the community" },
+  { title: "Build Your Community", desc: "Grow together, thrive together" },
 ];
 
 const HERO_SLIDES = [
-  { text: "Hero", desc: "You can change a life today" },
-  { text: "Become a Hero", desc: "Step up and make a difference" },
-  { text: "Unlock a Case", desc: "Choose a case to support" },
-  { text: "Contribute & Help", desc: "Your contribution counts" },
-  { text: "3 Free Contributions", desc: "Welcome offer — try it now" },
-  { text: "Help Verified People", desc: "Support those who need it most" },
-  { text: "Make a Real Impact", desc: "Be the change you want to see" },
+  { title: "Hero", desc: "You can change a life today" },
+  { title: "Become a Hero", desc: "Step up and make a difference" },
+  { title: "Unlock a Case", desc: "Choose a case to support" },
+  { title: "Contribute & Help", desc: "Your contribution counts" },
+  { title: "3 Free Contributions", desc: "Welcome offer — try it now" },
+  { title: "Help Verified People", desc: "Support those who need it most" },
+  { title: "Make a Real Impact", desc: "Be the change you want to see" },
 ];
 
 const REQUESTER_SLIDES = [
-  { text: "Requester", desc: "Get the help you deserve" },
-  { text: "Request Help", desc: "Reach out with confidence" },
-  { text: "Submit Your Case", desc: "Tell us your story" },
-  { text: "Complete KYC", desc: "Secure & private verification" },
-  { text: "Get Verified", desc: "Build trust in the community" },
-  { text: "Receive Verified Help", desc: "Support from real people" },
+  { title: "Requester", desc: "Get the help you deserve" },
+  { title: "Request Help", desc: "Reach out with confidence" },
+  { title: "Submit Your Case", desc: "Tell us your story" },
+  { title: "Complete KYC", desc: "Secure & private verification" },
+  { title: "Get Verified", desc: "Build trust in the community" },
+  { title: "Receive Verified Help", desc: "Support from real people" },
 ];
 
 // ---------- Social links (unchanged) ----------
@@ -138,13 +138,13 @@ export default function RoleSelectionPage() {
   const activeSlides =
     activeCaseCategories.length > 0
       ? [
-          { text: `${activeCases.length} Active Cases`, desc: "Tap to help now" },
+          { title: `${activeCases.length} Active Cases`, desc: "Tap to help now" },
           ...activeCaseCategories.map((cat) => ({
-            text: cat.category,
+            title: cat.category,
             desc: `${cat.count} case${cat.count === 1 ? "" : "s"}`,
           })),
         ]
-      : [{ text: "No active cases", desc: "Check back soon" }];
+      : [{ title: "No active cases", desc: "Check back soon" }];
 
   // ---------- Auto-slide state for each box ----------
   const [communityIndex, setCommunityIndex] = useState(0);
@@ -152,7 +152,7 @@ export default function RoleSelectionPage() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [requesterIndex, setRequesterIndex] = useState(0);
 
-  // Auto-slide effect for each box (no dots)
+  // Auto-slide effects (no dots, pure auto)
   useEffect(() => {
     const interval = setInterval(() => {
       setCommunityIndex((prev) => (prev + 1) % COMMUNITY_SLIDES.length);
@@ -216,13 +216,13 @@ export default function RoleSelectionPage() {
     }
   };
 
-  // ---------- Helper: render a slide inside a box ----------
-  const renderSlide = (text: string, desc: string) => (
-    <div className="flex flex-col items-center justify-center h-full w-full px-2">
-      <span className="text-base font-bold text-foreground md:text-xl">
-        {text}
+  // ---------- Helper: render slide content (title + desc) ----------
+  const renderSlide = (title: string, desc: string) => (
+    <div className="flex flex-col items-center justify-center w-full h-full px-2">
+      <span className="text-lg font-bold text-white md:text-2xl drop-shadow-sm">
+        {title}
       </span>
-      <span className="mt-1 text-xs text-muted-foreground md:text-sm">
+      <span className="mt-1 text-sm text-white/90 md:text-base drop-shadow-sm">
         {desc}
       </span>
     </div>
@@ -251,62 +251,64 @@ export default function RoleSelectionPage() {
           <p className="text-sm text-muted-foreground">How are you today?</p>
         </div>
 
-        {/* 4‑Box Grid */}
+        {/* 4‑Box Grid - Full Color */}
         <div className="grid grid-cols-2 gap-3 md:gap-5">
           {/* ---------- Community (Teal) ---------- */}
           <Link
             to="/community"
-            className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-teal-300/60 bg-gradient-to-br from-teal-50/80 to-white/80 p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-lg hover:shadow-teal-500/20 dark:border-teal-800/60 dark:from-teal-950/30 dark:to-background/80"
+            className="group flex aspect-square flex-col items-center justify-center rounded-3xl bg-teal-600 p-4 text-center shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-teal-700"
           >
-            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-500/10 text-teal-600 transition-transform group-hover:scale-105 dark:text-teal-400">
+            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white transition-transform group-hover:scale-105">
               <Users className="h-7 w-7 md:h-8 md:w-8" />
             </div>
-            {/* Slide area */}
             <div className="flex-1 flex items-center justify-center w-full">
               {renderSlide(
-                COMMUNITY_SLIDES[communityIndex].text,
+                COMMUNITY_SLIDES[communityIndex].title,
                 COMMUNITY_SLIDES[communityIndex].desc
               )}
             </div>
-            <span className="mt-1 text-[10px] font-medium text-teal-600 dark:text-teal-400 opacity-70">
+            <span className="mt-1 text-xs font-medium text-white/80">
               Guest available
             </span>
           </Link>
 
-          {/* ---------- Active Cases (Coral / Rose) ---------- */}
+          {/* ---------- Active Cases (Rose) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("hero")}
-            className="group relative flex aspect-square flex-col items-center justify-center rounded-3xl border border-rose-300/60 bg-gradient-to-br from-rose-50/80 to-white/80 p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/20 dark:border-rose-800/60 dark:from-rose-950/30 dark:to-background/80"
+            className="group flex aspect-square flex-col items-center justify-center rounded-3xl bg-rose-600 p-4 text-center shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-rose-700"
           >
-            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 transition-transform group-hover:scale-105 dark:text-rose-400">
+            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white transition-transform group-hover:scale-105">
               <Bell className="h-7 w-7 md:h-8 md:w-8" />
             </div>
             <div className="flex-1 flex items-center justify-center w-full">
               {activeSlides.length > 0 &&
                 renderSlide(
-                  activeSlides[activeIndex].text,
+                  activeSlides[activeIndex].title,
                   activeSlides[activeIndex].desc
                 )}
             </div>
-            <span className="mt-1 text-[10px] font-medium text-rose-600 dark:text-rose-400 opacity-70">
+            <span className="mt-1 text-xs font-medium text-white/80">
               {activeCases.length} active cases
             </span>
           </button>
 
-          {/* ---------- Become a Hero (Gold / Amber) ---------- */}
+          {/* ---------- Become a Hero (Amber) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("hero")}
-            className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-amber-300/60 bg-gradient-to-br from-amber-50/80 to-white/80 p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/20 dark:border-amber-800/60 dark:from-amber-950/30 dark:to-background/80"
+            className="group flex aspect-square flex-col items-center justify-center rounded-3xl bg-amber-500 p-4 text-center shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-amber-600"
           >
-            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 transition-transform group-hover:scale-105 dark:text-amber-400">
+            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white transition-transform group-hover:scale-105">
               <Heart className="h-7 w-7 md:h-8 md:w-8" />
             </div>
             <div className="flex-1 flex items-center justify-center w-full">
-              {renderSlide(HERO_SLIDES[heroIndex].text, HERO_SLIDES[heroIndex].desc)}
+              {renderSlide(
+                HERO_SLIDES[heroIndex].title,
+                HERO_SLIDES[heroIndex].desc
+              )}
             </div>
-            <span className="mt-1 text-[10px] font-medium text-amber-600 dark:text-amber-400 opacity-70">
+            <span className="mt-1 text-xs font-medium text-white/80">
               3 free contributions
             </span>
           </button>
@@ -315,18 +317,18 @@ export default function RoleSelectionPage() {
           <button
             type="button"
             onClick={() => handleRoleSelect("requester")}
-            className="group flex aspect-square flex-col items-center justify-center rounded-3xl border border-blue-300/60 bg-gradient-to-br from-blue-50/80 to-white/80 p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/20 dark:border-blue-800/60 dark:from-blue-950/30 dark:to-background/80"
+            className="group flex aspect-square flex-col items-center justify-center rounded-3xl bg-blue-600 p-4 text-center shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-blue-700"
           >
-            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 transition-transform group-hover:scale-105 dark:text-blue-400">
+            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white transition-transform group-hover:scale-105">
               <HandHelping className="h-7 w-7 md:h-8 md:w-8" />
             </div>
             <div className="flex-1 flex items-center justify-center w-full">
               {renderSlide(
-                REQUESTER_SLIDES[requesterIndex].text,
+                REQUESTER_SLIDES[requesterIndex].title,
                 REQUESTER_SLIDES[requesterIndex].desc
               )}
             </div>
-            <span className="mt-1 text-[10px] font-medium text-blue-600 dark:text-blue-400 opacity-70">
+            <span className="mt-1 text-xs font-medium text-white/80">
               KYC verified
             </span>
           </button>
