@@ -1,5 +1,5 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
-// Givethra - Full-Color Auto-Slide Boxes with Icons inside Slides
+// Givethra - Full-Color Auto-Slide Boxes (No Extra Icons, No Dots)
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -17,7 +17,7 @@ import {
   MessageCircle,
   Download,
   Smartphone,
-  // Icons for slides
+  // Icons for slides (only used inside slides)
   Users,
   Share2,
   HeartHandshake,
@@ -44,7 +44,7 @@ import {
 import { useEffect, useState } from "react";
 import { getApprovedCases, getKycStatus } from "@/lib/api";
 
-// ---------- Slide data with icons (exactly as per image) ----------
+// ---------- Slide data with icons (only these appear inside boxes) ----------
 const COMMUNITY_SLIDES = [
   { icon: <Users className="w-8 h-8" />, title: "Community", desc: "Connect with people who care" },
   { icon: <Share2 className="w-8 h-8" />, title: "Connect & Share", desc: "Share your story, find support" },
@@ -75,38 +75,14 @@ const REQUESTER_SLIDES = [
 // Category styles for Active Cases (to get icons)
 const ROLE_CATEGORY_STYLES: Record<
   string,
-  { icon: typeof Battery; color: string; bg: string }
+  { icon: typeof Battery }
 > = {
-  "Electricity Bill": {
-    icon: Battery,
-    color: "text-amber-600",
-    bg: "bg-amber-500/10",
-  },
-  "Gas Bill": {
-    icon: Flame,
-    color: "text-orange-600",
-    bg: "bg-orange-500/10",
-  },
-  "Water Bill": {
-    icon: Droplets,
-    color: "text-sky-600",
-    bg: "bg-sky-500/10",
-  },
-  "School Fees": {
-    icon: GraduationCap,
-    color: "text-indigo-600",
-    bg: "bg-indigo-500/10",
-  },
-  "Medical & Treatment": {
-    icon: Stethoscope,
-    color: "text-rose-600",
-    bg: "bg-rose-500/10",
-  },
-  "Business / Work Help": {
-    icon: ShoppingCart,
-    color: "text-emerald-600",
-    bg: "bg-emerald-500/10",
-  },
+  "Electricity Bill": { icon: Battery },
+  "Gas Bill": { icon: Flame },
+  "Water Bill": { icon: Droplets },
+  "School Fees": { icon: GraduationCap },
+  "Medical & Treatment": { icon: Stethoscope },
+  "Business / Work Help": { icon: ShoppingCart },
 };
 
 // ---------- Social links (unchanged) ----------
@@ -169,7 +145,7 @@ export default function RoleSelectionPage() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [requesterIndex, setRequesterIndex] = useState(0);
 
-  // Auto-slide effects (no dots)
+  // Auto-slide effects (no dots anywhere)
   useEffect(() => {
     const interval = setInterval(() => {
       setCommunityIndex((prev) => (prev + 1) % COMMUNITY_SLIDES.length);
@@ -265,7 +241,7 @@ export default function RoleSelectionPage() {
           <p className="text-sm text-muted-foreground">How are you today?</p>
         </div>
 
-        {/* 4‑Box Grid - Full Color, Icons inside slides, no extra icons */}
+        {/* 4‑Box Grid - Full Color, only slides, no extra icons, no dots */}
         <div className="grid grid-cols-2 gap-3 md:gap-5">
           {/* ---------- Community (Teal) ---------- */}
           <Link
