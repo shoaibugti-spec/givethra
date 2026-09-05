@@ -656,9 +656,9 @@ export default function AdminPage() {
     return needed > 0 && collected >= needed && !c.closed_by_admin;
   });
 
-  const paidPayClose = caseList.filter((c) => c.status === "completed" && c.closed_by_admin === true && c.paid_receipt_url);
-  const rejectedPayClose = caseList.filter((c) => c.status === "approved" && c.closed_by_admin === false && c.rejection_reason);
-
+  const paidPayClose = caseList.filter((c) => c.status === "completed" && c.closed_by_admin);
+const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.closed_by_admin && c.rejection_reason);
+  
   const usersList = profiles.map((p) => {
     const uid = p.user_id;
     const kyc = kycList.find((k) => k.user_id === uid);
