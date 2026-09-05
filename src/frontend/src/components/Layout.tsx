@@ -34,7 +34,7 @@ import {
 import RoleSwitcher from "@/components/RoleSwitcher";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
-const ASSISTANT_EMAIL = "shoaibugti@gmail.com";
+// ASSISTANT_EMAIL REMOVED
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
@@ -62,7 +62,7 @@ function NavLink({ to, children, onClick }: { to: string; children: React.ReactN
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
-  const { isAuthenticated, logout, user, isAssistant } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth(); // isAssistant removed
   const { role } = useRole();
   const navigate = useNavigate();
   const router = useRouterState();
@@ -231,12 +231,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </>
             )}
             {isAdmin && <div className="py-1"><NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink></div>}
-            {/* ✅ Assistant Dashboard link only in mobile menu */}
-            {isAssistant && (
-              <div className="py-1">
-                <NavLink to="/assistant-dashboard" onClick={closeMenu}>Assistant Dashboard</NavLink>
-              </div>
-            )}
+            {/* Assistant Dashboard link REMOVED */}
             <div className="py-1"><NavLink to="/about" onClick={closeMenu}>About</NavLink></div>
             <div className="py-1"><NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink></div>
 
