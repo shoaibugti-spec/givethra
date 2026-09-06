@@ -1,5 +1,6 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
-// 🔥 Requester button → /submit-request when KYC approved
+// Givethra - Full-Color Auto-Slide Boxes
+// 🔥 FINAL: Requester button → /submit-request when KYC approved
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
