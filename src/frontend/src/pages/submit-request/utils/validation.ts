@@ -1,4 +1,5 @@
-// src/frontend/src/pages/submit-request/utils/validation.ts
+import { isEasyCat, PROPERTY_RELEVANT_CATS, isDebtCategory, getMaxLimit } from "../constants";
+
 export function validateStep(stepId: string, formData: any): string | null {
   switch (stepId) {
     case "category":
@@ -46,7 +47,6 @@ export function validateStep(stepId: string, formData: any): string | null {
       }
       return null;
     case "categoryDetails":
-      // Category-specific validation handled in StepCategoryDetails
       return null;
     case "propertyOwnership":
       if (PROPERTY_RELEVANT_CATS.has(formData.category) && !formData.propertyOwnership) {
