@@ -201,8 +201,12 @@ export default function SubmitRequestWizard() {
       case "category":
   return (
     <StepCategory
-      {...commonProps}
-      // 🔥 categories prop کو مکمل ہٹا دیں
+      value={formData.category}
+      onChange={(val) => setFormData((prev) => ({ ...prev, category: val }))}
+      onNext={handleNext}
+      onBack={handleBack}
+      isFirst={isFirst}
+      isLast={isLast}
       willBeFree={willBeFree}
       isFreeDisabled={stats.isFreeDisabled}
       freeCasesUsed={stats.freeCasesUsed}
