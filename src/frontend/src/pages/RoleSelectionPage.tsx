@@ -1,5 +1,5 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
-// Givethra - Full-Color Auto-Slide Boxes (No Extra Icons, No Dots)
+// Givethra - Full-Color Auto-Slide Boxes
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -17,7 +17,6 @@ import {
   MessageCircle,
   Download,
   Smartphone,
-  // Icons for slides (only used inside slides)
   Users,
   Share2,
   HeartHandshake,
@@ -44,7 +43,6 @@ import {
 import { useEffect, useState } from "react";
 import { getApprovedCases, getKycStatus } from "@/lib/api";
 
-// ---------- Slide data with icons (only these appear inside boxes) ----------
 const COMMUNITY_SLIDES = [
   { icon: <Users className="w-8 h-8" />, title: "Community", desc: "Connect with people who care" },
   { icon: <Share2 className="w-8 h-8" />, title: "Connect & Share", desc: "Share your story, find support" },
@@ -72,11 +70,7 @@ const REQUESTER_SLIDES = [
   { icon: <Heart className="w-8 h-8" />, title: "Receive Verified Help", desc: "Support from real people" },
 ];
 
-// Category styles for Active Cases (to get icons)
-const ROLE_CATEGORY_STYLES: Record<
-  string,
-  { icon: typeof Battery }
-> = {
+const ROLE_CATEGORY_STYLES: Record<string, { icon: typeof Battery }> = {
   "Electricity Bill": { icon: Battery },
   "Gas Bill": { icon: Flame },
   "Water Bill": { icon: Droplets },
@@ -85,7 +79,6 @@ const ROLE_CATEGORY_STYLES: Record<
   "Business / Work Help": { icon: ShoppingCart },
 };
 
-// ---------- Social links (unchanged) ----------
 const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
@@ -99,7 +92,6 @@ export default function RoleSelectionPage() {
 
   const [activeCases, setActiveCases] = useState<any[]>([]);
 
-  // ---------- Fetch active cases ----------
   useEffect(() => {
     getApprovedCases()
       .then((rows) => {
@@ -110,7 +102,6 @@ export default function RoleSelectionPage() {
       });
   }, []);
 
-  // ---------- Build category slides for Active Cases ----------
   const activeCaseCategories = Object.entries(
     activeCases.reduce<Record<string, number>>((counts, currentCase) => {
       const category = String(currentCase?.category || "Other");
@@ -122,7 +113,6 @@ export default function RoleSelectionPage() {
     count,
   }));
 
-  // Active slides: first a summary, then each category with icon
   const activeSlides =
     activeCaseCategories.length > 0
       ? [
@@ -139,13 +129,11 @@ export default function RoleSelectionPage() {
         ]
       : [{ icon: <Bell className="w-8 h-8" />, title: "No active cases", desc: "Check back soon" }];
 
-  // ---------- Auto-slide state for each box ----------
   const [communityIndex, setCommunityIndex] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const [heroIndex, setHeroIndex] = useState(0);
   const [requesterIndex, setRequesterIndex] = useState(0);
 
-  // Auto-slide effects (no dots anywhere)
   useEffect(() => {
     const interval = setInterval(() => {
       setCommunityIndex((prev) => (prev + 1) % COMMUNITY_SLIDES.length);
@@ -175,13 +163,12 @@ export default function RoleSelectionPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // ---------- 🔥 Role selection handler (UPDATED) ----------
+  // 🔥 FIX: Correct role selection handler
   const handleRoleSelect = async (role: "hero" | "requester") => {
     setRole(role);
     setAuthRole(role === "requester" ? "help_seeker" : "hero");
 
     if (!isAuthenticated) {
-      // Not signed in -> go to sign-in with redirect
       navigate({
         to: "/sign-in",
         search: {
@@ -192,16 +179,13 @@ export default function RoleSelectionPage() {
       return;
     }
 
-    // User is signed in
     if (role === "requester") {
       try {
         const kyc = await getKycStatus(user!.id);
         const status = String(kyc?.status || "none").trim().toLowerCase();
         if (status === "approved") {
-          // ✅ KYC approved -> go to new submit wizard
           navigate({ to: "/submit-request" });
         } else {
-          // KYC pending or rejected -> go to KYC page
           navigate({ to: "/kyc" });
         }
       } catch (error) {
@@ -209,12 +193,10 @@ export default function RoleSelectionPage() {
         navigate({ to: "/kyc" });
       }
     } else {
-      // Hero -> go to Active Cases
       navigate({ to: "/cases" });
     }
   };
 
-  // ---------- Render a slide (icon + title + desc, centered) ----------
   const SlideContent = ({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) => (
     <div className="flex flex-col items-center justify-center w-full h-full text-white">
       <div className="mb-2">{icon}</div>
@@ -223,11 +205,9 @@ export default function RoleSelectionPage() {
     </div>
   );
 
-  // ---------- Render ----------
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <div className="max-w-4xl w-full space-y-12">
-        {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
             <span className="text-3xl font-bold text-foreground">Givethra</span>
@@ -246,9 +226,7 @@ export default function RoleSelectionPage() {
           <p className="text-sm text-muted-foreground">How are you today?</p>
         </div>
 
-        {/* 4‑Box Grid - Full Color, only slides, no extra icons, no dots */}
         <div className="grid grid-cols-2 gap-3 md:gap-5">
-          {/* ---------- Community (Teal) ---------- */}
           <Link
             to="/community"
             className="group flex items-center justify-center rounded-3xl bg-teal-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-teal-700 aspect-square"
@@ -260,7 +238,6 @@ export default function RoleSelectionPage() {
             />
           </Link>
 
-          {/* ---------- Active Cases (Coral/Red) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("hero")}
@@ -275,7 +252,6 @@ export default function RoleSelectionPage() {
             )}
           </button>
 
-          {/* ---------- Become a Hero (Gold/Amber) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("hero")}
@@ -288,7 +264,6 @@ export default function RoleSelectionPage() {
             />
           </button>
 
-          {/* ---------- Requester (Blue) ---------- */}
           <button
             type="button"
             onClick={() => handleRoleSelect("requester")}
@@ -302,7 +277,6 @@ export default function RoleSelectionPage() {
           </button>
         </div>
 
-        {/* Rest of the page (unchanged) */}
         <section className="space-y-8 bg-background py-8" aria-label="Community impact walls">
           <HeroesWall />
           <KindnessWall />
@@ -331,7 +305,6 @@ export default function RoleSelectionPage() {
           </div>
         </section>
 
-        {/* Trust Badges */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-xs text-muted-foreground pt-4 border-t border-border">
           <div className="flex flex-col items-center gap-1">
             <ShieldCheck className="h-5 w-5 text-primary" />
@@ -355,7 +328,6 @@ export default function RoleSelectionPage() {
           </div>
         </div>
 
-        {/* Footer */}
         <section className="py-10 px-4 bg-card border-t border-border">
           <div className="max-w-2xl mx-auto text-center space-y-5">
             <div className="space-y-1">
@@ -443,7 +415,6 @@ export default function RoleSelectionPage() {
           </div>
         </section>
 
-        {/* Bottom Quote */}
         <div className="text-center text-xs text-muted-foreground pt-4">
           <p>"Be the reason someone believes in kindness."</p>
           <p className="mt-2">givethra.org</p>
