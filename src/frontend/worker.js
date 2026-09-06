@@ -1962,16 +1962,17 @@ async function handleRequest(request, env, ctx) {
             await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?")
               .bind(String(effectiveKyc?.status || values.status).toLowerCase(), now(), current.user_id).run();
             if (String(current.status || "").trim().toLowerCase() !== values.status) {
-              if (values.status === "approved") {
-                await sendNotification(
-                  env,
-                  current.user_id,
-                  "kyc_approved",
-                  "KYC Approved",
-                  "Your identity has been verified. Please complete the onboarding guide to get started.",
-                  "/onboarding"
-                );
-              } else if (values.status === "rejected") {
+              // worker.js — KYC approve کرتے وقت
+if (values.status === "approved") {
+  await sendNotification(
+    env,
+    current.user_id,
+    "kyc_approved",
+    "KYC Approved ✅",
+    "Your identity has been verified. Please complete your request to get help.",
+    "/submit-request"  // 🔥 یہاں /home کی بجائے /submit-request
+  );
+} else if (values.status === "rejected") {
                 const reason = String(values.rejection_reason || "").trim();
                 await sendNotification(
                   env,
