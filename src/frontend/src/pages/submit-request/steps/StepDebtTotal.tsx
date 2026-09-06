@@ -3,8 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StepNavigation } from "../shared/StepNavigation";
-import { CASE_CURRENCIES, CURRENCY_SYMBOLS } from "../constants";
-import { calculateDebtAmount } from "../utils/debtCalculator";
+import { CASE_CURRENCIES, CURRENCY_SYMBOLS, calculateDebtAmount } from "../constants"; // 🔥 یہاں سے import کریں
 import { useState, useEffect } from "react";
 
 export default function StepDebtTotal({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
