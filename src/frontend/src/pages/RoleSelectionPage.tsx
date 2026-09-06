@@ -229,9 +229,9 @@ export default function RoleSelectionPage() {
           </div>
           <div className="space-y-2">
             <h1 className="text-4xl md:text-5xl font-bold text-foreground">
-              Real People.
+              Verified Help.
               <br className="sm:hidden" />
-              <span className="text-primary"> Real Needs. Real Help.</span>
+              <span className="text-primary"> Real Impact.</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               A trusted platform where real people with genuine needs get support
