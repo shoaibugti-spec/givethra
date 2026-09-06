@@ -199,16 +199,16 @@ export default function SubmitRequestWizard() {
 
     switch (currentStepId) {
       case "category":
-        return (
-          <StepCategory
-            {...commonProps}
-            categories={CATEGORIES}
-            categoryLimits={CATEGORY_LIMITS}
-            willBeFree={willBeFree}
-            isFreeDisabled={stats.isFreeDisabled}
-            freeCasesUsed={stats.freeCasesUsed}
-          />
-        );
+  return (
+    <StepCategory
+      {...commonProps}
+      // 🔥 categories prop کو ہٹا دیا گیا ہے تاکہ StepCategory اپنی اندرونی categories استعمال کرے
+      categoryLimits={CATEGORY_LIMITS}
+      willBeFree={willBeFree}
+      isFreeDisabled={stats.isFreeDisabled}
+      freeCasesUsed={stats.freeCasesUsed}
+    />
+  );
       case "title": return <StepTitle {...commonProps} placeholder="e.g. Help with School Fee" />;
       case "shortDesc": return <StepShortDesc {...commonProps} placeholder="One line summary" />;
       case "country": return <StepCountry {...commonProps} />;
