@@ -31,10 +31,7 @@ const CasesPage = lazy(() => import("@/pages/CasesPage").catch(() => ({ default:
 const CaseDetailPage = lazy(() => import("@/pages/CaseDetailPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const AffidavitPage = lazy(() => import("@/pages/AffidavitPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
-// 🔥 OLD SubmitRequestPage (commented out, keeping for reference)
-// const SubmitRequestPage = lazy(() => import("@/pages/SubmitRequestPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
-
-// 🔥 NEW SubmitRequestWizard
+// 🔥 NEW SubmitRequestWizard (پرانی SubmitRequestPage کی جگہ)
 const SubmitRequestWizard = lazy(() => 
   import("@/pages/submit-request/SubmitRequestWizard").catch(() => ({ 
     default: () => <div className="p-8 text-center">Failed to load Submit Request Wizard</div> 
