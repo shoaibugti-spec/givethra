@@ -1,9 +1,23 @@
-// src/frontend/src/pages/submit-request/utils/submitCase.ts
 import { insertCaseSubmission } from "@/lib/api";
 import { sendNotification } from "@/lib/notify";
+import { calculateDebtAmount } from "../constants";
 
 export async function submitCase(formData: any, userId: string, isFree: boolean) {
-  // Build the case object from formData
+  // Compute final amount
+  let finalAmount = 0;
+  const category = formData.category;
+
+  // Check if fixed amount
+  const fixedCats = ["Child Support", "Widow & Elderly Support", "Disability Support"];
+  if (fixedCats.includes(category)) {
+    finalAmount = 6000;
+  } else if (category === "Debt Relief") {
+    const debt = parseFloat(formData.debtTotalAmount) || 0;
+    finalAmount = calculateDebtAmount(debt);
+  } else {
+    finalAmount = parseFloat(formData.amount) || 0;
+  }
+
   const caseData = {
     user_id: userId,
     category: formData.category,
@@ -13,7 +27,7 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
     city: formData.city,
     urgency: formData.urgency || "Medium",
     description: formData.description,
-    amount_needed: parseFloat(formData.amount) || 0,
+    amount_needed: finalAmount,
     currency: formData.currency || "PKR",
     why_help: formData.description,
     deadline: formData.deadline,
@@ -37,7 +51,12 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
       seeker_contact: formData.seekerContact,
       disability_mode: formData.disabilityMode,
       disability_type: formData.disabilityType,
-      // ... more fields
+      salary_slip_url: formData.salarySlipUrl,
+      statement_url: formData.statementUrl,
+      rental_agreement_url: formData.rentalAgreementUrl,
+      landlord_cnic_url: formData.landlordCnicUrl,
+      owner_cnic_url: formData.ownerCnicUrl,
+      owner_relation: formData.ownerRelation,
     },
     photo_urls: Object.values(formData.catDocUrls || {}),
     selfie_url: formData.selfieUrl,
