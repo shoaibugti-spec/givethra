@@ -202,8 +202,7 @@ export default function SubmitRequestWizard() {
   return (
     <StepCategory
       {...commonProps}
-      // 🔥 categories prop کو ہٹا دیا گیا ہے تاکہ StepCategory اپنی اندرونی categories استعمال کرے
-      categoryLimits={CATEGORY_LIMITS}
+      // 🔥 categories prop کو مکمل ہٹا دیں
       willBeFree={willBeFree}
       isFreeDisabled={stats.isFreeDisabled}
       freeCasesUsed={stats.freeCasesUsed}
