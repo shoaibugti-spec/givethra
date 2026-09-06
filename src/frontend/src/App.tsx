@@ -1,6 +1,6 @@
 // src/frontend/src/App.tsx
 // Givethra - Full App with Role Selection, Onboarding, and Role-based routing
-// 🔥 ULTIMATE FIX: Requester directly goes to /submit-request without any redirect
+// 🔥 FINAL FIX: Removed onboarding redirect for Requesters; fixed imports
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -18,7 +18,7 @@ import {
 import { ThemeProvider } from "next-themes";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
-import { getKycStatus, getOnboardingStatus } from "@/lib/api";
+import { getKycStatus } from "@/lib/api";
 
 // Lazy imports
 const HomePage = lazy(() => import("@/pages/HomePage").catch(() => ({ default: () => <div>Failed to load page</div> })));
@@ -29,12 +29,12 @@ const CasesPage = lazy(() => import("@/pages/CasesPage").catch(() => ({ default:
 const CaseDetailPage = lazy(() => import("@/pages/CaseDetailPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const AffidavitPage = lazy(() => import("@/pages/AffidavitPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
-// 🔥 NEW SubmitRequestWizard - with fallback
+// 🔥 SubmitRequestWizard - with correct import path
 const SubmitRequestWizard = lazy(() => 
   import("@/pages/submit-request/SubmitRequestWizard")
     .then(module => ({ default: module.default }))
     .catch(() => ({ 
-      default: () => <div className="p-8 text-center text-red-600">Failed to load Submit Request Wizard. Please check console for errors.</div> 
+      default: () => <div className="p-8 text-center text-red-600">Failed to load Submit Request Wizard. Check console.</div> 
     }))
 );
 
@@ -88,13 +88,13 @@ function BottomNavFallback() {
 
 import BottomNav from "@/components/BottomNav";
 
-// Root layout with BottomNav and authenticated-route guards.
+// Root layout
 function RootLayout() {
   const { isAuthenticated, user, role: authRole, isAdmin } = useAuth();
   const { role, setRole } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
-  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+  const [checking, setChecking] = useState(true);
 
   // Sync role from auth context to role context
   useEffect(() => {
@@ -103,87 +103,60 @@ function RootLayout() {
     if (authRole === "help_seeker" && role !== "requester") setRole("requester");
   }, [authRole, isAuthenticated, role, setRole]);
 
-  // 🔥 SIMPLIFIED: Only check KYC for Requesters, no onboarding redirect at all
+  // 🔥 Simplified KYC check - NO ONBOARDING REDIRECT FOR REQUESTERS
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      setCheckingOnboarding(false);
+      setChecking(false);
       return;
     }
 
     let cancelled = false;
-    const checkStatus = async () => {
+    const checkKyc = async () => {
       try {
         const kyc = await getKycStatus(user.id);
-        const effectiveKycStatus = String(kyc?.status || "none").trim().toLowerCase();
+        const status = String(kyc?.status || "none").trim().toLowerCase();
 
         const publicPaths = [
           "/", "/sign-in", "/sign-up", "/about", "/account-privacy", "/privacy",
           "/terms", "/community-guidelines", "/faq", "/contact", "/community",
           "/heroes-wall", "/kindness-wall",
         ];
-        const isPublicPath = publicPaths.includes(location.pathname);
+        const isPublic = publicPaths.includes(location.pathname);
         const isRequester = role === "requester";
 
-        // 🔥 Requester: if not KYC approved, redirect to KYC (except on public paths)
-        if (!isAdmin && isRequester && effectiveKycStatus !== "approved" && !isPublicPath && location.pathname !== "/kyc") {
-          if (!cancelled) {
-            console.log("[App] Requester KYC not approved, redirecting to /kyc");
-            navigate({ to: "/kyc" });
-          }
+        // Requester: if not approved, go to KYC
+        if (!isAdmin && isRequester && status !== "approved" && !isPublic && location.pathname !== "/kyc") {
+          if (!cancelled) navigate({ to: "/kyc" });
           return;
         }
 
-        // 🔥 Requester: if KYC approved, allow ALL routes (including /submit-request)
-        if (!isAdmin && isRequester && effectiveKycStatus === "approved") {
-          // No onboarding redirect - let the wizard handle everything
-          if (!cancelled) {
-            console.log("[App] Requester KYC approved, allowing navigation to:", location.pathname);
-          }
-        }
-
-        // 🔥 Hero: no KYC required, no onboarding redirect for /cases
-        if (!isAdmin && role === "hero") {
-          // Allow Hero to go anywhere, especially /cases
-          if (!cancelled) {
-            console.log("[App] Hero mode, allowing navigation to:", location.pathname);
-          }
-        }
-
-        if (!role && !isAdmin) {
-          if (!cancelled && !isPublicPath) {
-            navigate({ to: "/" });
-          }
-        }
-
+        // No other checks; allow everything else
+        if (!cancelled) setChecking(false);
       } catch (err) {
-        console.error("[App] Error checking status:", err);
-      } finally {
-        if (!cancelled) setCheckingOnboarding(false);
+        console.error("KYC check error:", err);
+        setChecking(false);
       }
     };
 
-    checkStatus();
-    return () => {
-      cancelled = true;
-    };
+    checkKyc();
+    return () => { cancelled = true; };
   }, [isAdmin, isAuthenticated, user, role, location.pathname, navigate]);
 
-  // Role guard: If no role selected, redirect to role selection page
+  // Role guard: if no role selected, go to role selection
   useEffect(() => {
-    if (!role && !isAdmin && !checkingOnboarding && isAuthenticated) {
+    if (!role && !isAdmin && !checking && isAuthenticated) {
       const publicPaths = [
         "/", "/sign-in", "/sign-up", "/kyc", "/onboarding", "/about", "/account-privacy",
         "/privacy", "/terms", "/community-guidelines", "/faq", "/contact", "/community",
         "/heroes-wall", "/kindness-wall",
       ];
       if (!publicPaths.includes(location.pathname)) {
-        console.log("[App] No role, redirecting to /");
         navigate({ to: "/" });
       }
     }
-  }, [role, isAdmin, isAuthenticated, location.pathname, navigate, checkingOnboarding]);
+  }, [role, isAdmin, isAuthenticated, location.pathname, navigate, checking]);
 
-  if (isAuthenticated && checkingOnboarding) {
+  if (isAuthenticated && checking) {
     return <AppLoadingScreen />;
   }
 
@@ -213,21 +186,18 @@ const homeRoute = createRoute({
   path: "/home",
   component: () => {
     const { role } = useRole();
-    if (!role) {
-      return <PageLoader />;
-    }
+    if (!role) return <PageLoader />;
     return <Suspense fallback={<PageLoader />}><HomePage /></Suspense>;
   },
 });
 
-// ----- All remaining routes -----
 const signUpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-up", component: () => <Suspense fallback={<PageLoader />}><SignUpPage /></Suspense> });
 const signInRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-in", component: () => <Suspense fallback={<PageLoader />}><SignInPage /></Suspense> });
 const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases", component: () => <Suspense fallback={<PageLoader />}><CasesPage /></Suspense> });
 const caseDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases/$id", component: () => <Suspense fallback={<PageLoader />}><CaseDetailPage /></Suspense> });
 const affidavitRoute = createRoute({ getParentRoute: () => rootRoute, path: "/affidavit/$caseId", component: () => <Suspense fallback={<PageLoader />}><AffidavitPage /></Suspense> });
 
-// 🔥 SUBMIT REQUEST - using NEW WIZARD
+// 🔥 Submit Request using new Wizard
 const submitRequestRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/submit-request",
@@ -259,7 +229,6 @@ const communityRoute = createRoute({ getParentRoute: () => rootRoute, path: "/co
 const heroesWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/heroes-wall", component: () => <Suspense fallback={<PageLoader />}><HeroesWallPage /></Suspense> });
 const kindnessWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/kindness-wall", component: () => <Suspense fallback={<PageLoader />}><KindnessWallPage /></Suspense> });
 
-// Build route tree
 const routeTree = rootRoute.addChildren([
   indexRoute,
   homeRoute,
@@ -303,7 +272,6 @@ declare module "@tanstack/react-router" {
   }
 }
 
-// App loading screen
 function AppLoadingScreen() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--background, #ffffff)", gap: "1.5rem" }}>
