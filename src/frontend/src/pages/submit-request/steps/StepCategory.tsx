@@ -1,7 +1,7 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
 import { StepNavigation } from "../shared/StepNavigation";
 
-// 🔥 تمام 19 کیٹگریز — ہر ایک کا اپنا رنگ (hex colors)
+// 🔥 یہ categories خود StepCategory کے اندر ہیں، باہر سے کوئی override نہیں
 const CATEGORIES = [
   { id: "Electricity Bill", label: "⚡ Electricity Bill", color: "#eab308" },
   { id: "Gas Bill", label: "🔥 Gas Bill", color: "#f97316" },
@@ -47,22 +47,15 @@ export default function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  // 🔥 جب کوئی category منتخب ہو تو اسے set کریں اور اگلے step پر جائیں
   const handleSelect = (id: string) => {
-    console.log("Category selected:", id);
     onChange(id);
-    // تھوڑی تاخیر کے بعد Next پر جائیں
     setTimeout(() => {
-      if (id) {
-        console.log("Moving to next step...");
-        onNext();
-      }
+      if (id) onNext();
     }, 400);
   };
 
   return (
     <div className="space-y-6">
-      {/* Heading */}
       <div className="space-y-2 text-center">
         <h2 className="text-2xl font-bold">What do you need help with?</h2>
         <p className="text-sm text-muted-foreground">
@@ -80,7 +73,6 @@ export default function StepCategory({
         )}
       </div>
 
-      {/* 🔥 19 رنگین باکسز — inline styles کے ساتھ */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {CATEGORIES.map((cat) => {
           const isSelected = value === cat.id;
@@ -139,7 +131,6 @@ export default function StepCategory({
         })}
       </div>
 
-      {/* 🔥 Next/Back buttons */}
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
