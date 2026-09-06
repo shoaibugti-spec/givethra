@@ -1,6 +1,7 @@
 // src/frontend/src/App.tsx
 // Givethra - Full App with Role Selection, Onboarding, and Role-based routing
 // 🔥 FIXED: Heroes bypass KYC, Requesters must complete KYC
+// 🔥 FIXED: Removed onboarding redirect for Requesters (new wizard handles it)
 // 🔥 ASSISTANT REMOVED: No assistant routes or imports
 // 🔥 NEW: SubmitRequestWizard integrated
 
@@ -31,7 +32,7 @@ const CasesPage = lazy(() => import("@/pages/CasesPage").catch(() => ({ default:
 const CaseDetailPage = lazy(() => import("@/pages/CaseDetailPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const AffidavitPage = lazy(() => import("@/pages/AffidavitPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
-// 🔥 NEW SubmitRequestWizard (پرانی SubmitRequestPage کی جگہ)
+// 🔥 NEW SubmitRequestWizard
 const SubmitRequestWizard = lazy(() => 
   import("@/pages/submit-request/SubmitRequestWizard").catch(() => ({ 
     default: () => <div className="p-8 text-center">Failed to load Submit Request Wizard</div> 
@@ -62,7 +63,6 @@ const OnboardingPage = lazy(() => import("@/pages/OnboardingPage").catch(() => (
 const CommunityPage = lazy(() => import("@/pages/CommunityPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const HeroesWallPage = lazy(() => import("@/pages/HeroesWallPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const KindnessWallPage = lazy(() => import("@/pages/KindnessWallPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
-// ❌ AssistantDashboard import REMOVED
 
 // Page loader
 const PageLoader = () => (
@@ -105,6 +105,7 @@ function RootLayout() {
   }, [authRole, isAuthenticated, role, setRole]);
 
   // 🔥 KYC check - only for Requesters, Heroes bypass KYC
+  // 🔥 FIX: Removed onboarding redirect for Requesters (new wizard handles it)
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setCheckingOnboarding(false);
@@ -142,15 +143,18 @@ function RootLayout() {
         const isRequester = role === "requester";
         const requiresKyc = isRequester && effectiveKycStatus !== "approved";
 
+        // 🔥 Requester: redirect to KYC if not approved
         if (!isAdmin && requiresKyc && !isPublicPath && location.pathname !== "/kyc") {
           if (!cancelled) navigate({ to: "/kyc" });
           return;
         }
 
+        // 🔥 Hero: no KYC required, but check onboarding if approved
         if (!isAdmin && role === "hero") {
           if (effectiveKycStatus === "approved") {
             const onboardingCompleted = await getOnboardingStatus(user.id);
-            if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
+            // Allow Hero to go to /cases without onboarding redirect
+            if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding" && location.pathname !== "/cases") {
               navigate({ to: "/onboarding" });
             }
           }
@@ -158,11 +162,13 @@ function RootLayout() {
           return;
         }
 
+        // 🔥 Requester: NO onboarding redirect anymore (new wizard handles it)
+        // We only check KYC, no onboarding for Requesters
         if (!isAdmin && isRequester && effectiveKycStatus === "approved") {
-          const onboardingCompleted = await getOnboardingStatus(user.id);
-          if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding") {
-            navigate({ to: "/onboarding" });
-          }
+          // Onboarding is now part of the wizard; no redirect.
+          // Just allow the user to proceed.
+          if (!cancelled) setCheckingOnboarding(false);
+          return;
         }
 
         if (!role) {
@@ -278,7 +284,6 @@ const onboardingRoute = createRoute({ getParentRoute: () => rootRoute, path: "/o
 const communityRoute = createRoute({ getParentRoute: () => rootRoute, path: "/community", component: () => <Suspense fallback={<PageLoader />}><CommunityPage /></Suspense> });
 const heroesWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/heroes-wall", component: () => <Suspense fallback={<PageLoader />}><HeroesWallPage /></Suspense> });
 const kindnessWallRoute = createRoute({ getParentRoute: () => rootRoute, path: "/kindness-wall", component: () => <Suspense fallback={<PageLoader />}><KindnessWallPage /></Suspense> });
-// ❌ assistantDashboardRoute REMOVED
 
 // Build route tree
 const routeTree = rootRoute.addChildren([
@@ -289,7 +294,7 @@ const routeTree = rootRoute.addChildren([
   casesRoute,
   caseDetailRoute,
   affidavitRoute,
-  submitRequestRoute, // 🔥 Now using SubmitRequestWizard
+  submitRequestRoute,
   profileRoute,
   myCasesRoute,
   myHelpRoute,
@@ -314,7 +319,6 @@ const routeTree = rootRoute.addChildren([
   communityRoute,
   heroesWallRoute,
   kindnessWallRoute,
-  // ❌ assistantDashboardRoute REMOVED
 ]);
 
 const router = createRouter({ routeTree });
