@@ -1,6 +1,7 @@
 // src/frontend/src/pages/SubmitRequestPage.tsx
 // Fully refactored with enhanced T&C, feedback suspension, and complete validation.
 // FIXED: Free case logic — first case free, second chance free if first rejected.
+// 🔥 NEW: Uses shared creditGate for consistent credit checking and auto-redirect.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,9 @@ import {
   Calculator,
   Heart,
 } from "lucide-react";
+
+// 🔥 NEW: Import shared credit gate
+import { checkCreditGate } from "@/lib/creditGate";
 
 // ============================================================
 //  CATEGORY ASSISTANCE LIMITS POLICY (unchanged)
@@ -1683,7 +1687,7 @@ export default function SubmitRequestPage() {
   }
 
   // ============================================================
-  //  HANDLE SUBMIT
+  //  HANDLE SUBMIT — 🔥 FIXED: uses checkCreditGate
   // ============================================================
   async function handleSubmit() {
     if (!confirmed) {
@@ -1759,15 +1763,26 @@ export default function SubmitRequestPage() {
 
       const free = firstFree || offerFree;
 
+      // 🔥 NEW: Use shared creditGate for consistent credit check
+      // If not free, check balance and redirect if needed
       if (!free) {
-        const wallet = await getWallet(uid);
-        if (!wallet || wallet.balance < 1) {
-          toast.error("Insufficient credits! You need 1 credit.");
-          navigate({ to: "/wallet" });
+        // Use current balance from state (loaded from wallet)
+        const isFreeAllowed = false; // since we already determined not free
+        const result = checkCreditGate({
+          balance,
+          required: 1,
+          isFreeAllowed,
+          navigate,
+          context: "case_submit",
+        });
+        if (!result) {
+          // checkCreditGate already showed error and redirected
           setSubmitting(false);
           return;
         }
       }
+
+      // If we pass, proceed with submission
 
       const allDocUrls: Record<string, string> = { ...catDocUrls };
       const photoUrls: string[] = Object.values(allDocUrls);
