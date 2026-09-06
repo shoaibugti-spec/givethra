@@ -1,6 +1,6 @@
 // src/frontend/src/App.tsx
-// Givethra - Full App with Role Selection, Onboarding, and Role-based routing
-// 🔥 FINAL FIX: Removed onboarding redirect for Requesters; fixed imports
+// Givethra - Full App with Role Selection, KYC, and Routing
+// 🔥 FINAL FIX: Removed ALL onboarding redirects for both Requester and Hero
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -29,12 +29,12 @@ const CasesPage = lazy(() => import("@/pages/CasesPage").catch(() => ({ default:
 const CaseDetailPage = lazy(() => import("@/pages/CaseDetailPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const AffidavitPage = lazy(() => import("@/pages/AffidavitPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
-// 🔥 SubmitRequestWizard - with correct import path
-const SubmitRequestWizard = lazy(() => 
+// 🔥 SubmitRequestWizard
+const SubmitRequestWizard = lazy(() =>
   import("@/pages/submit-request/SubmitRequestWizard")
     .then(module => ({ default: module.default }))
-    .catch(() => ({ 
-      default: () => <div className="p-8 text-center text-red-600">Failed to load Submit Request Wizard. Check console.</div> 
+    .catch(() => ({
+      default: () => <div className="p-8 text-center text-red-600">Failed to load Submit Request Wizard. Check console.</div>
     }))
 );
 
@@ -103,7 +103,7 @@ function RootLayout() {
     if (authRole === "help_seeker" && role !== "requester") setRole("requester");
   }, [authRole, isAuthenticated, role, setRole]);
 
-  // 🔥 Simplified KYC check - NO ONBOARDING REDIRECT FOR REQUESTERS
+  // 🔥 SIMPLIFIED: Only check KYC for Requesters, NO ONBOARDING CHECKS AT ALL
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setChecking(false);
@@ -124,13 +124,13 @@ function RootLayout() {
         const isPublic = publicPaths.includes(location.pathname);
         const isRequester = role === "requester";
 
-        // Requester: if not approved, go to KYC
+        // Requester: if not approved, go to KYC (except public paths)
         if (!isAdmin && isRequester && status !== "approved" && !isPublic && location.pathname !== "/kyc") {
           if (!cancelled) navigate({ to: "/kyc" });
           return;
         }
 
-        // No other checks; allow everything else
+        // No other checks — allow everything else, including /submit-request and /cases
         if (!cancelled) setChecking(false);
       } catch (err) {
         console.error("KYC check error:", err);
