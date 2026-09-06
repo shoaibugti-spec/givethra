@@ -49,7 +49,6 @@ export default function StepCategory({
 }: Props) {
   const handleSelect = (id: string) => {
     onChange(id);
-    // تھوڑی دیر بعد Next پر جائیں
     setTimeout(() => {
       if (id) onNext();
     }, 300);
