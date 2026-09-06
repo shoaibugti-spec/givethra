@@ -462,3 +462,56 @@ function getVisibleSteps(formData: any): string[] {
 
   return steps;
 }
+
+const allSteps = [
+  { id: "category", component: StepCategory },
+  { id: "title", component: StepTitle },
+  { id: "shortDesc", component: StepShortDesc },
+  // ... تمام steps
+];
+
+const visibleStepIds = getVisibleSteps(formData);
+const currentStepIndex = visibleStepIds.indexOf(currentStepId);
+const totalSteps = visibleStepIds.length;
+
+function handleNext() {
+  // موجودہ step کی validation
+  const isValid = validateStep(currentStepId, formData);
+  if (!isValid) return;
+
+  const nextIndex = currentStepIndex + 1;
+  if (nextIndex >= totalSteps) {
+    // Submit
+    handleSubmit();
+  } else {
+    setCurrentStepId(visibleStepIds[nextIndex]);
+  }
+}
+
+function handleBack() {
+  const prevIndex = currentStepIndex - 1;
+  if (prevIndex >= 0) {
+    setCurrentStepId(visibleStepIds[prevIndex]);
+  }
+}
+
+// Render current step
+const StepComponent = allSteps.find(s => s.id === currentStepId)?.component;
+return (
+  <div>
+    <SubmitTopBar isFree={willBeFree} balance={balance} />
+    <div className="mb-4 text-sm text-muted-foreground">
+      Step {currentStepIndex + 1} of {totalSteps}
+    </div>
+    <StepComponent
+      // props
+      value={formData[currentStepId]}
+      onChange={(val) => setFormData({ ...formData, [currentStepId]: val })}
+      onNext={handleNext}
+      onBack={handleBack}
+      isFirst={currentStepIndex === 0}
+      isLast={currentStepIndex === totalSteps - 1}
+      // other props
+    />
+  </div>
+);
