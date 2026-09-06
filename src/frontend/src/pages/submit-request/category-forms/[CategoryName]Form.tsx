@@ -1,5 +1,6 @@
 // src/frontend/src/pages/submit-request/category-forms/[CategoryName]Form.tsx
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { Label } from "@/components/ui/label";
 
 export default function [CategoryName]Form({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
   const { catFields, catDocUrls } = formData;
