@@ -1,4 +1,3 @@
-// src/frontend/src/pages/submit-request/shared/StepProgress.tsx
 export function StepProgress({ current, total }: { current: number; total: number }) {
   const percentage = Math.round((current / total) * 100);
 
