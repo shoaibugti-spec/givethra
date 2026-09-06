@@ -1,5 +1,6 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
 // Givethra - Full-Color Auto-Slide Boxes
+// 🔥 FINAL: Requester button navigates to /submit-request when KYC approved
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -94,24 +95,17 @@ export default function RoleSelectionPage() {
 
   useEffect(() => {
     getApprovedCases()
-      .then((rows) => {
-        setActiveCases(Array.isArray(rows) ? rows : []);
-      })
-      .catch(() => {
-        setActiveCases([]);
-      });
+      .then((rows) => setActiveCases(Array.isArray(rows) ? rows : []))
+      .catch(() => setActiveCases([]));
   }, []);
 
   const activeCaseCategories = Object.entries(
-    activeCases.reduce<Record<string, number>>((counts, currentCase) => {
-      const category = String(currentCase?.category || "Other");
-      counts[category] = (counts[category] || 0) + 1;
+    activeCases.reduce<Record<string, number>>((counts, c) => {
+      const cat = String(c?.category || "Other");
+      counts[cat] = (counts[cat] || 0) + 1;
       return counts;
     }, {})
-  ).map(([category, count]) => ({
-    category,
-    count,
-  }));
+  ).map(([category, count]) => ({ category, count }));
 
   const activeSlides =
     activeCaseCategories.length > 0
@@ -120,11 +114,7 @@ export default function RoleSelectionPage() {
           ...activeCaseCategories.map((cat) => {
             const style = ROLE_CATEGORY_STYLES[cat.category] || { icon: FileText };
             const Icon = style.icon;
-            return {
-              icon: <Icon className="w-8 h-8" />,
-              title: cat.category,
-              desc: `${cat.count} case${cat.count === 1 ? "" : "s"}`,
-            };
+            return { icon: <Icon className="w-8 h-8" />, title: cat.category, desc: `${cat.count} case${cat.count === 1 ? "" : "s"}` };
           }),
         ]
       : [{ icon: <Bell className="w-8 h-8" />, title: "No active cases", desc: "Check back soon" }];
@@ -135,35 +125,27 @@ export default function RoleSelectionPage() {
   const [requesterIndex, setRequesterIndex] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCommunityIndex((prev) => (prev + 1) % COMMUNITY_SLIDES.length);
-    }, 4000);
+    const interval = setInterval(() => setCommunityIndex(p => (p + 1) % COMMUNITY_SLIDES.length), 4000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (activeSlides.length === 0) return;
-    const interval = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % activeSlides.length);
-    }, 3500);
+    const interval = setInterval(() => setActiveIndex(p => (p + 1) % activeSlides.length), 3500);
     return () => clearInterval(interval);
   }, [activeSlides.length]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % HERO_SLIDES.length);
-    }, 4200);
+    const interval = setInterval(() => setHeroIndex(p => (p + 1) % HERO_SLIDES.length), 4200);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setRequesterIndex((prev) => (prev + 1) % REQUESTER_SLIDES.length);
-    }, 4600);
+    const interval = setInterval(() => setRequesterIndex(p => (p + 1) % REQUESTER_SLIDES.length), 4600);
     return () => clearInterval(interval);
   }, []);
 
-  // 🔥 FIX: Requester button redirects to /submit-request when KYC approved
+  // 🔥 Requester button handler
   const handleRoleSelect = async (role: "hero" | "requester") => {
     setRole(role);
     setAuthRole(role === "requester" ? "help_seeker" : "hero");
@@ -184,12 +166,11 @@ export default function RoleSelectionPage() {
         const kyc = await getKycStatus(user!.id);
         const status = String(kyc?.status || "none").trim().toLowerCase();
         if (status === "approved") {
-          navigate({ to: "/submit-request" }); // 🔥 یہاں /submit-request
+          navigate({ to: "/submit-request" });
         } else {
           navigate({ to: "/kyc" });
         }
-      } catch (error) {
-        console.error("KYC status check failed:", error);
+      } catch {
         navigate({ to: "/kyc" });
       }
     } else {
@@ -289,9 +270,7 @@ export default function RoleSelectionPage() {
                 <Smartphone className="h-5 w-5 text-primary" />
                 📱 Get the Givethra Android App
               </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Verified cases, anytime — right on your phone.
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Verified cases, anytime — right on your phone.</p>
             </div>
             <a
               href="/Givethra.apk"
@@ -299,8 +278,7 @@ export default function RoleSelectionPage() {
               type="application/vnd.android.package-archive"
               className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl font-semibold text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
             >
-              <Download className="h-4 w-4" />
-              Download App
+              <Download className="h-4 w-4" /> Download App
             </a>
           </div>
         </section>
@@ -331,75 +309,19 @@ export default function RoleSelectionPage() {
         <section className="py-10 px-4 bg-card border-t border-border">
           <div className="max-w-2xl mx-auto text-center space-y-5">
             <div className="space-y-1">
-              <h2 className="font-display text-lg font-bold text-foreground">
-                Connect with Givethra
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Follow us and reach out — we're here to help.
-              </p>
+              <h2 className="font-display text-lg font-bold text-foreground">Connect with Givethra</h2>
+              <p className="text-sm text-muted-foreground">Follow us and reach out — we're here to help.</p>
             </div>
             <div className="flex items-center justify-center gap-3">
-              <a
-                href={FACEBOOK_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a
-                href={INSTAGRAM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a
-                href={LINKEDIN_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="LinkedIn"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
-                <Linkedin className="h-5 w-5" />
-              </a>
-              <a
-                href={WHATSAPP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="WhatsApp Channel"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
-                <MessageCircle className="h-5 w-5" />
-              </a>
-              <a
-                href={`mailto:${CONTACT_EMAIL}`}
-                aria-label="Email"
-                className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-              >
-                <Mail className="h-5 w-5" />
-              </a>
+              <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><Facebook className="h-5 w-5" /></a>
+              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><Instagram className="h-5 w-5" /></a>
+              <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><Linkedin className="h-5 w-5" /></a>
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Channel" className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><MessageCircle className="h-5 w-5" /></a>
+              <a href={`mailto:${CONTACT_EMAIL}`} aria-label="Email" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><Mail className="h-5 w-5" /></a>
             </div>
-            <a
-              href={WHATSAPP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline"
-            >
-              <MessageCircle className="h-4 w-4" />
-              Follow our WhatsApp Channel
-            </a>
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline"><MessageCircle className="h-4 w-4" /> Follow our WhatsApp Channel</a>
             <div>
-              <a
-                href={`mailto:${CONTACT_EMAIL}`}
-                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-              >
-                <Mail className="h-4 w-4" />
-                {CONTACT_EMAIL}
-              </a>
+              <a href={`mailto:${CONTACT_EMAIL}`} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"><Mail className="h-4 w-4" /> {CONTACT_EMAIL}</a>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
               <Link to="/about">About</Link>
@@ -409,9 +331,7 @@ export default function RoleSelectionPage() {
               <Link to="/community-guidelines">Community Guidelines</Link>
               <Link to="/contact">Contact Us</Link>
             </div>
-            <p className="text-xs text-muted-foreground pt-1">
-              © {new Date().getFullYear()} Givethra. All rights reserved.
-            </p>
+            <p className="text-xs text-muted-foreground pt-1">© {new Date().getFullYear()} Givethra. All rights reserved.</p>
           </div>
         </section>
 
