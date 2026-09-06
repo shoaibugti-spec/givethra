@@ -1,0 +1,40 @@
+// src/frontend/src/pages/submit-request/steps/StepMaritalStatus.tsx
+import { Label } from "@/components/ui/label";
+import { StepNavigation } from "../shared/StepNavigation";
+
+const OPTIONS = ["Single", "Married", "Widow", "Divorced"];
+
+export default function StepMaritalStatus({ value, onChange, onNext, onBack, isFirst, isLast }: any) {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h2 className="text-2xl font-bold">What is your marital status?</h2>
+        <p className="text-sm text-muted-foreground">This helps us understand your family situation.</p>
+        <Label>Marital Status *</Label>
+        <div className="grid grid-cols-2 gap-3">
+          {OPTIONS.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onChange(opt)}
+              className={`p-4 rounded-xl border-2 text-center transition-all ${
+                value === opt
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:border-primary/50"
+              }`}
+            >
+              <div className="font-medium">{opt}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+      <StepNavigation
+        onNext={onNext}
+        onBack={onBack}
+        isFirst={isFirst}
+        isLast={isLast}
+        disabled={!value}
+      />
+    </div>
+  );
+}
