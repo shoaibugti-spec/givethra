@@ -1,9 +1,6 @@
 // src/frontend/src/App.tsx
 // Givethra - Full App with Role Selection, Onboarding, and Role-based routing
-// 🔥 FIXED: Heroes bypass KYC, Requesters must complete KYC
-// 🔥 FIXED: Removed onboarding redirect for Requesters (new wizard handles it)
-// 🔥 ASSISTANT REMOVED: No assistant routes or imports
-// 🔥 NEW: SubmitRequestWizard integrated
+// 🔥 ULTIMATE FIX: Requester directly goes to /submit-request without any redirect
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -32,11 +29,13 @@ const CasesPage = lazy(() => import("@/pages/CasesPage").catch(() => ({ default:
 const CaseDetailPage = lazy(() => import("@/pages/CaseDetailPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const AffidavitPage = lazy(() => import("@/pages/AffidavitPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
-// 🔥 NEW SubmitRequestWizard
+// 🔥 NEW SubmitRequestWizard - with fallback
 const SubmitRequestWizard = lazy(() => 
-  import("@/pages/submit-request/SubmitRequestWizard").catch(() => ({ 
-    default: () => <div className="p-8 text-center">Failed to load Submit Request Wizard</div> 
-  }))
+  import("@/pages/submit-request/SubmitRequestWizard")
+    .then(module => ({ default: module.default }))
+    .catch(() => ({ 
+      default: () => <div className="p-8 text-center text-red-600">Failed to load Submit Request Wizard. Please check console for errors.</div> 
+    }))
 );
 
 const ProfilePage = lazy(() => import("@/pages/ProfilePage").catch(() => ({ default: () => <div>Failed to load page</div> })));
@@ -104,8 +103,7 @@ function RootLayout() {
     if (authRole === "help_seeker" && role !== "requester") setRole("requester");
   }, [authRole, isAuthenticated, role, setRole]);
 
-  // 🔥 KYC check - only for Requesters, Heroes bypass KYC
-  // 🔥 FIX: Removed onboarding redirect for Requesters (new wizard handles it)
+  // 🔥 SIMPLIFIED: Only check KYC for Requesters, no onboarding redirect at all
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setCheckingOnboarding(false);
@@ -116,22 +114,7 @@ function RootLayout() {
     const checkStatus = async () => {
       try {
         const kyc = await getKycStatus(user.id);
-        const kycCacheKey = `givethra_kyc_status_${user.id}`;
-        let cachedKycStatus = "unknown";
-        try {
-          cachedKycStatus = localStorage.getItem(kycCacheKey) || "unknown";
-        } catch {
-          cachedKycStatus = "unknown";
-        }
-        const apiKycStatus = String(kyc?.status || "unknown").trim().toLowerCase();
-        const effectiveKycStatus = apiKycStatus === "unknown" ? cachedKycStatus : apiKycStatus;
-        if (apiKycStatus !== "unknown") {
-          try {
-            localStorage.setItem(kycCacheKey, apiKycStatus);
-          } catch {
-            // Storage is optional; the API status remains authoritative.
-          }
-        }
+        const effectiveKycStatus = String(kyc?.status || "none").trim().toLowerCase();
 
         const publicPaths = [
           "/", "/sign-in", "/sign-up", "/about", "/account-privacy", "/privacy",
@@ -139,51 +122,41 @@ function RootLayout() {
           "/heroes-wall", "/kindness-wall",
         ];
         const isPublicPath = publicPaths.includes(location.pathname);
-
         const isRequester = role === "requester";
-        const requiresKyc = isRequester && effectiveKycStatus !== "approved";
 
-        // 🔥 Requester: redirect to KYC if not approved
-        if (!isAdmin && requiresKyc && !isPublicPath && location.pathname !== "/kyc") {
-          if (!cancelled) navigate({ to: "/kyc" });
-          return;
-        }
-
-        // 🔥 Hero: no KYC required, but check onboarding if approved
-        if (!isAdmin && role === "hero") {
-          if (effectiveKycStatus === "approved") {
-            const onboardingCompleted = await getOnboardingStatus(user.id);
-            // Allow Hero to go to /cases without onboarding redirect
-            if (!cancelled && !onboardingCompleted && location.pathname !== "/onboarding" && location.pathname !== "/cases") {
-              navigate({ to: "/onboarding" });
-            }
+        // 🔥 Requester: if not KYC approved, redirect to KYC (except on public paths)
+        if (!isAdmin && isRequester && effectiveKycStatus !== "approved" && !isPublicPath && location.pathname !== "/kyc") {
+          if (!cancelled) {
+            console.log("[App] Requester KYC not approved, redirecting to /kyc");
+            navigate({ to: "/kyc" });
           }
-          if (!cancelled) setCheckingOnboarding(false);
           return;
         }
 
-        // 🔥 Requester: NO onboarding redirect anymore (new wizard handles it)
-        // We only check KYC, no onboarding for Requesters
+        // 🔥 Requester: if KYC approved, allow ALL routes (including /submit-request)
         if (!isAdmin && isRequester && effectiveKycStatus === "approved") {
-          // Onboarding is now part of the wizard; no redirect.
-          // Just allow the user to proceed.
-          if (!cancelled) setCheckingOnboarding(false);
-          return;
+          // No onboarding redirect - let the wizard handle everything
+          if (!cancelled) {
+            console.log("[App] Requester KYC approved, allowing navigation to:", location.pathname);
+          }
         }
 
-        if (!role) {
-          if (!cancelled) setCheckingOnboarding(false);
-          return;
+        // 🔥 Hero: no KYC required, no onboarding redirect for /cases
+        if (!isAdmin && role === "hero") {
+          // Allow Hero to go anywhere, especially /cases
+          if (!cancelled) {
+            console.log("[App] Hero mode, allowing navigation to:", location.pathname);
+          }
         }
 
-        if (!isAdmin && role !== "hero" && role !== "requester") {
-          if (!cancelled && !isPublicPath && location.pathname !== "/kyc") {
+        if (!role && !isAdmin) {
+          if (!cancelled && !isPublicPath) {
             navigate({ to: "/" });
           }
         }
 
       } catch (err) {
-        console.error("Error checking status:", err);
+        console.error("[App] Error checking status:", err);
       } finally {
         if (!cancelled) setCheckingOnboarding(false);
       }
@@ -204,6 +177,7 @@ function RootLayout() {
         "/heroes-wall", "/kindness-wall",
       ];
       if (!publicPaths.includes(location.pathname)) {
+        console.log("[App] No role, redirecting to /");
         navigate({ to: "/" });
       }
     }
@@ -246,14 +220,14 @@ const homeRoute = createRoute({
   },
 });
 
-// ----- All remaining routes (Assistant route REMOVED) -----
+// ----- All remaining routes -----
 const signUpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-up", component: () => <Suspense fallback={<PageLoader />}><SignUpPage /></Suspense> });
 const signInRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-in", component: () => <Suspense fallback={<PageLoader />}><SignInPage /></Suspense> });
 const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases", component: () => <Suspense fallback={<PageLoader />}><CasesPage /></Suspense> });
 const caseDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases/$id", component: () => <Suspense fallback={<PageLoader />}><CaseDetailPage /></Suspense> });
 const affidavitRoute = createRoute({ getParentRoute: () => rootRoute, path: "/affidavit/$caseId", component: () => <Suspense fallback={<PageLoader />}><AffidavitPage /></Suspense> });
 
-// 🔥 SUBMIT REQUEST - NOW USING NEW WIZARD
+// 🔥 SUBMIT REQUEST - using NEW WIZARD
 const submitRequestRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/submit-request",
