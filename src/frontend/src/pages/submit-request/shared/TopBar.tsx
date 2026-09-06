@@ -1,4 +1,3 @@
-// src/frontend/src/pages/submit-request/shared/TopBar.tsx
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 export function SubmitTopBar({ isFree, balance }: { isFree: boolean; balance: number }) {
