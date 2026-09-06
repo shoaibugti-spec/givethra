@@ -403,3 +403,62 @@ function StepGuide({ lines }: { lines: string[] }) {
     </div>
   );
 }
+
+function getVisibleSteps(formData: any): string[] {
+  const steps = ["category"];
+
+  // Basic info
+  steps.push("title", "shortDesc", "country", "city");
+
+  // Urgency: only if not easy
+  if (!isEasyCat(formData.category)) {
+    steps.push("urgency");
+  }
+
+  // Gender
+  steps.push("gender");
+  if (formData.gender === "Male" || formData.gender === "Female") {
+    steps.push("maritalStatus");
+  }
+  if (formData.gender === "Female") {
+    steps.push("orphan");
+    if (formData.isOrphan === "Yes") {
+      steps.push("orphanParent");
+    }
+  }
+
+  steps.push("seekerName", "seekerContact", "jobStatus");
+
+  if (formData.jobStatus === "Yes") {
+    steps.push("jobDocuments");
+  } else if (formData.jobStatus === "No") {
+    steps.push("noJobDocument");
+  }
+
+  // Category details (one big step, but later can be split)
+  steps.push("categoryDetails");
+
+  // Property
+  if (PROPERTY_RELEVANT_CATS.has(formData.category)) {
+    steps.push("propertyOwnership");
+    if (formData.propertyOwnership === "rented") {
+      steps.push("rentedDocuments");
+    } else if (formData.propertyOwnership === "owned") {
+      steps.push("ownedDocuments");
+    }
+  }
+
+  // Why help
+  steps.push("whyHelp");
+
+  // Amount
+  if (isDebtCategory(formData.category)) {
+    steps.push("debtTotal");
+  } else {
+    steps.push("amount");
+  }
+
+  steps.push("currency", "deadline", "selfie", "video", "terms");
+
+  return steps;
+}
