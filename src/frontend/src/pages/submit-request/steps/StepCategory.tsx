@@ -1,8 +1,8 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
 import { StepNavigation } from "../shared/StepNavigation";
 
-// 🔥 یہ categories خود StepCategory کے اندر ہیں، باہر سے کوئی override نہیں
-const CATEGORIES = [
+// 🔥 تمام 19 کیٹگریز — ہر ایک کا اپنا رنگ (hex)
+const ALL_CATEGORIES = [
   { id: "Electricity Bill", label: "⚡ Electricity Bill", color: "#eab308" },
   { id: "Gas Bill", label: "🔥 Gas Bill", color: "#f97316" },
   { id: "Water Bill", label: "💧 Water Bill", color: "#3b82f6" },
@@ -49,32 +49,37 @@ export default function StepCategory({
 }: Props) {
   const handleSelect = (id: string) => {
     onChange(id);
+    // تھوڑی دیر بعد Next پر جائیں
     setTimeout(() => {
       if (id) onNext();
-    }, 400);
+    }, 300);
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2 text-center">
-        <h2 className="text-2xl font-bold">What do you need help with?</h2>
-        <p className="text-sm text-muted-foreground">
+    <div style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
+      {/* Heading */}
+      <div style={{ textAlign: "center", marginBottom: "24px" }}>
+        <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "8px" }}>
+          What do you need help with?
+        </h2>
+        <p style={{ color: "#666", fontSize: "14px" }}>
           Choose the category that best describes your need.
         </p>
         {willBeFree && !isFreeDisabled && (
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 text-sm font-medium">
+          <div style={{ display: "inline-block", marginTop: "8px", padding: "6px 16px", borderRadius: "20px", background: "#d1fae5", color: "#065f46", fontSize: "14px", fontWeight: "500" }}>
             🎉 {freeCasesUsed === 0 ? "Your first case is FREE!" : "This case is FREE!"}
           </div>
         )}
         {isFreeDisabled && (
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 text-sm">
+          <div style={{ display: "inline-block", marginTop: "8px", padding: "6px 16px", borderRadius: "20px", background: "#fef3c7", color: "#92400e", fontSize: "14px", fontWeight: "500" }}>
             ⚠️ Free cases used up. 1 credit fee applies.
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {CATEGORIES.map((cat) => {
+      {/* Grid of category boxes */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
+        {ALL_CATEGORIES.map((cat) => {
           const isSelected = value === cat.id;
           return (
             <button
@@ -92,7 +97,7 @@ export default function StepCategory({
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "4px",
-                border: isSelected ? "4px solid #000000" : "none",
+                border: isSelected ? "4px solid #000" : "none",
                 transform: isSelected ? "scale(1.05)" : "scale(1)",
                 transition: "all 0.2s ease",
                 boxShadow: isSelected ? "0 8px 25px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.15)",
@@ -101,18 +106,19 @@ export default function StepCategory({
                 fontWeight: "500",
                 fontSize: "14px",
                 lineHeight: "1.3",
+                position: "relative",
               }}
             >
-              <span style={{ fontSize: "28px" }}>{cat.label.split(" ")[0]}</span>
-              <span>{cat.label}</span>
+              <span style={{ fontSize: "28px", display: "block" }}>{cat.label.split(" ")[0]}</span>
+              <span style={{ display: "block" }}>{cat.label}</span>
               {isSelected && (
                 <span
                   style={{
                     position: "absolute",
                     top: "-10px",
                     right: "-10px",
-                    background: "#000000",
-                    color: "#ffffff",
+                    background: "#000",
+                    color: "#fff",
                     borderRadius: "50%",
                     width: "28px",
                     height: "28px",
@@ -131,14 +137,40 @@ export default function StepCategory({
         })}
       </div>
 
-      <StepNavigation
-        onNext={onNext}
-        onBack={onBack}
-        isFirst={isFirst}
-        isLast={isLast}
-        nextLabel="Next →"
-        disabled={!value}
-      />
+      {/* Navigation */}
+      <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "center" }}>
+        {!isFirst && (
+          <button
+            onClick={onBack}
+            style={{
+              padding: "10px 24px",
+              borderRadius: "8px",
+              border: "1px solid #ccc",
+              background: "transparent",
+              cursor: "pointer",
+              flex: 1,
+            }}
+          >
+            Back
+          </button>
+        )}
+        <button
+          onClick={onNext}
+          disabled={!value}
+          style={{
+            padding: "10px 24px",
+            borderRadius: "8px",
+            border: "none",
+            background: value ? "#00A896" : "#ccc",
+            color: "#fff",
+            cursor: value ? "pointer" : "not-allowed",
+            flex: 1,
+            opacity: value ? 1 : 0.6,
+          }}
+        >
+          Next →
+        </button>
+      </div>
     </div>
   );
 }
