@@ -1,6 +1,6 @@
 // src/frontend/src/App.tsx
 // Givethra - Full App with Role Selection, KYC, and Routing
-// 🔥 FINAL FIX: Removed ALL onboarding redirects for both Requester and Hero
+// 🔥 FINAL FIX: Removed ALL onboarding redirects for Requester and Hero
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -103,7 +103,7 @@ function RootLayout() {
     if (authRole === "help_seeker" && role !== "requester") setRole("requester");
   }, [authRole, isAuthenticated, role, setRole]);
 
-  // 🔥 SIMPLIFIED: Only check KYC for Requesters, NO ONBOARDING CHECKS AT ALL
+  // 🔥 ONLY KYC CHECK — NO ONBOARDING CHECKS AT ALL
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setChecking(false);
@@ -124,13 +124,13 @@ function RootLayout() {
         const isPublic = publicPaths.includes(location.pathname);
         const isRequester = role === "requester";
 
-        // Requester: if not approved, go to KYC (except public paths)
+        // 🔥 Requester: if not KYC approved, redirect to /kyc (except public paths)
         if (!isAdmin && isRequester && status !== "approved" && !isPublic && location.pathname !== "/kyc") {
           if (!cancelled) navigate({ to: "/kyc" });
           return;
         }
 
-        // No other checks — allow everything else, including /submit-request and /cases
+        // All other cases: allow navigation (including /submit-request and /cases)
         if (!cancelled) setChecking(false);
       } catch (err) {
         console.error("KYC check error:", err);
