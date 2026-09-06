@@ -1,4 +1,6 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
+// 🔥 FINAL BUILD-FIXED VERSION: uses StepMartialStatus and StepPeopertyOwnership
+
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -6,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
-// تمام steps import (فائل ناموں کے مطابق)
+// 🔥 Imports with exact file names (StepMartialStatus, StepPeopertyOwnership)
 import StepCategory from "./steps/StepCategory";
 import StepTitle from "./steps/StepTitle";
 import StepShortDesc from "./steps/StepShortDesc";
@@ -14,8 +16,7 @@ import StepCountry from "./steps/StepCountry";
 import StepCity from "./steps/StepCity";
 import StepUrgency from "./steps/StepUrgency";
 import StepGender from "./steps/StepGender";
-// 🔥 درست نام: StepMartialStatus (فائل موجودہ نام کے مطابق)
-import StepMartialStatus from "./steps/StepMartialStatus";
+import StepMartialStatus from "./steps/StepMartialStatus";   // ✅ exists
 import StepOrphan from "./steps/StepOrphan";
 import StepOrphanParent from "./steps/StepOrphanParent";
 import StepSeekerName from "./steps/StepSeekerName";
@@ -24,8 +25,7 @@ import StepJobStatus from "./steps/StepJobStatus";
 import StepJobDocuments from "./steps/StepJobDocuments";
 import StepNoJobDocument from "./steps/StepNoJobDocument";
 import StepCategoryDetails from "./steps/StepCategoryDetails";
-// 🔥 درست نام: StepPeopertyOwnership (فائل موجودہ نام کے مطابق)
-import StepPeopertyOwnership from "./steps/StepPeopertyOwnership";
+import StepPeopertyOwnership from "./steps/StepPeopertyOwnership";   // ✅ exists
 import StepRentedDocuments from "./steps/StepRentedDocuments";
 import StepOwnedDocuments from "./steps/StepOwnedDocuments";
 import StepWhyHelp from "./steps/StepWhyHelp";
@@ -55,7 +55,6 @@ export default function SubmitRequestWizard() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // ---- All form state ----
   const [formData, setFormData] = useState({
     category: "",
     title: "",
@@ -105,7 +104,6 @@ export default function SubmitRequestWizard() {
   const canUseFree = !stats.isSuspended && !stats.isFreeDisabled && stats.freeCasesUsed < 2;
   const willBeFree = canUseFree;
 
-  // Load draft
   useEffect(() => {
     if (!isAuthenticated) {
       navigate({ to: "/sign-in", search: { redirect: "/submit-request" } });
@@ -113,20 +111,18 @@ export default function SubmitRequestWizard() {
     }
     const saved = loadDraft();
     if (saved) {
-      setFormData((prev) => ({ ...prev, ...saved }));
+      setFormData(prev => ({ ...prev, ...saved }));
       if (saved._stepId) setCurrentStepId(saved._stepId);
     }
     setIsLoading(false);
   }, [isAuthenticated, navigate, loadDraft]);
 
-  // Auto-save draft
   useEffect(() => {
     if (!isLoading) {
       saveDraft({ ...formData, _stepId: currentStepId });
     }
   }, [formData, currentStepId, isLoading, saveDraft]);
 
-  // Submit handler
   const handleSubmit = useCallback(async () => {
     for (const stepId of visibleStepIds) {
       const error = validateStep(stepId, formData);
@@ -165,7 +161,6 @@ export default function SubmitRequestWizard() {
     }
   }, [formData, visibleStepIds, user, willBeFree, clearDraft, navigate]);
 
-  // Navigation
   const handleNext = useCallback(() => {
     const error = validateStep(currentStepId, formData);
     if (error) {
@@ -189,11 +184,10 @@ export default function SubmitRequestWizard() {
     }
   }, [currentIndex, visibleStepIds]);
 
-  // Render current step
   const renderStep = () => {
     const commonProps = {
       value: formData[currentStepId as keyof typeof formData],
-      onChange: (val: any) => setFormData((prev) => ({ ...prev, [currentStepId]: val })),
+      onChange: (val: any) => setFormData(prev => ({ ...prev, [currentStepId]: val })),
       onNext: handleNext,
       onBack: handleBack,
       isFirst,
@@ -221,7 +215,7 @@ export default function SubmitRequestWizard() {
       case "city": return <StepCity {...commonProps} placeholder="e.g. Karachi" />;
       case "urgency": return <StepUrgency {...commonProps} />;
       case "gender": return <StepGender {...commonProps} />;
-      case "maritalStatus": return <StepMartialStatus {...commonProps} />; // 🔥 درست نام
+      case "maritalStatus": return <StepMartialStatus {...commonProps} />;
       case "orphan": return <StepOrphan {...commonProps} />;
       case "orphanParent": return <StepOrphanParent {...commonProps} />;
       case "seekerName": return <StepSeekerName {...commonProps} placeholder="Your full name" />;
@@ -230,7 +224,7 @@ export default function SubmitRequestWizard() {
       case "jobDocuments": return <StepJobDocuments {...commonProps} formData={formData} setFormData={setFormData} />;
       case "noJobDocument": return <StepNoJobDocument {...commonProps} formData={formData} setFormData={setFormData} />;
       case "categoryDetails": return <StepCategoryDetails {...commonProps} formData={formData} setFormData={setFormData} />;
-      case "propertyOwnership": return <StepPeopertyOwnership {...commonProps} />; // 🔥 درست نام
+      case "propertyOwnership": return <StepPeopertyOwnership {...commonProps} />;
       case "rentedDocuments": return <StepRentedDocuments {...commonProps} formData={formData} setFormData={setFormData} />;
       case "ownedDocuments": return <StepOwnedDocuments {...commonProps} formData={formData} setFormData={setFormData} />;
       case "whyHelp": return <StepWhyHelp {...commonProps} />;
@@ -248,7 +242,7 @@ export default function SubmitRequestWizard() {
   if (isLoading || statsLoading) {
     return (
       <Layout>
-        <div className="max-w-2xl mx-auto px-4 py-20 text-center">Loading...</div>
+        <div className="max-w-2xl mx-auto px-4 py-20 text-center">Loading Submit Request Wizard...</div>
       </Layout>
     );
   }
