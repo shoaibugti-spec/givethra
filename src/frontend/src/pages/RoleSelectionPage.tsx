@@ -184,7 +184,7 @@ export default function RoleSelectionPage() {
         const kyc = await getKycStatus(user!.id);
         const status = String(kyc?.status || "none").trim().toLowerCase();
         if (status === "approved") {
-          navigate({ to: "/submit-request" });
+          navigate({ to: "/submit-request" }); // 🔥 یہاں /submit-request
         } else {
           navigate({ to: "/kyc" });
         }
