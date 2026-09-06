@@ -989,19 +989,6 @@ export default function HomePage() {
               }}
               className="flex-1 space-y-4 text-center md:text-left"
             >
-              <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
-                <span className="text-foreground">
-                  Real People.
-                </span>
-                <br />
-                <span className="text-primary">
-                  Real Needs. Real Help.
-                </span>
-              </h1>
-
-              <p className="text-base text-muted-foreground max-w-md">
-                Connect with verified people, support genuine needs, and create meaningful impact.
-              </p>
 
               {!isAuthenticated && (
                 <div className="flex gap-3 justify-center md:justify-start">
