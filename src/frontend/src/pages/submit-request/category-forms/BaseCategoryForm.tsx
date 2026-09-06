@@ -1,4 +1,3 @@
-// src/frontend/src/pages/submit-request/category-forms/BaseCategoryForm.tsx
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,8 +45,6 @@ export function BaseCategoryForm({
     }));
   };
 
-  const { catFields, catDocUrls } = formData;
-
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -59,29 +56,22 @@ export function BaseCategoryForm({
       <div className="space-y-4">
         {children}
 
-        {/* Navigation - if hideNavigation is true, parent will handle it */}
         {!hideNavigation && (
-          <StepNavigation
-            onNext={onNext}
-            onBack={onBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            // Parent can add their own disabled logic
-          />
+          <StepNavigation onNext={onNext} onBack={onBack} isFirst={isFirst} isLast={isLast} />
         )}
       </div>
     </div>
   );
 }
 
-// Helper to render text input
-export function TextInput({ field, value, onChange, placeholder, required = true }: any) {
+export function TextInput({ field, value, onChange, placeholder, required = true, type = "text" }: any) {
   return (
     <div className="space-y-2">
       <Label>
         {field} {required && <span className="text-red-500">*</span>}
       </Label>
       <Input
+        type={type}
         value={value || ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder || `Enter ${field.toLowerCase()}`}
@@ -90,7 +80,6 @@ export function TextInput({ field, value, onChange, placeholder, required = true
   );
 }
 
-// Helper to render textarea
 export function TextAreaInput({ field, value, onChange, placeholder, required = true, rows = 3 }: any) {
   return (
     <div className="space-y-2">
@@ -107,7 +96,6 @@ export function TextAreaInput({ field, value, onChange, placeholder, required = 
   );
 }
 
-// Helper to render file upload
 export function FileUpload({ label, key, required, hint, accept, onUpload, value }: any) {
   return (
     <DocBox
