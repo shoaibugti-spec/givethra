@@ -163,7 +163,7 @@ export default function RoleSelectionPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // 🔥 FIX: Correct role selection handler
+  // 🔥 FIX: Requester button redirects to /submit-request when KYC approved
   const handleRoleSelect = async (role: "hero" | "requester") => {
     setRole(role);
     setAuthRole(role === "requester" ? "help_seeker" : "hero");
