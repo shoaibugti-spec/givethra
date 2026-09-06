@@ -175,29 +175,33 @@ export default function RoleSelectionPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // ---------- Role selection handler (unchanged) ----------
+  // ---------- 🔥 Role selection handler (UPDATED) ----------
   const handleRoleSelect = async (role: "hero" | "requester") => {
     setRole(role);
     setAuthRole(role === "requester" ? "help_seeker" : "hero");
 
     if (!isAuthenticated) {
+      // Not signed in -> go to sign-in with redirect
       navigate({
         to: "/sign-in",
         search: {
           role,
-          redirect: role === "requester" ? "/kyc" : "/home",
+          redirect: role === "requester" ? "/submit-request" : "/cases",
         },
       });
       return;
     }
 
+    // User is signed in
     if (role === "requester") {
       try {
         const kyc = await getKycStatus(user!.id);
         const status = String(kyc?.status || "none").trim().toLowerCase();
         if (status === "approved") {
-          navigate({ to: "/home" });
+          // ✅ KYC approved -> go to new submit wizard
+          navigate({ to: "/submit-request" });
         } else {
+          // KYC pending or rejected -> go to KYC page
           navigate({ to: "/kyc" });
         }
       } catch (error) {
@@ -205,7 +209,8 @@ export default function RoleSelectionPage() {
         navigate({ to: "/kyc" });
       }
     } else {
-      navigate({ to: "/home" });
+      // Hero -> go to Active Cases
+      navigate({ to: "/cases" });
     }
   };
 
