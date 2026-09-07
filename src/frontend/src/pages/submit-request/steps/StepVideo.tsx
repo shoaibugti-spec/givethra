@@ -1,6 +1,7 @@
 // src/frontend/src/pages/submit-request/steps/StepVideo.tsx
-// Live vertical video: min 60s, max 120s, pause OK, stop after 60s
-// Upload path matches SubmitRequestPage: cases/{userId}/{ts}_appeal.webm
+// Live video: min 60s, max 120s, pause OK, stop after 60s
+// Playback uses LOCAL blob (reliable). Remote URL only for form submit.
+// No text overlay inside the video frame.
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ function pad2(n: number) {
 function formatClock(totalSec: number) {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
-  return `\( {m}: \){pad2(s)}`;
+  return m + ":" + pad2(s);
 }
 
 function pickMimeType(): string {
@@ -28,7 +29,6 @@ function pickMimeType(): string {
     "video/webm;codecs=vp8,opus",
     "video/webm;codecs=vp9,opus",
     "video/webm",
-    "video/mp4",
   ];
   for (const t of types) {
     if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported?.(t)) {
@@ -62,7 +62,6 @@ export default function StepVideo({
   const [uploading, setUploading] = useState(false);
   const [localBlobUrl, setLocalBlobUrl] = useState<string>("");
   const remoteUrl = formData?.videoUrl || "";
-  const playbackSrc = remoteUrl || localBlobUrl;
   const [error, setError] = useState("");
 
   const clearTimer = () => {
@@ -83,55 +82,44 @@ export default function StepVideo({
     setError("");
     try {
       stopStream();
+      // Match SubmitRequestPage constraints — avoids 2x zoom
       const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+        },
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
           channelCount: 1,
-        },
-        video: {
-          facingMode: { ideal: "user" },
-          width: { ideal: 720 },
-          height: { ideal: 1280 },
-          aspectRatio: { ideal: 9 / 16 },
-          frameRate: { ideal: 30, max: 30 },
+          sampleRate: 44100,
         },
       });
 
-      const audioTrack = stream.getAudioTracks()[0];
-      if (audioTrack?.applyConstraints) {
-        try {
-          await audioTrack.applyConstraints({
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          });
-        } catch {
-          // ignore
-        }
-      }
-
       streamRef.current = stream;
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 80));
       const el = liveVideoRef.current;
       if (!el) throw new Error("Video element not ready");
       el.srcObject = stream;
       el.muted = true;
-      el.playsInline = true;
-      await el.play();
+      el.setAttribute("playsinline", "true");
+      el.onloadedmetadata = () => {
+        el.play().catch(() => undefined);
+      };
+      await el.play().catch(() => undefined);
       setCameraReady(true);
     } catch (e: any) {
       console.error(e);
-      setError(
-        "Camera/microphone access denied. Allow permissions and try again."
-      );
+      setError("Camera/microphone access denied. Allow permissions and try again.");
       setCameraReady(false);
     }
   };
 
   useEffect(() => {
-    if (!playbackSrc) startCamera();
+    if (!localBlobUrl) startCamera();
     return () => {
       clearTimer();
       try {
@@ -176,8 +164,8 @@ export default function StepVideo({
     try {
       recorder = new MediaRecorder(streamRef.current, {
         mimeType,
+        videoBitsPerSecond: 2200000,
         audioBitsPerSecond: 128000,
-        videoBitsPerSecond: 2500000,
       });
     } catch {
       try {
@@ -227,7 +215,7 @@ export default function StepVideo({
     if (!rec) return;
 
     if (secondsRef.current < MIN_SECONDS) {
-      toast.error(`Record at least ${MIN_SECONDS} seconds before stopping.`);
+      toast.error("Record at least 60 seconds before stopping.");
       return;
     }
 
@@ -236,29 +224,16 @@ export default function StepVideo({
     setPaused(false);
 
     await new Promise<void>((resolve) => {
-      const prev = rec.onstop;
-      rec.onstop = () => {
-        if (typeof prev === "function") {
-          try {
-            prev.call(rec, new Event("stop") as any);
-          } catch {
-            // ignore
-          }
-        }
-        resolve();
-      };
+      rec.onstop = () => resolve();
       try {
         if (rec.state !== "inactive") {
-          // Flush last data
           try {
             rec.requestData?.();
           } catch {
             // ignore
           }
           rec.stop();
-        } else {
-          resolve();
-        }
+        } else resolve();
       } catch {
         resolve();
       }
@@ -267,11 +242,10 @@ export default function StepVideo({
     setRecording(false);
     recorderRef.current = null;
 
-    const mime = pickMimeType() || "video/webm";
-    const blob = new Blob(chunksRef.current, { type: mime.split(";")[0] });
+    const blob = new Blob(chunksRef.current, { type: "video/webm" });
     chunksRef.current = [];
-
     const sizeMB = blob.size / (1024 * 1024);
+
     if (blob.size < 1000) {
       setError("Recording failed. Please try again.");
       stoppingRef.current = false;
@@ -279,13 +253,13 @@ export default function StepVideo({
       return;
     }
     if (sizeMB > 48) {
-      setError(`Video is ${sizeMB.toFixed(1)}MB (max 50MB). Record a shorter video.`);
+      setError("Video is too large (max 50MB). Record a shorter video.");
       stoppingRef.current = false;
       await startCamera();
       return;
     }
 
-    // Local preview first so user can play & check audio
+    // Always keep LOCAL preview for reliable play/listen (like SubmitRequestPage videoPreview)
     if (localBlobUrl) URL.revokeObjectURL(localBlobUrl);
     const blobUrl = URL.createObjectURL(blob);
     setLocalBlobUrl(blobUrl);
@@ -301,18 +275,16 @@ export default function StepVideo({
     setError("");
     try {
       const file = new File([blob], "appeal.webm", { type: "video/webm" });
-      // Same path style as SubmitRequestPage
       const path = `cases/\( {user.id}/ \){Date.now()}_appeal.webm`;
       const url = await uploadFileToStorage(file, path);
       setFormData((prev: any) => ({ ...prev, videoUrl: url }));
-      toast.success(`Video uploaded (${sizeMB.toFixed(1)} MB)`);
+      toast.success("Video uploaded successfully (" + sizeMB.toFixed(1) + " MB)");
     } catch (e: any) {
       console.error(e);
       const msg = e?.message || "Video upload failed. Please record again.";
       setError(msg);
       toast.error(msg);
       setFormData((prev: any) => ({ ...prev, videoUrl: "" }));
-      // Keep local preview so user can still listen; allow retake
     } finally {
       setUploading(false);
       stoppingRef.current = false;
@@ -321,8 +293,7 @@ export default function StepVideo({
 
   const onStopClick = () => {
     if (secondsRef.current < MIN_SECONDS) {
-      const left = MIN_SECONDS - secondsRef.current;
-      toast.error(`You must record more than 1 minute. ${left}s left.`);
+      toast.error("You must record more than 1 minute. " + (MIN_SECONDS - secondsRef.current) + "s left.");
       return;
     }
     void finishRecording();
@@ -356,30 +327,26 @@ export default function StepVideo({
   const isValid = !!remoteUrl && !recording && !uploading;
   const progressPct = Math.min(100, (seconds / MAX_SECONDS) * 100);
 
-  const clock = formatClock(seconds);
-  const minClock = formatClock(MIN_SECONDS);
-  const maxClock = formatClock(MAX_SECONDS);
-
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">Live video appeal</h2>
         <p className="text-sm text-muted-foreground">
-          Record a live vertical video about your case for Heroes. Minimum more than
-          1 minute ({MIN_SECONDS}s). Maximum {MAX_SECONDS} seconds. File upload is not
-          allowed.
+          Record a live video about your case for Heroes. Minimum more than 1 minute (60s).
+          Maximum 120 seconds. File upload is not allowed.
         </p>
       </div>
 
-      {/* Vertical frame */}
-      <div className="mx-auto w-full max-w-sm rounded-2xl border overflow-hidden bg-black aspect-[9/16] relative">
-        {playbackSrc ? (
+      {/* VIDEO FRAME ONLY — no text overlays inside */}
+      <div className="w-full rounded-xl border bg-black overflow-hidden">
+        {localBlobUrl ? (
           <video
-            key={playbackSrc}
-            src={playbackSrc}
+            key={localBlobUrl}
+            src={localBlobUrl}
             controls
             playsInline
-            className="h-full w-full object-cover bg-black"
+            preload="metadata"
+            className="w-full max-h-[420px] object-contain bg-black"
           />
         ) : (
           <video
@@ -387,51 +354,48 @@ export default function StepVideo({
             playsInline
             muted
             autoPlay
-            className="h-full w-full object-cover"
+            className="w-full max-h-[420px] object-contain bg-black"
           />
-        )}
-
-        {recording && (
-          <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
-            <span className="rounded-full bg-red-600 text-white text-xs font-semibold px-3 py-1">
-              {paused ? "PAUSED" : "REC"} {clock}
-            </span>
-            <span className="rounded-full bg-black/60 text-white text-xs px-3 py-1">
-              Min {minClock} · Max {maxClock}
-            </span>
-          </div>
-        )}
-
-        {recording && (
-          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/20">
-            <div
-              className="h-full bg-red-500 transition-all"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        )}
-
-        {uploading && (
-          <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white text-sm">
-            Uploading video...
-          </div>
         )}
       </div>
 
+      {/* Status OUTSIDE the video frame */}
+      {recording && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-red-600">
+              {paused ? "Paused" : "Recording"} {formatClock(seconds)}
+            </span>
+            <span className="text-muted-foreground">
+              Min {formatClock(MIN_SECONDS)} · Max {formatClock(MAX_SECONDS)}
+            </span>
+          </div>
+          <div className="w-full bg-muted rounded-full h-2">
+            <div
+              className="bg-red-500 h-2 rounded-full transition-all"
+              style={{ width: progressPct + "%" }}
+            />
+          </div>
+        </div>
+      )}
+
+      {uploading && (
+        <p className="text-sm text-amber-600 text-center">Uploading video...</p>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {remoteUrl && !uploading && (
+      {remoteUrl && !uploading && localBlobUrl && (
         <p className="text-sm text-green-600 text-center">
-          Video ready — play it above to check your voice, then continue.
+          Video ready — press play above to check picture and sound, then continue.
         </p>
       )}
       {localBlobUrl && !remoteUrl && !uploading && (
         <p className="text-sm text-amber-700 text-center">
-          Preview is ready. Upload did not finish — tap Record again or check your connection.
+          Preview is available. Upload did not finish — record again or check your connection.
         </p>
       )}
 
-      <div className="flex flex-col gap-2 max-w-sm mx-auto w-full">
-        {!playbackSrc && !recording && (
+      <div className="flex flex-col gap-2">
+        {!localBlobUrl && !recording && (
           <>
             <Button
               type="button"
@@ -467,35 +431,26 @@ export default function StepVideo({
               variant={canStop ? "default" : "secondary"}
             >
               {seconds < MIN_SECONDS
-                ? `Stop unlocks in ${MIN_SECONDS - seconds}s`
+                ? "Stop unlocks in " + (MIN_SECONDS - seconds) + "s"
                 : "Stop & save"}
             </Button>
           </div>
         )}
 
-        {playbackSrc && !recording && (
+        {localBlobUrl && !recording && (
           <Button type="button" variant="outline" onClick={retake} disabled={uploading}>
             Record again
           </Button>
         )}
       </div>
 
-      <div className="rounded-xl border p-3 text-sm space-y-1 max-w-sm mx-auto w-full">
-        <p className="font-medium">Recording rules</p>
-        <p className="text-muted-foreground">• Speak for more than 1 minute (at least 60 seconds).</p>
-        <p className="text-muted-foreground">• Maximum length is 120 seconds.</p>
-        <p className="text-muted-foreground">• You can Pause anytime. Stop unlocks after 60 seconds.</p>
-        <p className="text-muted-foreground">• After recording, play the video and check your voice.</p>
-      </div>
-
       <StepGuide
         lines={[
-          "This video is for Heroes so they understand your real situation and why you need help.",
-          "Explain who you are, what happened, your current condition, and how help will change things.",
-          "Share honest feelings and facts. If needed, briefly show a relevant document in the video.",
-          "Speak clearly in a quiet place so audio is clean.",
-          "After Stop, play the video once to confirm sound and picture, then continue.",
-          "Do not upload a gallery file — only this live recording is accepted.",
+          "This video is for Heroes so they understand your situation and why you need help.",
+          "Explain who you are, what happened, your current condition, and how help will help.",
+          "Speak clearly in a quiet place.",
+          "After recording, press play and listen once to confirm sound is clear.",
+          "Minimum more than 1 minute. Maximum 120 seconds. Pause is allowed. Stop unlocks after 60 seconds.",
         ]}
       />
 
