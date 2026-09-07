@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// 🔥 FIXED: No blinking — stable props, memoized steps
+// 🔥 FINAL FIX: Stable step rendering, no blinking, no focus loss
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,37 @@ import { useUserSubmitStats } from "./hooks/useUserSubmitStats";
 import { CATEGORIES, CATEGORY_LIMITS } from "./constants";
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
+
+// 🔥 Stable map of step components
+const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
+  category: StepCategory,
+  title: StepTitle,
+  shortDesc: StepShortDesc,
+  country: StepCountry,
+  city: StepCity,
+  urgency: StepUrgency,
+  gender: StepGender,
+  maritalStatus: StepMartialStatus,
+  orphan: StepOrphan,
+  orphanParent: StepOrphanParent,
+  seekerName: StepSeekerName,
+  seekerContact: StepSeekerContact,
+  jobStatus: StepJobStatus,
+  jobDocuments: StepJobDocuments,
+  noJobDocument: StepNoJobDocument,
+  categoryDetails: StepCategoryDetails,
+  propertyOwnership: StepPeopertyOwnership,
+  rentedDocuments: StepRentedDocuments,
+  ownedDocuments: StepOwnedDocuments,
+  whyHelp: StepWhyHelp,
+  debtTotal: StepDebtTotal,
+  amount: StepAmount,
+  currency: StepCurrency,
+  deadline: StepDeadline,
+  selfie: StepSelfie,
+  video: StepVideo,
+  terms: StepTerms,
+};
 
 export default function SubmitRequestWizard() {
   const { user, isAuthenticated } = useAuth();
@@ -104,6 +135,7 @@ export default function SubmitRequestWizard() {
   const canUseFree = !stats.isSuspended && !stats.isFreeDisabled && stats.freeCasesUsed < 2;
   const willBeFree = canUseFree;
 
+  // Load draft
   useEffect(() => {
     if (!isAuthenticated) {
       navigate({ to: "/sign-in", search: { redirect: "/submit-request" } });
@@ -117,17 +149,19 @@ export default function SubmitRequestWizard() {
     setIsLoading(false);
   }, [isAuthenticated, navigate, loadDraft]);
 
+  // Auto-save draft
   useEffect(() => {
     if (!isLoading) {
       saveDraft({ ...formData, _stepId: currentStepId });
     }
   }, [formData, currentStepId, isLoading, saveDraft]);
 
-  // 🔥 Stable callbacks
+  // 🔥 Stable field change handler
   const handleFieldChange = useCallback((field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
+  // Submit handler
   const handleSubmit = useCallback(async () => {
     for (const stepId of visibleStepIds) {
       const error = validateStep(stepId, formData);
@@ -166,6 +200,7 @@ export default function SubmitRequestWizard() {
     }
   }, [formData, visibleStepIds, user, willBeFree, clearDraft, navigate]);
 
+  // Navigation
   const handleNext = useCallback(() => {
     const error = validateStep(currentStepId, formData);
     if (error) {
@@ -189,338 +224,44 @@ export default function SubmitRequestWizard() {
     }
   }, [currentIndex, visibleStepIds]);
 
-  // 🔥 Memoized step rendering to avoid re-creating elements
-  const renderStep = useMemo(() => {
+  // 🔥 Memoize props for each step to avoid unnecessary re-renders
+  const stepProps = useMemo(() => {
     const value = formData[currentStepId as keyof typeof formData];
     const onChange = (val: any) => handleFieldChange(currentStepId, val);
 
-    switch (currentStepId) {
-      case "category":
-        return (
-          <StepCategory
-            value={formData.category}
-            onChange={(val) => handleFieldChange("category", val)}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            willBeFree={willBeFree}
-            isFreeDisabled={stats.isFreeDisabled}
-            freeCasesUsed={stats.freeCasesUsed}
-          />
-        );
-      case "title":
-        return (
-          <StepTitle
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            placeholder="e.g. Help with School Fee"
-          />
-        );
-      case "shortDesc":
-        return (
-          <StepShortDesc
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            placeholder="One line summary"
-          />
-        );
-      case "country":
-        return (
-          <StepCountry
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "city":
-        return (
-          <StepCity
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            placeholder="e.g. Karachi"
-          />
-        );
-      case "urgency":
-        return (
-          <StepUrgency
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "gender":
-        return (
-          <StepGender
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "maritalStatus":
-        return (
-          <StepMartialStatus
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "orphan":
-        return (
-          <StepOrphan
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "orphanParent":
-        return (
-          <StepOrphanParent
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "seekerName":
-        return (
-          <StepSeekerName
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            placeholder="Your full name"
-          />
-        );
-      case "seekerContact":
-        return (
-          <StepSeekerContact
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            placeholder="Your phone"
-          />
-        );
-      case "jobStatus":
-        return (
-          <StepJobStatus
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "jobDocuments":
-        return (
-          <StepJobDocuments
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-            setFormData={setFormData}
-          />
-        );
-      case "noJobDocument":
-        return (
-          <StepNoJobDocument
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-            setFormData={setFormData}
-          />
-        );
-      case "categoryDetails":
-        return (
-          <StepCategoryDetails
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-            setFormData={setFormData}
-          />
-        );
-      case "propertyOwnership":
-        return (
-          <StepPeopertyOwnership
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "rentedDocuments":
-        return (
-          <StepRentedDocuments
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-            setFormData={setFormData}
-          />
-        );
-      case "ownedDocuments":
-        return (
-          <StepOwnedDocuments
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-            setFormData={setFormData}
-          />
-        );
-      case "whyHelp":
-        return (
-          <StepWhyHelp
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "debtTotal":
-        return (
-          <StepDebtTotal
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-            setFormData={setFormData}
-          />
-        );
-      case "amount":
-        return (
-          <StepAmount
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-          />
-        );
-      case "currency":
-        return (
-          <StepCurrency
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      case "deadline":
-        return (
-          <StepDeadline
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-          />
-        );
-      case "selfie":
-        return (
-          <StepSelfie
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-            setFormData={setFormData}
-          />
-        );
-      case "video":
-        return (
-          <StepVideo
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            formData={formData}
-            setFormData={setFormData}
-          />
-        );
-      case "terms":
-        return (
-          <StepTerms
-            value={value}
-            onChange={onChange}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-          />
-        );
-      default:
-        return <div>Unknown step</div>;
+    // Common props for all steps
+    const common = {
+      value,
+      onChange,
+      onNext: handleNext,
+      onBack: handleBack,
+      isFirst,
+      isLast,
+    };
+
+    // Specific props for certain steps
+    const extra: any = {};
+    if (currentStepId === "category") {
+      extra.willBeFree = willBeFree;
+      extra.isFreeDisabled = stats.isFreeDisabled;
+      extra.freeCasesUsed = stats.freeCasesUsed;
     }
+    if (["jobDocuments", "noJobDocument", "categoryDetails", "rentedDocuments", "ownedDocuments", "debtTotal", "selfie", "video"].includes(currentStepId)) {
+      extra.formData = formData;
+      extra.setFormData = setFormData;
+    }
+    if (["amount", "deadline"].includes(currentStepId)) {
+      extra.formData = formData;
+    }
+    if (["title", "shortDesc", "seekerName", "seekerContact", "city"].includes(currentStepId)) {
+      extra.placeholder = currentStepId === "title" ? "e.g. Help with School Fee"
+        : currentStepId === "shortDesc" ? "One line summary"
+        : currentStepId === "seekerName" ? "Your full name"
+        : currentStepId === "seekerContact" ? "Your phone"
+        : "e.g. Karachi";
+    }
+
+    return { ...common, ...extra };
   }, [
     currentStepId,
     formData,
@@ -533,6 +274,9 @@ export default function SubmitRequestWizard() {
     stats.isFreeDisabled,
     stats.freeCasesUsed,
   ]);
+
+  // 🔥 Get the current step component from the map
+  const CurrentStepComponent = STEP_COMPONENTS[currentStepId];
 
   if (isLoading || statsLoading) {
     return (
@@ -582,7 +326,15 @@ export default function SubmitRequestWizard() {
       <div className="max-w-2xl mx-auto px-4 py-6">
         <SubmitTopBar isFree={willBeFree} balance={stats.balance} />
         <StepProgress current={currentIndex + 1} total={totalSteps} />
-        <div className="mt-6">{renderStep}</div>
+        <div className="mt-6">
+          {/* 🔥 Render current step with stable key */}
+          {CurrentStepComponent && (
+            <CurrentStepComponent
+              key={currentStepId}
+              {...stepProps}
+            />
+          )}
+        </div>
         {currentIndex > 0 && (
           <p className="mt-4 text-xs text-muted-foreground text-center">
             💾 Your progress is saved automatically.
