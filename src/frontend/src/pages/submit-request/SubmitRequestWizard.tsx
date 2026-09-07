@@ -1,11 +1,11 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// 🔥 FINAL FIX: Stable step rendering, no blinking, no focus loss
+// ✅ FIXED: Stable step rendering, NO blinking, NO unnecessary re-renders
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
 import { toast } from "sonner";
 
 // All steps
@@ -51,7 +51,6 @@ import { CATEGORIES, CATEGORY_LIMITS } from "./constants";
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
 
-// 🔥 Stable map of step components
 const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   category: StepCategory,
   title: StepTitle,
@@ -135,6 +134,14 @@ export default function SubmitRequestWizard() {
   const canUseFree = !stats.isSuspended && !stats.isFreeDisabled && stats.freeCasesUsed < 2;
   const willBeFree = canUseFree;
 
+  // ✅ Refs for stable callbacks
+  const currentStepIdRef = useRef(currentStepId);
+  currentStepIdRef.current = currentStepId;
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
+  const visibleStepIdsRef = useRef(visibleStepIds);
+  visibleStepIdsRef.current = visibleStepIds;
+
   // Load draft
   useEffect(() => {
     if (!isAuthenticated) {
@@ -156,32 +163,62 @@ export default function SubmitRequestWizard() {
     }
   }, [formData, currentStepId, isLoading, saveDraft]);
 
-  // 🔥 Stable field change handler
+  // ✅ STABLE: Never changes identity
   const handleFieldChange = useCallback((field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
+  // ✅ STABLE: Uses refs, never re-creates
+  const handleNext = useCallback(() => {
+    const stepId = currentStepIdRef.current;
+    const data = formDataRef.current;
+    const error = validateStep(stepId, data);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    const idx = visibleStepIdsRef.current.indexOf(stepId);
+    const nextIndex = idx + 1;
+    if (nextIndex >= visibleStepIdsRef.current.length) {
+      // handleSubmit will be called separately
+    } else {
+      setCurrentStepId(visibleStepIdsRef.current[nextIndex]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, []);
+
+  // ✅ STABLE: Uses refs
+  const handleBack = useCallback(() => {
+    const stepId = currentStepIdRef.current;
+    const idx = visibleStepIdsRef.current.indexOf(stepId);
+    const prevIndex = idx - 1;
+    if (prevIndex >= 0) {
+      setCurrentStepId(visibleStepIdsRef.current[prevIndex]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, []);
+
   // Submit handler
   const handleSubmit = useCallback(async () => {
-    for (const stepId of visibleStepIds) {
-      const error = validateStep(stepId, formData);
+    for (const stepId of visibleStepIdsRef.current) {
+      const error = validateStep(stepId, formDataRef.current);
       if (error) {
         toast.error(`❌ ${error}`);
         setCurrentStepId(stepId);
         return;
       }
     }
-    if (!formData.confirmed) {
+    if (!formDataRef.current.confirmed) {
       toast.error("You must agree to the Terms & Conditions.");
       setCurrentStepId("terms");
       return;
     }
-    if (!formData.selfieUrl) {
+    if (!formDataRef.current.selfieUrl) {
       toast.error("Please take a live selfie");
       setCurrentStepId("selfie");
       return;
     }
-    if (!formData.videoUrl) {
+    if (!formDataRef.current.videoUrl) {
       toast.error("Please record a video appeal");
       setCurrentStepId("video");
       return;
@@ -189,7 +226,7 @@ export default function SubmitRequestWizard() {
 
     setSubmitting(true);
     try {
-      const result = await submitCase(formData, user!.id, willBeFree);
+      const result = await submitCase(formDataRef.current, user!.id, willBeFree);
       clearDraft();
       toast.success(result.message);
       navigate({ to: "/my-cases" });
@@ -198,61 +235,44 @@ export default function SubmitRequestWizard() {
     } finally {
       setSubmitting(false);
     }
-  }, [formData, visibleStepIds, user, willBeFree, clearDraft, navigate]);
+  }, [user, willBeFree, clearDraft, navigate]);
 
-  // Navigation
-  const handleNext = useCallback(() => {
-    const error = validateStep(currentStepId, formData);
-    if (error) {
-      toast.error(error);
-      return;
-    }
-    const nextIndex = currentIndex + 1;
-    if (nextIndex >= totalSteps) {
-      handleSubmit();
+  // ✅ STABLE onChange — never re-creates
+  const stableOnChange = useCallback((val: any) => {
+    handleFieldChange(currentStepIdRef.current, val);
+  }, [handleFieldChange]);
+
+  // ✅ STABLE setFormData wrapper
+  const stableSetFormData = useCallback((updater: any) => {
+    if (typeof updater === "function") {
+      setFormData(prev => updater(prev));
     } else {
-      setCurrentStepId(visibleStepIds[nextIndex]);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      setFormData(updater);
     }
-  }, [currentStepId, currentIndex, totalSteps, visibleStepIds, formData, handleSubmit]);
+  }, []);
 
-  const handleBack = useCallback(() => {
-    const prevIndex = currentIndex - 1;
-    if (prevIndex >= 0) {
-      setCurrentStepId(visibleStepIds[prevIndex]);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }, [currentIndex, visibleStepIds]);
-
-  // 🔥 Memoize props for each step to avoid unnecessary re-renders
+  // ✅ Step props — MINIMAL dependencies
   const stepProps = useMemo(() => {
     const value = formData[currentStepId as keyof typeof formData];
-    const onChange = (val: any) => handleFieldChange(currentStepId, val);
 
-    // Common props for all steps
     const common = {
       value,
-      onChange,
+      onChange: stableOnChange,
       onNext: handleNext,
       onBack: handleBack,
       isFirst,
       isLast,
     };
 
-    // Specific props for certain steps
     const extra: any = {};
     if (currentStepId === "category") {
       extra.willBeFree = willBeFree;
       extra.isFreeDisabled = stats.isFreeDisabled;
       extra.freeCasesUsed = stats.freeCasesUsed;
     }
-    if (["jobDocuments", "noJobDocument", "categoryDetails", "rentedDocuments", "ownedDocuments", "debtTotal", "selfie", "video"].includes(currentStepId)) {
+    if (["jobDocuments", "noJobDocument", "categoryDetails", "rentedDocuments", "ownedDocuments", "debtTotal", "selfie", "video", "amount", "deadline"].includes(currentStepId)) {
       extra.formData = formData;
-      extra.setFormData = setFormData;
-    }
-    if (["amount", "deadline"].includes(currentStepId)) {
-      extra.formData = formData;
-      extra.setFormData = setFormData;
+      extra.setFormData = stableSetFormData;
     }
     if (["title", "shortDesc", "seekerName", "seekerContact", "city"].includes(currentStepId)) {
       extra.placeholder = currentStepId === "title" ? "e.g. Help with School Fee"
@@ -264,19 +284,19 @@ export default function SubmitRequestWizard() {
 
     return { ...common, ...extra };
   }, [
-    currentStepId,
-    formData,
-    handleFieldChange,
-    handleNext,
-    handleBack,
-    isFirst,
-    isLast,
-    willBeFree,
-    stats.isFreeDisabled,
-    stats.freeCasesUsed,
+    currentStepId,       // Only changes on step navigation
+    formData,            // Still needed for value + extra.formData
+    stableOnChange,      // Stable
+    handleNext,          // Stable
+    handleBack,          // Stable
+    isFirst,             // Step navigation
+    isLast,              // Step navigation
+    willBeFree,          // Stats
+    stats.isFreeDisabled,// Stats
+    stats.freeCasesUsed, // Stats
+    stableSetFormData,   // Stable
   ]);
 
-  // 🔥 Get the current step component from the map
   const CurrentStepComponent = STEP_COMPONENTS[currentStepId];
 
   if (isLoading || statsLoading) {
@@ -328,7 +348,6 @@ export default function SubmitRequestWizard() {
         <SubmitTopBar isFree={willBeFree} balance={stats.balance} />
         <StepProgress current={currentIndex + 1} total={totalSteps} />
         <div className="mt-6">
-          {/* 🔥 Render current step with stable key */}
           {CurrentStepComponent && (
             <CurrentStepComponent
               key={currentStepId}
