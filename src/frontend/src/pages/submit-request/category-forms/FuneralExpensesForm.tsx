@@ -1,150 +1,118 @@
 // src/frontend/src/pages/submit-request/category-forms/FuneralExpensesForm.tsx
+import { useMemo } from "react";
 import { Label } from "@/components/ui/label";
-import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BaseCategoryForm } from "./BaseCategoryForm";
+import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
+import { CHOICE_FIELDS } from "../constants";
 
-export default function FuneralExpensesForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields = {}, catDocUrls = {} } = formData;
+export default function FuneralExpensesForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const catFields = formData.catFields || {};
+  const catDocUrls = formData.catDocUrls || {};
+  const relationOptions = CHOICE_FIELDS.deceased_relation || [];
 
-  const setField = (key: string, value: any) => {
+  const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catFields: { ...prev.catFields, [key]: value },
+      catFields: { ...(prev.catFields || {}), [key]: value },
     }));
   };
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
+      catDocUrls: { ...(prev.catDocUrls || {}), [key]: url },
     }));
   };
 
-  const relationOptions = [
-    "My father",
-    "My mother",
-    "My husband",
-    "My wife",
-    "My child",
-    "Other relative",
-  ];
-
-  const isValid =
-    !!catFields.deceased_relation &&
-    !!catFields.deceased_name?.trim() &&
-    !!catFields.service_provider?.trim() &&
-    !!catFields.provider_contact?.trim() &&
-    !!catFields.provider_bank?.trim() &&
-    !!catFields.provider_account?.trim() &&
-    !!catFields.funeral_amount &&
-    !!catFields.funeral_date &&
-    !!catDocUrls.death_certificate &&
-    !!catDocUrls.relation_proof;
+  const isValid = useMemo(() => {
+    return (
+      !!catFields.deceased_relation &&
+      !!catFields.deceased_name?.trim() &&
+      !!catDocUrls.death_certificate &&
+      !!catDocUrls.relation_proof
+    );
+  }, [catFields, catDocUrls]);
 
   return (
     <BaseCategoryForm
-      formData={formData}
-      setFormData={setFormData}
+      title="Funeral Expenses"
+      subtitle="Verified funeral need only"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
       isLast={isLast}
-      title="🕊️ Funeral Expenses"
-      subtitle="Provide funeral expense details."
-      guide="📌 One case = ONE funeral only. Provide funeral service provider details."
       disabled={!isValid}
     >
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <Label>Relation to the deceased *</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {relationOptions.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setField("deceased_relation", opt)}
-                className={`px-2 py-2 rounded-lg border text-xs font-medium text-left ${
-                  catFields.deceased_relation === opt
-                    ? "bg-primary text-white border-primary"
-                    : "border-border"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <Label>Relation to deceased *</Label>
+          <Select
+            value={catFields.deceased_relation || ""}
+            onValueChange={(v) => setField("deceased_relation", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select relation" />
+            </SelectTrigger>
+            <SelectContent>
+              {relationOptions.map((opt: string) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <TextInput
-          field="Deceased Person's Full Name"
-          value={catFields.deceased_name}
-          onChange={(v: string) => setField("deceased_name", v)}
-          placeholder="Full name of the deceased"
-        />
-
-        <TextInput
-          field="Funeral Service Provider"
-          value={catFields.service_provider}
-          onChange={(v: string) => setField("service_provider", v)}
-          placeholder="Name of the funeral service provider"
-        />
-
-        <TextInput
-          field="Provider Contact Number"
-          value={catFields.provider_contact}
-          onChange={(v: string) => setField("provider_contact", v)}
-          placeholder="Phone number for verification"
-        />
-
-        <TextInput
-          field="Provider Bank Name"
-          value={catFields.provider_bank}
-          onChange={(v: string) => setField("provider_bank", v)}
-          placeholder="Bank name"
-        />
-
-        <TextInput
-          field="Provider Account Number"
-          value={catFields.provider_account}
-          onChange={(v: string) => setField("provider_account", v)}
-          placeholder="Account number"
-        />
-
-        <TextInput
-          field="Funeral Expenses Amount"
-          value={catFields.funeral_amount}
-          onChange={(v: string) => setField("funeral_amount", v)}
-          placeholder="e.g. 50000"
-          type="number"
-        />
-
-        <div className="space-y-2">
-          <Label>Funeral Date *</Label>
-          <input
-            type="date"
-            value={catFields.funeral_date || ""}
-            onChange={(e) => setField("funeral_date", e.target.value)}
-            className="w-full px-4 py-2.5 rounded-lg border"
+        <div className="space-y-1">
+          <Label>Deceased person's name *</Label>
+          <Input
+            value={catFields.deceased_name || ""}
+            onChange={(e) => setField("deceased_name", e.target.value)}
+            placeholder="Full name of the deceased"
           />
         </div>
 
-        <FileUpload
-          label="Death Certificate"
-          key="death_certificate"
+        <DocBox
+          label="Death certificate"
           required
-          hint="Clear photo of the death certificate"
-          onUpload={(url: string) => setDoc("death_certificate", url)}
+          hint="Official death certificate"
+          onUpload={(url) => setDoc("death_certificate", url)}
           value={catDocUrls.death_certificate}
         />
 
-        <FileUpload
-          label="Proof of Relation (B-Form / FRC)"
-          key="relation_proof"
+        <DocBox
+          label="Relation proof"
           required
           hint="Proof of relation to the deceased"
-          onUpload={(url: string) => setDoc("relation_proof", url)}
+          onUpload={(url) => setDoc("relation_proof", url)}
           value={catDocUrls.relation_proof}
         />
       </div>
+
+      <StepGuide
+        lines={[
+          "Death certificate is mandatory.",
+          "Relation proof must clearly show your connection to the deceased.",
+          "Service provider payment details come in the payment receiver step.",
+          "Submit only verified, clear documents.",
+        ]}
+      />
     </BaseCategoryForm>
   );
 }
