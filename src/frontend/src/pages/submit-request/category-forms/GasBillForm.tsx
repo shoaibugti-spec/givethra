@@ -4,7 +4,7 @@ import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 import { GAS_COMPANIES } from "@/lib/institutesList";
 
 export default function GasBillForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields, catDocUrls, refNumber } = formData;
+  const { catFields = {}, catDocUrls = {}, refNumber } = formData;
 
   const setField = (key: string, value: any) => {
     setFormData((prev: any) => ({
@@ -24,7 +24,10 @@ export default function GasBillForm({ formData, setFormData, onNext, onBack, isF
     setFormData((prev: any) => ({ ...prev, refNumber: value }));
   };
 
-  const isValid = refNumber?.trim() && catFields.bill_owner_name?.trim() && catDocUrls.bill;
+  const isValid =
+    !!refNumber?.trim() &&
+    !!catFields.bill_owner_name?.trim() &&
+    !!catDocUrls.bill;
 
   return (
     <BaseCategoryForm
@@ -37,18 +40,21 @@ export default function GasBillForm({ formData, setFormData, onNext, onBack, isF
       title="🔥 Gas Bill Details"
       subtitle="Provide your gas bill details for verification."
       guide="⚠️ One case = ONE bill only. Upload a clear photo of your gas bill."
+      disabled={!isValid}
     >
       <div className="space-y-3">
         <div className="space-y-2">
           <Label>Select Your Company *</Label>
           <div className="grid grid-cols-2 gap-2">
-            {GAS_COMPANIES.map((c) => (
+            {(GAS_COMPANIES || []).map((c: any) => (
               <button
                 key={c.name}
                 type="button"
                 onClick={() => setField("company", c.name)}
                 className={`px-3 py-2.5 rounded-lg border text-xs font-medium text-left ${
-                  catFields.company === c.name ? "bg-primary text-white border-primary" : "border-border"
+                  catFields.company === c.name
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                 }`}
               >
                 {c.name}
@@ -67,7 +73,7 @@ export default function GasBillForm({ formData, setFormData, onNext, onBack, isF
         <TextInput
           field="Bill Owner Name (as on bill)"
           value={catFields.bill_owner_name}
-          onChange={(v) => setField("bill_owner_name", v)}
+          onChange={(v: string) => setField("bill_owner_name", v)}
           placeholder="e.g. Muhammad Ali"
         />
 
@@ -76,7 +82,7 @@ export default function GasBillForm({ formData, setFormData, onNext, onBack, isF
           key="bill"
           required
           hint="Bill should clearly show consumer/reference number and amount"
-          onUpload={(url) => setDoc("bill", url)}
+          onUpload={(url: string) => setDoc("bill", url)}
           value={catDocUrls.bill}
         />
       </div>
