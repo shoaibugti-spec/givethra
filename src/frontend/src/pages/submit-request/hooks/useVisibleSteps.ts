@@ -3,6 +3,14 @@ import { useMemo } from "react";
 import { isEasyCat, PROPERTY_RELEVANT_CATS, isDebtCategory } from "../constants";
 
 export function useVisibleSteps(formData: any): string[] {
+  // ✅ صرف وہ فیلڈز جو واقعی steps کی فہرست بدلتی ہیں
+  // اس سے ہر keystroke / category update پر نیا array نہیں بنتا
+  const category = formData?.category ?? "";
+  const gender = formData?.gender ?? "";
+  const isOrphan = formData?.isOrphan ?? "";
+  const jobStatus = formData?.jobStatus ?? "";
+  const propertyOwnership = formData?.propertyOwnership ?? "";
+
   return useMemo(() => {
     const steps: string[] = [];
 
@@ -13,7 +21,7 @@ export function useVisibleSteps(formData: any): string[] {
     steps.push("title", "shortDesc", "country", "city");
 
     // 6. Urgency (only if not easy)
-    if (!isEasyCat(formData.category)) {
+    if (!isEasyCat(category)) {
       steps.push("urgency");
     }
 
@@ -21,14 +29,14 @@ export function useVisibleSteps(formData: any): string[] {
     steps.push("gender");
 
     // 8. Marital Status (only if Male or Female)
-    if (formData.gender === "Male" || formData.gender === "Female") {
+    if (gender === "Male" || gender === "Female") {
       steps.push("maritalStatus");
     }
 
     // 9-10. Orphan (only if Female)
-    if (formData.gender === "Female") {
+    if (gender === "Female") {
       steps.push("orphan");
-      if (formData.isOrphan === "Yes") {
+      if (isOrphan === "Yes") {
         steps.push("orphanParent");
       }
     }
@@ -40,21 +48,21 @@ export function useVisibleSteps(formData: any): string[] {
     steps.push("jobStatus");
 
     // 14-15. Job documents
-    if (formData.jobStatus === "Yes") {
+    if (jobStatus === "Yes") {
       steps.push("jobDocuments");
-    } else if (formData.jobStatus === "No") {
+    } else if (jobStatus === "No") {
       steps.push("noJobDocument");
     }
 
-    // 16. Category Details (always, but content depends on category)
+    // 16. Category Details (always)
     steps.push("categoryDetails");
 
     // 17-19. Property (only for relevant categories)
-    if (PROPERTY_RELEVANT_CATS.has(formData.category)) {
+    if (PROPERTY_RELEVANT_CATS.has(category)) {
       steps.push("propertyOwnership");
-      if (formData.propertyOwnership === "rented") {
+      if (propertyOwnership === "rented") {
         steps.push("rentedDocuments");
-      } else if (formData.propertyOwnership === "owned") {
+      } else if (propertyOwnership === "owned") {
         steps.push("ownedDocuments");
       }
     }
@@ -63,15 +71,15 @@ export function useVisibleSteps(formData: any): string[] {
     steps.push("whyHelp");
 
     // 21-22. Amount
-    if (isDebtCategory(formData.category)) {
+    if (isDebtCategory(category)) {
       steps.push("debtTotal");
     } else {
       steps.push("amount");
     }
 
-    // 23-25. Currency, Deadline, Selfie, Video, Terms
+    // 23-27. Currency, Deadline, Selfie, Video, Terms
     steps.push("currency", "deadline", "selfie", "video", "terms");
 
     return steps;
-  }, [formData]);
+  }, [category, gender, isOrphan, jobStatus, propertyOwnership]);
 }
