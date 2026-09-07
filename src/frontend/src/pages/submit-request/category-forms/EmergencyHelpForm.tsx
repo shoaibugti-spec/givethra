@@ -1,115 +1,117 @@
 // src/frontend/src/pages/submit-request/category-forms/EmergencyHelpForm.tsx
+import { useMemo } from "react";
 import { Label } from "@/components/ui/label";
-import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BaseCategoryForm } from "./BaseCategoryForm";
+import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function EmergencyHelpForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields = {}, catDocUrls = {} } = formData;
+const EMERGENCY_TYPES = [
+  "Accident",
+  "Sudden illness",
+  "Natural disaster",
+  "Displacement",
+  "Other urgent need",
+];
 
-  const setField = (key: string, value: any) => {
+export default function EmergencyHelpForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const catFields = formData.catFields || {};
+  const catDocUrls = formData.catDocUrls || {};
+
+  const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catFields: { ...prev.catFields, [key]: value },
+      catFields: { ...(prev.catFields || {}), [key]: value },
     }));
   };
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
+      catDocUrls: { ...(prev.catDocUrls || {}), [key]: url },
     }));
   };
 
-  const emergencyTypes = [
-    "Medical Emergency",
-    "Natural Disaster",
-    "Accident",
-    "Urgent Family Matter",
-    "Other",
-  ];
-
-  const isValid =
-    !!catFields.emergency_type &&
-    !!catFields.emergency_description?.trim() &&
-    !!catFields.emergency_location?.trim() &&
-    !!catFields.emergency_amount &&
-    !!catFields.emergency_date &&
-    !!catDocUrls.emergency_proof;
+  const isValid = useMemo(() => {
+    return (
+      !!catFields.emergency_type &&
+      !!catFields.emergency_description?.trim() &&
+      !!catDocUrls.emergency_proof
+    );
+  }, [catFields, catDocUrls]);
 
   return (
     <BaseCategoryForm
-      formData={formData}
-      setFormData={setFormData}
+      title="Emergency Help"
+      subtitle="Verified urgent need only"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
       isLast={isLast}
-      title="🚨 Emergency Help"
-      subtitle="Provide emergency help details."
-      guide="⚡ For urgent situations only. Please provide proof of the emergency."
       disabled={!isValid}
     >
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <Label>Emergency Type *</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {emergencyTypes.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setField("emergency_type", opt)}
-                className={`px-2 py-2 rounded-lg border text-xs font-medium ${
-                  catFields.emergency_type === opt
-                    ? "bg-primary text-white border-primary"
-                    : "border-border"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <Label>Emergency type *</Label>
+          <Select
+            value={catFields.emergency_type || ""}
+            onValueChange={(v) => setField("emergency_type", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select emergency type" />
+            </SelectTrigger>
+            <SelectContent>
+              {EMERGENCY_TYPES.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <TextInput
-          field="Emergency Description"
-          value={catFields.emergency_description}
-          onChange={(v: string) => setField("emergency_description", v)}
-          placeholder="Describe the emergency in detail"
-        />
-
-        <TextInput
-          field="Emergency Location"
-          value={catFields.emergency_location}
-          onChange={(v: string) => setField("emergency_location", v)}
-          placeholder="Complete address or location"
-        />
-
-        <TextInput
-          field="Amount Needed"
-          value={catFields.emergency_amount}
-          onChange={(v: string) => setField("emergency_amount", v)}
-          placeholder="e.g. 20000"
-          type="number"
-        />
-
-        <div className="space-y-2">
-          <Label>Emergency Date *</Label>
-          <input
-            type="date"
-            value={catFields.emergency_date || ""}
-            onChange={(e) => setField("emergency_date", e.target.value)}
-            className="w-full px-4 py-2.5 rounded-lg border"
+        <div className="space-y-1">
+          <Label>Describe the emergency *</Label>
+          <Textarea
+            value={catFields.emergency_description || ""}
+            onChange={(e) => setField("emergency_description", e.target.value)}
+            placeholder="What happened, when, and what help is needed now"
+            rows={4}
           />
         </div>
 
-        <FileUpload
-          label="Emergency Proof (Photo / Report)"
-          key="emergency_proof"
+        <DocBox
+          label="Emergency proof"
           required
-          hint="Clear photo of the emergency situation, hospital report, or any proof"
-          onUpload={(url: string) => setDoc("emergency_proof", url)}
+          hint="Photo, report, or document proving the emergency"
+          onUpload={(url) => setDoc("emergency_proof", url)}
           value={catDocUrls.emergency_proof}
         />
       </div>
+
+      <StepGuide
+        lines={[
+          "Explain the emergency clearly and honestly.",
+          "Upload proof that shows the urgent situation.",
+          "Recipient payment details come in the payment receiver step.",
+          "False claims are rejected and may affect your account.",
+        ]}
+      />
     </BaseCategoryForm>
   );
 }
