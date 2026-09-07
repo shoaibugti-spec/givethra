@@ -3,7 +3,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { StepGuide } from "../shared/StepGuide"; // یا یہاں بھی StepGuide رکھ سکتے ہیں
+import { StepGuide } from "../shared/StepGuide";
+// 🔥 یہ دو imports شامل کیے
+import { toast } from "sonner";
+import { COUNTRIES } from "@/lib/countries";
 
 interface Props {
   category: string;
