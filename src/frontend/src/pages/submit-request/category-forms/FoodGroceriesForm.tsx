@@ -1,113 +1,102 @@
 // src/frontend/src/pages/submit-request/category-forms/FoodGroceriesForm.tsx
+import { useMemo } from "react";
 import { Label } from "@/components/ui/label";
-import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { Input } from "@/components/ui/input";
+import { BaseCategoryForm } from "./BaseCategoryForm";
+import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function FoodGroceriesForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields = {}, catDocUrls = {} } = formData;
+export default function FoodGroceriesForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const catFields = formData.catFields || {};
+  const catDocUrls = formData.catDocUrls || {};
 
-  const setField = (key: string, value: any) => {
+  const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catFields: { ...prev.catFields, [key]: value },
+      catFields: { ...(prev.catFields || {}), [key]: value },
     }));
   };
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
+      catDocUrls: { ...(prev.catDocUrls || {}), [key]: url },
     }));
   };
 
-  const isValid =
-    !!catFields.family_members &&
-    !!catFields.shop_name?.trim() &&
-    !!catFields.shop_contact?.trim() &&
-    !!catFields.shop_address?.trim() &&
-    !!catFields.groceries_amount &&
-    !!catFields.groceries_due_date &&
-    !!catDocUrls.groceries_estimate &&
-    !!catDocUrls.shop_proof;
+  const isValid = useMemo(() => {
+    return (
+      !!catFields.family_members &&
+      !!catFields.shop_name?.trim() &&
+      !!catFields.groceries_amount &&
+      !!catDocUrls.groceries_estimate
+    );
+  }, [catFields, catDocUrls]);
 
   return (
     <BaseCategoryForm
-      formData={formData}
-      setFormData={setFormData}
+      title="Food & Groceries"
+      subtitle="Max Rs 12,000 per family · verified need"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
       isLast={isLast}
-      title="🍲 Food & Groceries"
-      subtitle="Provide grocery details for your family."
-      guide="💰 Max Rs 12,000 per family. Provide shop details for verification."
       disabled={!isValid}
     >
-      <div className="space-y-3">
-        <TextInput
-          field="Number of Family Members"
-          value={catFields.family_members}
-          onChange={(v: string) => setField("family_members", v)}
-          placeholder="e.g. 5"
-          type="number"
-        />
-
-        <TextInput
-          field="Shop Name"
-          value={catFields.shop_name}
-          onChange={(v: string) => setField("shop_name", v)}
-          placeholder="Full shop name"
-        />
-
-        <TextInput
-          field="Shop Contact Number"
-          value={catFields.shop_contact}
-          onChange={(v: string) => setField("shop_contact", v)}
-          placeholder="Phone number for verification"
-        />
-
-        <TextInput
-          field="Shop Address"
-          value={catFields.shop_address}
-          onChange={(v: string) => setField("shop_address", v)}
-          placeholder="Complete address of the shop"
-        />
-
-        <TextInput
-          field="Estimated Groceries Amount"
-          value={catFields.groceries_amount}
-          onChange={(v: string) => setField("groceries_amount", v)}
-          placeholder="e.g. 8000"
-          type="number"
-        />
-
-        <div className="space-y-2">
-          <Label>Due Date *</Label>
-          <input
-            type="date"
-            value={catFields.groceries_due_date || ""}
-            onChange={(e) => setField("groceries_due_date", e.target.value)}
-            className="w-full px-4 py-2.5 rounded-lg border"
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <Label>Number of family members *</Label>
+          <Input
+            type="number"
+            value={catFields.family_members || ""}
+            onChange={(e) => setField("family_members", e.target.value)}
+            placeholder="e.g. 5"
           />
         </div>
 
-        <FileUpload
-          label="Groceries List / Estimate"
-          key="groceries_estimate"
+        <div className="space-y-1">
+          <Label>Shop name *</Label>
+          <Input
+            value={catFields.shop_name || ""}
+            onChange={(e) => setField("shop_name", e.target.value)}
+            placeholder="Grocery shop name"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label>Groceries amount needed *</Label>
+          <Input
+            type="number"
+            value={catFields.groceries_amount || ""}
+            onChange={(e) => setField("groceries_amount", e.target.value)}
+            placeholder="Max Rs 12,000"
+          />
+        </div>
+
+        <DocBox
+          label="Groceries estimate / list photo"
           required
-          hint="Clear photo of the grocery list or estimate from the shop"
-          onUpload={(url: string) => setDoc("groceries_estimate", url)}
+          hint="Clear list with prices from the shop"
+          onUpload={(url) => setDoc("groceries_estimate", url)}
           value={catDocUrls.groceries_estimate}
         />
-
-        <FileUpload
-          label="Shop Proof / Receipt"
-          key="shop_proof"
-          required
-          hint="Any proof of the shop (receipt, business card, etc.)"
-          onUpload={(url: string) => setDoc("shop_proof", url)}
-          value={catDocUrls.shop_proof}
-        />
       </div>
+
+      <StepGuide
+        lines={[
+          "Maximum help is Rs 12,000 per family for this category.",
+          "Upload a clear shop estimate or item list with prices.",
+          "Shop payment details will be asked in the payment receiver step.",
+          "Amount must match the estimate document.",
+        ]}
+      />
     </BaseCategoryForm>
   );
 }
