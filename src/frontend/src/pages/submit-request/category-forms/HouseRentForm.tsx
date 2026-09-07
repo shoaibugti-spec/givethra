@@ -1,119 +1,110 @@
 // src/frontend/src/pages/submit-request/category-forms/HouseRentForm.tsx
+import { useMemo } from "react";
 import { Label } from "@/components/ui/label";
-import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { Input } from "@/components/ui/input";
+import { BaseCategoryForm } from "./BaseCategoryForm";
+import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function HouseRentForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields = {}, catDocUrls = {} } = formData;
+export default function HouseRentForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const catFields = formData.catFields || {};
+  const catDocUrls = formData.catDocUrls || {};
 
-  const setField = (key: string, value: any) => {
+  const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catFields: { ...prev.catFields, [key]: value },
+      catFields: { ...(prev.catFields || {}), [key]: value },
     }));
   };
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
+      catDocUrls: { ...(prev.catDocUrls || {}), [key]: url },
     }));
   };
 
-  const isValid =
-    !!catFields.landlord_name?.trim() &&
-    !!catFields.landlord_contact?.trim() &&
-    !!catFields.landlord_bank?.trim() &&
-    !!catFields.landlord_account?.trim() &&
-    !!catFields.rent_amount &&
-    !!catFields.rent_due_date &&
-    !!catDocUrls.rental_agreement &&
-    !!catDocUrls.landlord_cnic;
+  const isValid = useMemo(() => {
+    return (
+      !!catFields.landlord_name?.trim() &&
+      !!catFields.landlord_contact?.trim() &&
+      !!catFields.rent_amount &&
+      !!catDocUrls.rental_agreement &&
+      !!catDocUrls.landlord_cnic
+    );
+  }, [catFields, catDocUrls]);
 
   return (
     <BaseCategoryForm
-      formData={formData}
-      setFormData={setFormData}
+      title="House Rent"
+      subtitle="One month verified rent only"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
       isLast={isLast}
-      title="🏠 House Rent"
-      subtitle="Provide rental details for verification."
-      guide="💰 Verified 1 Month Rent. One case = ONE rental property only."
       disabled={!isValid}
     >
-      <div className="space-y-3">
-        <TextInput
-          field="Landlord's Full Name"
-          value={catFields.landlord_name}
-          onChange={(v: string) => setField("landlord_name", v)}
-          placeholder="Full name of landlord"
-        />
-
-        <TextInput
-          field="Landlord's Contact Number"
-          value={catFields.landlord_contact}
-          onChange={(v: string) => setField("landlord_contact", v)}
-          placeholder="Phone number for verification"
-        />
-
-        <TextInput
-          field="Landlord's Bank Name"
-          value={catFields.landlord_bank}
-          onChange={(v: string) => setField("landlord_bank", v)}
-          placeholder="Bank name"
-        />
-
-        <TextInput
-          field="Landlord's Account Number"
-          value={catFields.landlord_account}
-          onChange={(v: string) => setField("landlord_account", v)}
-          placeholder="Account number"
-        />
-
-        <TextInput
-          field="Monthly Rent Amount"
-          value={catFields.rent_amount}
-          onChange={(v: string) => setField("rent_amount", v)}
-          placeholder="e.g. 25000"
-          type="number"
-        />
-
-        <div className="space-y-2">
-          <Label>Rent Due Date *</Label>
-          <input
-            type="date"
-            value={catFields.rent_due_date || ""}
-            onChange={(e) => setField("rent_due_date", e.target.value)}
-            className="w-full px-4 py-2.5 rounded-lg border"
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <Label>Landlord name *</Label>
+          <Input
+            value={catFields.landlord_name || ""}
+            onChange={(e) => setField("landlord_name", e.target.value)}
+            placeholder="Full name of landlord"
           />
         </div>
 
-        <TextInput
-          field="Property Address"
-          value={catFields.property_address}
-          onChange={(v: string) => setField("property_address", v)}
-          placeholder="Complete address of the property"
-        />
+        <div className="space-y-1">
+          <Label>Landlord contact *</Label>
+          <Input
+            value={catFields.landlord_contact || ""}
+            onChange={(e) => setField("landlord_contact", e.target.value)}
+            placeholder="Landlord phone number"
+          />
+        </div>
 
-        <FileUpload
-          label="Rental Agreement / Contract"
-          key="rental_agreement"
+        <div className="space-y-1">
+          <Label>Monthly rent amount (ONE month) *</Label>
+          <Input
+            type="number"
+            value={catFields.rent_amount || ""}
+            onChange={(e) => setField("rent_amount", e.target.value)}
+            placeholder="Amount for one month only"
+          />
+        </div>
+
+        <DocBox
+          label="Rental agreement"
           required
-          hint="Clear photo of your rental agreement or lease document"
-          onUpload={(url: string) => setDoc("rental_agreement", url)}
+          hint="Clear photo of the rent agreement"
+          onUpload={(url) => setDoc("rental_agreement", url)}
           value={catDocUrls.rental_agreement}
         />
 
-        <FileUpload
-          label="Landlord's CNIC"
-          key="landlord_cnic"
+        <DocBox
+          label="Landlord CNIC"
           required
-          hint="CNIC of the landlord or any document proving property ownership"
-          onUpload={(url: string) => setDoc("landlord_cnic", url)}
+          hint="Front side of landlord CNIC"
+          onUpload={(url) => setDoc("landlord_cnic", url)}
           value={catDocUrls.landlord_cnic}
         />
       </div>
+
+      <StepGuide
+        lines={[
+          "Request help for ONE month rent only — not multiple months or arrears.",
+          "Landlord name and contact must be real and reachable for verification.",
+          "Upload a clear rental agreement and landlord CNIC.",
+          "Payment receiver details (landlord bank) will be asked in the next step for this category.",
+        ]}
+      />
     </BaseCategoryForm>
   );
 }
