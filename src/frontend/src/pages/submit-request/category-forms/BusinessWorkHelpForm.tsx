@@ -1,108 +1,100 @@
 // src/frontend/src/pages/submit-request/category-forms/BusinessWorkHelpForm.tsx
-import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { useMemo } from "react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { BaseCategoryForm } from "./BaseCategoryForm";
+import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function BusinessWorkHelpForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields = {}, catDocUrls = {} } = formData;
+export default function BusinessWorkHelpForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const catFields = formData.catFields || {};
+  const catDocUrls = formData.catDocUrls || {};
 
-  const setField = (key: string, value: any) => {
+  const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catFields: { ...prev.catFields, [key]: value },
+      catFields: { ...(prev.catFields || {}), [key]: value },
     }));
   };
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
+      catDocUrls: { ...(prev.catDocUrls || {}), [key]: url },
     }));
   };
 
-  const isValid =
-    !!catFields.business_name?.trim() &&
-    !!catFields.business_type?.trim() &&
-    !!catFields.owner_name?.trim() &&
-    !!catFields.owner_contact?.trim() &&
-    !!catFields.business_address?.trim() &&
-    !!catFields.business_amount &&
-    !!catDocUrls.business_quotation &&
-    !!catDocUrls.business_proof;
+  const isValid = useMemo(() => {
+    return (
+      !!catFields.business_name?.trim() &&
+      !!catFields.business_amount &&
+      !!catDocUrls.business_quotation &&
+      !!catDocUrls.business_proof
+    );
+  }, [catFields, catDocUrls]);
 
   return (
     <BaseCategoryForm
-      formData={formData}
-      setFormData={setFormData}
+      title="Business / Work Help"
+      subtitle="Max Rs 20,000 · verified business need"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
       isLast={isLast}
-      title="💼 Business / Work Help"
-      subtitle="Provide business or work help details."
-      guide="💰 Rs 8,000–20,000 based on verified need. Provide business proof for verification."
       disabled={!isValid}
     >
-      <div className="space-y-3">
-        <TextInput
-          field="Business Name"
-          value={catFields.business_name}
-          onChange={(v: string) => setField("business_name", v)}
-          placeholder="Official business name"
-        />
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <Label>Business / work name *</Label>
+          <Input
+            value={catFields.business_name || ""}
+            onChange={(e) => setField("business_name", e.target.value)}
+            placeholder="Name of business or work activity"
+          />
+        </div>
 
-        <TextInput
-          field="Business Type"
-          value={catFields.business_type}
-          onChange={(v: string) => setField("business_type", v)}
-          placeholder="e.g. Retail, Services, Manufacturing"
-        />
+        <div className="space-y-1">
+          <Label>Amount needed *</Label>
+          <Input
+            type="number"
+            value={catFields.business_amount || ""}
+            onChange={(e) => setField("business_amount", e.target.value)}
+            placeholder="Typical range Rs 8,000–20,000"
+          />
+        </div>
 
-        <TextInput
-          field="Business Owner Name"
-          value={catFields.owner_name}
-          onChange={(v: string) => setField("owner_name", v)}
-          placeholder="Full name of owner"
-        />
-
-        <TextInput
-          field="Owner Contact Number"
-          value={catFields.owner_contact}
-          onChange={(v: string) => setField("owner_contact", v)}
-          placeholder="Phone number for verification"
-        />
-
-        <TextInput
-          field="Business Address"
-          value={catFields.business_address}
-          onChange={(v: string) => setField("business_address", v)}
-          placeholder="Complete business address"
-        />
-
-        <TextInput
-          field="Amount Needed"
-          value={catFields.business_amount}
-          onChange={(v: string) => setField("business_amount", v)}
-          placeholder="e.g. 15000"
-          type="number"
-        />
-
-        <FileUpload
-          label="Business Equipment / Supply Quotation"
-          key="business_quotation"
+        <DocBox
+          label="Business quotation / cost list"
           required
-          hint="Quotation for the items needed for business"
-          onUpload={(url: string) => setDoc("business_quotation", url)}
+          hint="Clear list of items or costs needed"
+          onUpload={(url) => setDoc("business_quotation", url)}
           value={catDocUrls.business_quotation}
         />
 
-        <FileUpload
-          label="Business Proof (License / Registration)"
-          key="business_proof"
+        <DocBox
+          label="Business proof"
           required
-          hint="Proof that you have a business (license, registration, etc.)"
-          onUpload={(url: string) => setDoc("business_proof", url)}
+          hint="Photo or document proving the business / work"
+          onUpload={(url) => setDoc("business_proof", url)}
           value={catDocUrls.business_proof}
         />
       </div>
+
+      <StepGuide
+        lines={[
+          "Maximum amount for this category is Rs 20,000.",
+          "Upload a clear quotation and proof of business activity.",
+          "Supplier payment details will be collected in the payment receiver step.",
+          "Vague or incomplete documents can cause rejection.",
+        ]}
+      />
     </BaseCategoryForm>
   );
 }
