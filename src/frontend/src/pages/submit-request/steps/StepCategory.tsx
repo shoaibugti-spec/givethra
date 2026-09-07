@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
-// ✅ FIXED: Zero blinking, no layout shift, clean UI
+// ✅ FIXED: Zero blinking, clean UI, memoized buttons
 
 import React, { memo, useCallback, useRef } from "react";
 
@@ -37,7 +37,6 @@ interface Props {
   freeCasesUsed?: number;
 }
 
-// ✅ Memoized button — only re-renders if its own isSelected changes
 const CategoryButton = memo(function CategoryButton({
   cat,
   isSelected,
@@ -78,11 +77,10 @@ const CategoryButton = memo(function CategoryButton({
         WebkitTapHighlightColor: "transparent",
         userSelect: "none",
         touchAction: "manipulation",
-        // ✅ NO border transition — inset shadow never changes layout
+        // ✅ Inset shadow — no layout shift, no transition
         boxShadow: isSelected
           ? "inset 0 0 0 4px #000000, 0 6px 20px rgba(0,0,0,0.35)"
           : "inset 0 0 0 0px transparent, 0 2px 8px rgba(0,0,0,0.12)",
-        // ✅ NO transition at all — instant snap, zero blinking
       }}
     >
       <span style={{ fontSize: "28px", lineHeight: 1, display: "block" }}>
@@ -246,7 +244,6 @@ const StepCategory = memo(function StepCategory({
             opacity: value ? 1 : 0.6,
             fontSize: "16px",
             fontWeight: "500",
-            // ✅ No transition on Next button either
           }}
         >
           Next →
