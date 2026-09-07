@@ -1,7 +1,7 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
-// 🔥 Memoized version with local state — NO BLINKING
+// 🔥 FINAL: No blinking at all — using useRef for selection state
 
-import React, { useState, useEffect, useCallback, memo } from "react";
+import React, { useState, useRef, useCallback, memo, useEffect } from "react";
 import { StepNavigation } from "../shared/StepNavigation";
 
 const ALL_CATEGORIES = [
@@ -38,6 +38,9 @@ interface Props {
   freeCasesUsed?: number;
 }
 
+// 🔥 Memoized navigation component to prevent re-renders
+const MemoizedStepNavigation = memo(StepNavigation);
+
 const StepCategory = memo(function StepCategory({
   value,
   onChange,
@@ -49,31 +52,41 @@ const StepCategory = memo(function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  // 🔥 Local state to avoid flickering
-  const [selected, setSelected] = useState(value);
+  // 🔥 Use ref to track selection without causing re-renders
+  const selectedRef = useRef<string>(value);
+  // 🔥 Force re-render only when we need to update the UI (we'll use a trick)
+  const [, forceUpdate] = useState(0);
 
-  // Sync with parent if value changes from outside (e.g., draft restore)
+  // Sync ref with prop when it changes externally (e.g., draft restore)
   useEffect(() => {
-    setSelected(value);
+    if (value && value !== selectedRef.current) {
+      selectedRef.current = value;
+      forceUpdate((prev) => prev + 1);
+    }
   }, [value]);
 
   const handleSelect = useCallback(
     (id: string) => {
-      if (id === selected) return;
-      setSelected(id);
+      if (id === selectedRef.current) return;
+      selectedRef.current = id;
+      // Force re-render to show selection
+      forceUpdate((prev) => prev + 1);
+      // Notify parent
       onChange(id);
     },
-    [selected, onChange]
+    [onChange]
   );
 
-  // 🔥 Memoized navigation handlers to prevent re-renders
+  // 🔥 Memoized handlers to prevent recreation
   const handleNext = useCallback(() => {
-    if (selected) onNext();
-  }, [selected, onNext]);
+    if (selectedRef.current) onNext();
+  }, [onNext]);
 
   const handleBack = useCallback(() => {
     onBack();
   }, [onBack]);
+
+  const currentSelected = selectedRef.current;
 
   return (
     <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
@@ -98,7 +111,7 @@ const StepCategory = memo(function StepCategory({
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
         {ALL_CATEGORIES.map((cat) => {
-          const isSelected = selected === cat.id;
+          const isSelected = currentSelected === cat.id;
           return (
             <button
               key={cat.id}
@@ -155,40 +168,13 @@ const StepCategory = memo(function StepCategory({
         })}
       </div>
 
-      <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "center" }}>
-        {!isFirst && (
-          <button
-            onClick={handleBack}
-            style={{
-              padding: "10px 24px",
-              borderRadius: "8px",
-              border: "1px solid #ccc",
-              background: "transparent",
-              cursor: "pointer",
-              flex: 1,
-            }}
-          >
-            Back
-          </button>
-        )}
-        <button
-          onClick={handleNext}
-          disabled={!selected}
-          style={{
-            padding: "10px 24px",
-            borderRadius: "8px",
-            border: "none",
-            background: selected ? "#00A896" : "#ccc",
-            color: "#fff",
-            cursor: selected ? "pointer" : "not-allowed",
-            flex: 1,
-            opacity: selected ? 1 : 0.6,
-            transition: "background 0.2s ease",
-          }}
-        >
-          Next →
-        </button>
-      </div>
+      <MemoizedStepNavigation
+        onNext={handleNext}
+        onBack={handleBack}
+        isFirst={isFirst}
+        isLast={isLast}
+        disabled={!currentSelected}
+      />
     </div>
   );
 });
