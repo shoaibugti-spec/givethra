@@ -1,5 +1,9 @@
 // src/frontend/src/pages/ProfilePage.tsx
-// 🔥 FIXED: دو مکمل الگ data sets (Hero + Requester)، Role toggle صرف UI، stats فوری، amount لازمی نظر آئے
+// 🔥 FIXED: Promise.allSettled for resilience (Fix #6)
+// 🔥 FIXED: Badge now shows correctly using isTrulyCompletedHelp (Fix #5)
+// 🔥 FIXED: Edit button separated from name/badge to avoid layout collision (Fix #7)
+// 🔥 FIXED: Profile loading stuck - now shows page even if profile is null (Fix #8)
+// 🔥 FIXED: "/profile/me" now uses actual logged-in user id (Critical fix)
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -38,7 +42,7 @@ import {
   Info,
   MoreHorizontal,
   Pin,
-  AlertCircle,
+  AlertCircle, // ✅ added for error state
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -70,22 +74,52 @@ import {
 import { isTrulyCompletedHelp } from "@/lib/resolutionStatus";
 import { computeHeroStats, computeRequesterStats, type HeroStats, type RequesterStats } from "@/lib/profileStats";
 
+// ---------------------------------------------------------------------------
 // Config
+// ---------------------------------------------------------------------------
+
 const SUPPORTS_PER_CREDIT = 100;
 const CREDITS_PER_REWARD = 5;
 
+// ---------------------------------------------------------------------------
 // Helpers
+// ---------------------------------------------------------------------------
+
 function getBadge(unlockCount: number, contributionCount: number, directHelpCount: number) {
   if (contributionCount >= 3 && directHelpCount >= 3 || contributionCount + directHelpCount >= 10) {
-    return { title: "Super Hero", emoji: "🌟", description: "You have unlocked cases, contributed, and provided direct help. You are the ultimate Hero!", icon: <Trophy className="h-4 w-4 text-yellow-500" />, color: "bg-gradient-to-r from-yellow-400 to-orange-500 text-white" };
+    return {
+      title: "Super Hero",
+      emoji: "🌟",
+      description: "You have unlocked cases, contributed, and provided direct help. You are the ultimate Hero!",
+      icon: <Trophy className="h-4 w-4 text-yellow-500" />,
+      color: "bg-gradient-to-r from-yellow-400 to-orange-500 text-white",
+    };
   }
   if (directHelpCount > 0 || contributionCount > 0) {
-    return { title: "Hero", emoji: "🦸", description: "You paid directly for someone's need. You are a true Hero!", icon: <Award className="h-4 w-4 text-blue-500" />, color: "bg-gradient-to-r from-blue-400 to-indigo-500 text-white" };
+    return {
+      title: "Hero",
+      emoji: "🦸",
+      description: "You paid directly for someone's need. You are a true Hero!",
+      icon: <Award className="h-4 w-4 text-blue-500" />,
+      color: "bg-gradient-to-r from-blue-400 to-indigo-500 text-white",
+    };
   }
   if (unlockCount > 0) {
-    return { title: "Young Hero", emoji: "⭐", description: "You unlocked a case. Complete a contribution or direct help to become a full Hero.", icon: <Sparkles className="h-4 w-4 text-green-500" />, color: "bg-gradient-to-r from-green-400 to-emerald-500 text-white" };
+    return {
+      title: "Young Hero",
+      emoji: "⭐",
+      description: "You unlocked a case. Complete a contribution or direct help to become a full Hero.",
+      icon: <Sparkles className="h-4 w-4 text-green-500" />,
+      color: "bg-gradient-to-r from-green-400 to-emerald-500 text-white",
+    };
   }
-  return { title: "Newborn Hero", emoji: "🆕", description: "Your Hero journey is ready to begin.", icon: <Sparkles className="h-4 w-4 text-purple-500" />, color: "bg-gradient-to-r from-purple-400 to-pink-500 text-white" };
+  return {
+    title: "Newborn Hero",
+    emoji: "🆕",
+    description: "Your Hero journey is ready to begin.",
+    icon: <Sparkles className="h-4 w-4 text-purple-500" />,
+    color: "bg-gradient-to-r from-purple-400 to-pink-500 text-white",
+  };
 }
 
 function getTrustLevel(rejected: number, approved: number, expired: number) {
@@ -105,12 +139,17 @@ function getCaseStatusStyle(status: string) {
   return "bg-muted text-muted-foreground border-border";
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export default function ProfilePage() {
   const { isAuthenticated, user, logout } = useAuth();
   const { role } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
 
+  // 🔥 CRITICAL FIX: Treat "me" as the logged-in user's ID
   const rawParam = location.pathname.match(/^\/profile\/([^/]+)/)?.[1];
   const profileUserId = (!rawParam || rawParam === "me") ? (user?.id || "") : rawParam;
 
@@ -134,35 +173,77 @@ export default function ProfilePage() {
   const [relationshipLoading, setRelationshipLoading] = useState(false);
 
   const [requesterStats, setRequesterStats] = useState<RequesterStats>({
-    totalSubmitted: 0, totalApproved: 0, totalRejected: 0, totalCompleted: 0, totalExpired: 0, totalHelpReceived: 0,
+    totalSubmitted: 0,
+    totalApproved: 0,
+    totalRejected: 0,
+    totalCompleted: 0,
+    totalExpired: 0,
+    totalHelpReceived: 0,
   });
   const [heroStats, setHeroStats] = useState<HeroStats>({
-    totalUnlocks: 0, directHelps: 0, contributions: 0, totalAmountHelped: 0, activeUnlocked: 0,
+    totalUnlocks: 0,
+    directHelps: 0,
+    contributions: 0,
+    totalAmountHelped: 0,
+    activeUnlocked: 0,
   });
   const [helpedCases, setHelpedCases] = useState<any[]>([]);
   const [trustLevel, setTrustLevel] = useState(100);
-  const [badge, setBadge] = useState<any>(null);
+  const [badge, setBadge] = useState<{ title: string; emoji: string; description: string; icon: JSX.Element; color: string } | null>(null);
 
   useEffect(() => {
-    setProfile(null); setProfileError(null); setKycData(null); setProfileLoading(true);
-    if (!profileUserId) { navigate({ to: "/sign-in" }); return; }
+    setProfile(null);
+    setProfileError(null);
+    setKycData(null);
+    setProfileLoading(true);
+    if (!profileUserId) {
+      navigate({ to: "/sign-in" });
+      return;
+    }
     loadData();
   }, [isAuthenticated, location.pathname, role, profileUserId]);
 
+  // 🔥 FIX #6: Use Promise.allSettled to prevent single failure from blocking everything
   async function loadData() {
-    setProfileLoading(true); setProfileError(null);
+    setProfileLoading(true);
+    setProfileError(null);
     try {
       const results = await Promise.allSettled([
-        getKycSubmission(profileUserId), getCasesByUser(profileUserId), getProfile(profileUserId, role),
-        getCaseResolutionsByHero(profileUserId), getCaseUnlocksByHero(profileUserId),
+        getKycSubmission(profileUserId),
+        getCasesByUser(profileUserId),
+        getProfile(profileUserId, role),
+        getCaseResolutionsByHero(profileUserId),
+        getCaseUnlocksByHero(profileUserId),
       ]);
 
       const [kycResult, caseResult, profResult, resolutionsResult, unlocksResult] = results;
+
       const kyc = kycResult.status === "fulfilled" ? kycResult.value : null;
       const caseList = caseResult.status === "fulfilled" ? caseResult.value : [];
       const prof = profResult.status === "fulfilled" ? profResult.value : null;
       const resolutions = resolutionsResult.status === "fulfilled" ? resolutionsResult.value : [];
       const unlocks = unlocksResult.status === "fulfilled" ? unlocksResult.value : [];
+
+      // Log any failures (but don't block the whole page)
+      if (kycResult.status === "rejected") {
+        console.warn("KYC submission fetch failed (may be permissions):", kycResult.reason);
+      }
+      if (profResult.status === "rejected") {
+        console.error("Profile fetch failed:", profResult.reason);
+        setProfileError("Could not load profile details. Please try again later.");
+        toast.error("Could not load profile details.");
+      } else {
+        setProfileError(null);
+      }
+      if (caseResult.status === "rejected") {
+        console.warn("Cases fetch failed:", caseResult.reason);
+      }
+      if (resolutionsResult.status === "rejected") {
+        console.warn("Resolutions fetch failed:", resolutionsResult.reason);
+      }
+      if (unlocksResult.status === "rejected") {
+        console.warn("Unlocks fetch failed:", unlocksResult.reason);
+      }
 
       setKycData(kyc);
       setProfile(prof);
@@ -174,12 +255,8 @@ export default function ProfilePage() {
       const list = Array.isArray(caseList) ? caseList : [];
       const resolutionList = Array.isArray(resolutions) ? resolutions : [];
       const unlockList = Array.isArray(unlocks) ? unlocks : [];
-
       const nextRequesterStats = computeRequesterStats(list);
       const nextHeroStats = computeHeroStats(unlockList, resolutionList);
-
-      // 🔥 FIXED: amount لازمی نظر آئے (خالی نہ رہے)
-      nextHeroStats.totalAmountHelped = Number(nextHeroStats.totalAmountHelped || 0);
 
       setCases(list);
       setRequesterStats(nextRequesterStats);
@@ -190,15 +267,68 @@ export default function ProfilePage() {
       setHelpedCases(validResolutions.slice(0, 5));
       setBadge(getBadge(nextHeroStats.totalUnlocks, nextHeroStats.contributions, nextHeroStats.directHelps));
     } catch (err) {
-      console.error(err);
+      // This outer catch should rarely be hit, but just in case
+      console.error("Unexpected error in loadData:", err);
       setProfileError("An unexpected error occurred while loading the profile.");
       toast.error("An unexpected error occurred while loading the profile.");
     } finally {
+      // 🔥 FIX #8: Ensure loading always stops
       setProfileLoading(false);
     }
   }
 
-  // toggleHero, openRelationshipList, removeRelationship, menuItems, initials — unchanged
+  async function toggleHero() {
+    if (!isAuthenticated || !user?.id) {
+      navigate({ to: "/sign-in" });
+      return;
+    }
+    if (isOwnProfile || heroUpdating) return;
+    setHeroUpdating(true);
+    try {
+      if (isMyHero) {
+        await unfollowUser(profileUserId);
+        setIsMyHero(false);
+        setHeroesCount((count) => Math.max(0, count - 1));
+        toast.success("Removed from My Heroes");
+      } else {
+        await followUser(profileUserId);
+        setIsMyHero(true);
+        setHeroesCount((count) => count + 1);
+        toast.success("Added to My Heroes");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update Hero status");
+    } finally {
+      setHeroUpdating(false);
+    }
+  }
+
+  async function openRelationshipList(type: "heroes" | "requesters") {
+    setRelationshipType(type);
+    setRelationshipLoading(true);
+    try {
+      setRelationshipUsers(await getFollowList(profileUserId, type));
+    } catch (error) {
+      console.error("Failed to load relationship list", error);
+      setRelationshipUsers([]);
+    } finally {
+      setRelationshipLoading(false);
+    }
+  }
+
+  async function removeRelationship(targetId: string) {
+    if (!isOwnProfile) return;
+    try {
+      if (relationshipType === "heroes") await unfollowUser(targetId);
+      if (relationshipType === "requesters") await removeRequester(targetId);
+      setRelationshipUsers((items) => items.filter((item) => String(item.user_id) !== String(targetId)));
+      if (relationshipType === "heroes") setFollowingCount((count) => Math.max(0, count - 1));
+      if (relationshipType === "requesters") setHeroesCount((count) => Math.max(0, count - 1));
+    } catch (error) {
+      console.error("Failed to remove relationship", error);
+    }
+  }
+
   const kycApproved = kycData?.status === "approved";
   const displayName = profile?.full_name || user?.fullName || "My Profile";
   const avatarUrl = profile?.avatar_url || null;
@@ -237,6 +367,7 @@ export default function ProfilePage() {
       .toUpperCase()
       .slice(0, 2) || "G";
 
+  // 🔥 FIX #8: Show page even if profile is null — just show an error message
   const profileReady = !profileLoading;
   const showProfileError = profileError || (!profile && !profileLoading);
 
@@ -254,6 +385,7 @@ export default function ProfilePage() {
     );
   }
 
+  // 🔥 FIX #8: If profile is null (failed to load), show error state
   if (!profile) {
     return (
       <Layout>
@@ -266,7 +398,9 @@ export default function ProfilePage() {
             <p className="mt-2 text-sm text-red-600 dark:text-red-400">
               {profileError || "We could not load this profile. Please try again later."}
             </p>
-            <Button className="mt-4" onClick={() => loadData()}>Retry</Button>
+            <Button className="mt-4" onClick={() => loadData()}>
+              Retry
+            </Button>
           </div>
         </div>
       </Layout>
@@ -276,66 +410,638 @@ export default function ProfilePage() {
   return (
     <Layout>
       <div className="max-w-xl mx-auto px-4 pt-0 pb-24 space-y-4">
-        {/* Header Card — unchanged */}
+        {/* ============================= Header Card ============================= */}
         <div className="rounded-b-3xl bg-card border border-border shadow-sm overflow-hidden">
-          {/* Cover, Avatar, Name + Badge, Edit button — unchanged */}
-          {/* Role-based Stats — FIXED: دو الگ گرڈز، صرف ایک دکھائیں */}
+          {/* Cover */}
+          <div className="h-32 relative bg-gradient-to-br from-primary via-primary/80 to-primary/40">
+            {coverUrl ? (
+              <img src={coverUrl} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute top-2 right-4 h-16 w-16 rounded-full bg-white/10 blur-xl" />
+                <div className="absolute bottom-0 left-8 h-12 w-12 rounded-full bg-white/10 blur-lg" />
+              </div>
+            )}
+
+            {isOwnProfile && (
+              <button
+                aria-label="Profile menu"
+                className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur-sm flex items-center justify-center hover:bg-black/35 transition-colors"
+                onClick={() => setShowMenu(true)}
+              >
+                <MoreHorizontal className="h-4 w-4 text-white" />
+              </button>
+            )}
+          </div>
+
+          <div className="px-5 pb-5">
+            {/* Avatar row — remains unchanged */}
+            <div className="flex items-end justify-between -mt-12 mb-3">
+              <div className="relative shrink-0">
+                <div className="h-24 w-24 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-white font-bold text-2xl">{initials}</span>
+                  )}
+                </div>
+                {isOwnProfile && (
+                  <button
+                    type="button"
+                    onClick={() => navigate({ to: "/edit-profile" })}
+                    title="Edit Profile"
+                    aria-label="Edit Profile"
+                    className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full border-2 border-card bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {!isOwnProfile && (
+                <Button
+                  type="button"
+                  onClick={toggleHero}
+                  disabled={heroUpdating}
+                  className={`rounded-full px-4 h-9 font-semibold shadow-sm shrink-0 ${
+                    isMyHero
+                      ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90"
+                  }`}
+                >
+                  <HeartHandshake className="h-4 w-4 mr-1.5" />
+                  {heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
+                </Button>
+              )}
+            </div>
+
+            {/* ================================================================
+                🔥 FIX #7: Name + Badge (first row) and Edit button (second row)
+                ================================================================ */}
+
+            {/* Name + Badge — اپنی مکمل قطار، آزادی سے wrap ہو سکتی ہے */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-foreground break-words">{displayName}</h1>
+              {badge && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
+                    {badge.icon}
+                    {badge.title}
+                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setBadgeInfoOpen(true)}
+                          className="text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs text-xs">{badge.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
+            </div>
+
+            {/* Edit بٹن — اپنی الگ قطار، ہمیشہ مکمل چوڑائی کے ساتھ نظر آئے گا */}
+            {isOwnProfile && (
+              <div className="flex justify-end mt-1.5">
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/edit-profile" })}
+                  title="Edit Profile"
+                  aria-label="Edit Profile"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary px-3 py-1.5 text..."
+                >
+                  Edit Profile
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ============================= Role-based Stats ============================= */}
           {role === "hero" ? (
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-                <div className="text-2xl font-bold text-foreground">{heroStats.totalAmountHelped > 0 ? `\[ {heroStats.totalAmountHelped.toFixed(2)}` : "—"}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><HandCoins className="h-3 w-3" /> Total Amount Helped</div>
+                <div className="text-2xl font-bold text-foreground">
+                  {heroStats.totalAmountHelped > 0 ? `\[ {heroStats.totalAmountHelped.toFixed(2)}` : "—"}
+                </div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HandCoins className="h-3 w-3" /> Total Spent
+                </div>
               </div>
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
                 <div className="text-2xl font-bold text-foreground">{heroStats.directHelps + heroStats.contributions}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><HeartHandshake className="h-3 w-3" /> Helped</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HeartHandshake className="h-3 w-3" /> Helped
+                </div>
               </div>
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
                 <div className="text-2xl font-bold text-foreground">{heroStats.directHelps}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><Building2 className="h-3 w-3" /> Direct Helps</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Building2 className="h-3 w-3" /> Direct Helps
+                </div>
               </div>
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
                 <div className="text-2xl font-bold text-foreground">{heroStats.contributions}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><HandCoins className="h-3 w-3" /> Contributions</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HandCoins className="h-3 w-3" /> Contributions
+                </div>
               </div>
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
                 <div className="text-2xl font-bold text-foreground">{heroStats.totalUnlocks}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><Unlock className="h-3 w-3" /> Total Unlocks</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Unlock className="h-3 w-3" /> Total Unlocks
+                </div>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
                 <div className="text-2xl font-bold text-foreground">{requesterStats.totalSubmitted}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><Briefcase className="h-3 w-3" /> Submitted</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Briefcase className="h-3 w-3" /> Submitted
+                </div>
               </div>
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
                 <div className="text-2xl font-bold text-foreground">{requesterStats.totalApproved}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-teal-600" /> Approved</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-teal-600" /> Approved
+                </div>
               </div>
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
                 <div className="text-2xl font-bold text-foreground">{requesterStats.totalCompleted}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed
+                </div>
               </div>
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
                 <div className="text-2xl font-bold text-foreground">{requesterStats.totalRejected}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><XCircle className="h-3 w-3 text-red-600" /> Rejected</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <XCircle className="h-3 w-3 text-red-600" /> Rejected
+                </div>
               </div>
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
                 <div className="text-2xl font-bold text-foreground">{requesterStats.totalExpired}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><Calendar className="h-3 w-3 text-amber-600" /> Expired</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Calendar className="h-3 w-3 text-amber-600" /> Expired
+                </div>
               </div>
               <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
-                <div className="text-2xl font-bold text-green-600">{requesterStats.totalHelpReceived > 0 ? ` \]{requesterStats.totalHelpReceived.toFixed(2)}` : "—"}</div>
-                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1"><HeartHandshake className="h-3 w-3" /> Total Help Received</div>
+                <div className="text-2xl font-bold text-green-600">
+                  {requesterStats.totalHelpReceived > 0 ? ` \]{requesterStats.totalHelpReceived.toFixed(2)}` : "—"}
+                </div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HeartHandshake className="h-3 w-3" /> Total Help Received
+                </div>
               </div>
             </div>
           )}
 
-          {/* Cases, Helped Cases, Posts, Menu, Dialogs — unchanged */}
+          {/* ============================= Cases List ============================= */}
+          {cases.length > 0 && (
+            <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold flex items-center gap-1.5">
+                  <Briefcase className="h-4 w-4 text-primary" /> Cases
+                </h2>
+                {isOwnProfile && (
+                  <button
+                    onClick={() => navigate({ to: "/my-cases" })}
+                    className="text-xs text-primary font-medium flex items-center hover:underline"
+                  >
+                    View all <ChevronRight className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                {cases.slice(0, 5).map((c: any) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-border p-3"
+                  >
+                    <span className="text-sm font-medium truncate">{c.title || `Case #${c.id}`}</span>
+                    <span
+                      className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border capitalize ${getCaseStatusStyle(c.status)}`}
+                    >
+                      {c.status || "pending"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ============================= Helped Cases (Hero view) ============================= */}
+          {role === "hero" && helpedCases.length > 0 && (
+            <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+              <h2 className="font-semibold flex items-center gap-1.5">
+                <HeartHandshake className="h-4 w-4 text-primary" /> Cases You Helped
+              </h2>
+              <div className="space-y-2">
+                {helpedCases.map((r: any) => (
+                  <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-border p-3">
+                    <span className="text-sm font-medium truncate">{r.case_title || `Case #${r.case_id ?? r.id}`}</span>
+                    <span className="shrink-0 text-xs font-semibold text-green-600">
+                      {r.seeker_confirmed_amount ?? r.amount_paid ? `$${Number(r.seeker_confirmed_amount ?? r.amount_paid).toFixed(2)}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ============================= Community Posts ============================= */}
+          {Array.isArray(profile?.posts) && profile.posts.length > 0 && (
+            <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold flex items-center gap-1.5">
+                  <MessageCircle className="h-4 w-4 text-primary" /> Community Posts
+                </h2>
+                <span className="text-xs text-muted-foreground">{profile.posts.length} posts</span>
+              </div>
+              {profile.posts.map((post: any) => (
+                <article key={post.id} className="rounded-xl border border-border p-3">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {post.is_pinned ? <Pin className="h-3 w-3 text-primary" /> : null}
+                    <span>{post.is_pinned ? "Pinned" : "Community post"}</span>
+                  </div>
+                  <p className="mt-2 text-sm whitespace-pre-wrap">{post.message}</p>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {/* Sandwich Menu Dialog */}
+          <Dialog open={showMenu} onOpenChange={setShowMenu}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Account Menu</DialogTitle>
+                <DialogDescription>Manage your profile and account settings.</DialogDescription>
+              </DialogHeader>
+              <div className="rounded-2xl border border-border overflow-hidden">
+                {menuItems.map((item, idx) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      setShowMenu(false);
+                      navigate({ to: item.to as "/" });
+                    }}
+                    className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors ${
+                      idx < menuItems.length - 1 ? "border-b border-border" : ""
+                    }`}
+                  >
+                    <span className="text-primary">{item.icon}</span>
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Logout Button */}
+          {isOwnProfile && (
+            <button
+              type="button"
+              onClick={() => setShowLogout(true)}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/20 font-medium text-sm transition-colors"
+            >
+              <LogOut className="h-4 w-4" /> Logout
+            </button>
+          )}
+
+          <p className="text-center text-xs text-muted-foreground pb-2">Givethra v2.0 · Built with ❤️</p>
         </div>
+
+        {/* Logout Dialog */}
+        <Dialog open={showLogout} onOpenChange={setShowLogout}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <LogOut className="h-5 w-5 text-red-500" /> Logout
+              </DialogTitle>
+              <DialogDescription>Are you sure you want to logout?</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowLogout(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => {
+                  logout();
+                  setShowLogout(false);
+                  navigate({ to: "/" });
+                }}
+              >
+                <LogOut className="h-4 w-4 mr-1.5" /> Logout
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Badge Info Dialog */}
+        <Dialog open={badgeInfoOpen} onOpenChange={setBadgeInfoOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Info className="h-5 w-5 text-primary" /> Hero Badges
+              </DialogTitle>
+              <DialogDescription>Understand what each badge means and how you earn them.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+                <div className="mt-0.5 text-xl">🆕</div>
+                <div>
+                  <p className="font-semibold text-sm">Newborn Hero</p>
+                  <p className="text-xs text-muted-foreground">You unlocked a case but did not complete a payment. Take the next step!</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+                <div className="mt-0.5 text-xl">⭐</div>
+                <div>
+                  <p className="font-semibold text-sm">Young Hero</p>
+                  <p className="text-xs text-muted-foreground">You contributed to a fundraising pool. Every contribution counts!</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+                <div className="mt-0.5 text-xl">🦸</div>
+                <div>
+                  <p className="font-semibold text-sm">Hero</p>
+                  <p className="text-xs text-muted-foreground">You paid directly for someone's need. You are a true Hero!</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+                <div className="mt-0.5 text-xl">🌟</div>
+                <div>
+                  <p className="font-semibold text-sm">Super Hero</p>
+                  <p className="text-xs text-muted-foreground">You have unlocked, contributed, and provided direct help. The ultimate Hero!</p>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setBadgeInfoOpen(false)}>Got it</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Credits Info Dialog */}
+        <Dialog open={creditsInfoOpen} onOpenChange={setCreditsInfoOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Coins className="h-5 w-5 text-amber-600" /> How Credits Work
+              </DialogTitle>
+              <DialogDescription>Turn community Supports into real perks.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2 text-sm text-muted-foreground">
+              <p>
+                Every <span className="font-semibold text-foreground">{SUPPORTS_PER_CREDIT} Supports</span> your posts and
+                cases receive from the community earn you{" "}
+                <span className="font-semibold text-foreground">1 Credit</span>.
+              </p>
+              <p>
+                Collect <span className="font-semibold text-foreground">{CREDITS_PER_REWARD} Credits</span> to unlock a
+                reward — submit a new case, unlock a case, or clear an account suspension.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setCreditsInfoOpen(false)}>Got it</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Relationship List Dialog */}
+        <Dialog open={relationshipType !== null} onOpenChange={(open) => !open && setRelationshipType(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{relationshipType === "heroes" ? "Your Heroes" : "Your Requesters"}</DialogTitle>
+              <DialogDescription>
+                {relationshipType === "heroes" ? "People you have chosen as Heroes." : "People who have chosen you as their Hero."}
+                {!relationshipLoading && relationshipUsers.length > 0 && (
+                  <span className="block mt-0.5 text-xs font-medium text-foreground">{relationshipUsers.length} total</span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[55vh] overflow-y-auto space-y-2 pr-1">
+              {relationshipLoading ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
+              ) : relationshipUsers.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">No {relationshipType} yet.</p>
+              ) : (
+                relationshipUsers.map((item, idx) => {
+                  const userId = item.user_id ?? item.id ?? item.hero_id ?? item.requester_id ?? "";
+                  const name = item.full_name ?? item.name ?? item.user_name ?? "Givethra User";
+                  const initials2 = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
+                  return (
+                    <div key={String(userId || idx)} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                      <button
+                        onClick={() => {
+                          setRelationshipType(null);
+                          if (userId) navigate({ to: "/profile/$id", params: { id: String(userId) } });
+                        }}
+                        className="h-10 w-10 rounded-full overflow-hidden bg-primary text-white flex items-center justify-center font-semibold shrink-0"
+                      >
+                        {item.avatar_url ? (
+                          <img src={item.avatar_url} alt={name} className="h-full w-full object-cover" />
+                        ) : (
+                          initials2
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRelationshipType(null);
+                          if (userId) navigate({ to: "/profile/$id", params: { id: String(userId) } });
+                        }}
+                        className="flex-1 text-left min-w-0"
+                      >
+                        <span className="font-medium truncate block">
+                          {name}
+                          {item.is_verified ? <span className="ml-1 text-teal-600">✓</span> : null}
+                        </span>
+                      </button>
+                      {isOwnProfile && (
+                        <Button variant="outline" size="sm" onClick={() => removeRelationship(String(userId))}>
+                          {relationshipType === "heroes" ? "Unhero" : "Remove"}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-      {/* Dialogs — unchanged */}
+
+      {/* Logout Dialog */}
+      <Dialog open={showLogout} onOpenChange={setShowLogout}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LogOut className="h-5 w-5 text-red-500" /> Logout
+            </DialogTitle>
+            <DialogDescription>Are you sure you want to logout?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setShowLogout(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={() => {
+                logout();
+                setShowLogout(false);
+                navigate({ to: "/" });
+              }}
+            >
+              <LogOut className="h-4 w-4 mr-1.5" /> Logout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Badge Info Dialog */}
+      <Dialog open={badgeInfoOpen} onOpenChange={setBadgeInfoOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" /> Hero Badges
+            </DialogTitle>
+            <DialogDescription>Understand what each badge means and how you earn them.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+              <div className="mt-0.5 text-xl">🆕</div>
+              <div>
+                <p className="font-semibold text-sm">Newborn Hero</p>
+                <p className="text-xs text-muted-foreground">You unlocked a case but did not complete a payment. Take the next step!</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+              <div className="mt-0.5 text-xl">⭐</div>
+              <div>
+                <p className="font-semibold text-sm">Young Hero</p>
+                <p className="text-xs text-muted-foreground">You contributed to a fundraising pool. Every contribution counts!</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+              <div className="mt-0.5 text-xl">🦸</div>
+              <div>
+                <p className="font-semibold text-sm">Hero</p>
+                <p className="text-xs text-muted-foreground">You paid directly for someone's need. You are a true Hero!</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
+              <div className="mt-0.5 text-xl">🌟</div>
+              <div>
+                <p className="font-semibold text-sm">Super Hero</p>
+                <p className="text-xs text-muted-foreground">You have unlocked, contributed, and provided direct help. The ultimate Hero!</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setBadgeInfoOpen(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credits Info Dialog */}
+      <Dialog open={creditsInfoOpen} onOpenChange={setCreditsInfoOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-amber-600" /> How Credits Work
+            </DialogTitle>
+            <DialogDescription>Turn community Supports into real perks.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-sm text-muted-foreground">
+            <p>
+              Every <span className="font-semibold text-foreground">{SUPPORTS_PER_CREDIT} Supports</span> your posts and
+              cases receive from the community earn you{" "}
+              <span className="font-semibold text-foreground">1 Credit</span>.
+            </p>
+            <p>
+              Collect <span className="font-semibold text-foreground">{CREDITS_PER_REWARD} Credits</span> to unlock a
+              reward — submit a new case, unlock a case, or clear an account suspension.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setCreditsInfoOpen(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Relationship List Dialog */}
+      <Dialog open={relationshipType !== null} onOpenChange={(open) => !open && setRelationshipType(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{relationshipType === "heroes" ? "Your Heroes" : "Your Requesters"}</DialogTitle>
+            <DialogDescription>
+              {relationshipType === "heroes" ? "People you have chosen as Heroes." : "People who have chosen you as their Hero."}
+              {!relationshipLoading && relationshipUsers.length > 0 && (
+                <span className="block mt-0.5 text-xs font-medium text-foreground">{relationshipUsers.length} total</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[55vh] overflow-y-auto space-y-2 pr-1">
+            {relationshipLoading ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
+            ) : relationshipUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">No {relationshipType} yet.</p>
+            ) : (
+              relationshipUsers.map((item, idx) => {
+                const userId = item.user_id ?? item.id ?? item.hero_id ?? item.requester_id ?? "";
+                const name = item.full_name ?? item.name ?? item.user_name ?? "Givethra User";
+                const initials2 = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
+                return (
+                  <div key={String(userId || idx)} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                    <button
+                      onClick={() => {
+                        setRelationshipType(null);
+                        if (userId) navigate({ to: "/profile/$id", params: { id: String(userId) } });
+                      }}
+                      className="h-10 w-10 rounded-full overflow-hidden bg-primary text-white flex items-center justify-center font-semibold shrink-0"
+                    >
+                      {item.avatar_url ? (
+                        <img src={item.avatar_url} alt={name} className="h-full w-full object-cover" />
+                      ) : (
+                        initials2
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRelationshipType(null);
+                        if (userId) navigate({ to: "/profile/$id", params: { id: String(userId) } });
+                      }}
+                      className="flex-1 text-left min-w-0"
+                    >
+                      <span className="font-medium truncate block">
+                        {name}
+                        {item.is_verified ? <span className="ml-1 text-teal-600">✓</span> : null}
+                      </span>
+                    </button>
+                    {isOwnProfile && (
+                      <Button variant="outline" size="sm" onClick={() => removeRelationship(String(userId))}>
+                        {relationshipType === "heroes" ? "Unhero" : "Remove"}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
