@@ -1,15 +1,16 @@
+// src/frontend/src/pages/AffidavitPage.tsx
+// 🔥 FIXED: Full shared Affidavit system with role parameter, always shows Payment Proof + Affidavit
+
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCaseById, getCaseResolutions } from "@/lib/api";
-// 🔥 FIX #2: Import shared helpers
 import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-// 🔥 FIX #5: Better maskName: if only one name, show it; else first + last initial
 function maskName(value: unknown): string {
   const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "Protected participant";
@@ -52,11 +53,9 @@ export default function AffidavitPage() {
       setLoading(false);
       return () => { active = false; };
     }
-    // 🔥 FIX #1: Do NOT pass heroId — use the OR-clause in worker
     Promise.all([getCaseById(caseId), getCaseResolutions(caseId)])
       .then(([nextCase, resolutions]) => {
         if (!active) return;
-        // 🔥 FIX #3: Filter all truly completed resolutions, then pick the one with receipt first
         const completedList = (Array.isArray(resolutions) ? resolutions : []).filter(isTrulyCompletedHelp);
         const verified = completedList.find((r) => r.receipt_url) || completedList[0] || null;
         setCaseData(nextCase);
@@ -80,6 +79,8 @@ export default function AffidavitPage() {
   const amount = data.seeker_confirmed_amount ?? data.amount_paid ?? data.amount ?? caseData?.amount_collected ?? caseData?.amount_needed ?? "Not recorded";
   const verificationCode = String(data.verification_security_code || data.security_code || data.id || caseId).slice(-16).toUpperCase();
   const receiptUrl = data.receipt_url || data.paid_receipt_url || caseData?.paid_receipt_url || "";
+  const isContribution = isContributionResolution(data);
+  const role = isContribution ? "Hero" : "Requester";
 
   return (
     <Layout>
@@ -101,7 +102,7 @@ export default function AffidavitPage() {
             <header className="border-b border-border pb-6 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground"><FileText className="h-6 w-6" /></div>
               <p className="mt-4 text-xs font-bold uppercase tracking-[0.22em] text-primary">Givethra</p>
-              <h1 className="mt-2 text-2xl font-bold tracking-tight">DIGITALLY VERIFIED AFFIDAVIT</h1>
+              <h1 className="mt-2 text-2xl font-bold tracking-tight">DIGITALLY VERIFIED AFFIDAVIT — {role}</h1>
               <p className="mt-2 text-sm text-muted-foreground">Official record of completed assistance</p>
             </header>
 
