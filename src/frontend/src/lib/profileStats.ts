@@ -1,17 +1,30 @@
 // src/frontend/src/lib/profileStats.ts
 // Shared stat-computation helpers for ProfilePage (Hero view + Requester view).
 //
+// Verified against:
+//   - lib/api.ts        → getCasesByUser, getCaseUnlocksByHero, getCaseResolutionsByHero
+//   - lib/resolutionStatus.ts → isTrulyCompletedHelp, isContributionResolution
+//
 // 🔥 FIXED (this pass):
 // 1. totalUnlocks / activeUnlocked now only count real "help" unlocks
 //    (payment_type "full" or "partial"). A "media" unlock (paying 1 credit
-//    just to view the verification selfie/video) is not a help-unlock and
-//    was inflating the Hero's "Total Unlocks" counter before this fix.
+//    just to view the verification selfie/video, via getCaseUnlock's
+//    payment_type param in api.ts) is not a help-unlock and was inflating
+//    the Hero's "Total Unlocks" counter before this fix.
+//
 // 2. totalHelpReceived (Requester stat) now falls back to the case's
 //    amount_needed when amount_collected is missing/zero. Direct-payment
 //    cases (one Hero pays the full bill at once) don't always update
 //    amount_collected on the case row the way fundraising contributions do,
 //    so relying on amount_collected alone under-reported (often to $0) the
 //    money a requester actually received once their case was completed.
+//
+// 3. totalApproved now also counts cases whose status is "published" or
+//    "active", not just literally "approved". getCasesByUser returns the
+//    raw case row from the backend, and MyCasesPage.tsx already treats
+//    "approved" and "published" as the same bucket for a requester's own
+//    dashboard — this keeps ProfilePage's count consistent with that page
+//    instead of silently under-counting approved-but-not-yet-completed cases.
 
 import { isContributionResolution, isTrulyCompletedHelp } from "./resolutionStatus";
 
@@ -32,12 +45,21 @@ export interface RequesterStats {
   totalHelpReceived: number;
 }
 
-// Unlock rows can have payment_type "full", "partial", or "media".
-// Only "full" and "partial" represent a Hero actually stepping up to help —
-// "media" is just a paid peek at the verification selfie/video.
+// Unlock rows can have payment_type "full", "partial", or "media"
+// (see getCaseUnlock / insertCaseUnlock in lib/api.ts). Only "full" and
+// "partial" represent a Hero actually stepping up to help — "media" is
+// just a paid peek at the verification selfie/video.
 function isHelpUnlock(unlock: any): boolean {
   const type = String(unlock?.payment_type || "").toLowerCase();
   return type === "full" || type === "partial";
+}
+
+// Cases can sit in an "approved" state under more than one literal string
+// depending on where in the pipeline they are (see MyCasesPage.tsx and
+// CaseDetailPage.tsx's isPublishedCase check) — treat all of them as
+// "approved" for the requester's stat card.
+function isApprovedCaseStatus(status: string): boolean {
+  return status === "approved" || status === "published" || status === "active";
 }
 
 export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): HeroStats {
@@ -86,7 +108,7 @@ export function computeRequesterStats(cases: any[] = []): RequesterStats {
 
   return {
     totalSubmitted: safeCases.length,
-    totalApproved: safeCases.filter((item) => norm(item) === "approved").length,
+    totalApproved: safeCases.filter((item) => isApprovedCaseStatus(norm(item))).length,
     totalRejected: safeCases.filter((item) => norm(item) === "rejected").length,
     totalCompleted: completedCases.length,
     totalExpired: safeCases.filter((item) => norm(item) === "expired").length,
