@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 
 export default function HomeRepairForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields, catDocUrls } = formData;
+  const { catFields = {}, catDocUrls = {} } = formData;
 
   const setField = (key: string, value: any) => {
     setFormData((prev: any) => ({
@@ -23,15 +23,15 @@ export default function HomeRepairForm({ formData, setFormData, onNext, onBack, 
   const repairOptions = ["Plumbing", "Electrical", "Roofing", "Flooring", "Painting", "Other"];
 
   const isValid =
-    catFields.property_type &&
-    catFields.repair_type &&
-    catFields.contractor_name?.trim() &&
-    catFields.contractor_contact?.trim() &&
-    catFields.contractor_bank?.trim() &&
-    catFields.contractor_account?.trim() &&
-    catFields.repair_amount &&
-    catFields.repair_address?.trim() &&
-    catDocUrls.repair_estimate;
+    !!catFields.property_type &&
+    !!catFields.repair_type &&
+    !!catFields.contractor_name?.trim() &&
+    !!catFields.contractor_contact?.trim() &&
+    !!catFields.contractor_bank?.trim() &&
+    !!catFields.contractor_account?.trim() &&
+    !!catFields.repair_amount &&
+    !!catFields.repair_address?.trim() &&
+    !!catDocUrls.repair_estimate;
 
   return (
     <BaseCategoryForm
@@ -44,6 +44,7 @@ export default function HomeRepairForm({ formData, setFormData, onNext, onBack, 
       title="🔧 Home Repair"
       subtitle="Provide home repair details."
       guide="💰 Max Rs 18,000. Provide contractor details and repair estimate."
+      disabled={!isValid}
     >
       <div className="space-y-3">
         <div className="space-y-2">
@@ -55,7 +56,9 @@ export default function HomeRepairForm({ formData, setFormData, onNext, onBack, 
                 type="button"
                 onClick={() => setField("property_type", opt)}
                 className={`px-3 py-2.5 rounded-lg border text-sm font-medium ${
-                  catFields.property_type === opt ? "bg-primary text-white border-primary" : "border-border"
+                  catFields.property_type === opt
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                 }`}
               >
                 {opt}
@@ -73,7 +76,9 @@ export default function HomeRepairForm({ formData, setFormData, onNext, onBack, 
                 type="button"
                 onClick={() => setField("repair_type", opt)}
                 className={`px-2 py-2 rounded-lg border text-xs font-medium ${
-                  catFields.repair_type === opt ? "bg-primary text-white border-primary" : "border-border"
+                  catFields.repair_type === opt
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                 }`}
               >
                 {opt}
@@ -85,35 +90,35 @@ export default function HomeRepairForm({ formData, setFormData, onNext, onBack, 
         <TextInput
           field="Contractor Name"
           value={catFields.contractor_name}
-          onChange={(v) => setField("contractor_name", v)}
+          onChange={(v: string) => setField("contractor_name", v)}
           placeholder="Full name of contractor"
         />
 
         <TextInput
           field="Contractor Contact Number"
           value={catFields.contractor_contact}
-          onChange={(v) => setField("contractor_contact", v)}
+          onChange={(v: string) => setField("contractor_contact", v)}
           placeholder="Phone number for verification"
         />
 
         <TextInput
           field="Contractor Bank Name"
           value={catFields.contractor_bank}
-          onChange={(v) => setField("contractor_bank", v)}
+          onChange={(v: string) => setField("contractor_bank", v)}
           placeholder="Bank name"
         />
 
         <TextInput
           field="Contractor Account Number"
           value={catFields.contractor_account}
-          onChange={(v) => setField("contractor_account", v)}
+          onChange={(v: string) => setField("contractor_account", v)}
           placeholder="Account number"
         />
 
         <TextInput
           field="Repair Cost"
           value={catFields.repair_amount}
-          onChange={(v) => setField("repair_amount", v)}
+          onChange={(v: string) => setField("repair_amount", v)}
           placeholder="e.g. 12000"
           type="number"
         />
@@ -121,7 +126,7 @@ export default function HomeRepairForm({ formData, setFormData, onNext, onBack, 
         <TextInput
           field="Property Address"
           value={catFields.repair_address}
-          onChange={(v) => setField("repair_address", v)}
+          onChange={(v: string) => setField("repair_address", v)}
           placeholder="Complete address of the property"
         />
 
@@ -130,7 +135,7 @@ export default function HomeRepairForm({ formData, setFormData, onNext, onBack, 
           key="repair_estimate"
           required
           hint="Clear photo of the repair estimate or quotation"
-          onUpload={(url) => setDoc("repair_estimate", url)}
+          onUpload={(url: string) => setDoc("repair_estimate", url)}
           value={catDocUrls.repair_estimate}
         />
 
@@ -139,7 +144,7 @@ export default function HomeRepairForm({ formData, setFormData, onNext, onBack, 
           key="contractor_agreement"
           required={false}
           hint="If you have a contractor, attach the agreement (optional)"
-          onUpload={(url) => setDoc("contractor_agreement", url)}
+          onUpload={(url: string) => setDoc("contractor_agreement", url)}
           value={catDocUrls.contractor_agreement}
         />
       </div>
