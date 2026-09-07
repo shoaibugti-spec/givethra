@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 
 export default function FoodGroceriesForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields, catDocUrls } = formData;
+  const { catFields = {}, catDocUrls = {} } = formData;
 
   const setField = (key: string, value: any) => {
     setFormData((prev: any) => ({
@@ -20,13 +20,14 @@ export default function FoodGroceriesForm({ formData, setFormData, onNext, onBac
   };
 
   const isValid =
-    catFields.family_members &&
-    catFields.shop_name?.trim() &&
-    catFields.shop_contact?.trim() &&
-    catFields.shop_address?.trim() &&
-    catFields.groceries_amount &&
-    catFields.groceries_due_date &&
-    catDocUrls.groceries_estimate;
+    !!catFields.family_members &&
+    !!catFields.shop_name?.trim() &&
+    !!catFields.shop_contact?.trim() &&
+    !!catFields.shop_address?.trim() &&
+    !!catFields.groceries_amount &&
+    !!catFields.groceries_due_date &&
+    !!catDocUrls.groceries_estimate &&
+    !!catDocUrls.shop_proof;
 
   return (
     <BaseCategoryForm
@@ -39,12 +40,13 @@ export default function FoodGroceriesForm({ formData, setFormData, onNext, onBac
       title="🍲 Food & Groceries"
       subtitle="Provide grocery details for your family."
       guide="💰 Max Rs 12,000 per family. Provide shop details for verification."
+      disabled={!isValid}
     >
       <div className="space-y-3">
         <TextInput
           field="Number of Family Members"
           value={catFields.family_members}
-          onChange={(v) => setField("family_members", v)}
+          onChange={(v: string) => setField("family_members", v)}
           placeholder="e.g. 5"
           type="number"
         />
@@ -52,28 +54,28 @@ export default function FoodGroceriesForm({ formData, setFormData, onNext, onBac
         <TextInput
           field="Shop Name"
           value={catFields.shop_name}
-          onChange={(v) => setField("shop_name", v)}
+          onChange={(v: string) => setField("shop_name", v)}
           placeholder="Full shop name"
         />
 
         <TextInput
           field="Shop Contact Number"
           value={catFields.shop_contact}
-          onChange={(v) => setField("shop_contact", v)}
+          onChange={(v: string) => setField("shop_contact", v)}
           placeholder="Phone number for verification"
         />
 
         <TextInput
           field="Shop Address"
           value={catFields.shop_address}
-          onChange={(v) => setField("shop_address", v)}
+          onChange={(v: string) => setField("shop_address", v)}
           placeholder="Complete address of the shop"
         />
 
         <TextInput
           field="Estimated Groceries Amount"
           value={catFields.groceries_amount}
-          onChange={(v) => setField("groceries_amount", v)}
+          onChange={(v: string) => setField("groceries_amount", v)}
           placeholder="e.g. 8000"
           type="number"
         />
@@ -93,7 +95,7 @@ export default function FoodGroceriesForm({ formData, setFormData, onNext, onBac
           key="groceries_estimate"
           required
           hint="Clear photo of the grocery list or estimate from the shop"
-          onUpload={(url) => setDoc("groceries_estimate", url)}
+          onUpload={(url: string) => setDoc("groceries_estimate", url)}
           value={catDocUrls.groceries_estimate}
         />
 
@@ -102,7 +104,7 @@ export default function FoodGroceriesForm({ formData, setFormData, onNext, onBac
           key="shop_proof"
           required
           hint="Any proof of the shop (receipt, business card, etc.)"
-          onUpload={(url) => setDoc("shop_proof", url)}
+          onUpload={(url: string) => setDoc("shop_proof", url)}
           value={catDocUrls.shop_proof}
         />
       </div>
