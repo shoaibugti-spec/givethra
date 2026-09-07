@@ -1,7 +1,12 @@
 // src/frontend/src/pages/submit-request/utils/validation.ts
-import { isEasyCat, PROPERTY_RELEVANT_CATS, isDebtCategory, getMaxLimit } from "../constants";
+import {
+  PROPERTY_RELEVANT_CATS,
+  isDebtCategory,
+  getMaxLimit,
+  PAYMENT_RECEIVER_CATS,
+} from "../constants";
 
-const MIN_WHY_HELP_WORDS = 500;
+const MIN_WHY_HELP_WORDS = 200;
 
 function countWords(text: string): number {
   const t = (text || "").trim();
@@ -9,9 +14,36 @@ function countWords(text: string): number {
   return t.split(/\s+/).filter(Boolean).length;
 }
 
+function getGenderDocKeys(
+  gender: string,
+  maritalStatus: string,
+  isOrphan: string
+): string[] {
+  const keys: string[] = [];
+  if (gender === "Male") {
+    if (maritalStatus === "Single") keys.push("frc");
+    if (maritalStatus === "Married") keys.push("nikah_nama", "frc");
+    if (maritalStatus === "Widow") keys.push("wife_death_cert", "nikah_nama", "frc");
+    if (maritalStatus === "Divorced") keys.push("divorce_cert", "nikah_nama", "frc");
+  }
+  if (gender === "Female") {
+    if (maritalStatus === "Single") keys.push("frc");
+    if (maritalStatus === "Married") keys.push("nikah_nama", "frc");
+    if (maritalStatus === "Widow") keys.push("husband_death_cert", "nikah_nama", "frc");
+    if (maritalStatus === "Divorced") keys.push("divorce_cert", "nikah_nama", "frc");
+    if (isOrphan === "Yes") keys.push("orphan_proof");
+  }
+  if (gender === "Child") {
+    keys.push("b_form", "frc");
+    if (isOrphan === "Yes") keys.push("orphan_proof");
+  }
+  return keys;
+}
+
 export function validateStep(stepId: string, formData: any): string | null {
   const f = formData.catFields || {};
   const d = formData.catDocUrls || {};
+  const gd = formData.genderDocUrls || {};
   const cat = formData.category;
 
   switch (stepId) {
@@ -32,15 +64,37 @@ export function validateStep(stepId: string, formData: any): string | null {
     case "maritalStatus":
       return !formData.maritalStatus ? "Please select marital status" : null;
     case "orphan":
-      if (formData.gender === "Female" && !formData.isOrphan) {
+      if (
+        (formData.gender === "Female" || formData.gender === "Child") &&
+        !formData.isOrphan
+      ) {
         return "Please select if you are an orphan";
       }
       return null;
     case "orphanParent":
-      if (formData.gender === "Female" && formData.isOrphan === "Yes" && !formData.orphanParent) {
+      if (
+        (formData.gender === "Female" || formData.gender === "Child") &&
+        formData.isOrphan === "Yes" &&
+        !formData.orphanParent
+      ) {
         return "Please select which parent passed away";
       }
       return null;
+
+    case "genderDocuments": {
+      const keys = getGenderDocKeys(
+        formData.gender || "",
+        formData.maritalStatus || "",
+        formData.isOrphan || ""
+      );
+      for (const key of keys) {
+        if (!gd[key]) {
+          return "Please upload all required identity documents";
+        }
+      }
+      return null;
+    }
+
     case "seekerName":
       return !formData.seekerName?.trim() ? "Please enter your full name" : null;
     case "seekerContact":
@@ -138,7 +192,6 @@ export function validateStep(stepId: string, formData: any): string | null {
         if (!d.livestock_quotation) return "Please upload quotation";
         if (!d.livestock_proof) return "Please upload proof";
       }
-      // School / Education / Medical / Medicines — forms already gate with isValid
       return null;
     }
 
@@ -160,15 +213,28 @@ export function validateStep(stepId: string, formData: any): string | null {
       }
       return null;
 
-    case "whyHelp": {
-      // ✅ description OR whyHelp (field-mapping safety)
-      const raw = String(formData.description || formData.whyHelp || "").trim();
-      if (!raw) {
-        return "Please explain your situation in detail";
+    case "paymentReceiver": {
+      if (!PAYMENT_RECEIVER_CATS.has(cat)) return null;
+      if (!formData.receiverName?.trim()) return "Please enter the payment receiver name";
+      if (!formData.receiverContact?.trim()) return "Please enter the payment receiver contact";
+      if (!formData.receiverBank?.trim()) return "Please enter the bank name";
+      if (!formData.receiverAccount?.trim()) return "Please enter the account number";
+      if (!formData.receiverAddress?.trim()) return "Please enter the address";
+      if (
+        ["Food & Groceries", "Medicines", "Home Repair"].includes(cat) &&
+        !formData.receiverShopName?.trim()
+      ) {
+        return "Please enter the shop name";
       }
+      return null;
+    }
+
+    case "whyHelp": {
+      const raw = String(formData.description || formData.whyHelp || "").trim();
+      if (!raw) return "Please explain your situation in detail";
       const words = countWords(raw);
       if (words < MIN_WHY_HELP_WORDS) {
-        return `Please write at least ${MIN_WHY_HELP_WORDS} words (currently ${words}). Explain your problem fully.`;
+        return `Please write at least ${MIN_WHY_HELP_WORDS} words (currently ${words}).`;
       }
       return null;
     }
