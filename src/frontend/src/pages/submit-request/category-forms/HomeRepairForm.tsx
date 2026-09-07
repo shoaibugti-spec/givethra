@@ -1,153 +1,131 @@
 // src/frontend/src/pages/submit-request/category-forms/HomeRepairForm.tsx
+import { useMemo } from "react";
 import { Label } from "@/components/ui/label";
-import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BaseCategoryForm } from "./BaseCategoryForm";
+import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function HomeRepairForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields = {}, catDocUrls = {} } = formData;
+const PROPERTY_TYPES = ["House", "Room", "Shop", "Other"];
+const REPAIR_TYPES = ["Roof", "Wall", "Plumbing", "Electrical", "Other"];
 
-  const setField = (key: string, value: any) => {
+export default function HomeRepairForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const catFields = formData.catFields || {};
+  const catDocUrls = formData.catDocUrls || {};
+
+  const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catFields: { ...prev.catFields, [key]: value },
+      catFields: { ...(prev.catFields || {}), [key]: value },
     }));
   };
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
+      catDocUrls: { ...(prev.catDocUrls || {}), [key]: url },
     }));
   };
 
-  const propertyOptions = ["Owned", "Rented"];
-  const repairOptions = ["Plumbing", "Electrical", "Roofing", "Flooring", "Painting", "Other"];
-
-  const isValid =
-    !!catFields.property_type &&
-    !!catFields.repair_type &&
-    !!catFields.contractor_name?.trim() &&
-    !!catFields.contractor_contact?.trim() &&
-    !!catFields.contractor_bank?.trim() &&
-    !!catFields.contractor_account?.trim() &&
-    !!catFields.repair_amount &&
-    !!catFields.repair_address?.trim() &&
-    !!catDocUrls.repair_estimate;
+  const isValid = useMemo(() => {
+    return (
+      !!catFields.property_type &&
+      !!catFields.repair_type &&
+      !!catFields.repair_amount &&
+      !!catDocUrls.repair_estimate
+    );
+  }, [catFields, catDocUrls]);
 
   return (
     <BaseCategoryForm
-      formData={formData}
-      setFormData={setFormData}
+      title="Home Repair"
+      subtitle="Max Rs 18,000 · verified repair need"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
       isLast={isLast}
-      title="🔧 Home Repair"
-      subtitle="Provide home repair details."
-      guide="💰 Max Rs 18,000. Provide contractor details and repair estimate."
       disabled={!isValid}
     >
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <Label>Property Type *</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {propertyOptions.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setField("property_type", opt)}
-                className={`px-3 py-2.5 rounded-lg border text-sm font-medium ${
-                  catFields.property_type === opt
-                    ? "bg-primary text-white border-primary"
-                    : "border-border"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <Label>Property type *</Label>
+          <Select
+            value={catFields.property_type || ""}
+            onValueChange={(v) => setField("property_type", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select property type" />
+            </SelectTrigger>
+            <SelectContent>
+              {PROPERTY_TYPES.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label>Repair Type *</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {repairOptions.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setField("repair_type", opt)}
-                className={`px-2 py-2 rounded-lg border text-xs font-medium ${
-                  catFields.repair_type === opt
-                    ? "bg-primary text-white border-primary"
-                    : "border-border"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
+        <div className="space-y-1">
+          <Label>Repair type *</Label>
+          <Select
+            value={catFields.repair_type || ""}
+            onValueChange={(v) => setField("repair_type", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select repair type" />
+            </SelectTrigger>
+            <SelectContent>
+              {REPAIR_TYPES.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <TextInput
-          field="Contractor Name"
-          value={catFields.contractor_name}
-          onChange={(v: string) => setField("contractor_name", v)}
-          placeholder="Full name of contractor"
-        />
+        <div className="space-y-1">
+          <Label>Repair amount *</Label>
+          <Input
+            type="number"
+            value={catFields.repair_amount || ""}
+            onChange={(e) => setField("repair_amount", e.target.value)}
+            placeholder="Max Rs 18,000"
+          />
+        </div>
 
-        <TextInput
-          field="Contractor Contact Number"
-          value={catFields.contractor_contact}
-          onChange={(v: string) => setField("contractor_contact", v)}
-          placeholder="Phone number for verification"
-        />
-
-        <TextInput
-          field="Contractor Bank Name"
-          value={catFields.contractor_bank}
-          onChange={(v: string) => setField("contractor_bank", v)}
-          placeholder="Bank name"
-        />
-
-        <TextInput
-          field="Contractor Account Number"
-          value={catFields.contractor_account}
-          onChange={(v: string) => setField("contractor_account", v)}
-          placeholder="Account number"
-        />
-
-        <TextInput
-          field="Repair Cost"
-          value={catFields.repair_amount}
-          onChange={(v: string) => setField("repair_amount", v)}
-          placeholder="e.g. 12000"
-          type="number"
-        />
-
-        <TextInput
-          field="Property Address"
-          value={catFields.repair_address}
-          onChange={(v: string) => setField("repair_address", v)}
-          placeholder="Complete address of the property"
-        />
-
-        <FileUpload
-          label="Repair Estimate / Quotation"
-          key="repair_estimate"
+        <DocBox
+          label="Repair estimate"
           required
-          hint="Clear photo of the repair estimate or quotation"
-          onUpload={(url: string) => setDoc("repair_estimate", url)}
+          hint="Clear estimate from contractor or material shop"
+          onUpload={(url) => setDoc("repair_estimate", url)}
           value={catDocUrls.repair_estimate}
         />
-
-        <FileUpload
-          label="Contractor Agreement / Work Order"
-          key="contractor_agreement"
-          required={false}
-          hint="If you have a contractor, attach the agreement (optional)"
-          onUpload={(url: string) => setDoc("contractor_agreement", url)}
-          value={catDocUrls.contractor_agreement}
-        />
       </div>
+
+      <StepGuide
+        lines={[
+          "Maximum amount is Rs 18,000 for this category.",
+          "Upload a clear repair estimate matching the amount.",
+          "Contractor / shop payment details come in the payment receiver step.",
+          "Only verified repair needs are approved.",
+        ]}
+      />
     </BaseCategoryForm>
   );
 }
