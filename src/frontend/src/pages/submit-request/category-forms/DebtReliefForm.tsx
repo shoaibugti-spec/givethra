@@ -1,98 +1,94 @@
 // src/frontend/src/pages/submit-request/category-forms/DebtReliefForm.tsx
-import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { useMemo } from "react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { BaseCategoryForm } from "./BaseCategoryForm";
+import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function DebtReliefForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields = {}, catDocUrls = {} } = formData;
+export default function DebtReliefForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const catFields = formData.catFields || {};
+  const catDocUrls = formData.catDocUrls || {};
 
-  const setField = (key: string, value: any) => {
+  const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catFields: { ...prev.catFields, [key]: value },
+      catFields: { ...(prev.catFields || {}), [key]: value },
     }));
   };
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
+      catDocUrls: { ...(prev.catDocUrls || {}), [key]: url },
     }));
   };
 
-  const isValid =
-    !!catFields.creditor_name?.trim() &&
-    !!catFields.creditor_contact?.trim() &&
-    !!catFields.creditor_bank?.trim() &&
-    !!catFields.creditor_account?.trim() &&
-    !!catFields.total_debt &&
-    !!catFields.debt_reason?.trim() &&
-    !!catDocUrls.debt_proof;
+  const isValid = useMemo(() => {
+    return (
+      !!catFields.creditor_name?.trim() &&
+      !!catFields.total_debt &&
+      !!catDocUrls.debt_proof
+    );
+  }, [catFields, catDocUrls]);
 
   return (
     <BaseCategoryForm
-      formData={formData}
-      setFormData={setFormData}
+      title="Debt Relief"
+      subtitle="5% of total debt · max Rs 25,000"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
       isLast={isLast}
-      title="💰 Debt Relief"
-      subtitle="Provide debt relief details."
-      guide="📊 5% of total debt (max Rs 25,000). Amount is automatically calculated."
       disabled={!isValid}
     >
-      <div className="space-y-3">
-        <TextInput
-          field="Creditor Name"
-          value={catFields.creditor_name}
-          onChange={(v: string) => setField("creditor_name", v)}
-          placeholder="Name of the creditor"
-        />
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <Label>Creditor name *</Label>
+          <Input
+            value={catFields.creditor_name || ""}
+            onChange={(e) => setField("creditor_name", e.target.value)}
+            placeholder="Person or institution owed"
+          />
+        </div>
 
-        <TextInput
-          field="Creditor Contact Number"
-          value={catFields.creditor_contact}
-          onChange={(v: string) => setField("creditor_contact", v)}
-          placeholder="Phone number for verification"
-        />
+        <div className="space-y-1">
+          <Label>Total debt amount *</Label>
+          <Input
+            type="number"
+            value={catFields.total_debt || ""}
+            onChange={(e) => setField("total_debt", e.target.value)}
+            placeholder="Full outstanding debt"
+          />
+          <p className="text-xs text-muted-foreground">
+            Help amount is calculated later as 5% of total debt (maximum Rs 25,000).
+          </p>
+        </div>
 
-        <TextInput
-          field="Creditor Bank Name"
-          value={catFields.creditor_bank}
-          onChange={(v: string) => setField("creditor_bank", v)}
-          placeholder="Bank name"
-        />
-
-        <TextInput
-          field="Creditor Account Number"
-          value={catFields.creditor_account}
-          onChange={(v: string) => setField("creditor_account", v)}
-          placeholder="Account number"
-        />
-
-        <TextInput
-          field="Total Outstanding Debt"
-          value={catFields.total_debt}
-          onChange={(v: string) => setField("total_debt", v)}
-          placeholder="e.g. 500000"
-          type="number"
-        />
-
-        <TextInput
-          field="Reason for Debt"
-          value={catFields.debt_reason}
-          onChange={(v: string) => setField("debt_reason", v)}
-          placeholder="Brief explanation of why the debt was incurred"
-        />
-
-        <FileUpload
-          label="Debt Proof (Loan Agreement / Bank Statement)"
-          key="debt_proof"
+        <DocBox
+          label="Debt proof"
           required
-          hint="Clear photo of loan agreement, bank statement, or any proof of debt"
-          onUpload={(url: string) => setDoc("debt_proof", url)}
+          hint="Loan paper, ledger, or written proof of debt"
+          onUpload={(url) => setDoc("debt_proof", url)}
           value={catDocUrls.debt_proof}
         />
       </div>
+
+      <StepGuide
+        lines={[
+          "Help is 5% of total debt, capped at Rs 25,000.",
+          "You will confirm total debt again in the amount step.",
+          "Upload clear proof of the outstanding debt.",
+          "Creditor payment details come in the payment receiver step.",
+        ]}
+      />
     </BaseCategoryForm>
   );
 }
