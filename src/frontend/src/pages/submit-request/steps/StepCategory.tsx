@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
-// 🔥 FIXED: Simple, stable, no blinking
+// 🔥 FIXED: No blinking — limited transitions, GPU acceleration
 
 import React, { memo, useCallback } from "react";
 import { StepNavigation } from "../shared/StepNavigation";
@@ -49,7 +49,6 @@ const StepCategory = memo(function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  // 🔥 Simple: no local state, no refs. Use the prop directly.
   const handleSelect = useCallback((id: string) => {
     if (id === value) return;
     onChange(id);
@@ -101,7 +100,8 @@ const StepCategory = memo(function StepCategory({
                 gap: "4px",
                 border: isSelected ? "4px solid #000" : "none",
                 transform: isSelected ? "scale(1.05)" : "scale(1)",
-                transition: "all 0.2s ease",
+                // 🔥 FIX: محدود transition، صرف transform اور box-shadow کو smooth کریں
+                transition: "transform 0.15s ease, box-shadow 0.15s ease, border 0.15s ease",
                 boxShadow: isSelected ? "0 8px 25px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.15)",
                 cursor: "pointer",
                 textAlign: "center",
@@ -109,6 +109,8 @@ const StepCategory = memo(function StepCategory({
                 fontSize: "14px",
                 lineHeight: "1.3",
                 position: "relative",
+                // 🔥 GPU acceleration کے لیے
+                willChange: "transform, box-shadow",
               }}
             >
               <span style={{ fontSize: "28px", display: "block" }}>{cat.label.split(" ")[0]}</span>
@@ -167,7 +169,7 @@ const StepCategory = memo(function StepCategory({
             cursor: value ? "pointer" : "not-allowed",
             flex: 1,
             opacity: value ? 1 : 0.6,
-            transition: "background 0.2s ease",
+            transition: "background 0.2s ease, opacity 0.2s ease",
           }}
         >
           Next →
