@@ -1,27 +1,27 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
 import { StepNavigation } from "../shared/StepNavigation";
 
-// 🔥 تمام 19 کیٹگریز — ہر ایک کا اپنا رنگ (hex)
+// 🔥 تمام 19 کیٹگریز — ہر ایک کا اپنا رنگ (Tailwind کلاسز کے لیے)
 const ALL_CATEGORIES = [
-  { id: "Electricity Bill", label: "⚡ Electricity Bill", color: "#eab308" },
-  { id: "Gas Bill", label: "🔥 Gas Bill", color: "#f97316" },
-  { id: "Water Bill", label: "💧 Water Bill", color: "#3b82f6" },
-  { id: "House Rent", label: "🏠 House Rent", color: "#6366f1" },
-  { id: "School, College & University Fees", label: "🎓 School/College Fee", color: "#a855f7" },
-  { id: "Education, Books & Admission", label: "📚 Education/Books", color: "#ec4899" },
-  { id: "Medical & Treatment", label: "🏥 Medical Treatment", color: "#ef4444" },
-  { id: "Medicines", label: "💊 Medicines", color: "#f43f5e" },
-  { id: "Food & Groceries", label: "🍲 Food & Groceries", color: "#10b981" },
-  { id: "Child Support", label: "👶 Child Support", color: "#06b6d4" },
-  { id: "Widow & Elderly Support", label: "👵 Widow/Elderly", color: "#14b8a6" },
-  { id: "Disability Support", label: "♿ Disability Support", color: "#0ea5e9" },
-  { id: "Marriage Support", label: "💍 Marriage Support", color: "#d946ef" },
-  { id: "Business / Work Help", label: "💼 Business Help", color: "#f59e0b" },
-  { id: "Home Repair", label: "🔧 Home Repair", color: "#78716c" },
-  { id: "Funeral Expenses", label: "🕊️ Funeral Expenses", color: "#6b7280" },
-  { id: "Livestock / Farming", label: "🐄 Livestock/Farming", color: "#84cc16" },
-  { id: "Debt Relief", label: "💰 Debt Relief", color: "#8b5cf6" },
-  { id: "Emergency Help", label: "🚨 Emergency Help", color: "#b91c1c" },
+  { id: "Electricity Bill", label: "⚡ Electricity Bill", color: "bg-yellow-500" },
+  { id: "Gas Bill", label: "🔥 Gas Bill", color: "bg-orange-500" },
+  { id: "Water Bill", label: "💧 Water Bill", color: "bg-blue-500" },
+  { id: "House Rent", label: "🏠 House Rent", color: "bg-indigo-500" },
+  { id: "School, College & University Fees", label: "🎓 School/College Fee", color: "bg-purple-500" },
+  { id: "Education, Books & Admission", label: "📚 Education/Books", color: "bg-pink-500" },
+  { id: "Medical & Treatment", label: "🏥 Medical Treatment", color: "bg-red-500" },
+  { id: "Medicines", label: "💊 Medicines", color: "bg-rose-500" },
+  { id: "Food & Groceries", label: "🍲 Food & Groceries", color: "bg-emerald-500" },
+  { id: "Child Support", label: "👶 Child Support", color: "bg-cyan-500" },
+  { id: "Widow & Elderly Support", label: "👵 Widow/Elderly", color: "bg-teal-500" },
+  { id: "Disability Support", label: "♿ Disability Support", color: "bg-sky-500" },
+  { id: "Marriage Support", label: "💍 Marriage Support", color: "bg-fuchsia-500" },
+  { id: "Business / Work Help", label: "💼 Business Help", color: "bg-amber-500" },
+  { id: "Home Repair", label: "🔧 Home Repair", color: "bg-stone-500" },
+  { id: "Funeral Expenses", label: "🕊️ Funeral Expenses", color: "bg-gray-500" },
+  { id: "Livestock / Farming", label: "🐄 Livestock/Farming", color: "bg-lime-500" },
+  { id: "Debt Relief", label: "💰 Debt Relief", color: "bg-violet-500" },
+  { id: "Emergency Help", label: "🚨 Emergency Help", color: "bg-red-700" },
 ];
 
 interface Props {
@@ -48,36 +48,39 @@ export default function StepCategory({
   freeCasesUsed = 0,
 }: Props) {
   const handleSelect = (id: string) => {
+    console.log("Category selected:", id); // 🔍 ڈیبگ کے لیے
     onChange(id);
+    // تھوڑی تاخیر کے بعد Next پر جائیں
     setTimeout(() => {
-      if (id) onNext();
-    }, 300);
+      if (id) {
+        console.log("Moving to next step...");
+        onNext();
+      }
+    }, 400);
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
+    <div className="p-4 max-w-3xl mx-auto">
       {/* Heading */}
-      <div style={{ textAlign: "center", marginBottom: "24px" }}>
-        <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "8px" }}>
-          What do you need help with?
-        </h2>
-        <p style={{ color: "#666", fontSize: "14px" }}>
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold mb-2">What do you need help with?</h2>
+        <p className="text-muted-foreground text-sm">
           Choose the category that best describes your need.
         </p>
         {willBeFree && !isFreeDisabled && (
-          <div style={{ display: "inline-block", marginTop: "8px", padding: "6px 16px", borderRadius: "20px", background: "#d1fae5", color: "#065f46", fontSize: "14px", fontWeight: "500" }}>
+          <div className="inline-block mt-2 px-4 py-1.5 rounded-full bg-green-100 text-green-700 text-sm font-medium">
             🎉 {freeCasesUsed === 0 ? "Your first case is FREE!" : "This case is FREE!"}
           </div>
         )}
         {isFreeDisabled && (
-          <div style={{ display: "inline-block", marginTop: "8px", padding: "6px 16px", borderRadius: "20px", background: "#fef3c7", color: "#92400e", fontSize: "14px", fontWeight: "500" }}>
+          <div className="inline-block mt-2 px-4 py-1.5 rounded-full bg-amber-100 text-amber-700 text-sm font-medium">
             ⚠️ Free cases used up. 1 credit fee applies.
           </div>
         )}
       </div>
 
-      {/* Grid of category boxes */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
+      {/* 🔥 Grid of category boxes — Tailwind classes for colors */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {ALL_CATEGORIES.map((cat) => {
           const isSelected = value === cat.id;
           return (
@@ -85,49 +88,19 @@ export default function StepCategory({
               key={cat.id}
               type="button"
               onClick={() => handleSelect(cat.id)}
-              style={{
-                backgroundColor: cat.color,
-                color: "#ffffff",
-                borderRadius: "16px",
-                padding: "16px 8px",
-                minHeight: "90px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "4px",
-                border: isSelected ? "4px solid #000" : "none",
-                transform: isSelected ? "scale(1.05)" : "scale(1)",
-                transition: "all 0.2s ease",
-                boxShadow: isSelected ? "0 8px 25px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.15)",
-                cursor: "pointer",
-                textAlign: "center",
-                fontWeight: "500",
-                fontSize: "14px",
-                lineHeight: "1.3",
-                position: "relative",
-              }}
+              className={`
+                relative p-4 rounded-2xl text-white font-medium
+                transition-all duration-200 transform
+                ${cat.color} hover:scale-105 hover:shadow-lg
+                ${isSelected ? "ring-4 ring-primary ring-offset-2 scale-105" : ""}
+                flex flex-col items-center justify-center gap-1
+                min-h-[90px] text-center
+              `}
             >
-              <span style={{ fontSize: "28px", display: "block" }}>{cat.label.split(" ")[0]}</span>
-              <span style={{ display: "block" }}>{cat.label}</span>
+              <span className="text-3xl">{cat.label.split(" ")[0]}</span>
+              <span className="text-sm leading-tight">{cat.label}</span>
               {isSelected && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "-10px",
-                    right: "-10px",
-                    background: "#000",
-                    color: "#fff",
-                    borderRadius: "50%",
-                    width: "28px",
-                    height: "28px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                  }}
-                >
+                <span className="absolute -top-2 -right-2 bg-black text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
                   ✓
                 </span>
               )}
@@ -137,18 +110,11 @@ export default function StepCategory({
       </div>
 
       {/* Navigation */}
-      <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "center" }}>
+      <div className="mt-6 flex gap-3 justify-center">
         {!isFirst && (
           <button
             onClick={onBack}
-            style={{
-              padding: "10px 24px",
-              borderRadius: "8px",
-              border: "1px solid #ccc",
-              background: "transparent",
-              cursor: "pointer",
-              flex: 1,
-            }}
+            className="flex-1 py-2.5 px-6 rounded-lg border border-border bg-transparent hover:bg-muted transition-colors"
           >
             Back
           </button>
@@ -156,16 +122,10 @@ export default function StepCategory({
         <button
           onClick={onNext}
           disabled={!value}
-          style={{
-            padding: "10px 24px",
-            borderRadius: "8px",
-            border: "none",
-            background: value ? "#00A896" : "#ccc",
-            color: "#fff",
-            cursor: value ? "pointer" : "not-allowed",
-            flex: 1,
-            opacity: value ? 1 : 0.6,
-          }}
+          className={`
+            flex-1 py-2.5 px-6 rounded-lg font-medium
+            ${value ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-muted-foreground cursor-not-allowed"}
+          `}
         >
           Next →
         </button>
