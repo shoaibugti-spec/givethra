@@ -1,13 +1,13 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
-// 🔥 FINAL: No blinking at all — using useRef for selection state
+// 🔥 FIXED: Simple, stable, no blinking
 
-import React, { useState, useRef, useCallback, memo, useEffect } from "react";
+import React, { memo, useCallback } from "react";
 import { StepNavigation } from "../shared/StepNavigation";
 
 const ALL_CATEGORIES = [
-  { id: "Electricity Bill", label: "⚡ Electricity Bill", color: "#eab308" },
-  { id: "Gas Bill", label: "🔥 Gas Bill", color: "#f97316" },
-  { id: "Water Bill", label: "💧 Water Bill", color: "#3b82f6" },
+  { id: "Electricity Bill", label: "⚡ Electricity", color: "#eab308" },
+  { id: "Gas Bill", label: "🔥 Gas", color: "#f97316" },
+  { id: "Water Bill", label: "💧 Water", color: "#3b82f6" },
   { id: "House Rent", label: "🏠 House Rent", color: "#6366f1" },
   { id: "School, College & University Fees", label: "🎓 School/College Fee", color: "#a855f7" },
   { id: "Education, Books & Admission", label: "📚 Education/Books", color: "#ec4899" },
@@ -38,9 +38,6 @@ interface Props {
   freeCasesUsed?: number;
 }
 
-// 🔥 Memoized navigation component to prevent re-renders
-const MemoizedStepNavigation = memo(StepNavigation);
-
 const StepCategory = memo(function StepCategory({
   value,
   onChange,
@@ -52,41 +49,15 @@ const StepCategory = memo(function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  // 🔥 Use ref to track selection without causing re-renders
-  const selectedRef = useRef<string>(value);
-  // 🔥 Force re-render only when we need to update the UI (we'll use a trick)
-  const [, forceUpdate] = useState(0);
+  // 🔥 Simple: no local state, no refs. Use the prop directly.
+  const handleSelect = useCallback((id: string) => {
+    if (id === value) return;
+    onChange(id);
+  }, [value, onChange]);
 
-  // Sync ref with prop when it changes externally (e.g., draft restore)
-  useEffect(() => {
-    if (value && value !== selectedRef.current) {
-      selectedRef.current = value;
-      forceUpdate((prev) => prev + 1);
-    }
-  }, [value]);
-
-  const handleSelect = useCallback(
-    (id: string) => {
-      if (id === selectedRef.current) return;
-      selectedRef.current = id;
-      // Force re-render to show selection
-      forceUpdate((prev) => prev + 1);
-      // Notify parent
-      onChange(id);
-    },
-    [onChange]
-  );
-
-  // 🔥 Memoized handlers to prevent recreation
   const handleNext = useCallback(() => {
-    if (selectedRef.current) onNext();
-  }, [onNext]);
-
-  const handleBack = useCallback(() => {
-    onBack();
-  }, [onBack]);
-
-  const currentSelected = selectedRef.current;
+    if (value) onNext();
+  }, [value, onNext]);
 
   return (
     <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
@@ -111,7 +82,7 @@ const StepCategory = memo(function StepCategory({
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
         {ALL_CATEGORIES.map((cat) => {
-          const isSelected = currentSelected === cat.id;
+          const isSelected = value === cat.id;
           return (
             <button
               key={cat.id}
@@ -168,13 +139,40 @@ const StepCategory = memo(function StepCategory({
         })}
       </div>
 
-      <MemoizedStepNavigation
-        onNext={handleNext}
-        onBack={handleBack}
-        isFirst={isFirst}
-        isLast={isLast}
-        disabled={!currentSelected}
-      />
+      <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "center" }}>
+        {!isFirst && (
+          <button
+            onClick={onBack}
+            style={{
+              padding: "10px 24px",
+              borderRadius: "8px",
+              border: "1px solid #ccc",
+              background: "transparent",
+              cursor: "pointer",
+              flex: 1,
+            }}
+          >
+            Back
+          </button>
+        )}
+        <button
+          onClick={handleNext}
+          disabled={!value}
+          style={{
+            padding: "10px 24px",
+            borderRadius: "8px",
+            border: "none",
+            background: value ? "#00A896" : "#ccc",
+            color: "#fff",
+            cursor: value ? "pointer" : "not-allowed",
+            flex: 1,
+            opacity: value ? 1 : 0.6,
+            transition: "background 0.2s ease",
+          }}
+        >
+          Next →
+        </button>
+      </div>
     </div>
   );
 });
