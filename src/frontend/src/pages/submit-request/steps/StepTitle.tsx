@@ -2,18 +2,17 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { StepNavigation } from "../shared/StepNavigation";
+import { StepGuide } from "../shared/StepGuide";
 
-interface Props {
-  value: string;
-  onChange: (val: string) => void;
-  onNext: () => void;
-  onBack: () => void;
-  isFirst: boolean;
-  isLast: boolean;
-  placeholder?: string;
-}
-
-export default function StepTitle({ value, onChange, onNext, onBack, isFirst, isLast, placeholder }: Props) {
+export default function StepTitle({
+  value,
+  onChange,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+  placeholder,
+}: any) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -21,15 +20,25 @@ export default function StepTitle({ value, onChange, onNext, onBack, isFirst, is
         <p className="text-sm text-muted-foreground">
           Write a short, clear title that describes your need in a few words.
         </p>
-        <Label>Request Title *</Label>
+        <Label>Request title *</Label>
         <Input
-          value={value}
+          value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder || "e.g. Help with School Fee"}
           className="text-lg py-6"
           autoFocus
         />
       </div>
+
+      <StepGuide
+        lines={[
+          "Keep the title short and specific (about 5–12 words).",
+          "Example: “Electricity bill for June” or “School fee for one child”.",
+          "Do not write your full story here — that comes in Why Help.",
+          "Avoid vague titles like “Need help” or “Urgent”.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
