@@ -1,382 +1,213 @@
 // src/frontend/src/pages/submit-request/category-forms/EducationBooksForm.tsx
+import { useMemo } from "react";
 import { Label } from "@/components/ui/label";
-import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
-import { EDUCATION_INSTITUTES } from "@/lib/institutesList";
-import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BaseCategoryForm } from "./BaseCategoryForm";
+import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
+import {
+  EDUCATION_SUB_OPTIONS,
+  EDUCATION_ADMISSION_FIELDS,
+  getEducationDocs,
+} from "../constants";
 
-export default function EducationBooksForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const {
-    catFields = {},
-    catDocUrls = {},
-    eduSubType,
-    eduAdmissionLevel,
-    eduSubFields = {},
-  } = formData;
+export default function EducationBooksForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const catFields = formData.catFields || {};
+  const catDocUrls = formData.catDocUrls || {};
+  const eduSubType = formData.eduSubType || catFields.edu_sub_type || "";
+  const eduAdmissionLevel = formData.eduAdmissionLevel || catFields.admission_level || "";
 
-  const [search, setSearch] = useState("");
-  const [isOther, setIsOther] = useState(false);
-  const [otherName, setOtherName] = useState("");
-  const [otherContact, setOtherContact] = useState("");
-  const [otherAddress, setOtherAddress] = useState("");
-
-  const setField = (key: string, value: any) => {
+  const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catFields: { ...prev.catFields, [key]: value },
+      catFields: { ...(prev.catFields || {}), [key]: value },
     }));
   };
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
+      catDocUrls: { ...(prev.catDocUrls || {}), [key]: url },
     }));
   };
 
-  const setEduSubType = (type: string) => {
+  const onSubTypeChange = (value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      eduSubType: type,
+      eduSubType: value,
       eduAdmissionLevel: "",
-      eduSubFields: {},
+      catFields: {
+        ...(prev.catFields || {}),
+        edu_sub_type: value,
+        admission_level: "",
+      },
     }));
   };
 
-  const setEduAdmissionLevel = (level: string) => {
+  const onLevelChange = (value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      eduAdmissionLevel: level,
-      eduSubFields: {},
+      eduAdmissionLevel: value,
+      catFields: { ...(prev.catFields || {}), admission_level: value },
     }));
   };
 
-  const filteredInstitutes = (EDUCATION_INSTITUTES || [])
-    .filter((n: string) => n.toLowerCase().includes(search.toLowerCase()))
-    .slice(0, 8);
+  const admissionFields =
+    eduSubType === "admission" && eduAdmissionLevel
+      ? (EDUCATION_ADMISSION_FIELDS as any)[eduAdmissionLevel] || []
+      : [];
 
-  const isValid = (() => {
+  const requiredDocs = getEducationDocs(eduSubType, eduAdmissionLevel || eduSubType);
+
+  const isValid = useMemo(() => {
     if (!eduSubType) return false;
-    if (!catFields.student_name?.trim() || !catFields.student_class?.trim()) return false;
-
-    if (eduSubType === "admission") {
-      if (!eduAdmissionLevel) return false;
-      const hasInstitute = !!catFields.institute_name || (isOther && !!otherName.trim());
-      if (!hasInstitute) return false;
-      return (
-        !!catDocUrls.admission_proof &&
-        !!catDocUrls.fee_challan &&
-        !!catDocUrls.student_id_proof
-      );
+    if (!catFields.student_name?.trim()) return false;
+    if (!catFields.student_class?.trim()) return false;
+    if (eduSubType === "admission" && !eduAdmissionLevel) return false;
+    for (const field of admissionFields) {
+      if (field.required && !String(catFields[field.key] || "").trim()) return false;
     }
-
-    if (eduSubType === "books") {
-      return (
-        !!catFields.institute_name?.trim() &&
-        !!catDocUrls.books_quotation &&
-        !!catDocUrls.student_id_proof
-      );
+    for (const doc of requiredDocs) {
+      if (doc.required && !catDocUrls[doc.key]) return false;
     }
-
-    if (eduSubType === "uniform") {
-      return (
-        !!catFields.institute_name?.trim() &&
-        !!catDocUrls.uniform_quotation &&
-        !!catDocUrls.student_id_proof &&
-        !!catDocUrls.uniform_items
-      );
-    }
-
-    return false;
-  })();
+    return true;
+  }, [
+    eduSubType,
+    eduAdmissionLevel,
+    catFields,
+    catDocUrls,
+    admissionFields,
+    requiredDocs,
+  ]);
 
   return (
     <BaseCategoryForm
-      formData={formData}
-      setFormData={setFormData}
+      title="Education, Books & Admission"
+      subtitle="ONE student · verified education cost only"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
       isLast={isLast}
-      title="📚 Education, Books & Admission"
-      subtitle="Provide details for admission, books, or uniform for ONE student only."
-      guide="⚠️ One case = ONE student only. Choose what type of help you need."
       disabled={!isValid}
     >
       <div className="space-y-4">
-        <div className="space-y-2">
-          <Label>What do you need help with? *</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { value: "admission", label: "🎓 Admission" },
-              { value: "books", label: "📚 Books" },
-              { value: "uniform", label: "👕 Uniform" },
-            ].map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setEduSubType(opt.value)}
-                className={`px-3 py-2.5 rounded-lg border text-sm font-medium ${
-                  eduSubType === opt.value
-                    ? "bg-primary text-white border-primary"
-                    : "border-border"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+        <div className="space-y-1">
+          <Label>Help type *</Label>
+          <Select value={eduSubType} onValueChange={onSubTypeChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              {EDUCATION_SUB_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {eduSubType && (
-          <>
-            <TextInput
-              field="Student's Full Name"
-              value={catFields.student_name}
-              onChange={(v: string) => setField("student_name", v)}
-              placeholder="Full name of student"
-            />
+        <div className="space-y-1">
+          <Label>Student's name (ONE student only) *</Label>
+          <Input
+            value={catFields.student_name || ""}
+            onChange={(e) => setField("student_name", e.target.value)}
+            placeholder="Full name of one student"
+          />
+        </div>
 
-            <TextInput
-              field="Class / Grade / Program"
-              value={catFields.student_class}
-              onChange={(v: string) => setField("student_class", v)}
-              placeholder="e.g. Grade 8, FA, BS"
-            />
+        <div className="space-y-1">
+          <Label>Class / grade / program *</Label>
+          <Input
+            value={catFields.student_class || ""}
+            onChange={(e) => setField("student_class", e.target.value)}
+            placeholder="e.g. Grade 8, FA, BS"
+          />
+        </div>
 
-            {eduSubType === "admission" && (
-              <>
-                <div className="space-y-2">
-                  <Label>Where are you seeking admission? *</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {["School", "College", "University"].map((level) => (
-                      <button
-                        key={level}
-                        type="button"
-                        onClick={() => setEduAdmissionLevel(level)}
-                        className={`px-3 py-2.5 rounded-lg border text-sm font-medium ${
-                          eduAdmissionLevel === level
-                            ? "bg-primary text-white border-primary"
-                            : "border-border"
-                        }`}
-                      >
-                        {level}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {eduAdmissionLevel && (
-                  <>
-                    {!isOther && !catFields.institute_name && (
-                      <div className="space-y-2">
-                        <Label>Search & Select {eduAdmissionLevel} *</Label>
-                        <input
-                          type="text"
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          placeholder={`Type ${eduAdmissionLevel.toLowerCase()} name...`}
-                          className="w-full px-4 py-2.5 rounded-lg border"
-                        />
-                        {search.length >= 2 && (
-                          <div className="rounded-xl border divide-y overflow-hidden max-h-48 overflow-y-auto">
-                            {filteredInstitutes.map((n: string) => (
-                              <button
-                                key={n}
-                                type="button"
-                                onClick={() => setField("institute_name", n)}
-                                className="w-full text-left px-3 py-2.5 text-sm hover:bg-primary/5"
-                              >
-                                {n}
-                              </button>
-                            ))}
-                            {filteredInstitutes.length === 0 && (
-                              <p className="px-3 py-2.5 text-sm text-muted-foreground">
-                                No match found.
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setIsOther(true)}
-                          className="text-xs text-primary font-medium underline"
-                        >
-                          My institute is not in the list
-                        </button>
-                      </div>
-                    )}
-
-                    {catFields.institute_name && !isOther && (
-                      <div className="rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-300 p-3 flex items-center justify-between">
-                        <p className="text-sm font-medium text-green-700">
-                          ✓ {catFields.institute_name}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setField("institute_name", "")}
-                          className="text-xs text-primary underline"
-                        >
-                          Change
-                        </button>
-                      </div>
-                    )}
-
-                    {isOther && (
-                      <div className="space-y-3 rounded-xl border p-3">
-                        <div className="flex justify-between">
-                          <p className="text-sm font-semibold">Institute (not in list)</p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsOther(false);
-                              setOtherName("");
-                              setOtherContact("");
-                              setOtherAddress("");
-                            }}
-                            className="text-xs text-primary underline"
-                          >
-                            Back to list
-                          </button>
-                        </div>
-                        <TextInput
-                          field="Institute Full Name"
-                          value={otherName}
-                          onChange={setOtherName}
-                          placeholder="Complete official name"
-                        />
-                        <TextInput
-                          field="Institute Contact Number"
-                          value={otherContact}
-                          onChange={setOtherContact}
-                          placeholder="Office number"
-                        />
-                        <TextInput
-                          field="Institute Address"
-                          value={otherAddress}
-                          onChange={setOtherAddress}
-                          placeholder="Complete address"
-                        />
-                      </div>
-                    )}
-
-                    {(catFields.institute_name || isOther) && (
-                      <>
-                        <TextInput
-                          field="Admission Type"
-                          value={catFields.admission_type}
-                          onChange={(v: string) => setField("admission_type", v)}
-                          placeholder="New Admission / Re-admission / Transfer"
-                        />
-
-                        <TextInput
-                          field="Admission Status"
-                          value={catFields.admission_status}
-                          onChange={(v: string) => setField("admission_status", v)}
-                          placeholder="Selected / Admission Offered / Confirmed"
-                        />
-
-                        <FileUpload
-                          label="Admission / Selection Proof (Offer Letter / Merit List)"
-                          key="admission_proof"
-                          required
-                          hint="Clear photo of offer letter or merit list"
-                          onUpload={(url: string) => setDoc("admission_proof", url)}
-                          value={catDocUrls.admission_proof}
-                        />
-
-                        <FileUpload
-                          label="Fee Challan / Voucher (with amount & due date)"
-                          key="fee_challan"
-                          required
-                          hint="Challan should clearly show amount and due date"
-                          onUpload={(url: string) => setDoc("fee_challan", url)}
-                          value={catDocUrls.fee_challan}
-                        />
-
-                        <FileUpload
-                          label="Student B-Form / CNIC / School ID"
-                          key="student_id_proof"
-                          required
-                          hint="Clear proof of student identity"
-                          onUpload={(url: string) => setDoc("student_id_proof", url)}
-                          value={catDocUrls.student_id_proof}
-                        />
-                      </>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-
-            {eduSubType === "books" && (
-              <>
-                <TextInput
-                  field="Institute / School Name"
-                  value={catFields.institute_name}
-                  onChange={(v: string) => setField("institute_name", v)}
-                  placeholder="School or college name"
-                />
-
-                <FileUpload
-                  label="Books List / Quotation from Shop"
-                  key="books_quotation"
-                  required
-                  hint="Clear photo of book list and price quotation"
-                  onUpload={(url: string) => setDoc("books_quotation", url)}
-                  value={catDocUrls.books_quotation}
-                />
-
-                <FileUpload
-                  label="Student B-Form / School/College ID"
-                  key="student_id_proof"
-                  required
-                  hint="Student identity proof"
-                  onUpload={(url: string) => setDoc("student_id_proof", url)}
-                  value={catDocUrls.student_id_proof}
-                />
-              </>
-            )}
-
-            {eduSubType === "uniform" && (
-              <>
-                <TextInput
-                  field="Institute / School Name"
-                  value={catFields.institute_name}
-                  onChange={(v: string) => setField("institute_name", v)}
-                  placeholder="School or college name"
-                />
-
-                <FileUpload
-                  label="Uniform List / Quotation from Shop"
-                  key="uniform_quotation"
-                  required
-                  hint="Clear photo of uniform items and price quotation"
-                  onUpload={(url: string) => setDoc("uniform_quotation", url)}
-                  value={catDocUrls.uniform_quotation}
-                />
-
-                <FileUpload
-                  label="Student B-Form / School/College ID"
-                  key="student_id_proof"
-                  required
-                  hint="Student identity proof"
-                  onUpload={(url: string) => setDoc("student_id_proof", url)}
-                  value={catDocUrls.student_id_proof}
-                />
-
-                <FileUpload
-                  label="Items Needed (List photo or written)"
-                  key="uniform_items"
-                  required
-                  hint="List of uniform items (shoes, bag, winter uniform etc.)"
-                  onUpload={(url: string) => setDoc("uniform_items", url)}
-                  value={catDocUrls.uniform_items}
-                />
-              </>
-            )}
-          </>
+        {eduSubType === "admission" && (
+          <div className="space-y-1">
+            <Label>Admission level *</Label>
+            <Select value={eduAdmissionLevel} onValueChange={onLevelChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="School / College / University" />
+              </SelectTrigger>
+              <SelectContent>
+                {["School", "College", "University"].map((lvl) => (
+                  <SelectItem key={lvl} value={lvl}>
+                    {lvl}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
+
+        {admissionFields.map((field: any) => (
+          <div key={field.key} className="space-y-1">
+            <Label>
+              {field.label} {field.required ? "*" : ""}
+            </Label>
+            {field.choices ? (
+              <Select
+                value={catFields[field.key] || ""}
+                onValueChange={(v) => setField(field.key, v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={`Select ${field.label}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {field.choices.map((c: string) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={catFields[field.key] || ""}
+                onChange={(e) => setField(field.key, e.target.value)}
+                placeholder={field.placeholder || field.label}
+              />
+            )}
+          </div>
+        ))}
+
+        {requiredDocs.map((doc) => (
+          <DocBox
+            key={doc.key}
+            label={doc.label}
+            required={doc.required}
+            hint={doc.hint}
+            onUpload={(url) => setDoc(doc.key, url)}
+            value={catDocUrls[doc.key]}
+          />
+        ))}
       </div>
+
+      <StepGuide
+        lines={[
+          "This case is for ONE student only.",
+          "Choose the correct help type: Admission, Books, or Uniform.",
+          "Upload clear quotation / challan and student identity proof.",
+          "Amounts and documents must match what the institute requires.",
+        ]}
+      />
     </BaseCategoryForm>
   );
 }
