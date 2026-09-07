@@ -2,42 +2,54 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { StepNavigation } from "../shared/StepNavigation";
-import { isEasyCat } from "../constants";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function StepDeadline({ value, formData, onChange, onNext, onBack, isFirst, isLast }: any) {
-  const { category } = formData;
-  const isEasy = isEasyCat(category);
-  const label = isEasy ? "Bill / Challan Due Date (Expiry) *" : "Expected Resolution Date *";
+export default function StepDeadline({
+  value,
+  onChange,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const isPast = value ? new Date(value) < new Date(new Date().toDateString()) : false;
+  const isValid = !!value && !isPast;
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold">{isEasy ? "📅 Bill Expiry Date" : "📅 When do you need this resolved?"}</h2>
+        <h2 className="text-2xl font-bold">When do you need this help by?</h2>
         <p className="text-sm text-muted-foreground">
-          {isEasy
-            ? "Select the due date on your bill. If this passes, the case will expire."
-            : "Select a date by which you need this help."}
+          Select a realistic deadline in the future.
         </p>
-        <Label>{label}</Label>
+        <Label>Deadline *</Label>
         <Input
           type="date"
-          value={value}
+          value={value || ""}
           onChange={(e) => onChange(e.target.value)}
-          className="py-6 text-lg"
-          min={new Date().toISOString().split("T")[0]}
+          className="text-lg py-6"
+          autoFocus
         />
-        {isEasy && value && (
-          <p className="text-xs text-amber-600">
-            ⚠️ If the due date passes and the case is not completed, the case will EXPIRE.
-          </p>
+        {isPast && (
+          <p className="text-sm text-red-600">Deadline must be in the future.</p>
         )}
       </div>
+
+      <StepGuide
+        lines={[
+          "Pick a real due date from your bill, challan, or need.",
+          "Past dates are not allowed.",
+          "Unrealistic deadlines can reduce trust during review.",
+          "For utility bills, use the bill due date when possible.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
         isFirst={isFirst}
         isLast={isLast}
-        disabled={!value}
+        disabled={!isValid}
       />
     </div>
   );
