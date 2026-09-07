@@ -1,16 +1,26 @@
 // src/frontend/src/pages/submit-request/steps/StepMaritalStatus.tsx
 import { Label } from "@/components/ui/label";
 import { StepNavigation } from "../shared/StepNavigation";
+import { StepGuide } from "../shared/StepGuide";
 
 const OPTIONS = ["Single", "Married", "Widow", "Divorced"];
 
-export default function StepMaritalStatus({ value, onChange, onNext, onBack, isFirst, isLast }: any) {
+export default function StepMaritalStatus({
+  value,
+  onChange,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">What is your marital status?</h2>
-        <p className="text-sm text-muted-foreground">This helps us understand your family situation.</p>
-        <Label>Marital Status *</Label>
+        <p className="text-sm text-muted-foreground">
+          This helps us understand your family situation and required documents.
+        </p>
+        <Label>Marital status *</Label>
         <div className="grid grid-cols-2 gap-3">
           {OPTIONS.map((opt) => (
             <button
@@ -28,6 +38,16 @@ export default function StepMaritalStatus({ value, onChange, onNext, onBack, isF
           ))}
         </div>
       </div>
+
+      <StepGuide
+        lines={[
+          "Single: Family Registration Certificate (FRC) is required.",
+          "Married: Nikah Nama and FRC are required.",
+          "Widow / Widower: death certificate, Nikah Nama, and FRC are required.",
+          "Divorced: court divorce certificate, Nikah Nama, and FRC are required.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
