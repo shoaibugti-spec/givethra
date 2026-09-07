@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/steps/StepSelfie.tsx
-// Live vertical selfie — same upload path as SubmitRequestPage
+// Live selfie — no zoom crop, upload path same as SubmitRequestPage
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,6 @@ export default function StepSelfie({
 
   const [cameraReady, setCameraReady] = useState(false);
   const [uploading, setUploading] = useState(false);
-  // Local preview (data URL) shows immediately; formData.selfieUrl is remote URL after upload
   const [localPreview, setLocalPreview] = useState<string>("");
   const remoteUrl = formData?.selfieUrl || "";
   const showPreview = localPreview || remoteUrl;
@@ -41,28 +40,26 @@ export default function StepSelfie({
     setError("");
     try {
       stopCamera();
+      // Same style as SubmitRequestPage — do NOT force 9:16 constraints (causes zoom)
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          facingMode: { ideal: "user" },
-          // Prefer portrait
-          width: { ideal: 720 },
-          height: { ideal: 1280 },
-          aspectRatio: { ideal: 9 / 16 },
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
         },
       });
       streamRef.current = stream;
 
-      // Wait a tick so the <video> is mounted
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 80));
       const el = videoRef.current;
       if (!el) throw new Error("Video element not ready");
       el.srcObject = stream;
       el.muted = true;
-      el.playsInline = true;
-      await el.play();
+      el.setAttribute("playsinline", "true");
+      await el.play().catch(() => undefined);
 
-      // Wait until we have real frames
       await new Promise<void>((resolve) => {
         if (el.videoWidth > 0) return resolve();
         const onMeta = () => {
@@ -70,15 +67,13 @@ export default function StepSelfie({
           resolve();
         };
         el.addEventListener("loadedmetadata", onMeta);
-        setTimeout(() => resolve(), 1500);
+        setTimeout(() => resolve(), 2000);
       });
 
       setCameraReady(true);
     } catch (e: any) {
       console.error(e);
-      setError(
-        "Camera access denied or unavailable. Allow camera permission and try again."
-      );
+      setError("Camera access denied or unavailable. Allow camera permission and try again.");
       setCameraReady(false);
     }
   };
@@ -93,26 +88,23 @@ export default function StepSelfie({
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
-
     if (!video.videoWidth || !video.videoHeight) {
-      setError("Camera is still starting. Wait a second and try again.");
+      setError("Camera is still starting. Wait a moment and try again.");
       return;
     }
 
     setError("");
     try {
-      // Keep natural camera orientation (portrait if device gives portrait)
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Canvas not supported");
 
-      // Mirror for natural selfie look
+      // Natural capture (no forced crop). Mirror for selfie feel.
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // 1) Show preview immediately (same as SubmitRequestPage)
       const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
       setLocalPreview(dataUrl);
 
@@ -121,19 +113,14 @@ export default function StepSelfie({
       );
       if (!blob) throw new Error("Failed to create image");
 
-      // Stop camera after capture
       stopCamera();
 
-      // 2) Upload with Page path: cases/{userId}/{ts}_selfie.jpg
-      if (!user?.id) {
-        throw new Error("Please sign in again before uploading.");
-      }
+      if (!user?.id) throw new Error("Please sign in again before uploading.");
 
       setUploading(true);
       const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
       const path = `cases/\( {user.id}/ \){Date.now()}_selfie.jpg`;
       const url = await uploadFileToStorage(file, path);
-
       setFormData((prev: any) => ({ ...prev, selfieUrl: url }));
       toast.success("Selfie uploaded");
     } catch (e: any) {
@@ -163,20 +150,19 @@ export default function StepSelfie({
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">Live selfie</h2>
         <p className="text-sm text-muted-foreground">
-          Front camera opens for a live vertical selfie. Gallery upload is not allowed.
+          Open the front camera and take a clear live photo. Gallery upload is not allowed.
         </p>
       </div>
 
-      {/* Hidden canvas used for capture */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Vertical frame */}
-      <div className="mx-auto w-full max-w-sm rounded-2xl border overflow-hidden bg-black aspect-[9/16] relative">
+      {/* object-contain = no 2x zoom crop */}
+      <div className="w-full rounded-xl border bg-black overflow-hidden">
         {showPreview ? (
           <img
             src={showPreview}
             alt="Selfie preview"
-            className="h-full w-full object-cover"
+            className="w-full max-h-[420px] object-contain bg-black"
           />
         ) : (
           <video
@@ -184,24 +170,21 @@ export default function StepSelfie({
             playsInline
             muted
             autoPlay
-            className="h-full w-full object-cover"
+            className="w-full max-h-[420px] object-contain bg-black"
             style={{ transform: "scaleX(-1)" }}
           />
         )}
-
-        {uploading && (
-          <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white text-sm">
-            Uploading selfie...
-          </div>
-        )}
       </div>
 
+      {uploading && (
+        <p className="text-sm text-amber-600 text-center">Uploading selfie...</p>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       {remoteUrl && !uploading && (
         <p className="text-sm text-green-600 text-center">Selfie ready</p>
       )}
 
-      <div className="flex flex-col gap-2 max-w-sm mx-auto w-full">
+      <div className="flex flex-col gap-2">
         {!showPreview ? (
           <>
             <Button
@@ -227,10 +210,9 @@ export default function StepSelfie({
 
       <StepGuide
         lines={[
-          "This is a live camera selfie only — no file attachment.",
-          "Hold the phone upright (vertical). Keep your face centered.",
-          "Good lighting, no sunglasses or mask.",
-          "Wait until you see “Selfie ready” before tapping Next.",
+          "Live camera only — no file attachment.",
+          "Face the camera with good lighting.",
+          "Wait for “Selfie ready” before Next.",
         ]}
       />
 
