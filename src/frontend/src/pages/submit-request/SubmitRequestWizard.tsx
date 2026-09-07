@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// ✅ FIXED: blinking + status gates (pending / approved / rejected / feedback / suspension)
+// ✅ FIXED: blinking + status gates + whyHelp → description field mapping
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -261,9 +261,15 @@ export default function SubmitRequestWizard() {
     }
   }, [user, willBeFree, clearDraft, navigate, refetch]);
 
+  // ✅ whyHelp step always writes to "description" (backend field)
   const stableOnChange = useCallback(
     (val: any) => {
-      handleFieldChange(currentStepIdRef.current, val);
+      const stepId = currentStepIdRef.current;
+      if (stepId === "whyHelp") {
+        handleFieldChange("description", val);
+      } else {
+        handleFieldChange(stepId, val);
+      }
     },
     [handleFieldChange]
   );
@@ -283,8 +289,12 @@ export default function SubmitRequestWizard() {
     setForceNewCase(true);
   }, [clearDraft]);
 
-  // ── CRITICAL: only the single field value, not whole formData ──
-  const currentValue = formData[currentStepId as keyof typeof formData];
+  // ✅ whyHelp step always reads from "description"
+  const currentValue =
+    currentStepId === "whyHelp"
+      ? formData.description
+      : formData[currentStepId as keyof typeof formData];
+
   const needsFormData = STEPS_NEEDING_FORMDATA.has(currentStepId);
 
   const stepProps = useMemo(() => {
@@ -387,7 +397,7 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // ── Pending case (unless user forced new after reject — not for pending) ──
+  // ── Pending case ─────────────────────────────────────────────
   if (stats.activeCase?.status === "pending" && !forceNewCase) {
     return (
       <Layout>
