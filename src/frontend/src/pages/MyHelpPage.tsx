@@ -1,7 +1,5 @@
 // src/frontend/src/pages/MyHelpPage.tsx
-// Givethra - My Help Page (for Heroes)
-// 🔥 FIXED: Uses shared resolutionStatus helpers (Fix #5)
-// 🔥 FIXED: Unlock-only records now reflect actual case status (if completed by someone else, show "completed")
+// 🔥 FIXED: 4 separate UI blocks for Hero outcomes (paid_completed, unlock_only_completed, unlock_only_pending, resolution_pending)
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -42,7 +40,7 @@ function maskCnic(cnic?: string): string {
   if (digits.length < 6) return cnic;
   const shown = digits.slice(0, 4);
   const masked = "*".repeat(Math.max(digits.length - 4, 4));
-  return `${shown}${masked}`;
+  return `\( {shown} \){masked}`;
 }
 
 function generateAffidavitFromRecord(caseData: any, record: any, seekerName: string, heroName: string) {
@@ -52,7 +50,7 @@ function generateAffidavitFromRecord(caseData: any, record: any, seekerName: str
   const seekerCnic = maskCnic(record.seeker_cnic);
   const heroCnic = maskCnic(record.hero_cnic);
   const completedDate = record.completedAt ? new Date(record.completedAt).toLocaleDateString() : today;
-  const verifyCode = `GVT-${caseId}-${Date.now().toString(36).toUpperCase()}`;
+  const verifyCode = `GVT-\( {caseId}- \){Date.now().toString(36).toUpperCase()}`;
   const cur = caseData.currency || "USD";
   const s = sym(cur);
   const paidAmount = record.amount;
@@ -145,10 +143,7 @@ export default function MyHelpPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "completed" | "rejected">("all");
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate({ to: "/sign-in" });
-      return;
-    }
+    if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
     loadData();
     const onFocus = () => loadData();
     window.addEventListener("focus", onFocus);
@@ -188,7 +183,7 @@ export default function MyHelpPage() {
 
       const recordList: any[] = [];
 
-      // 🔥 FIX #5: Use isTrulyCompletedHelp and isContributionResolution from shared helpers
+      // Resolutions
       for (const resolution of resolutions) {
         const caseId = String(resolution.case_id || "");
         if (!caseId) continue;
@@ -229,7 +224,7 @@ export default function MyHelpPage() {
         });
       }
 
-      // 🔥 FIX: Unlock-only records - now check actual case status
+      // Unlock-only with classification
       for (const unlock of unlocks) {
         const caseId = String(unlock.case_id || "");
         if (!caseId) continue;
@@ -243,6 +238,9 @@ export default function MyHelpPage() {
         };
         const isPartial = unlock.payment_type === "partial";
         const caseIsCompleted = String(caseRecord.status || "").toLowerCase() === "completed";
+
+        const outcome = caseIsCompleted ? "unlock_only_completed" : "unlock_only_pending";
+
         recordList.push({
           id: unlock.id,
           type: isPartial ? "contribution" : "direct",
@@ -264,7 +262,8 @@ export default function MyHelpPage() {
           heroName: user.fullName || "You",
           heroCnic: "",
           isUnlockOnly: true,
-          caseCompletedByOther: caseIsCompleted, // 🔥 new flag for UI
+          caseCompletedByOther: caseIsCompleted,
+          outcome,
         });
       }
 
@@ -348,16 +347,154 @@ export default function MyHelpPage() {
                   const isRejected = record.status === "rejected";
                   const isUnlockOnly = record.isUnlockOnly;
 
+                  // 🔥 FIXED: 4 الگ UI blocks (حصہ 2 کے مطابق)
+                  if (isUnlockOnly) {
+                    return (
+                      <div
+                        key={record.id}
+                        className={`rounded-xl border p-4 space-y-3 ${
+                          isCompleted
+                            ? "border-green-300 bg-green-50/50 dark:bg-green-950/10"
+                            : "bg-card"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.color}`}>
+                                {cfg.icon} {cfg.label}
+                              </span>
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                {record.type === "contribution" ? "🤝 Contribution" : "🦸 Direct Help"}
+                              </span>
+                              {isUnlockOnly && (
+                                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                                  🔓 Unlock Only
+                                </span>
+                              )}
+                            </div>
+                            <p className="font-semibold text-sm truncate">{record.caseTitle}</p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span>{record.caseCategory}</span>
+                              {(record.caseCity || record.caseCountry) && (
+                                <span className="flex items-center gap-0.5">
+                                  <MapPin className="h-3 w-3" /> {[record.caseCity, record.caseCountry].filter(Boolean).join(", ")}
+                                </span>
+                              )}
+                              {record.amount > 0 && (
+                                <span className="font-medium text-foreground">
+                                  {s} {record.amount} {cur}
+                                </span>
+                              )}
+                            </div>
+                            {record.transactionId && record.transactionId !== "N/A" && (
+                              <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{record.transactionId}</span></p>
+                            )}
+                            {record.completedAt && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Calendar className="h-3 w-3" /> {new Date(record.completedAt).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {isCompleted && record.isApproved && !isUnlockOnly && (
+                            <Button
+                              size="sm"
+                              className="gap-2 bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[120px]"
+                              onClick={() => {
+                                const affidavitWindow = window.open(`/affidavit/${encodeURIComponent(record.caseId)}`, "_blank", "noopener,noreferrer");
+                                if (!affidavitWindow) toast.error("Please allow pop-ups to view the affidavit.");
+                              }}
+                            >
+                              <FileText className="h-3.5 w-3.5" /> View Affidavit
+                            </Button>
+                          )}
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 min-w-[100px]"
+                            onClick={() => navigate({ to: "/cases/$id", params: { id: record.caseId } })}
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1.5" /> View Case
+                          </Button>
+
+                          {isRejected && !isCompleted && (
+                            <div className="w-full mt-1 rounded-lg bg-red-100 dark:bg-red-950/30 p-2 text-xs text-red-700 flex items-center gap-1.5">
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                              This help was not verified. You can try helping again on another case.
+                            </div>
+                          )}
+
+                          {/* 3 outcomes کے مطابق پیغام */}
+                          {isUnlockOnly && record.caseCompletedByOther && (
+                            <div className="w-full mt-1 rounded-lg bg-blue-100 dark:bg-blue-950/30 p-2 text-xs text-blue-700">
+                              🙏 یہ کیس مکمل ہو چکا ہے — کسی اور کی مدد سے یہ پورا ہوا۔ آپ کا unlock بھی اس سفر کا حصہ تھا، شکریہ! نیا کیس تلاش کریں اور مکمل Hero بنیں۔ <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate({ to: "/cases" })}>Browse More Cases</Button>
+                            </div>
+                          )}
+                          {isUnlockOnly && !record.caseCompletedByOther && (
+                            <div className="w-full mt-1 rounded-lg bg-amber-100 dark:bg-amber-950/30 p-2 text-xs text-amber-700">
+                              💪 You unlocked this case but didn't complete a payment. Browse more cases and become a full Hero!
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // paid_completed (Payment Proof + Affidavit)
+                  if (record.type === "contribution" && isCompleted && record.isApproved) {
+                    return (
+                      <div
+                        key={record.id}
+                        className="rounded-xl border p-4 space-y-3 border-green-300 bg-green-50/50 dark:bg-green-950/10"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.color}`}>
+                                {cfg.icon} {cfg.label}
+                              </span>
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                🤝 Contribution
+                              </span>
+                            </div>
+                            <p className="font-semibold text-sm truncate">{record.caseTitle}</p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span>{record.caseCategory}</span>
+                              {record.amount > 0 && <span className="font-medium text-foreground">{s} {record.amount} {cur}</span>}
+                            </div>
+                            {record.transactionId && <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{record.transactionId}</span></p>}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            className="gap-2 bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[120px]"
+                            onClick={() => window.open(`/affidavit/${encodeURIComponent(record.caseId)}`, "_blank", "noopener,noreferrer")}
+                          >
+                            <FileText className="h-3.5 w-3.5" /> View Affidavit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 min-w-[100px]"
+                            onClick={() => navigate({ to: "/cases/$id", params: { id: record.caseId } })}
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1.5" /> View Case
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // default paid_completed (Direct Help)
                   return (
                     <div
                       key={record.id}
-                      className={`rounded-xl border p-4 space-y-3 ${
-                        isRejected
-                          ? "border-red-300 bg-red-50/50 dark:bg-red-950/10"
-                          : isCompleted
-                          ? "border-green-300 bg-green-50/50 dark:bg-green-950/10"
-                          : "bg-card"
-                      }`}
+                      className={`rounded-xl border p-4 space-y-3 ${isCompleted ? "border-green-300 bg-green-50/50 dark:bg-green-950/10" : "bg-card"}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1.5 flex-1 min-w-0">
@@ -368,51 +505,25 @@ export default function MyHelpPage() {
                             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
                               {record.type === "contribution" ? "🤝 Contribution" : "🦸 Direct Help"}
                             </span>
-                            {isUnlockOnly && (
-                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                                🔓 Unlock Only
-                              </span>
-                            )}
                           </div>
                           <p className="font-semibold text-sm truncate">{record.caseTitle}</p>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span>{record.caseCategory}</span>
-                            {(record.caseCity || record.caseCountry) && (
-                              <span className="flex items-center gap-0.5">
-                                <MapPin className="h-3 w-3" /> {[record.caseCity, record.caseCountry].filter(Boolean).join(", ")}
-                              </span>
-                            )}
-                            {record.amount > 0 && (
-                              <span className="font-medium text-foreground">
-                                {s} {record.amount} {cur}
-                              </span>
-                            )}
+                            {record.amount > 0 && <span className="font-medium text-foreground">{s} {record.amount} {cur}</span>}
                           </div>
-                          {record.transactionId && record.transactionId !== "N/A" && (
-                            <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{record.transactionId}</span></p>
-                          )}
-                          {record.completedAt && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Calendar className="h-3 w-3" /> {new Date(record.completedAt).toLocaleDateString()}
-                            </p>
-                          )}
+                          {record.transactionId && <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{record.transactionId}</span></p>}
                         </div>
                       </div>
-
                       <div className="flex flex-wrap gap-2">
-                        {isCompleted && record.isApproved && !isUnlockOnly && (
+                        {isCompleted && record.isApproved && (
                           <Button
                             size="sm"
                             className="gap-2 bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[120px]"
-                            onClick={() => {
-                              const affidavitWindow = window.open(`/affidavit/${encodeURIComponent(record.caseId)}`, "_blank", "noopener,noreferrer");
-                              if (!affidavitWindow) toast.error("Please allow pop-ups to view the affidavit.");
-                            }}
+                            onClick={() => window.open(`/affidavit/${encodeURIComponent(record.caseId)}`, "_blank", "noopener,noreferrer")}
                           >
                             <FileText className="h-3.5 w-3.5" /> View Affidavit
                           </Button>
                         )}
-
                         <Button
                           size="sm"
                           variant="outline"
@@ -421,25 +532,6 @@ export default function MyHelpPage() {
                         >
                           <Eye className="h-3.5 w-3.5 mr-1.5" /> View Case
                         </Button>
-
-                        {isRejected && !isCompleted && (
-                          <div className="w-full mt-1 rounded-lg bg-red-100 dark:bg-red-950/30 p-2 text-xs text-red-700 flex items-center gap-1.5">
-                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                            This help was not verified. You can try helping again on another case.
-                          </div>
-                        )}
-
-                        {/* 🔥 FIX: Two separate messages based on whether case is completed by someone else */}
-                        {isUnlockOnly && record.caseCompletedByOther && (
-                          <div className="w-full mt-1 rounded-lg bg-blue-100 dark:bg-blue-950/30 p-2 text-xs text-blue-700">
-                            ✅ This case has been completed — someone else's help finished it, or your own payment proof was not recorded here.
-                          </div>
-                        )}
-                        {isUnlockOnly && !record.caseCompletedByOther && (
-                          <div className="w-full mt-1 rounded-lg bg-amber-100 dark:bg-amber-950/30 p-2 text-xs text-amber-700">
-                            💪 You unlocked this case but didn't complete a payment. Browse more cases and become a full Hero!
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
