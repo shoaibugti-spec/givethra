@@ -1,115 +1,132 @@
 // src/frontend/src/pages/submit-request/category-forms/WidowElderlyForm.tsx
+import { useMemo } from "react";
 import { Label } from "@/components/ui/label";
-import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BaseCategoryForm } from "./BaseCategoryForm";
+import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function WidowElderlyForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields = {}, catDocUrls = {} } = formData;
+const STATUS_OPTIONS = ["Widow", "Elderly"];
 
-  const setField = (key: string, value: any) => {
+export default function WidowElderlyForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const catFields = formData.catFields || {};
+  const catDocUrls = formData.catDocUrls || {};
+
+  const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catFields: { ...prev.catFields, [key]: value },
+      catFields: { ...(prev.catFields || {}), [key]: value },
     }));
   };
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({
       ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
+      catDocUrls: { ...(prev.catDocUrls || {}), [key]: url },
     }));
   };
 
-  const isValid =
-    !!catFields.status &&
-    !!catFields.full_name?.trim() &&
-    !!catFields.age?.trim() &&
-    !!catDocUrls.cnic &&
-    (catFields.status !== "Widow" || !!catDocUrls.death_cert);
+  const isWidow = catFields.status === "Widow";
+
+  const isValid = useMemo(() => {
+    if (!catFields.status) return false;
+    if (!catFields.full_name?.trim()) return false;
+    if (!catFields.age) return false;
+    if (!catDocUrls.cnic) return false;
+    if (isWidow && !catDocUrls.death_cert) return false;
+    return true;
+  }, [catFields, catDocUrls, isWidow]);
 
   return (
     <BaseCategoryForm
-      formData={formData}
-      setFormData={setFormData}
+      title="Widow & Elderly Support"
+      subtitle="Fixed stipend Rs 6,000 · verified need"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
       isLast={isLast}
-      title="👵 Widow & Elderly Support"
-      subtitle="Provide details for elderly or widow support."
-      guide="💰 Fixed Amount: Rs 6,000. For widows and elderly individuals."
       disabled={!isValid}
     >
-      <div className="space-y-3">
-        <div className="space-y-2">
+      <div className="space-y-4">
+        <div className="space-y-1">
           <Label>Status *</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {["Widow", "Elderly (60+)", "Both"].map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setField("status", opt)}
-                className={`px-3 py-2.5 rounded-lg border text-sm font-medium ${
-                  catFields.status === opt
-                    ? "bg-primary text-white border-primary"
-                    : "border-border"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
+          <Select
+            value={catFields.status || ""}
+            onValueChange={(v) => setField("status", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <TextInput
-          field="Full Name"
-          value={catFields.full_name}
-          onChange={(v: string) => setField("full_name", v)}
-          placeholder="Full name"
-        />
-
-        <TextInput
-          field="Age"
-          value={catFields.age}
-          onChange={(v: string) => setField("age", v)}
-          placeholder="Age in years"
-        />
-
-        {catFields.status === "Widow" && (
-          <TextInput
-            field="Spouse's Name"
-            value={catFields.spouse_name}
-            onChange={(v: string) => setField("spouse_name", v)}
-            placeholder="Name of deceased spouse"
+        <div className="space-y-1">
+          <Label>Full name *</Label>
+          <Input
+            value={catFields.full_name || ""}
+            onChange={(e) => setField("full_name", e.target.value)}
+            placeholder="Full name as on CNIC"
           />
-        )}
+        </div>
 
-        <TextInput
-          field="CNIC Number"
-          value={catFields.cnic}
-          onChange={(v: string) => setField("cnic", v)}
-          placeholder="CNIC number"
-        />
+        <div className="space-y-1">
+          <Label>Age *</Label>
+          <Input
+            type="number"
+            value={catFields.age || ""}
+            onChange={(e) => setField("age", e.target.value)}
+            placeholder="Age in years"
+          />
+        </div>
 
-        <FileUpload
-          label="CNIC Photo"
-          key="cnic"
+        <DocBox
+          label="CNIC photo"
           required
-          hint="Clear photo of CNIC (front and back)"
-          onUpload={(url: string) => setDoc("cnic", url)}
+          hint="Clear front side of CNIC"
+          onUpload={(url) => setDoc("cnic", url)}
           value={catDocUrls.cnic}
         />
 
-        {catFields.status === "Widow" && (
-          <FileUpload
-            label="Spouse's Death Certificate"
-            key="death_cert"
+        {isWidow && (
+          <DocBox
+            label="Spouse death certificate"
             required
-            hint="Clear photo of death certificate"
-            onUpload={(url: string) => setDoc("death_cert", url)}
+            hint="Required for widow status"
+            onUpload={(url) => setDoc("death_cert", url)}
             value={catDocUrls.death_cert}
           />
         )}
       </div>
+
+      <StepGuide
+        lines={[
+          "This category has a fixed stipend of Rs 6,000.",
+          "Widow status requires a clear death certificate of the spouse.",
+          "CNIC name and details must match the form.",
+          "Upload clear, readable documents only.",
+        ]}
+      />
     </BaseCategoryForm>
   );
 }
