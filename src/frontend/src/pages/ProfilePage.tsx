@@ -5,6 +5,10 @@
 // 🔥 FIXED: Edit button separated from name/badge to avoid layout collision (Fix #7)
 // 🔥 FIXED: Profile loading stuck - now shows page even if profile is null (Fix #8)
 // 🔥 FIXED: "/profile/me" now uses actual logged-in user id (Critical fix)
+// 🔥 FIXED (NEW): Removed the duplicate text "Edit Profile" button below the name/badge row.
+//                 Only the pencil icon button on top of the avatar photo remains as the
+//                 single way to edit the profile — this frees up vertical space and avoids
+//                 the two edit controls competing for the same job.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -436,7 +440,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="px-5 pb-5">
-            {/* Avatar row — remains unchanged */}
+            {/* Avatar row — the ONLY edit control is the pencil icon on the photo itself */}
             <div className="flex items-end justify-between -mt-12 mb-3">
               <div className="relative shrink-0">
                 <div className="h-24 w-24 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary">
@@ -477,10 +481,12 @@ export default function ProfilePage() {
             </div>
 
             {/* ================================================================
-                🔥 FIX #7: Name + Badge (first row) and Edit button (second row)
+                🔥 FIX (NEW): Name + Badge row only. The duplicate "Edit Profile"
+                text button that used to sit below this row has been removed —
+                the pencil icon on the avatar photo above is now the single,
+                only way to edit the profile. This frees up the vertical space
+                that button used to take.
                 ================================================================ */}
-
-            {/* Name + Badge — اپنی مکمل قطار، آزادی سے wrap ہو سکتی ہے */}
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-foreground break-words">{displayName}</h1>
               {badge && (
@@ -509,22 +515,7 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Edit بٹن — اپنی الگ قطار، ہمیشہ مکمل چوڑائی کے ساتھ نظر آئے گا */}
-            {isOwnProfile && (
-              <div className="flex justify-end mt-1.5">
-                <button
-                  type="button"
-                  onClick={() => navigate({ to: "/edit-profile" })}
-                  title="Edit Profile"
-                  aria-label="Edit Profile"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary px-3 py-1.5 text-xs font-semibold hover:bg-primary/15 transition-colors"
-                >
-                  <Pencil className="h-3.5 w-3.5" /> Edit Profile
-                </button>
-              </div>
-            )}
-
-            {/* Location, Member Since, KYC, Bio — same as before */}
+            {/* Location, Member Since, KYC, Bio */}
             <div className="space-y-1 mt-1">
               {(profile?.city || profile?.country) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
