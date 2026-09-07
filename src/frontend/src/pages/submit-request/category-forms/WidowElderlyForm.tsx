@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 
 export default function WidowElderlyForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields, catDocUrls } = formData;
+  const { catFields = {}, catDocUrls = {} } = formData;
 
   const setField = (key: string, value: any) => {
     setFormData((prev: any) => ({
@@ -19,7 +19,12 @@ export default function WidowElderlyForm({ formData, setFormData, onNext, onBack
     }));
   };
 
-  const isValid = catFields.full_name?.trim() && catFields.age?.trim() && catFields.status;
+  const isValid =
+    !!catFields.status &&
+    !!catFields.full_name?.trim() &&
+    !!catFields.age?.trim() &&
+    !!catDocUrls.cnic &&
+    (catFields.status !== "Widow" || !!catDocUrls.death_cert);
 
   return (
     <BaseCategoryForm
@@ -32,6 +37,7 @@ export default function WidowElderlyForm({ formData, setFormData, onNext, onBack
       title="👵 Widow & Elderly Support"
       subtitle="Provide details for elderly or widow support."
       guide="💰 Fixed Amount: Rs 6,000. For widows and elderly individuals."
+      disabled={!isValid}
     >
       <div className="space-y-3">
         <div className="space-y-2">
@@ -43,7 +49,9 @@ export default function WidowElderlyForm({ formData, setFormData, onNext, onBack
                 type="button"
                 onClick={() => setField("status", opt)}
                 className={`px-3 py-2.5 rounded-lg border text-sm font-medium ${
-                  catFields.status === opt ? "bg-primary text-white border-primary" : "border-border"
+                  catFields.status === opt
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                 }`}
               >
                 {opt}
@@ -55,14 +63,14 @@ export default function WidowElderlyForm({ formData, setFormData, onNext, onBack
         <TextInput
           field="Full Name"
           value={catFields.full_name}
-          onChange={(v) => setField("full_name", v)}
+          onChange={(v: string) => setField("full_name", v)}
           placeholder="Full name"
         />
 
         <TextInput
           field="Age"
           value={catFields.age}
-          onChange={(v) => setField("age", v)}
+          onChange={(v: string) => setField("age", v)}
           placeholder="Age in years"
         />
 
@@ -70,7 +78,7 @@ export default function WidowElderlyForm({ formData, setFormData, onNext, onBack
           <TextInput
             field="Spouse's Name"
             value={catFields.spouse_name}
-            onChange={(v) => setField("spouse_name", v)}
+            onChange={(v: string) => setField("spouse_name", v)}
             placeholder="Name of deceased spouse"
           />
         )}
@@ -78,7 +86,7 @@ export default function WidowElderlyForm({ formData, setFormData, onNext, onBack
         <TextInput
           field="CNIC Number"
           value={catFields.cnic}
-          onChange={(v) => setField("cnic", v)}
+          onChange={(v: string) => setField("cnic", v)}
           placeholder="CNIC number"
         />
 
@@ -87,7 +95,7 @@ export default function WidowElderlyForm({ formData, setFormData, onNext, onBack
           key="cnic"
           required
           hint="Clear photo of CNIC (front and back)"
-          onUpload={(url) => setDoc("cnic", url)}
+          onUpload={(url: string) => setDoc("cnic", url)}
           value={catDocUrls.cnic}
         />
 
@@ -97,7 +105,7 @@ export default function WidowElderlyForm({ formData, setFormData, onNext, onBack
             key="death_cert"
             required
             hint="Clear photo of death certificate"
-            onUpload={(url) => setDoc("death_cert", url)}
+            onUpload={(url: string) => setDoc("death_cert", url)}
             value={catDocUrls.death_cert}
           />
         )}
