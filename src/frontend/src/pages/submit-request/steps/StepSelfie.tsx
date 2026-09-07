@@ -1,9 +1,12 @@
 // src/frontend/src/pages/submit-request/steps/StepSelfie.tsx
+// Live vertical selfie — same upload path as SubmitRequestPage
+
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { StepNavigation } from "../shared/StepNavigation";
 import { StepGuide } from "../shared/StepGuide";
 import { uploadFileToStorage } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export default function StepSelfie({
@@ -14,14 +17,18 @@ export default function StepSelfie({
   isFirst,
   isLast,
 }: any) {
+  const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const [cameraReady, setCameraReady] = useState(false);
-  const [capturing, setCapturing] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string>(formData?.selfieUrl || "");
-  const [error, setError] = useState<string>("");
+  // Local preview (data URL) shows immediately; formData.selfieUrl is remote URL after upload
+  const [localPreview, setLocalPreview] = useState<string>("");
+  const remoteUrl = formData?.selfieUrl || "";
+  const showPreview = localPreview || remoteUrl;
+  const [error, setError] = useState("");
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -37,95 +44,141 @@ export default function StepSelfie({
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          facingMode: { ideal: "user" },
+          // Prefer portrait
+          width: { ideal: 720 },
+          height: { ideal: 1280 },
+          aspectRatio: { ideal: 9 / 16 },
         },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+
+      // Wait a tick so the <video> is mounted
+      await new Promise((r) => setTimeout(r, 50));
+      const el = videoRef.current;
+      if (!el) throw new Error("Video element not ready");
+      el.srcObject = stream;
+      el.muted = true;
+      el.playsInline = true;
+      await el.play();
+
+      // Wait until we have real frames
+      await new Promise<void>((resolve) => {
+        if (el.videoWidth > 0) return resolve();
+        const onMeta = () => {
+          el.removeEventListener("loadedmetadata", onMeta);
+          resolve();
+        };
+        el.addEventListener("loadedmetadata", onMeta);
+        setTimeout(() => resolve(), 1500);
+      });
+
       setCameraReady(true);
     } catch (e: any) {
       console.error(e);
       setError(
-        "Camera access denied or unavailable. Please allow camera permission and try again."
+        "Camera access denied or unavailable. Allow camera permission and try again."
       );
       setCameraReady(false);
     }
   };
 
   useEffect(() => {
-    startCamera();
+    if (!showPreview) startCamera();
     return () => stopCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const captureSelfie = async () => {
-    if (!videoRef.current || !cameraReady) return;
-    setCapturing(true);
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    if (!video.videoWidth || !video.videoHeight) {
+      setError("Camera is still starting. Wait a second and try again.");
+      return;
+    }
+
     setError("");
     try {
-      const video = videoRef.current;
-      const canvas = document.createElement("canvas");
-      const w = video.videoWidth || 1280;
-      const h = video.videoHeight || 720;
-      canvas.width = w;
-      canvas.height = h;
+      // Keep natural camera orientation (portrait if device gives portrait)
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Canvas not supported");
 
-      // Mirror like a real selfie view
-      ctx.translate(w, 0);
+      // Mirror for natural selfie look
+      ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
-      ctx.drawImage(video, 0, 0, w, h);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 1) Show preview immediately (same as SubmitRequestPage)
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+      setLocalPreview(dataUrl);
 
       const blob: Blob | null = await new Promise((resolve) =>
         canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92)
       );
-      if (!blob) throw new Error("Failed to capture image");
+      if (!blob) throw new Error("Failed to create image");
+
+      // Stop camera after capture
+      stopCamera();
+
+      // 2) Upload with Page path: cases/{userId}/{ts}_selfie.jpg
+      if (!user?.id) {
+        throw new Error("Please sign in again before uploading.");
+      }
 
       setUploading(true);
-      const file = new File([blob], `selfie_${Date.now()}.jpg`, {
-        type: "image/jpeg",
-      });
-      const url = await uploadFileToStorage(file, `selfies/\( {Date.now()}_ \){file.name}`);
-      setPreviewUrl(url);
+      const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
+      const path = `cases/\( {user.id}/ \){Date.now()}_selfie.jpg`;
+      const url = await uploadFileToStorage(file, path);
+
       setFormData((prev: any) => ({ ...prev, selfieUrl: url }));
-      toast.success("Selfie captured");
-      stopCamera();
+      toast.success("Selfie uploaded");
     } catch (e: any) {
       console.error(e);
-      setError(e?.message || "Failed to capture selfie. Please try again.");
-      toast.error("Selfie capture failed");
+      const msg = e?.message || "Selfie upload failed — retake please.";
+      setError(msg);
+      toast.error(msg);
+      setLocalPreview("");
+      setFormData((prev: any) => ({ ...prev, selfieUrl: "" }));
+      await startCamera();
     } finally {
-      setCapturing(false);
       setUploading(false);
     }
   };
 
   const retake = async () => {
-    setPreviewUrl("");
+    setLocalPreview("");
     setFormData((prev: any) => ({ ...prev, selfieUrl: "" }));
+    setError("");
     await startCamera();
   };
 
-  const isValid = !!previewUrl && !uploading;
+  const isValid = !!remoteUrl && !uploading;
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">Live selfie</h2>
         <p className="text-sm text-muted-foreground">
-          Your front camera will open. Capture a clear live photo of your face.
-          File upload is not allowed.
+          Front camera opens for a live vertical selfie. Gallery upload is not allowed.
         </p>
       </div>
 
-      <div className="rounded-2xl border overflow-hidden bg-black aspect-[3/4] max-h-[420px] relative">
-        {!previewUrl ? (
+      {/* Hidden canvas used for capture */}
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* Vertical frame */}
+      <div className="mx-auto w-full max-w-sm rounded-2xl border overflow-hidden bg-black aspect-[9/16] relative">
+        {showPreview ? (
+          <img
+            src={showPreview}
+            alt="Selfie preview"
+            className="h-full w-full object-cover"
+          />
+        ) : (
           <video
             ref={videoRef}
             playsInline
@@ -134,35 +187,30 @@ export default function StepSelfie({
             className="h-full w-full object-cover"
             style={{ transform: "scaleX(-1)" }}
           />
-        ) : (
-          <img
-            src={previewUrl}
-            alt="Selfie preview"
-            className="h-full w-full object-cover"
-          />
         )}
 
-        {(uploading || capturing) && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-sm">
-            {uploading ? "Uploading..." : "Capturing..."}
+        {uploading && (
+          <div className="absolute inset-0 bg-black/55 flex items-center justify-center text-white text-sm">
+            Uploading selfie...
           </div>
         )}
       </div>
 
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {remoteUrl && !uploading && (
+        <p className="text-sm text-green-600 text-center">Selfie ready</p>
       )}
 
-      <div className="flex flex-col gap-2">
-        {!previewUrl ? (
+      <div className="flex flex-col gap-2 max-w-sm mx-auto w-full">
+        {!showPreview ? (
           <>
             <Button
               type="button"
               onClick={captureSelfie}
-              disabled={!cameraReady || capturing || uploading}
+              disabled={!cameraReady || uploading}
               className="w-full"
             >
-              {capturing || uploading ? "Please wait..." : "Capture live selfie"}
+              Capture live selfie
             </Button>
             {!cameraReady && (
               <Button type="button" variant="outline" onClick={startCamera} className="w-full">
@@ -171,7 +219,7 @@ export default function StepSelfie({
             )}
           </>
         ) : (
-          <Button type="button" variant="outline" onClick={retake} className="w-full">
+          <Button type="button" variant="outline" onClick={retake} disabled={uploading} className="w-full">
             Retake live selfie
           </Button>
         )}
@@ -179,10 +227,10 @@ export default function StepSelfie({
 
       <StepGuide
         lines={[
-          "This must be a live camera selfie — gallery or file upload is not accepted.",
-          "Look at the camera with good lighting. Keep your face fully visible.",
-          "Remove sunglasses, mask, or heavy filters.",
-          "If the camera does not open, allow camera permission in your browser and tap Enable camera.",
+          "This is a live camera selfie only — no file attachment.",
+          "Hold the phone upright (vertical). Keep your face centered.",
+          "Good lighting, no sunglasses or mask.",
+          "Wait until you see “Selfie ready” before tapping Next.",
         ]}
       />
 
