@@ -1,6 +1,3 @@
-// src/frontend/src/pages/submit-request/hooks/useSubmitDraft.ts
-// ✅ FIXED: stable function identities
-
 import { useCallback } from "react";
 
 const SS_KEY = "givethra_submit_draft_v4";
@@ -9,9 +6,7 @@ export function useSubmitDraft() {
   const saveDraft = useCallback((data: any) => {
     try {
       sessionStorage.setItem(SS_KEY, JSON.stringify(data));
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   const loadDraft = useCallback((): any => {
@@ -26,9 +21,7 @@ export function useSubmitDraft() {
   const clearDraft = useCallback(() => {
     try {
       sessionStorage.removeItem(SS_KEY);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   return { saveDraft, loadDraft, clearDraft };
