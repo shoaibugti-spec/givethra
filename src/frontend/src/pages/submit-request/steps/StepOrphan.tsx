@@ -1,14 +1,17 @@
 // src/frontend/src/pages/submit-request/steps/StepOrphan.tsx
 import { Label } from "@/components/ui/label";
 import { StepNavigation } from "../shared/StepNavigation";
+import { StepGuide } from "../shared/StepGuide";
 
 export default function StepOrphan({ value, onChange, onNext, onBack, isFirst, isLast }: any) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">Are you an orphan?</h2>
-        <p className="text-sm text-muted-foreground">This information helps us provide targeted support.</p>
-        <Label>Orphan Status *</Label>
+        <p className="text-sm text-muted-foreground">
+          This information helps us provide targeted support and request the right proof.
+        </p>
+        <Label>Orphan status *</Label>
         <div className="grid grid-cols-2 gap-3">
           {["Yes", "No"].map((opt) => (
             <button
@@ -27,6 +30,15 @@ export default function StepOrphan({ value, onChange, onNext, onBack, isFirst, i
           ))}
         </div>
       </div>
+
+      <StepGuide
+        lines={[
+          "If Yes, you will select which parent passed away.",
+          "You must upload the parent's death certificate in the documents step.",
+          "Answer honestly — this is used for verification.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
