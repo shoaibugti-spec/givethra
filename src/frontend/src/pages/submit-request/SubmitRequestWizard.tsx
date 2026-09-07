@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// ✅ FIXED: Root cause of blinking — stable stepProps, debounced draft, no cascade on category select
+// ✅ FIXED: blinking + status gates (pending / approved / rejected / feedback / suspension)
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -102,49 +102,52 @@ const PLACEHOLDERS: Record<string, string> = {
   city: "e.g. Karachi",
 };
 
+const INITIAL_FORM = {
+  category: "",
+  title: "",
+  shortDesc: "",
+  country: "",
+  city: "",
+  urgency: "",
+  gender: "",
+  maritalStatus: "",
+  isOrphan: "",
+  orphanParent: "",
+  seekerName: "",
+  seekerContact: "",
+  jobStatus: "",
+  salarySlipUrl: "",
+  statementUrl: "",
+  catFields: {},
+  catDocUrls: {},
+  propertyOwnership: "",
+  rentalAgreementUrl: "",
+  landlordCnicUrl: "",
+  ownerCnicUrl: "",
+  ownerRelation: "",
+  description: "",
+  debtTotalAmount: "",
+  amount: "",
+  currency: "PKR",
+  deadline: "",
+  selfieUrl: "",
+  videoUrl: "",
+  confirmed: false,
+};
+
 export default function SubmitRequestWizard() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
-    category: "",
-    title: "",
-    shortDesc: "",
-    country: "",
-    city: "",
-    urgency: "",
-    gender: "",
-    maritalStatus: "",
-    isOrphan: "",
-    orphanParent: "",
-    seekerName: "",
-    seekerContact: "",
-    jobStatus: "",
-    salarySlipUrl: "",
-    statementUrl: "",
-    catFields: {},
-    catDocUrls: {},
-    propertyOwnership: "",
-    rentalAgreementUrl: "",
-    landlordCnicUrl: "",
-    ownerCnicUrl: "",
-    ownerRelation: "",
-    description: "",
-    debtTotalAmount: "",
-    amount: "",
-    currency: "PKR",
-    deadline: "",
-    selfieUrl: "",
-    videoUrl: "",
-    confirmed: false,
-  });
-
+  const [formData, setFormData] = useState({ ...INITIAL_FORM });
   const [currentStepId, setCurrentStepId] = useState<string>("category");
   const [submitting, setSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  // Rejected case کے بعد user "Resubmit" دبائے تو فارم کھلے
+  const [forceNewCase, setForceNewCase] = useState(false);
 
   const { saveDraft, loadDraft, clearDraft } = useSubmitDraft();
-  const { stats, loading: statsLoading } = useUserSubmitStats(user?.id);
+  const { stats, loading: statsLoading, refetch } = useUserSubmitStats(user?.id);
 
   const visibleStepIds = useVisibleSteps(formData);
   const currentIndex = visibleStepIds.indexOf(currentStepId);
@@ -178,7 +181,7 @@ export default function SubmitRequestWizard() {
     setIsLoading(false);
   }, [isAuthenticated, navigate, loadDraft]);
 
-  // ── Debounced auto-save (400ms) — stops thrashing on every keystroke ──
+  // ── Debounced auto-save (400ms) ──────────────────────────────
   useEffect(() => {
     if (isLoading) return;
     const timer = setTimeout(() => {
@@ -247,16 +250,17 @@ export default function SubmitRequestWizard() {
     try {
       const result = await submitCase(formDataRef.current, user!.id, willBeFree);
       clearDraft();
+      setForceNewCase(false);
       toast.success(result.message);
+      refetch();
       navigate({ to: "/my-cases" });
     } catch (err: any) {
       toast.error(err.message || "Submission failed");
     } finally {
       setSubmitting(false);
     }
-  }, [user, willBeFree, clearDraft, navigate]);
+  }, [user, willBeFree, clearDraft, navigate, refetch]);
 
-  // ✅ Always writes to the CURRENT step via ref
   const stableOnChange = useCallback(
     (val: any) => {
       handleFieldChange(currentStepIdRef.current, val);
@@ -272,6 +276,13 @@ export default function SubmitRequestWizard() {
     }
   }, []);
 
+  const startFreshCase = useCallback(() => {
+    clearDraft();
+    setFormData({ ...INITIAL_FORM });
+    setCurrentStepId("category");
+    setForceNewCase(true);
+  }, [clearDraft]);
+
   // ── CRITICAL: only the single field value, not whole formData ──
   const currentValue = formData[currentStepId as keyof typeof formData];
   const needsFormData = STEPS_NEEDING_FORMDATA.has(currentStepId);
@@ -280,10 +291,11 @@ export default function SubmitRequestWizard() {
     const common = {
       value: currentValue,
       onChange: stableOnChange,
-      onNext: handleNext,
+      onNext: isLast ? handleSubmit : handleNext,
       onBack: handleBack,
       isFirst,
       isLast,
+      submitting,
     };
 
     const extra: any = {};
@@ -306,22 +318,24 @@ export default function SubmitRequestWizard() {
     return { ...common, ...extra };
   }, [
     currentStepId,
-    currentValue, // ← only the one field that matters
+    currentValue,
     stableOnChange,
     handleNext,
     handleBack,
+    handleSubmit,
     isFirst,
     isLast,
+    submitting,
     willBeFree,
     stats.isFreeDisabled,
     stats.freeCasesUsed,
-    needsFormData ? formData : null, // full formData only when required
+    needsFormData ? formData : null,
     stableSetFormData,
   ]);
 
   const CurrentStepComponent = STEP_COMPONENTS[currentStepId];
 
-  // ── Loading / blocked states ─────────────────────────────────
+  // ── Loading ──────────────────────────────────────────────────
   if (isLoading || statsLoading) {
     return (
       <Layout>
@@ -332,6 +346,7 @@ export default function SubmitRequestWizard() {
     );
   }
 
+  // ── Suspension ───────────────────────────────────────────────
   if (stats.isSuspended) {
     return (
       <Layout>
@@ -346,6 +361,7 @@ export default function SubmitRequestWizard() {
     );
   }
 
+  // ── Feedback required (completed case, no feedback after 24h) ─
   if (stats.blockedByFeedback) {
     return (
       <Layout>
@@ -354,7 +370,8 @@ export default function SubmitRequestWizard() {
             <h1 className="text-2xl font-bold">Please Share Your Feedback First</h1>
             <p>
               Your case "<strong>{stats.blockedByFeedback.caseTitle}</strong>" was
-              completed. Before submitting a new case, please share your feedback.
+              completed. Before submitting a new case, please share your feedback
+              (message + 90-second video).
             </p>
             <Button asChild>
               <Link
@@ -370,6 +387,109 @@ export default function SubmitRequestWizard() {
     );
   }
 
+  // ── Pending case (unless user forced new after reject — not for pending) ──
+  if (stats.activeCase?.status === "pending" && !forceNewCase) {
+    return (
+      <Layout>
+        <div className="max-w-xl mx-auto px-4 py-16 text-center">
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-8 space-y-5">
+            <h1 className="text-2xl font-bold text-amber-800">⏳ کیس زیر نظر ہے</h1>
+            <p className="text-base">
+              آپ کا کیس <strong>"{stats.activeCase.title}"</strong> جمع ہو چکا ہے اور
+              ابھی <strong>Pending</strong> میں ہے۔
+            </p>
+            <p className="text-sm text-muted-foreground">
+              نیا کیس تبھی جمع کر سکیں گے جب یہ منظور، مسترد یا مکمل ہو جائے۔
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button asChild className="w-full">
+                <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
+                  میرا کیس دیکھیں
+                </Link>
+              </Button>
+              <Button variant="outline" asChild className="w-full">
+                <Link to="/my-cases">میرے تمام کیسز</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Approved / live case ─────────────────────────────────────
+  if (stats.activeCase?.status === "approved" && !forceNewCase) {
+    return (
+      <Layout>
+        <div className="max-w-xl mx-auto px-4 py-16 text-center">
+          <div className="rounded-2xl border border-green-300 bg-green-50 dark:bg-green-950/20 p-8 space-y-5">
+            <h1 className="text-2xl font-bold text-green-800">✅ کیس منظور ہو چکا</h1>
+            <p className="text-base">
+              <strong>"{stats.activeCase.title}"</strong> live ہے — لوگ اس میں
+              contribution / مدد کر رہے ہیں۔
+            </p>
+            <p className="text-sm text-muted-foreground">
+              جب کیس مکمل ہو جائے گا تو آپ کو payment proof اور feedback کا صفحہ
+              نظر آئے گا۔
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button asChild className="w-full">
+                <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
+                  کیس کا صفحہ کھولیں
+                </Link>
+              </Button>
+              <Button variant="outline" asChild className="w-full">
+                <Link to="/my-cases">میرے تمام کیسز</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Rejected case — show reason + resubmit ───────────────────
+  if (stats.activeCase?.status === "rejected" && !forceNewCase) {
+    return (
+      <Layout>
+        <div className="max-w-xl mx-auto px-4 py-16 text-center">
+          <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-8 space-y-5">
+            <h1 className="text-2xl font-bold text-red-700">❌ کیس مسترد ہو گیا</h1>
+            <p className="text-base">
+              <strong>"{stats.activeCase.title}"</strong> ایڈمن نے مسترد کر دیا۔
+            </p>
+            {stats.activeCase.rejectionReason ? (
+              <div className="rounded-lg bg-white dark:bg-card border p-4 text-left text-sm">
+                <p className="font-semibold mb-1">وجہ / Reason:</p>
+                <p className="text-muted-foreground whitespace-pre-wrap">
+                  {stats.activeCase.rejectionReason}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                تفصیلی وجہ کیس کے صفحے پر دیکھ سکتے ہیں۔
+              </p>
+            )}
+            <div className="flex flex-col gap-3">
+              <Button className="w-full" onClick={startFreshCase}>
+                پھر سے کیس جمع کروائیں
+              </Button>
+              <Button variant="outline" asChild className="w-full">
+                <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
+                  مسترد شدہ کیس دیکھیں
+                </Link>
+              </Button>
+              <Button variant="ghost" asChild className="w-full">
+                <Link to="/my-cases">میرے تمام کیسز</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Main wizard form ─────────────────────────────────────────
   return (
     <Layout>
       <div className="max-w-2xl mx-auto px-4 py-6">
