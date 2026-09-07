@@ -1,21 +1,31 @@
-// src/frontend/src/pages/submit-request/steps/StepPropertyOwnership.tsx
+// src/frontend/src/pages/submit-request/steps/StepPeopertyOwnership.tsx
 import { Label } from "@/components/ui/label";
 import { StepNavigation } from "../shared/StepNavigation";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function StepPropertyOwnership({ value, onChange, onNext, onBack, isFirst, isLast }: any) {
+const OPTIONS = [
+  { value: "rented", label: "Rented", icon: "🏠" },
+  { value: "owned", label: "Owned", icon: "📜" },
+];
+
+export default function StepPeopertyOwnership({
+  value,
+  onChange,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold">🏠 Property Ownership</h2>
+        <h2 className="text-2xl font-bold">Property ownership</h2>
         <p className="text-sm text-muted-foreground">
-          Is the property where you live owned by you or are you a tenant (renting)?
+          Is the property rented or owned? This decides which documents we ask next.
         </p>
-        <Label>Property Status *</Label>
+        <Label>Ownership *</Label>
         <div className="grid grid-cols-2 gap-3">
-          {[
-            { value: "owned", label: "🏠 Owned", desc: "I own this property" },
-            { value: "rented", label: "🏢 Rented", desc: "I rent this property" },
-          ].map((opt) => (
+          {OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
@@ -26,12 +36,21 @@ export default function StepPropertyOwnership({ value, onChange, onNext, onBack,
                   : "border-border hover:border-primary/50"
               }`}
             >
-              <div className="font-medium text-lg">{opt.label}</div>
-              <div className="text-sm text-muted-foreground">{opt.desc}</div>
+              <div className="text-2xl mb-1">{opt.icon}</div>
+              <div className="font-medium">{opt.label}</div>
             </button>
           ))}
         </div>
       </div>
+
+      <StepGuide
+        lines={[
+          "Rented: you will upload rental agreement and landlord CNIC.",
+          "Owned: you will upload owner CNIC and relation to owner.",
+          "Choose the option that matches your real situation.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
