@@ -1,6 +1,6 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
 // Givethra - Full-Color Auto-Slide Boxes
-// 🔥 FINAL: Requester button → /submit-request when KYC approved
+// Requester button → the guided onboarding route after KYC approval
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -155,7 +155,7 @@ export default function RoleSelectionPage() {
         to: "/sign-in",
         search: {
           role,
-          redirect: role === "requester" ? "/submit-request" : "/cases",
+          redirect: role === "requester" ? "/onboarding-submit" : "/cases",
         },
       });
       return;
@@ -166,7 +166,7 @@ export default function RoleSelectionPage() {
         const kyc = await getKycStatus(user!.id);
         const status = String(kyc?.status || "none").trim().toLowerCase();
         if (status === "approved") {
-          navigate({ to: "/submit-request" });
+          navigate({ to: "/onboarding-submit" });
         } else {
           navigate({ to: "/kyc" });
         }

@@ -1,4 +1,5 @@
 // src/frontend/src/pages/submit-request/category-forms/EducationBooksForm.tsx
+import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 import { EDUCATION_INSTITUTES } from "@/lib/institutesList";
 import { useState } from "react";

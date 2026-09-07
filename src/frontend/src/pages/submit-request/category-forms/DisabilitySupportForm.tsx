@@ -1,7 +1,9 @@
 // src/frontend/src/pages/submit-request/category-forms/DisabilitySupportForm.tsx
+import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 import { HEALTH_INSTITUTES } from "@/lib/institutesList";
 import { useState } from "react";
+import { StepNavigation } from "../shared/StepNavigation";
 
 export default function DisabilitySupportForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
   const { catFields, catDocUrls, disabilityMode, disabilityShopName, disabilityShopContact, disabilityHospital, disabilityBankTitle, disabilityBankNumber, treatmentAmount, treatmentExpiry, treatmentPatientNumber, disabilityType } = formData;

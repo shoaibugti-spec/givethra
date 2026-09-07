@@ -963,7 +963,7 @@ export default function CaseDetailPage() {
                         </div>
                       )}
                     </div>
-                    <Button className="w-full" onClick={submitFeedback} disabled={fbSubmitting || recording || (fbVideoFile && videoDuration < 60)}>
+                    <Button className="w-full" onClick={submitFeedback} disabled={fbSubmitting || recording || (!!fbVideoFile && videoDuration < 60)}>
                       {fbSubmitting ? "Posting..." : "Post Feedback to Community Wall 🤲"}
                     </Button>
                     {fbVideoFile && videoDuration < 60 && <p className="text-xs text-red-500">⏳ Video must be at least 60 seconds. Current: {videoDuration}s</p>}

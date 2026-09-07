@@ -1,4 +1,5 @@
 // src/frontend/src/pages/submit-request/category-forms/GasBillForm.tsx
+import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 import { GAS_COMPANIES } from "@/lib/institutesList";
 

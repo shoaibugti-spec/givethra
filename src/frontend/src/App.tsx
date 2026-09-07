@@ -29,7 +29,16 @@ const CasesPage = lazy(() => import("@/pages/CasesPage").catch(() => ({ default:
 const CaseDetailPage = lazy(() => import("@/pages/CaseDetailPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 const AffidavitPage = lazy(() => import("@/pages/AffidavitPage").catch(() => ({ default: () => <div>Failed to load page</div> })));
 
-// 🔥 SubmitRequestWizard
+// The classic form remains the stable BottomNav entry point.
+const SubmitRequestPage = lazy(() =>
+  import("@/pages/SubmitRequestPage")
+    .then(module => ({ default: module.default }))
+    .catch(() => ({
+      default: () => <div className="p-8 text-center text-red-600">Failed to load Submit Request. Check console.</div>
+    }))
+);
+
+// The guided wizard is reserved for the requester onboarding flow.
 const SubmitRequestWizard = lazy(() =>
   import("@/pages/submit-request/SubmitRequestWizard")
     .then(module => ({ default: module.default }))
@@ -197,10 +206,17 @@ const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases"
 const caseDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cases/$id", component: () => <Suspense fallback={<PageLoader />}><CaseDetailPage /></Suspense> });
 const affidavitRoute = createRoute({ getParentRoute: () => rootRoute, path: "/affidavit/$caseId", component: () => <Suspense fallback={<PageLoader />}><AffidavitPage /></Suspense> });
 
-// 🔥 Submit Request using new Wizard
+// The legacy /submit-request route is intentionally kept on the original form.
 const submitRequestRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/submit-request",
+  component: () => <Suspense fallback={<PageLoader />}><SubmitRequestPage /></Suspense>,
+});
+
+// Requester onboarding uses a separate route so the two submit experiences never collide.
+const onboardingSubmitRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/onboarding-submit",
   component: () => <Suspense fallback={<PageLoader />}><SubmitRequestWizard /></Suspense>,
 });
 
@@ -238,6 +254,7 @@ const routeTree = rootRoute.addChildren([
   caseDetailRoute,
   affidavitRoute,
   submitRequestRoute,
+  onboardingSubmitRoute,
   profileRoute,
   myCasesRoute,
   myHelpRoute,

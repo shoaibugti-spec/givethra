@@ -1,4 +1,5 @@
 // src/frontend/src/pages/submit-request/category-forms/WaterBillForm.tsx
+import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 import { WATER_COMPANIES } from "@/lib/institutesList";
 

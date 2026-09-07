@@ -1,4 +1,5 @@
 // src/frontend/src/pages/submit-request/category-forms/MarriageSupportForm.tsx
+import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 
 export default function MarriageSupportForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {

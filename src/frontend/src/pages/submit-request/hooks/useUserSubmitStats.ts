@@ -25,13 +25,14 @@ export function useUserSubmitStats(userId?: string) {
       return;
     }
 
+    const currentUserId = userId;
     async function load() {
       setLoading(true);
       try {
         const [cases, suspension, wallet, feedbacks] = await Promise.all([
-          getCasesByUser(userId),
-          getUserSuspension(userId),
-          getWallet(userId),
+          getCasesByUser(currentUserId),
+          getUserSuspension(currentUserId),
+          getWallet(currentUserId),
           getFeedbacks(200),
         ]);
 
@@ -41,7 +42,7 @@ export function useUserSubmitStats(userId?: string) {
 
         // Check for blocked by feedback
         const completedCases = cases?.filter((c: any) => c.status === "completed") || [];
-        let blocked = null;
+        let blocked: { caseId: string; caseTitle: string } | null = null;
         if (completedCases.length > 0) {
           const feedbackList = Array.isArray(feedbacks) ? feedbacks : [];
           const now = Date.now();

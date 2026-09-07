@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StepNavigation } from "../shared/StepNavigation";
 import { CASE_CURRENCIES, CURRENCY_SYMBOLS, getMaxLimit } from "../constants";
 
-export default function StepAmount({ value, formData, onChange, onNext, onBack, isFirst, isLast }: any) {
+export default function StepAmount({ value, formData, setFormData, onChange, onNext, onBack, isFirst, isLast }: any) {
   const { currency, category } = formData;
   const sym = CURRENCY_SYMBOLS[currency] || currency;
   const maxLimit = getMaxLimit(category);

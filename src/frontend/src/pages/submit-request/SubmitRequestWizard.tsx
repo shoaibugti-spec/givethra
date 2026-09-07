@@ -138,7 +138,7 @@ export default function SubmitRequestWizard() {
   // Load draft
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate({ to: "/sign-in", search: { redirect: "/submit-request" } });
+      navigate({ to: "/sign-in", search: { redirect: "/onboarding-submit" } });
       return;
     }
     const saved = loadDraft();
@@ -252,6 +252,7 @@ export default function SubmitRequestWizard() {
     }
     if (["amount", "deadline"].includes(currentStepId)) {
       extra.formData = formData;
+      extra.setFormData = setFormData;
     }
     if (["title", "shortDesc", "seekerName", "seekerContact", "city"].includes(currentStepId)) {
       extra.placeholder = currentStepId === "title" ? "e.g. Help with School Fee"

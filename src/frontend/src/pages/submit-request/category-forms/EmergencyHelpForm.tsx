@@ -1,4 +1,5 @@
 // src/frontend/src/pages/submit-request/category-forms/EmergencyHelpForm.tsx
+import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 
 export default function EmergencyHelpForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {

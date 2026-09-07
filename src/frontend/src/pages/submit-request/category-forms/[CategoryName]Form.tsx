@@ -2,7 +2,7 @@
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 import { Label } from "@/components/ui/label";
 
-export default function [CategoryName]Form({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
+export default function CategoryNameForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
   const { catFields, catDocUrls } = formData;
 
   const setField = (key: string, value: any) => {

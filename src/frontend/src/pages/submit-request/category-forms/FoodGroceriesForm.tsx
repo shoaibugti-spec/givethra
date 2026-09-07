@@ -1,4 +1,5 @@
 // src/frontend/src/pages/submit-request/category-forms/FoodGroceriesForm.tsx
+import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 
 export default function FoodGroceriesForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {

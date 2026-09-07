@@ -910,7 +910,7 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
               </div>
 
               {(() => {
-                let displayCases = [];
+                let displayCases: any[] = [];
                 if (payFilter === "ready") displayCases = readyToClose;
                 else if (payFilter === "paid") displayCases = paidPayClose;
                 else if (payFilter === "rejected") displayCases = rejectedPayClose;
