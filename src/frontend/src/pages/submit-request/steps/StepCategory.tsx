@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
-// ✅ FIXED: Zero blinking, clean UI, memoized buttons
+// ✅ FIXED: Zero blinking — no DOM thrashing, stable styles, memoized buttons
 
 import React, { memo, useCallback, useRef } from "react";
 
@@ -77,7 +77,7 @@ const CategoryButton = memo(function CategoryButton({
         WebkitTapHighlightColor: "transparent",
         userSelect: "none",
         touchAction: "manipulation",
-        // ✅ Inset shadow — no layout shift, no transition
+        // Selected state shadow
         boxShadow: isSelected
           ? "inset 0 0 0 4px #000000, 0 6px 20px rgba(0,0,0,0.35)"
           : "inset 0 0 0 0px transparent, 0 2px 8px rgba(0,0,0,0.12)",
@@ -88,29 +88,32 @@ const CategoryButton = memo(function CategoryButton({
       </span>
       <span style={{ display: "block" }}>{cat.label}</span>
 
-      {isSelected && (
-        <span
-          style={{
-            position: "absolute",
-            top: "6px",
-            right: "6px",
-            background: "#ffffff",
-            color: "#000000",
-            borderRadius: "50%",
-            width: "22px",
-            height: "22px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "13px",
-            fontWeight: "bold",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
-            pointerEvents: "none",
-          }}
-        >
-          ✓
-        </span>
-      )}
+      {/* ✅ ہمیشہ DOM میں موجود — صرف opacity بدلتی ہے۔ add/remove نہیں ہوتا = بلنک نہیں */}
+      <span
+        aria-hidden={!isSelected}
+        style={{
+          position: "absolute",
+          top: "6px",
+          right: "6px",
+          background: "#ffffff",
+          color: "#000000",
+          borderRadius: "50%",
+          width: "22px",
+          height: "22px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "13px",
+          fontWeight: "bold",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+          pointerEvents: "none",
+          opacity: isSelected ? 1 : 0,
+          transform: isSelected ? "scale(1)" : "scale(0.8)",
+          transition: "opacity 0.12s ease, transform 0.12s ease",
+        }}
+      >
+        ✓
+      </span>
     </button>
   );
 });
@@ -126,7 +129,7 @@ const StepCategory = memo(function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  // ✅ Ref se track karo taake handleSelect stable rahe
+  // ✅ Ref سے track کریں تاکہ handleSelect مستحکم رہے
   const valueRef = useRef(value);
   valueRef.current = value;
 
@@ -135,7 +138,7 @@ const StepCategory = memo(function StepCategory({
       if (id === valueRef.current) return;
       onChange(id);
     },
-    [onChange] // 🔥 sirf onChange — value nahi
+    [onChange] // صرف onChange — value نہیں
   );
 
   const handleNext = useCallback(() => {
