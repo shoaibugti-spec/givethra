@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// 🔥 FINAL BUILD-FIXED VERSION: uses StepMartialStatus and StepPeopertyOwnership
+// 🔥 FINAL: Uses StepCategory for category selection
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
-// 🔥 Imports with exact file names (StepMartialStatus, StepPeopertyOwnership)
+// 🔥 All steps imported
 import StepCategory from "./steps/StepCategory";
 import StepTitle from "./steps/StepTitle";
 import StepShortDesc from "./steps/StepShortDesc";
@@ -16,7 +16,7 @@ import StepCountry from "./steps/StepCountry";
 import StepCity from "./steps/StepCity";
 import StepUrgency from "./steps/StepUrgency";
 import StepGender from "./steps/StepGender";
-import StepMartialStatus from "./steps/StepMartialStatus";   // ✅ exists
+import StepMartialStatus from "./steps/StepMartialStatus";
 import StepOrphan from "./steps/StepOrphan";
 import StepOrphanParent from "./steps/StepOrphanParent";
 import StepSeekerName from "./steps/StepSeekerName";
@@ -25,7 +25,7 @@ import StepJobStatus from "./steps/StepJobStatus";
 import StepJobDocuments from "./steps/StepJobDocuments";
 import StepNoJobDocument from "./steps/StepNoJobDocument";
 import StepCategoryDetails from "./steps/StepCategoryDetails";
-import StepPeopertyOwnership from "./steps/StepPeopertyOwnership";   // ✅ exists
+import StepPeopertyOwnership from "./steps/StepPeopertyOwnership";
 import StepRentedDocuments from "./steps/StepRentedDocuments";
 import StepOwnedDocuments from "./steps/StepOwnedDocuments";
 import StepWhyHelp from "./steps/StepWhyHelp";
@@ -185,6 +185,7 @@ export default function SubmitRequestWizard() {
   }, [currentIndex, visibleStepIds]);
 
   const renderStep = () => {
+    // 🔥 Common props for all steps
     const commonProps = {
       value: formData[currentStepId as keyof typeof formData],
       onChange: (val: any) => setFormData(prev => ({ ...prev, [currentStepId]: val })),
@@ -199,19 +200,19 @@ export default function SubmitRequestWizard() {
 
     switch (currentStepId) {
       case "category":
-  return (
-    <StepCategory
-      value={formData.category}
-      onChange={(val) => setFormData((prev) => ({ ...prev, category: val }))}
-      onNext={handleNext}
-      onBack={handleBack}
-      isFirst={isFirst}
-      isLast={isLast}
-      willBeFree={willBeFree}
-      isFreeDisabled={stats.isFreeDisabled}
-      freeCasesUsed={stats.freeCasesUsed}
-    />
-  );
+        return (
+          <StepCategory
+            value={formData.category}
+            onChange={(val) => setFormData((prev) => ({ ...prev, category: val }))}
+            onNext={handleNext}
+            onBack={handleBack}
+            isFirst={isFirst}
+            isLast={isLast}
+            willBeFree={willBeFree}
+            isFreeDisabled={stats.isFreeDisabled}
+            freeCasesUsed={stats.freeCasesUsed}
+          />
+        );
       case "title": return <StepTitle {...commonProps} placeholder="e.g. Help with School Fee" />;
       case "shortDesc": return <StepShortDesc {...commonProps} placeholder="One line summary" />;
       case "country": return <StepCountry {...commonProps} />;
