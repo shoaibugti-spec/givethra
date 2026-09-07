@@ -1,3 +1,5 @@
+// src/frontend/src/pages/submit-request/category-forms/BaseCategoryForm.tsx
+
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +18,7 @@ interface BaseProps {
   subtitle: string;
   guide?: string;
   hideNavigation?: boolean;
+  disabled?: boolean;
 }
 
 export function BaseCategoryForm({
@@ -30,41 +33,45 @@ export function BaseCategoryForm({
   subtitle,
   guide,
   hideNavigation = false,
+  disabled = false,
 }: BaseProps) {
-  const setField = (key: string, value: any) => {
-    setFormData((prev: any) => ({
-      ...prev,
-      catFields: { ...prev.catFields, [key]: value },
-    }));
-  };
-
-  const setDoc = (key: string, url: string) => {
-    setFormData((prev: any) => ({
-      ...prev,
-      catDocUrls: { ...prev.catDocUrls, [key]: url },
-    }));
-  };
-
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">{title}</h2>
         <p className="text-sm text-muted-foreground">{subtitle}</p>
-        {guide && <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg">{guide}</p>}
+        {guide && (
+          <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg">
+            {guide}
+          </p>
+        )}
       </div>
 
       <div className="space-y-4">
         {children}
 
         {!hideNavigation && (
-          <StepNavigation onNext={onNext} onBack={onBack} isFirst={isFirst} isLast={isLast} />
+          <StepNavigation
+            onNext={onNext}
+            onBack={onBack}
+            isFirst={isFirst}
+            isLast={isLast}
+            disabled={disabled}
+          />
         )}
       </div>
     </div>
   );
 }
 
-export function TextInput({ field, value, onChange, placeholder, required = true, type = "text" }: any) {
+export function TextInput({
+  field,
+  value,
+  onChange,
+  placeholder,
+  required = true,
+  type = "text",
+}: any) {
   return (
     <div className="space-y-2">
       <Label>
@@ -80,7 +87,14 @@ export function TextInput({ field, value, onChange, placeholder, required = true
   );
 }
 
-export function TextAreaInput({ field, value, onChange, placeholder, required = true, rows = 3 }: any) {
+export function TextAreaInput({
+  field,
+  value,
+  onChange,
+  placeholder,
+  required = true,
+  rows = 3,
+}: any) {
   return (
     <div className="space-y-2">
       <Label>
