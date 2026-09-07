@@ -5,7 +5,14 @@ import { EDUCATION_INSTITUTES } from "@/lib/institutesList";
 import { useState } from "react";
 
 export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields, catDocUrls, refNumber, eduSubType, eduSubFields } = formData;
+  const {
+    catFields = {},
+    catDocUrls = {},
+    refNumber,
+    eduSubType,
+    eduSubFields = {},
+  } = formData;
+
   const [search, setSearch] = useState("");
   const [isOther, setIsOther] = useState(false);
   const [otherName, setOtherName] = useState("");
@@ -41,11 +48,18 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
     setFormData((prev: any) => ({ ...prev, refNumber: value }));
   };
 
-  const filteredInstitutes = EDUCATION_INSTITUTES.filter((n) =>
-    n.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 8);
+  const filteredInstitutes = (EDUCATION_INSTITUTES || [])
+    .filter((n: string) => n.toLowerCase().includes(search.toLowerCase()))
+    .slice(0, 8);
 
-  const isValid = catFields.student_name?.trim() && catDocUrls.fee_challan;
+  const hasInstitute = !!catFields.institute_name || (isOther && !!otherName.trim());
+
+  const isValid =
+    !!eduSubType &&
+    hasInstitute &&
+    !!catFields.student_name?.trim() &&
+    !!catDocUrls.fee_challan &&
+    !!catDocUrls.student_id_proof;
 
   return (
     <BaseCategoryForm
@@ -58,6 +72,7 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
       title="🎓 School, College & University Fees"
       subtitle="Provide fee details for ONE student only."
       guide="⚠️ One case = ONE student only. Upload a clear photo of the fee challan/voucher."
+      disabled={!isValid}
     >
       <div className="space-y-4">
         <div className="space-y-2">
@@ -73,7 +88,9 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                 type="button"
                 onClick={() => setEduSubType(opt.value)}
                 className={`px-3 py-2.5 rounded-lg border text-sm font-medium ${
-                  eduSubType === opt.value ? "bg-primary text-white border-primary" : "border-border"
+                  eduSubType === opt.value
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                 }`}
               >
                 {opt.label}
@@ -96,7 +113,7 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                 />
                 {search.length >= 2 && (
                   <div className="rounded-xl border divide-y overflow-hidden max-h-48 overflow-y-auto">
-                    {filteredInstitutes.map((n) => (
+                    {filteredInstitutes.map((n: string) => (
                       <button
                         key={n}
                         type="button"
@@ -177,21 +194,21 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                 <TextInput
                   field="Student's Name (ONE student)"
                   value={catFields.student_name}
-                  onChange={(v) => setField("student_name", v)}
+                  onChange={(v: string) => setField("student_name", v)}
                   placeholder="Full name of student"
                 />
 
                 <TextInput
                   field="Father's Name"
                   value={catFields.father_name}
-                  onChange={(v) => setField("father_name", v)}
+                  onChange={(v: string) => setField("father_name", v)}
                   placeholder="Father's full name"
                 />
 
                 <TextInput
                   field="Roll No / Registration No"
                   value={catFields.roll_no}
-                  onChange={(v) => setField("roll_no", v)}
+                  onChange={(v: string) => setField("roll_no", v)}
                   placeholder="Student's roll number"
                 />
 
@@ -200,13 +217,13 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                     <TextInput
                       field="Class / Grade"
                       value={eduSubFields.class_grade}
-                      onChange={(v) => setEduField("class_grade", v)}
+                      onChange={(v: string) => setEduField("class_grade", v)}
                       placeholder="e.g. Grade 8"
                     />
                     <TextInput
                       field="Fee Month"
                       value={eduSubFields.fee_month}
-                      onChange={(v) => setEduField("fee_month", v)}
+                      onChange={(v: string) => setEduField("fee_month", v)}
                       placeholder="e.g. August 2026"
                     />
                   </>
@@ -223,7 +240,9 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                             type="button"
                             onClick={() => setEduField("program", opt)}
                             className={`px-2 py-2 rounded-lg border text-xs font-medium ${
-                              eduSubFields.program === opt ? "bg-primary text-white border-primary" : "border-border"
+                              eduSubFields.program === opt
+                                ? "bg-primary text-white border-primary"
+                                : "border-border"
                             }`}
                           >
                             {opt}
@@ -240,7 +259,9 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                             type="button"
                             onClick={() => setEduField("year", opt)}
                             className={`px-2 py-2 rounded-lg border text-xs font-medium ${
-                              eduSubFields.year === opt ? "bg-primary text-white border-primary" : "border-border"
+                              eduSubFields.year === opt
+                                ? "bg-primary text-white border-primary"
+                                : "border-border"
                             }`}
                           >
                             {opt}
@@ -251,7 +272,7 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                     <TextInput
                       field="Fee Month"
                       value={eduSubFields.fee_month}
-                      onChange={(v) => setEduField("fee_month", v)}
+                      onChange={(v: string) => setEduField("fee_month", v)}
                       placeholder="e.g. August 2026"
                     />
                   </>
@@ -262,19 +283,19 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                     <TextInput
                       field="Program / Degree"
                       value={eduSubFields.program_degree}
-                      onChange={(v) => setEduField("program_degree", v)}
+                      onChange={(v: string) => setEduField("program_degree", v)}
                       placeholder="e.g. BS Psychology"
                     />
                     <TextInput
                       field="Semester / Year"
                       value={eduSubFields.semester_year}
-                      onChange={(v) => setEduField("semester_year", v)}
+                      onChange={(v: string) => setEduField("semester_year", v)}
                       placeholder="e.g. Fall 2026"
                     />
                     <TextInput
                       field="Fee Month"
                       value={eduSubFields.fee_month}
-                      onChange={(v) => setEduField("fee_month", v)}
+                      onChange={(v: string) => setEduField("fee_month", v)}
                       placeholder="e.g. August 2026"
                     />
                   </>
@@ -292,7 +313,7 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                   key="fee_challan"
                   required
                   hint="Challan should clearly show amount and due date"
-                  onUpload={(url) => setDoc("fee_challan", url)}
+                  onUpload={(url: string) => setDoc("fee_challan", url)}
                   value={catDocUrls.fee_challan}
                 />
 
@@ -301,7 +322,7 @@ export default function SchoolFeesForm({ formData, setFormData, onNext, onBack, 
                   key="student_id_proof"
                   required
                   hint="Clear proof of student identity"
-                  onUpload={(url) => setDoc("student_id_proof", url)}
+                  onUpload={(url: string) => setDoc("student_id_proof", url)}
                   value={catDocUrls.student_id_proof}
                 />
               </>
