@@ -1,10 +1,17 @@
 // src/frontend/src/pages/submit-request/category-forms/ElectricityBillForm.tsx
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { DocBox } from "../shared/DocBox";
+import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
+import { ELECTRICITY_COMPANIES } from "@/lib/institutesList";
 
-export default function ElectricityBillForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields, catDocUrls } = formData;
+export default function ElectricityBillForm({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const { catFields = {}, catDocUrls = {}, refNumber } = formData;
 
   const setField = (key: string, value: any) => {
     setFormData((prev: any) => ({
@@ -20,40 +27,72 @@ export default function ElectricityBillForm({ formData, setFormData, onNext, onB
     }));
   };
 
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold">⚡ Electricity Bill Details</h2>
-      <p className="text-sm text-muted-foreground">
-        Provide your electricity bill details for verification.
-      </p>
+  const setRef = (value: string) => {
+    setFormData((prev: any) => ({ ...prev, refNumber: value }));
+  };
 
+  const isValid =
+    !!refNumber?.trim() &&
+    !!catFields.bill_owner_name?.trim() &&
+    !!catDocUrls.bill;
+
+  return (
+    <BaseCategoryForm
+      formData={formData}
+      setFormData={setFormData}
+      onNext={onNext}
+      onBack={onBack}
+      isFirst={isFirst}
+      isLast={isLast}
+      title="⚡ Electricity Bill Details"
+      subtitle="Provide your electricity bill details for verification."
+      guide="⚠️ One case = ONE bill only. Upload a clear photo of your electricity bill."
+      disabled={!isValid}
+    >
       <div className="space-y-3">
         <div className="space-y-2">
-          <Label>Consumer Reference Number *</Label>
-          <Input
-            value={formData.refNumber || ""}
-            onChange={(e) => setFormData((prev: any) => ({ ...prev, refNumber: e.target.value }))}
-            placeholder="e.g. 123456789"
-          />
+          <Label>Select Your Company *</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {(ELECTRICITY_COMPANIES || []).map((c: any) => (
+              <button
+                key={c.name}
+                type="button"
+                onClick={() => setField("company", c.name)}
+                className={`px-3 py-2.5 rounded-lg border text-xs font-medium text-left ${
+                  catFields.company === c.name
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label>Bill Owner Name (as on bill) *</Label>
-          <Input
-            value={catFields.bill_owner_name || ""}
-            onChange={(e) => setField("bill_owner_name", e.target.value)}
-            placeholder="e.g. Muhammad Ali"
-          />
-        </div>
+        <TextInput
+          field="Consumer Reference Number"
+          value={refNumber}
+          onChange={setRef}
+          placeholder="e.g. 123456789"
+        />
 
-        <DocBox
+        <TextInput
+          field="Bill Owner Name (as on bill)"
+          value={catFields.bill_owner_name}
+          onChange={(v: string) => setField("bill_owner_name", v)}
+          placeholder="e.g. Muhammad Ali"
+        />
+
+        <FileUpload
           label="Bill Photo (clear & readable)"
+          key="bill"
           required
           hint="Bill should clearly show consumer/reference number and amount"
-          onUpload={(url) => setDoc("bill", url)}
+          onUpload={(url: string) => setDoc("bill", url)}
           value={catDocUrls.bill}
         />
       </div>
-    </div>
+    </BaseCategoryForm>
   );
 }
