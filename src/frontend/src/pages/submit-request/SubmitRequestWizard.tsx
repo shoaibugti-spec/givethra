@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// 🔥 FINAL: Uses StepCategory for category selection
+// Givethra - Complete Submit Request Wizard
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
-// 🔥 All steps imported
+// All steps
 import StepCategory from "./steps/StepCategory";
 import StepTitle from "./steps/StepTitle";
 import StepShortDesc from "./steps/StepShortDesc";
@@ -185,7 +185,6 @@ export default function SubmitRequestWizard() {
   }, [currentIndex, visibleStepIds]);
 
   const renderStep = () => {
-    // 🔥 Common props for all steps
     const commonProps = {
       value: formData[currentStepId as keyof typeof formData],
       onChange: (val: any) => setFormData(prev => ({ ...prev, [currentStepId]: val })),
