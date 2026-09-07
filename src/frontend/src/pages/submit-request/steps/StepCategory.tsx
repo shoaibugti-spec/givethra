@@ -1,8 +1,7 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
-// 🔥 FIXED: No blinking, stable selection, smooth UX
+// 🔥 FIXED: No auto-advance, no local state, no blinking
 
 import { StepNavigation } from "../shared/StepNavigation";
-import { useState, useCallback, useRef } from "react";
 
 const ALL_CATEGORIES = [
   { id: "Electricity Bill", label: "⚡ Electricity Bill", color: "#eab308" },
@@ -49,38 +48,13 @@ export default function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  // 🔥 Local state to prevent flickering
-  const [selected, setSelected] = useState(value);
-  const isProcessing = useRef(false);
+  // 🔥 No local state — use props directly (fully controlled)
+  const isSelected = (id: string) => value === id;
 
-  const handleSelect = useCallback(
-    (id: string) => {
-      // Prevent double clicks / rapid fire
-      if (isProcessing.current) return;
-      if (id === selected) return;
-
-      isProcessing.current = true;
-
-      // Update local state immediately (smooth UI)
-      setSelected(id);
-      // Notify parent
-      onChange(id);
-
-      // After a short delay, allow navigation and reset flag
-      setTimeout(() => {
-        isProcessing.current = false;
-        // Auto-advance after selection (if needed)
-        if (id) {
-          onNext();
-        }
-      }, 300);
-    },
-    [selected, onChange, onNext]
-  );
-
-  // Sync with parent value if it changes externally
-  // (but we keep local state to avoid blinking)
-  // We don't need to sync because we control it.
+  const handleSelect = (id: string) => {
+    if (id === value) return; // already selected, do nothing
+    onChange(id);
+  };
 
   return (
     <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
@@ -105,7 +79,7 @@ export default function StepCategory({
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
         {ALL_CATEGORIES.map((cat) => {
-          const isSelected = selected === cat.id;
+          const selected = isSelected(cat.id);
           return (
             <button
               key={cat.id}
@@ -122,10 +96,10 @@ export default function StepCategory({
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "4px",
-                border: isSelected ? "4px solid #000" : "none",
-                transform: isSelected ? "scale(1.05)" : "scale(1)",
+                border: selected ? "4px solid #000" : "none",
+                transform: selected ? "scale(1.05)" : "scale(1)",
                 transition: "all 0.2s ease",
-                boxShadow: isSelected ? "0 8px 25px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.15)",
+                boxShadow: selected ? "0 8px 25px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.15)",
                 cursor: "pointer",
                 textAlign: "center",
                 fontWeight: "500",
@@ -136,7 +110,7 @@ export default function StepCategory({
             >
               <span style={{ fontSize: "28px", display: "block" }}>{cat.label.split(" ")[0]}</span>
               <span style={{ display: "block" }}>{cat.label}</span>
-              {isSelected && (
+              {selected && (
                 <span
                   style={{
                     position: "absolute",
@@ -162,6 +136,7 @@ export default function StepCategory({
         })}
       </div>
 
+      {/* 🔥 Navigation: Next button enabled only when a category is selected */}
       <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "center" }}>
         {!isFirst && (
           <button
@@ -180,16 +155,16 @@ export default function StepCategory({
         )}
         <button
           onClick={onNext}
-          disabled={!selected}
+          disabled={!value}
           style={{
             padding: "10px 24px",
             borderRadius: "8px",
             border: "none",
-            background: selected ? "#00A896" : "#ccc",
+            background: value ? "#00A896" : "#ccc",
             color: "#fff",
-            cursor: selected ? "pointer" : "not-allowed",
+            cursor: value ? "pointer" : "not-allowed",
             flex: 1,
-            opacity: selected ? 1 : 0.6,
+            opacity: value ? 1 : 0.6,
             transition: "background 0.2s ease",
           }}
         >
