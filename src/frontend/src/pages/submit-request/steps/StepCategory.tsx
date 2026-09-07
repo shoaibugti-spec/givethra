@@ -1,7 +1,9 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
+// Givethra - 19 Colored Category Boxes
+
 import { StepNavigation } from "../shared/StepNavigation";
 
-// 🔥 تمام 19 کیٹگریز — ہر ایک کا اپنا رنگ (hex)
+// 🔥 19 categories with colors
 const ALL_CATEGORIES = [
   { id: "Electricity Bill", label: "⚡ Electricity Bill", color: "#eab308" },
   { id: "Gas Bill", label: "🔥 Gas Bill", color: "#f97316" },
@@ -47,24 +49,16 @@ export default function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  // 🔍 ڈیبگ کے لیے — دیکھیں کہ value کیا ہے
-  console.log("[StepCategory] Current selected category:", value);
-
   const handleSelect = (id: string) => {
-    console.log("[StepCategory] Selected category:", id);
     onChange(id);
-    // تھوڑی تاخیر کے بعد Next پر جائیں
     setTimeout(() => {
-      if (id) {
-        console.log("[StepCategory] Moving to next step...");
-        onNext();
-      }
+      if (id) onNext();
     }, 400);
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
-      {/* Heading */}
+    <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
+      {/* Header */}
       <div style={{ textAlign: "center", marginBottom: "24px" }}>
         <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "8px" }}>
           What do you need help with?
@@ -84,7 +78,7 @@ export default function StepCategory({
         )}
       </div>
 
-      {/* Grid of category boxes — pure inline styles */}
+      {/* Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
         {ALL_CATEGORIES.map((cat) => {
           const isSelected = value === cat.id;
