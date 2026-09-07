@@ -72,7 +72,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
+import { isTrulyCompletedHelp } from "@/lib/resolutionStatus";
+import { computeHeroStats, computeRequesterStats, type HeroStats, type RequesterStats } from "@/lib/profileStats";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -86,7 +87,7 @@ const CREDITS_PER_REWARD = 5;
 // ---------------------------------------------------------------------------
 
 function getBadge(unlockCount: number, contributionCount: number, directHelpCount: number) {
-  if (directHelpCount > 0 && contributionCount > 0 && unlockCount > 0) {
+  if (contributionCount >= 3 && directHelpCount >= 3 || contributionCount + directHelpCount >= 10) {
     return {
       title: "Super Hero",
       emoji: "🌟",
@@ -95,7 +96,7 @@ function getBadge(unlockCount: number, contributionCount: number, directHelpCoun
       color: "bg-gradient-to-r from-yellow-400 to-orange-500 text-white",
     };
   }
-  if (directHelpCount > 0) {
+  if (directHelpCount > 0 || contributionCount > 0) {
     return {
       title: "Hero",
       emoji: "🦸",
@@ -104,25 +105,22 @@ function getBadge(unlockCount: number, contributionCount: number, directHelpCoun
       color: "bg-gradient-to-r from-blue-400 to-indigo-500 text-white",
     };
   }
-  if (contributionCount > 0) {
+  if (unlockCount > 0) {
     return {
       title: "Young Hero",
       emoji: "⭐",
-      description: "You contributed to a fundraising pool. Every contribution counts! Keep going to become a full Hero.",
+      description: "You unlocked a case. Complete a contribution or direct help to become a full Hero.",
       icon: <Sparkles className="h-4 w-4 text-green-500" />,
       color: "bg-gradient-to-r from-green-400 to-emerald-500 text-white",
     };
   }
-  if (unlockCount > 0) {
-    return {
-      title: "Newborn Hero",
-      emoji: "🆕",
-      description: "You unlocked a case. Take the next step to become a full Hero!",
-      icon: <Sparkles className="h-4 w-4 text-purple-500" />,
-      color: "bg-gradient-to-r from-purple-400 to-pink-500 text-white",
-    };
-  }
-  return null;
+  return {
+    title: "Newborn Hero",
+    emoji: "🆕",
+    description: "Your Hero journey is ready to begin.",
+    icon: <Sparkles className="h-4 w-4 text-purple-500" />,
+    color: "bg-gradient-to-r from-purple-400 to-pink-500 text-white",
+  };
 }
 
 function getTrustLevel(rejected: number, approved: number, expired: number) {
@@ -175,20 +173,22 @@ export default function ProfilePage() {
   const [relationshipUsers, setRelationshipUsers] = useState<any[]>([]);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
 
-  const [caseStats, setCaseStats] = useState({
-    submitted: 0,
-    completed: 0,
-    rejected: 0,
-    expired: 0,
+  const [requesterStats, setRequesterStats] = useState<RequesterStats>({
+    totalSubmitted: 0,
+    totalApproved: 0,
+    totalRejected: 0,
+    totalCompleted: 0,
+    totalExpired: 0,
+    totalHelpReceived: 0,
   });
-
-  const [helpedCount, setHelpedCount] = useState(0);
-  const [directHelps, setDirectHelps] = useState(0);
-  const [contributions, setContributions] = useState(0);
-  const [unlockCount, setUnlockCount] = useState(0);
-  const [totalAmountSpent, setTotalAmountSpent] = useState(0);
+  const [heroStats, setHeroStats] = useState<HeroStats>({
+    totalUnlocks: 0,
+    directHelps: 0,
+    contributions: 0,
+    totalAmountHelped: 0,
+    activeUnlocked: 0,
+  });
   const [helpedCases, setHelpedCases] = useState<any[]>([]);
-  const [totalHelpReceived, setTotalHelpReceived] = useState(0);
   const [trustLevel, setTrustLevel] = useState(100);
   const [badge, setBadge] = useState<{ title: string; emoji: string; description: string; icon: JSX.Element; color: string } | null>(null);
 
@@ -254,42 +254,19 @@ export default function ProfilePage() {
       setIsMyHero(Boolean(prof?.is_following));
 
       const list = Array.isArray(caseList) ? caseList : [];
-      setCases(list);
-      const submitted = list.length;
-      const completed = list.filter((c: any) => c.status === "completed").length;
-      const rejected = list.filter((c: any) => c.status === "rejected").length;
-      const expired = list.filter((c: any) => c.status === "expired").length;
-      setCaseStats({ submitted, completed, rejected, expired });
-
-      const totalReceived = list
-        .filter((c: any) => c.status === "completed")
-        .reduce((sum: number, c: any) => sum + (Number(c.amount_collected) || 0), 0);
-      setTotalHelpReceived(totalReceived);
-
-      setTrustLevel(getTrustLevel(rejected, completed, expired));
-
-      // 🔥 FIX #5: Use isTrulyCompletedHelp from shared helpers
       const resolutionList = Array.isArray(resolutions) ? resolutions : [];
-      const validResolutions = resolutionList.filter((r: any) => isTrulyCompletedHelp(r));
-      setHelpedCount(validResolutions.length);
-      setHelpedCases(validResolutions.slice(0, 5));
-
-      const direct = validResolutions.filter((r: any) => !isContributionResolution(r));
-      const contrib = validResolutions.filter((r: any) => isContributionResolution(r));
-      setDirectHelps(direct.length);
-      setContributions(contrib.length);
-
-      const totalSpent = validResolutions.reduce(
-        (sum: number, r: any) => sum + (Number(r.seeker_confirmed_amount ?? r.amount_paid) || 0),
-        0
-      );
-      setTotalAmountSpent(totalSpent);
-
       const unlockList = Array.isArray(unlocks) ? unlocks : [];
-      setUnlockCount(unlockList.length);
+      const nextRequesterStats = computeRequesterStats(list);
+      const nextHeroStats = computeHeroStats(unlockList, resolutionList);
 
-      // 🔥 Badge calculation now uses the correct counts
-      setBadge(getBadge(unlockList.length, contrib.length, direct.length));
+      setCases(list);
+      setRequesterStats(nextRequesterStats);
+      setHeroStats(nextHeroStats);
+      setTrustLevel(getTrustLevel(nextRequesterStats.totalRejected, nextRequesterStats.totalCompleted, nextRequesterStats.totalExpired));
+
+      const validResolutions = resolutionList.filter(isTrulyCompletedHelp);
+      setHelpedCases(validResolutions.slice(0, 5));
+      setBadge(getBadge(nextHeroStats.totalUnlocks, nextHeroStats.contributions, nextHeroStats.directHelps));
     } catch (err) {
       // This outer catch should rarely be hit, but just in case
       console.error("Unexpected error in loadData:", err);
@@ -631,7 +608,7 @@ export default function ProfilePage() {
           <div className="flex justify-between text-[10px] text-muted-foreground">
             <span>Based on case history</span>
             <span>
-              +{caseStats.completed * 5} approvals · -{caseStats.rejected * 10} rejections · -{caseStats.expired * 5} expired
+              +{requesterStats.totalCompleted * 5} approvals · -{requesterStats.totalRejected * 10} rejections · -{requesterStats.totalExpired * 5} expired
             </span>
           </div>
         </div>
@@ -669,32 +646,32 @@ export default function ProfilePage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
               <div className="text-2xl font-bold text-foreground">
-                {totalAmountSpent > 0 ? `$${totalAmountSpent.toFixed(2)}` : "—"}
+                {heroStats.totalAmountHelped > 0 ? `$${heroStats.totalAmountHelped.toFixed(2)}` : "—"}
               </div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <HandCoins className="h-3 w-3" /> Total Spent
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-              <div className="text-2xl font-bold text-foreground">{helpedCount}</div>
+              <div className="text-2xl font-bold text-foreground">{heroStats.directHelps + heroStats.contributions}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <HeartHandshake className="h-3 w-3" /> Helped
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-              <div className="text-2xl font-bold text-foreground">{directHelps}</div>
+              <div className="text-2xl font-bold text-foreground">{heroStats.directHelps}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <Building2 className="h-3 w-3" /> Direct Helps
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-              <div className="text-2xl font-bold text-foreground">{contributions}</div>
+              <div className="text-2xl font-bold text-foreground">{heroStats.contributions}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <HandCoins className="h-3 w-3" /> Contributions
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
-              <div className="text-2xl font-bold text-foreground">{unlockCount}</div>
+              <div className="text-2xl font-bold text-foreground">{heroStats.totalUnlocks}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <Unlock className="h-3 w-3" /> Total Unlocks
               </div>
@@ -703,32 +680,38 @@ export default function ProfilePage() {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-              <div className="text-2xl font-bold text-foreground">{caseStats.submitted}</div>
+              <div className="text-2xl font-bold text-foreground">{requesterStats.totalSubmitted}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <Briefcase className="h-3 w-3" /> Submitted
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-              <div className="text-2xl font-bold text-foreground">{caseStats.completed}</div>
+              <div className="text-2xl font-bold text-foreground">{requesterStats.totalApproved}</div>
+              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3 text-teal-600" /> Approved
+              </div>
+            </div>
+            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+              <div className="text-2xl font-bold text-foreground">{requesterStats.totalCompleted}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-              <div className="text-2xl font-bold text-foreground">{caseStats.rejected}</div>
+              <div className="text-2xl font-bold text-foreground">{requesterStats.totalRejected}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <XCircle className="h-3 w-3 text-red-600" /> Rejected
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-              <div className="text-2xl font-bold text-foreground">{caseStats.expired}</div>
+              <div className="text-2xl font-bold text-foreground">{requesterStats.totalExpired}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <Calendar className="h-3 w-3 text-amber-600" /> Expired
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
               <div className="text-2xl font-bold text-green-600">
-                {totalHelpReceived > 0 ? `$${totalHelpReceived.toFixed(2)}` : "—"}
+                {requesterStats.totalHelpReceived > 0 ? `$${requesterStats.totalHelpReceived.toFixed(2)}` : "—"}
               </div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <HeartHandshake className="h-3 w-3" /> Total Help Received
