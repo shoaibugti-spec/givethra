@@ -1,15 +1,25 @@
 // src/frontend/src/pages/submit-request/steps/StepOrphanParent.tsx
 import { Label } from "@/components/ui/label";
 import { StepNavigation } from "../shared/StepNavigation";
+import { StepGuide } from "../shared/StepGuide";
 
 const OPTIONS = ["Father", "Mother", "Both"];
 
-export default function StepOrphanParent({ value, onChange, onNext, onBack, isFirst, isLast }: any) {
+export default function StepOrphanParent({
+  value,
+  onChange,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">Which parent passed away?</h2>
-        <p className="text-sm text-muted-foreground">This helps us understand your family situation better.</p>
+        <p className="text-sm text-muted-foreground">
+          This helps us request the correct orphan proof document.
+        </p>
         <Label>Parent *</Label>
         <div className="grid grid-cols-3 gap-3">
           {OPTIONS.map((opt) => (
@@ -28,6 +38,15 @@ export default function StepOrphanParent({ value, onChange, onNext, onBack, isFi
           ))}
         </div>
       </div>
+
+      <StepGuide
+        lines={[
+          "Select Father, Mother, or Both.",
+          "You must upload the matching death certificate in identity documents.",
+          "Answer honestly — this is used for verification.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
