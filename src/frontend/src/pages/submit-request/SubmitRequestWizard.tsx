@@ -199,19 +199,19 @@ export default function SubmitRequestWizard() {
 
     switch (currentStepId) {
       case "category":
-        return (
-          <StepCategory
-            value={formData.category}
-            onChange={(val) => setFormData((prev) => ({ ...prev, category: val }))}
-            onNext={handleNext}
-            onBack={handleBack}
-            isFirst={isFirst}
-            isLast={isLast}
-            willBeFree={willBeFree}
-            isFreeDisabled={stats.isFreeDisabled}
-            freeCasesUsed={stats.freeCasesUsed}
-          />
-        );
+  return (
+    <StepCategory
+      value={formData.category}
+      onChange={(val) => setFormData((prev) => ({ ...prev, category: val }))}
+      onNext={handleNext}
+      onBack={handleBack}
+      isFirst={isFirst}
+      isLast={isLast}
+      willBeFree={willBeFree}
+      isFreeDisabled={stats.isFreeDisabled}
+      freeCasesUsed={stats.freeCasesUsed}
+    />
+  );
       case "title": return <StepTitle {...commonProps} placeholder="e.g. Help with School Fee" />;
       case "shortDesc": return <StepShortDesc {...commonProps} placeholder="One line summary" />;
       case "country": return <StepCountry {...commonProps} />;
