@@ -1,6 +1,14 @@
 // src/frontend/src/pages/submit-request/utils/validation.ts
 import { isEasyCat, PROPERTY_RELEVANT_CATS, isDebtCategory, getMaxLimit } from "../constants";
 
+const MIN_WHY_HELP_WORDS = 500;
+
+function countWords(text: string): number {
+  const t = (text || "").trim();
+  if (!t) return 0;
+  return t.split(/\s+/).filter(Boolean).length;
+}
+
 export function validateStep(stepId: string, formData: any): string | null {
   const f = formData.catFields || {};
   const d = formData.catDocUrls || {};
@@ -130,6 +138,7 @@ export function validateStep(stepId: string, formData: any): string | null {
         if (!d.livestock_quotation) return "Please upload quotation";
         if (!d.livestock_proof) return "Please upload proof";
       }
+      // School / Education / Medical / Medicines — forms already gate with isValid
       return null;
     }
 
@@ -150,8 +159,20 @@ export function validateStep(stepId: string, formData: any): string | null {
         if (!formData.ownerRelation) return "Please select owner relation";
       }
       return null;
-    case "whyHelp":
-      return !formData.description?.trim() ? "Please explain your situation" : null;
+
+    case "whyHelp": {
+      // ✅ description OR whyHelp (field-mapping safety)
+      const raw = String(formData.description || formData.whyHelp || "").trim();
+      if (!raw) {
+        return "Please explain your situation in detail";
+      }
+      const words = countWords(raw);
+      if (words < MIN_WHY_HELP_WORDS) {
+        return `Please write at least ${MIN_WHY_HELP_WORDS} words (currently ${words}). Explain your problem fully.`;
+      }
+      return null;
+    }
+
     case "debtTotal":
       if (isDebtCategory(formData.category)) {
         const val = parseFloat(formData.debtTotalAmount);
