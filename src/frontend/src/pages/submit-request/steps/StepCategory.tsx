@@ -1,7 +1,7 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
-// ✅ FIXED: No layout shift, memoized buttons, stable callbacks
+// ✅ FIXED: No blinking, no layout shift, memoized buttons
 
-import React, { memo, useCallback, useRef } from "react";
+import React, { memo, useCallback } from "react";
 
 const ALL_CATEGORIES = [
   { id: "Electricity Bill", label: "⚡ Electricity", color: "#eab308" },
@@ -37,7 +37,7 @@ interface Props {
   freeCasesUsed?: number;
 }
 
-// ✅ Individual button memoized — sirf selected/unselected wale re-render honge
+// ✅ Har button alag memo component — sirf selected wala re-render hoga
 interface CatButtonProps {
   cat: (typeof ALL_CATEGORIES)[0];
   isSelected: boolean;
@@ -49,11 +49,11 @@ const CategoryButton = memo(function CategoryButton({
   isSelected,
   onSelect,
 }: CatButtonProps) {
+  // ✅ Stable callback — har render pe naya function nahi banega
   const handleClick = useCallback(() => {
     onSelect(cat.id);
   }, [cat.id, onSelect]);
 
-  // Extract emoji once
   const emoji = cat.label.split(" ")[0];
 
   return (
@@ -73,11 +73,12 @@ const CategoryButton = memo(function CategoryButton({
         justifyContent: "center",
         gap: "4px",
         border: "none",
-        // ✅ OUTLINE instead of BORDER — no layout shift!
+        // ✅ OUTLINE se layout shift nahi hota — border se hota hai
         outline: isSelected ? "4px solid #000" : "3px solid transparent",
         outlineOffset: isSelected ? "2px" : "0",
         transform: isSelected ? "scale(1.03)" : "scale(1)",
-        transition: "transform 0.12s ease, box-shadow 0.12s ease, outline-color 0.12s ease",
+        // ✅ SIRF transform aur box-shadow pe transition — "all" nahi!
+        transition: "transform 0.15s ease, box-shadow 0.15s ease",
         boxShadow: isSelected
           ? "0 8px 25px rgba(0,0,0,0.35)"
           : "0 2px 8px rgba(0,0,0,0.12)",
@@ -87,21 +88,13 @@ const CategoryButton = memo(function CategoryButton({
         fontSize: "14px",
         lineHeight: "1.3",
         position: "relative",
-        // ✅ Explicit border-box
         boxSizing: "border-box",
         WebkitTapHighlightColor: "transparent",
         userSelect: "none",
         touchAction: "manipulation",
       }}
     >
-      <span
-        style={{
-          fontSize: "28px",
-          display: "block",
-          lineHeight: 1,
-          marginBottom: "2px",
-        }}
-      >
+      <span style={{ fontSize: "28px", display: "block", lineHeight: 1, marginBottom: "2px" }}>
         {emoji}
       </span>
       <span style={{ display: "block", padding: "0 4px" }}>{cat.label}</span>
@@ -144,83 +137,40 @@ const StepCategory = memo(function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  // ✅ Ref se value track karo taake handleSelect stable rahe
-  const valueRef = useRef(value);
-  valueRef.current = value;
-
   const handleSelect = useCallback(
     (id: string) => {
-      if (id === valueRef.current) return;
+      if (id === value) return;
       onChange(id);
     },
-    [onChange] // sirf onChange pe depend — value nahi
+    [value, onChange]
   );
 
   const handleNext = useCallback(() => {
-    if (valueRef.current) onNext();
-  }, [onNext]);
+    if (value) onNext();
+  }, [value, onNext]);
 
   return (
     <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: "24px" }}>
-        <h2
-          style={{
-            fontSize: "24px",
-            fontWeight: "bold",
-            marginBottom: "8px",
-          }}
-        >
+        <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "8px" }}>
           What do you need help with?
         </h2>
         <p style={{ color: "#666", fontSize: "14px" }}>
           Choose the category that best describes your need.
         </p>
-
         {willBeFree && !isFreeDisabled && (
-          <div
-            style={{
-              display: "inline-block",
-              marginTop: "8px",
-              padding: "6px 16px",
-              borderRadius: "20px",
-              background: "#d1fae5",
-              color: "#065f46",
-              fontSize: "14px",
-              fontWeight: "500",
-            }}
-          >
-            🎉{" "}
-            {freeCasesUsed === 0
-              ? "Your first case is FREE!"
-              : "This case is FREE!"}
+          <div style={{ display: "inline-block", marginTop: "8px", padding: "6px 16px", borderRadius: "20px", background: "#d1fae5", color: "#065f46", fontSize: "14px", fontWeight: "500" }}>
+            🎉 {freeCasesUsed === 0 ? "Your first case is FREE!" : "This case is FREE!"}
           </div>
         )}
-
         {isFreeDisabled && (
-          <div
-            style={{
-              display: "inline-block",
-              marginTop: "8px",
-              padding: "6px 16px",
-              borderRadius: "20px",
-              background: "#fef3c7",
-              color: "#92400e",
-              fontSize: "14px",
-              fontWeight: "500",
-            }}
-          >
+          <div style={{ display: "inline-block", marginTop: "8px", padding: "6px 16px", borderRadius: "20px", background: "#fef3c7", color: "#92400e", fontSize: "14px", fontWeight: "500" }}>
             ⚠️ Free cases used up. 1 credit fee applies.
           </div>
         )}
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, 1fr)",
-          gap: "12px",
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
         {ALL_CATEGORIES.map((cat) => (
           <CategoryButton
             key={cat.id}
@@ -231,14 +181,7 @@ const StepCategory = memo(function StepCategory({
         ))}
       </div>
 
-      <div
-        style={{
-          marginTop: "24px",
-          display: "flex",
-          gap: "12px",
-          justifyContent: "center",
-        }}
-      >
+      <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "center" }}>
         {!isFirst && (
           <button
             onClick={onBack}
