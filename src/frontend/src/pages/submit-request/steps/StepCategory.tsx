@@ -1,8 +1,7 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
-// 🔥 FIXED: No blinking — limited transitions, GPU acceleration
+// ✅ FIXED: No layout shift, memoized buttons, stable callbacks
 
-import React, { memo, useCallback } from "react";
-import { StepNavigation } from "../shared/StepNavigation";
+import React, { memo, useCallback, useRef } from "react";
 
 const ALL_CATEGORIES = [
   { id: "Electricity Bill", label: "⚡ Electricity", color: "#eab308" },
@@ -38,6 +37,102 @@ interface Props {
   freeCasesUsed?: number;
 }
 
+// ✅ Individual button memoized — sirf selected/unselected wale re-render honge
+interface CatButtonProps {
+  cat: (typeof ALL_CATEGORIES)[0];
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+}
+
+const CategoryButton = memo(function CategoryButton({
+  cat,
+  isSelected,
+  onSelect,
+}: CatButtonProps) {
+  const handleClick = useCallback(() => {
+    onSelect(cat.id);
+  }, [cat.id, onSelect]);
+
+  // Extract emoji once
+  const emoji = cat.label.split(" ")[0];
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      aria-pressed={isSelected}
+      style={{
+        backgroundColor: cat.color,
+        color: "#ffffff",
+        borderRadius: "16px",
+        padding: "16px 8px",
+        minHeight: "90px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "4px",
+        border: "none",
+        // ✅ OUTLINE instead of BORDER — no layout shift!
+        outline: isSelected ? "4px solid #000" : "3px solid transparent",
+        outlineOffset: isSelected ? "2px" : "0",
+        transform: isSelected ? "scale(1.03)" : "scale(1)",
+        transition: "transform 0.12s ease, box-shadow 0.12s ease, outline-color 0.12s ease",
+        boxShadow: isSelected
+          ? "0 8px 25px rgba(0,0,0,0.35)"
+          : "0 2px 8px rgba(0,0,0,0.12)",
+        cursor: "pointer",
+        textAlign: "center",
+        fontWeight: "600",
+        fontSize: "14px",
+        lineHeight: "1.3",
+        position: "relative",
+        // ✅ Explicit border-box
+        boxSizing: "border-box",
+        WebkitTapHighlightColor: "transparent",
+        userSelect: "none",
+        touchAction: "manipulation",
+      }}
+    >
+      <span
+        style={{
+          fontSize: "28px",
+          display: "block",
+          lineHeight: 1,
+          marginBottom: "2px",
+        }}
+      >
+        {emoji}
+      </span>
+      <span style={{ display: "block", padding: "0 4px" }}>{cat.label}</span>
+
+      {isSelected && (
+        <span
+          style={{
+            position: "absolute",
+            top: "-6px",
+            right: "-6px",
+            background: "#000",
+            color: "#fff",
+            borderRadius: "50%",
+            width: "26px",
+            height: "26px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "14px",
+            fontWeight: "bold",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+            pointerEvents: "none",
+          }}
+        >
+          ✓
+        </span>
+      )}
+    </button>
+  );
+});
+
 const StepCategory = memo(function StepCategory({
   value,
   onChange,
@@ -49,102 +144,105 @@ const StepCategory = memo(function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  const handleSelect = useCallback((id: string) => {
-    if (id === value) return;
-    onChange(id);
-  }, [value, onChange]);
+  // ✅ Ref se value track karo taake handleSelect stable rahe
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  const handleSelect = useCallback(
+    (id: string) => {
+      if (id === valueRef.current) return;
+      onChange(id);
+    },
+    [onChange] // sirf onChange pe depend — value nahi
+  );
 
   const handleNext = useCallback(() => {
-    if (value) onNext();
-  }, [value, onNext]);
+    if (valueRef.current) onNext();
+  }, [onNext]);
 
   return (
     <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: "24px" }}>
-        <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "8px" }}>
+        <h2
+          style={{
+            fontSize: "24px",
+            fontWeight: "bold",
+            marginBottom: "8px",
+          }}
+        >
           What do you need help with?
         </h2>
         <p style={{ color: "#666", fontSize: "14px" }}>
           Choose the category that best describes your need.
         </p>
+
         {willBeFree && !isFreeDisabled && (
-          <div style={{ display: "inline-block", marginTop: "8px", padding: "6px 16px", borderRadius: "20px", background: "#d1fae5", color: "#065f46", fontSize: "14px", fontWeight: "500" }}>
-            🎉 {freeCasesUsed === 0 ? "Your first case is FREE!" : "This case is FREE!"}
+          <div
+            style={{
+              display: "inline-block",
+              marginTop: "8px",
+              padding: "6px 16px",
+              borderRadius: "20px",
+              background: "#d1fae5",
+              color: "#065f46",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            🎉{" "}
+            {freeCasesUsed === 0
+              ? "Your first case is FREE!"
+              : "This case is FREE!"}
           </div>
         )}
+
         {isFreeDisabled && (
-          <div style={{ display: "inline-block", marginTop: "8px", padding: "6px 16px", borderRadius: "20px", background: "#fef3c7", color: "#92400e", fontSize: "14px", fontWeight: "500" }}>
+          <div
+            style={{
+              display: "inline-block",
+              marginTop: "8px",
+              padding: "6px 16px",
+              borderRadius: "20px",
+              background: "#fef3c7",
+              color: "#92400e",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
             ⚠️ Free cases used up. 1 credit fee applies.
           </div>
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
-        {ALL_CATEGORIES.map((cat) => {
-          const isSelected = value === cat.id;
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => handleSelect(cat.id)}
-              style={{
-                backgroundColor: cat.color,
-                color: "#ffffff",
-                borderRadius: "16px",
-                padding: "16px 8px",
-                minHeight: "90px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "4px",
-                border: isSelected ? "4px solid #000" : "none",
-                transform: isSelected ? "scale(1.05)" : "scale(1)",
-                // 🔥 FIX: محدود transition، صرف transform اور box-shadow کو smooth کریں
-                transition: "transform 0.15s ease, box-shadow 0.15s ease, border 0.15s ease",
-                boxShadow: isSelected ? "0 8px 25px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.15)",
-                cursor: "pointer",
-                textAlign: "center",
-                fontWeight: "500",
-                fontSize: "14px",
-                lineHeight: "1.3",
-                position: "relative",
-                // 🔥 GPU acceleration کے لیے
-                willChange: "transform, box-shadow",
-              }}
-            >
-              <span style={{ fontSize: "28px", display: "block" }}>{cat.label.split(" ")[0]}</span>
-              <span style={{ display: "block" }}>{cat.label}</span>
-              {isSelected && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "-10px",
-                    right: "-10px",
-                    background: "#000",
-                    color: "#fff",
-                    borderRadius: "50%",
-                    width: "28px",
-                    height: "28px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                  }}
-                >
-                  ✓
-                </span>
-              )}
-            </button>
-          );
-        })}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: "12px",
+        }}
+      >
+        {ALL_CATEGORIES.map((cat) => (
+          <CategoryButton
+            key={cat.id}
+            cat={cat}
+            isSelected={value === cat.id}
+            onSelect={handleSelect}
+          />
+        ))}
       </div>
 
-      <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "center" }}>
+      <div
+        style={{
+          marginTop: "24px",
+          display: "flex",
+          gap: "12px",
+          justifyContent: "center",
+        }}
+      >
         {!isFirst && (
           <button
             onClick={onBack}
+            type="button"
             style={{
               padding: "10px 24px",
               borderRadius: "8px",
@@ -152,6 +250,7 @@ const StepCategory = memo(function StepCategory({
               background: "transparent",
               cursor: "pointer",
               flex: 1,
+              fontSize: "16px",
             }}
           >
             Back
@@ -160,6 +259,7 @@ const StepCategory = memo(function StepCategory({
         <button
           onClick={handleNext}
           disabled={!value}
+          type="button"
           style={{
             padding: "10px 24px",
             borderRadius: "8px",
@@ -170,6 +270,8 @@ const StepCategory = memo(function StepCategory({
             flex: 1,
             opacity: value ? 1 : 0.6,
             transition: "background 0.2s ease, opacity 0.2s ease",
+            fontSize: "16px",
+            fontWeight: "500",
           }}
         >
           Next →
