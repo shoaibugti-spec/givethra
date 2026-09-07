@@ -1,9 +1,9 @@
 // src/frontend/src/pages/submit-request/steps/StepCategory.tsx
-// Givethra - 19 Colored Category Boxes
+// 🔥 FIXED: No blinking, stable selection, smooth UX
 
 import { StepNavigation } from "../shared/StepNavigation";
+import { useState, useCallback, useRef } from "react";
 
-// 🔥 19 categories with colors
 const ALL_CATEGORIES = [
   { id: "Electricity Bill", label: "⚡ Electricity Bill", color: "#eab308" },
   { id: "Gas Bill", label: "🔥 Gas Bill", color: "#f97316" },
@@ -49,16 +49,41 @@ export default function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  const handleSelect = (id: string) => {
-    onChange(id);
-    setTimeout(() => {
-      if (id) onNext();
-    }, 400);
-  };
+  // 🔥 Local state to prevent flickering
+  const [selected, setSelected] = useState(value);
+  const isProcessing = useRef(false);
+
+  const handleSelect = useCallback(
+    (id: string) => {
+      // Prevent double clicks / rapid fire
+      if (isProcessing.current) return;
+      if (id === selected) return;
+
+      isProcessing.current = true;
+
+      // Update local state immediately (smooth UI)
+      setSelected(id);
+      // Notify parent
+      onChange(id);
+
+      // After a short delay, allow navigation and reset flag
+      setTimeout(() => {
+        isProcessing.current = false;
+        // Auto-advance after selection (if needed)
+        if (id) {
+          onNext();
+        }
+      }, 300);
+    },
+    [selected, onChange, onNext]
+  );
+
+  // Sync with parent value if it changes externally
+  // (but we keep local state to avoid blinking)
+  // We don't need to sync because we control it.
 
   return (
     <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
-      {/* Header */}
       <div style={{ textAlign: "center", marginBottom: "24px" }}>
         <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "8px" }}>
           What do you need help with?
@@ -78,10 +103,9 @@ export default function StepCategory({
         )}
       </div>
 
-      {/* Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
         {ALL_CATEGORIES.map((cat) => {
-          const isSelected = value === cat.id;
+          const isSelected = selected === cat.id;
           return (
             <button
               key={cat.id}
@@ -138,7 +162,6 @@ export default function StepCategory({
         })}
       </div>
 
-      {/* Navigation */}
       <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "center" }}>
         {!isFirst && (
           <button
@@ -157,16 +180,17 @@ export default function StepCategory({
         )}
         <button
           onClick={onNext}
-          disabled={!value}
+          disabled={!selected}
           style={{
             padding: "10px 24px",
             borderRadius: "8px",
             border: "none",
-            background: value ? "#00A896" : "#ccc",
+            background: selected ? "#00A896" : "#ccc",
             color: "#fff",
-            cursor: value ? "pointer" : "not-allowed",
+            cursor: selected ? "pointer" : "not-allowed",
             flex: 1,
-            opacity: value ? 1 : 0.6,
+            opacity: selected ? 1 : 0.6,
+            transition: "background 0.2s ease",
           }}
         >
           Next →
