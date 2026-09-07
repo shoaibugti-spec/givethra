@@ -1,11 +1,11 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// ✅ FIXED: Stable step rendering, NO blinking, NO unnecessary re-renders
+// ✅ FIXED: Root cause of blinking — stable stepProps, debounced draft, no cascade on category select
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
 // All steps
@@ -46,11 +46,11 @@ import { useVisibleSteps } from "./hooks/useVisibleSteps";
 import { useSubmitDraft } from "./hooks/useSubmitDraft";
 import { useUserSubmitStats } from "./hooks/useUserSubmitStats";
 
-// Constants & utils
-import { CATEGORIES, CATEGORY_LIMITS } from "./constants";
+// Utils
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
 
+// ✅ Module-level — never recreated on render
 const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   category: StepCategory,
   title: StepTitle,
@@ -79,6 +79,27 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   selfie: StepSelfie,
   video: StepVideo,
   terms: StepTerms,
+};
+
+const STEPS_NEEDING_FORMDATA = new Set([
+  "jobDocuments",
+  "noJobDocument",
+  "categoryDetails",
+  "rentedDocuments",
+  "ownedDocuments",
+  "debtTotal",
+  "selfie",
+  "video",
+  "amount",
+  "deadline",
+]);
+
+const PLACEHOLDERS: Record<string, string> = {
+  title: "e.g. Help with School Fee",
+  shortDesc: "One line summary",
+  seekerName: "Your full name",
+  seekerContact: "Your phone",
+  city: "e.g. Karachi",
 };
 
 export default function SubmitRequestWizard() {
@@ -131,10 +152,11 @@ export default function SubmitRequestWizard() {
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === totalSteps - 1;
 
-  const canUseFree = !stats.isSuspended && !stats.isFreeDisabled && stats.freeCasesUsed < 2;
+  const canUseFree =
+    !stats.isSuspended && !stats.isFreeDisabled && stats.freeCasesUsed < 2;
   const willBeFree = canUseFree;
 
-  // ✅ Refs for stable callbacks
+  // ── Stable refs ──────────────────────────────────────────────
   const currentStepIdRef = useRef(currentStepId);
   currentStepIdRef.current = currentStepId;
   const formDataRef = useRef(formData);
@@ -142,7 +164,7 @@ export default function SubmitRequestWizard() {
   const visibleStepIdsRef = useRef(visibleStepIds);
   visibleStepIdsRef.current = visibleStepIds;
 
-  // Load draft
+  // ── Load draft once ──────────────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated) {
       navigate({ to: "/sign-in", search: { redirect: "/onboarding-submit" } });
@@ -150,25 +172,26 @@ export default function SubmitRequestWizard() {
     }
     const saved = loadDraft();
     if (saved) {
-      setFormData(prev => ({ ...prev, ...saved }));
+      setFormData((prev) => ({ ...prev, ...saved }));
       if (saved._stepId) setCurrentStepId(saved._stepId);
     }
     setIsLoading(false);
   }, [isAuthenticated, navigate, loadDraft]);
 
-  // Auto-save draft
+  // ── Debounced auto-save (400ms) — stops thrashing on every keystroke ──
   useEffect(() => {
-    if (!isLoading) {
-      saveDraft({ ...formData, _stepId: currentStepId });
-    }
+    if (isLoading) return;
+    const timer = setTimeout(() => {
+      saveDraft({ ...formDataRef.current, _stepId: currentStepIdRef.current });
+    }, 400);
+    return () => clearTimeout(timer);
   }, [formData, currentStepId, isLoading, saveDraft]);
 
-  // ✅ STABLE: Never changes identity
+  // ── Stable handlers ──────────────────────────────────────────
   const handleFieldChange = useCallback((field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
 
-  // ✅ STABLE: Uses refs, never re-creates
   const handleNext = useCallback(() => {
     const stepId = currentStepIdRef.current;
     const data = formDataRef.current;
@@ -179,15 +202,12 @@ export default function SubmitRequestWizard() {
     }
     const idx = visibleStepIdsRef.current.indexOf(stepId);
     const nextIndex = idx + 1;
-    if (nextIndex >= visibleStepIdsRef.current.length) {
-      // handleSubmit will be called separately
-    } else {
+    if (nextIndex < visibleStepIdsRef.current.length) {
       setCurrentStepId(visibleStepIdsRef.current[nextIndex]);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, []);
 
-  // ✅ STABLE: Uses refs
   const handleBack = useCallback(() => {
     const stepId = currentStepIdRef.current;
     const idx = visibleStepIdsRef.current.indexOf(stepId);
@@ -198,7 +218,6 @@ export default function SubmitRequestWizard() {
     }
   }, []);
 
-  // Submit handler
   const handleSubmit = useCallback(async () => {
     for (const stepId of visibleStepIdsRef.current) {
       const error = validateStep(stepId, formDataRef.current);
@@ -237,26 +256,29 @@ export default function SubmitRequestWizard() {
     }
   }, [user, willBeFree, clearDraft, navigate]);
 
-  // ✅ STABLE onChange — never re-creates
-  const stableOnChange = useCallback((val: any) => {
-    handleFieldChange(currentStepIdRef.current, val);
-  }, [handleFieldChange]);
+  // ✅ Always writes to the CURRENT step via ref
+  const stableOnChange = useCallback(
+    (val: any) => {
+      handleFieldChange(currentStepIdRef.current, val);
+    },
+    [handleFieldChange]
+  );
 
-  // ✅ STABLE setFormData wrapper
   const stableSetFormData = useCallback((updater: any) => {
     if (typeof updater === "function") {
-      setFormData(prev => updater(prev));
+      setFormData((prev) => updater(prev));
     } else {
       setFormData(updater);
     }
   }, []);
 
-  // ✅ Step props — MINIMAL dependencies
-  const stepProps = useMemo(() => {
-    const value = formData[currentStepId as keyof typeof formData];
+  // ── CRITICAL: only the single field value, not whole formData ──
+  const currentValue = formData[currentStepId as keyof typeof formData];
+  const needsFormData = STEPS_NEEDING_FORMDATA.has(currentStepId);
 
+  const stepProps = useMemo(() => {
     const common = {
-      value,
+      value: currentValue,
       onChange: stableOnChange,
       onNext: handleNext,
       onBack: handleBack,
@@ -265,44 +287,47 @@ export default function SubmitRequestWizard() {
     };
 
     const extra: any = {};
+
     if (currentStepId === "category") {
       extra.willBeFree = willBeFree;
       extra.isFreeDisabled = stats.isFreeDisabled;
       extra.freeCasesUsed = stats.freeCasesUsed;
     }
-    if (["jobDocuments", "noJobDocument", "categoryDetails", "rentedDocuments", "ownedDocuments", "debtTotal", "selfie", "video", "amount", "deadline"].includes(currentStepId)) {
+
+    if (needsFormData) {
       extra.formData = formData;
       extra.setFormData = stableSetFormData;
     }
-    if (["title", "shortDesc", "seekerName", "seekerContact", "city"].includes(currentStepId)) {
-      extra.placeholder = currentStepId === "title" ? "e.g. Help with School Fee"
-        : currentStepId === "shortDesc" ? "One line summary"
-        : currentStepId === "seekerName" ? "Your full name"
-        : currentStepId === "seekerContact" ? "Your phone"
-        : "e.g. Karachi";
+
+    if (PLACEHOLDERS[currentStepId]) {
+      extra.placeholder = PLACEHOLDERS[currentStepId];
     }
 
     return { ...common, ...extra };
   }, [
-    currentStepId,       // Only changes on step navigation
-    formData,            // Still needed for value + extra.formData
-    stableOnChange,      // Stable
-    handleNext,          // Stable
-    handleBack,          // Stable
-    isFirst,             // Step navigation
-    isLast,              // Step navigation
-    willBeFree,          // Stats
-    stats.isFreeDisabled,// Stats
-    stats.freeCasesUsed, // Stats
-    stableSetFormData,   // Stable
+    currentStepId,
+    currentValue, // ← only the one field that matters
+    stableOnChange,
+    handleNext,
+    handleBack,
+    isFirst,
+    isLast,
+    willBeFree,
+    stats.isFreeDisabled,
+    stats.freeCasesUsed,
+    needsFormData ? formData : null, // full formData only when required
+    stableSetFormData,
   ]);
 
   const CurrentStepComponent = STEP_COMPONENTS[currentStepId];
 
+  // ── Loading / blocked states ─────────────────────────────────
   if (isLoading || statsLoading) {
     return (
       <Layout>
-        <div className="max-w-2xl mx-auto px-4 py-20 text-center">Loading Submit Request Wizard...</div>
+        <div className="max-w-2xl mx-auto px-4 py-20 text-center">
+          Loading Submit Request Wizard...
+        </div>
       </Layout>
     );
   }
@@ -328,11 +353,14 @@ export default function SubmitRequestWizard() {
           <div className="rounded-2xl border bg-card p-8 space-y-4">
             <h1 className="text-2xl font-bold">Please Share Your Feedback First</h1>
             <p>
-              Your case "<strong>{stats.blockedByFeedback.caseTitle}</strong>" was completed.
-              Before submitting a new case, please share your feedback.
+              Your case "<strong>{stats.blockedByFeedback.caseTitle}</strong>" was
+              completed. Before submitting a new case, please share your feedback.
             </p>
             <Button asChild>
-              <Link to="/cases/$id" params={{ id: stats.blockedByFeedback.caseId }}>
+              <Link
+                to="/cases/$id"
+                params={{ id: stats.blockedByFeedback.caseId }}
+              >
                 Go to My Completed Case
               </Link>
             </Button>
@@ -349,10 +377,7 @@ export default function SubmitRequestWizard() {
         <StepProgress current={currentIndex + 1} total={totalSteps} />
         <div className="mt-6">
           {CurrentStepComponent && (
-            <CurrentStepComponent
-              key={currentStepId}
-              {...stepProps}
-            />
+            <CurrentStepComponent key={currentStepId} {...stepProps} />
           )}
         </div>
         {currentIndex > 0 && (
