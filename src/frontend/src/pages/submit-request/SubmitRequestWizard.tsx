@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// ✅ FIXED: blinking + status gates + whyHelp → description field mapping
+// FIXED: blinking + status gates + whyHelp→description + genderDocuments + English only
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import StepGender from "./steps/StepGender";
 import StepMartialStatus from "./steps/StepMartialStatus";
 import StepOrphan from "./steps/StepOrphan";
 import StepOrphanParent from "./steps/StepOrphanParent";
+import StepGenderDocuments from "./steps/StepGenderDocuments";
 import StepSeekerName from "./steps/StepSeekerName";
 import StepSeekerContact from "./steps/StepSeekerContact";
 import StepJobStatus from "./steps/StepJobStatus";
@@ -50,7 +51,7 @@ import { useUserSubmitStats } from "./hooks/useUserSubmitStats";
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
 
-// ✅ Module-level — never recreated on render
+// Module-level — never recreated on render
 const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   category: StepCategory,
   title: StepTitle,
@@ -62,6 +63,7 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   maritalStatus: StepMartialStatus,
   orphan: StepOrphan,
   orphanParent: StepOrphanParent,
+  genderDocuments: StepGenderDocuments,
   seekerName: StepSeekerName,
   seekerContact: StepSeekerContact,
   jobStatus: StepJobStatus,
@@ -84,6 +86,7 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
 const STEPS_NEEDING_FORMDATA = new Set([
   "jobDocuments",
   "noJobDocument",
+  "genderDocuments",
   "categoryDetails",
   "rentedDocuments",
   "ownedDocuments",
@@ -113,6 +116,7 @@ const INITIAL_FORM = {
   maritalStatus: "",
   isOrphan: "",
   orphanParent: "",
+  genderDocUrls: {},
   seekerName: "",
   seekerContact: "",
   jobStatus: "",
@@ -143,7 +147,6 @@ export default function SubmitRequestWizard() {
   const [currentStepId, setCurrentStepId] = useState<string>("category");
   const [submitting, setSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  // Rejected case کے بعد user "Resubmit" دبائے تو فارم کھلے
   const [forceNewCase, setForceNewCase] = useState(false);
 
   const { saveDraft, loadDraft, clearDraft } = useSubmitDraft();
@@ -159,7 +162,6 @@ export default function SubmitRequestWizard() {
     !stats.isSuspended && !stats.isFreeDisabled && stats.freeCasesUsed < 2;
   const willBeFree = canUseFree;
 
-  // ── Stable refs ──────────────────────────────────────────────
   const currentStepIdRef = useRef(currentStepId);
   currentStepIdRef.current = currentStepId;
   const formDataRef = useRef(formData);
@@ -167,7 +169,6 @@ export default function SubmitRequestWizard() {
   const visibleStepIdsRef = useRef(visibleStepIds);
   visibleStepIdsRef.current = visibleStepIds;
 
-  // ── Load draft once ──────────────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated) {
       navigate({ to: "/sign-in", search: { redirect: "/onboarding-submit" } });
@@ -181,7 +182,6 @@ export default function SubmitRequestWizard() {
     setIsLoading(false);
   }, [isAuthenticated, navigate, loadDraft]);
 
-  // ── Debounced auto-save (400ms) ──────────────────────────────
   useEffect(() => {
     if (isLoading) return;
     const timer = setTimeout(() => {
@@ -190,7 +190,13 @@ export default function SubmitRequestWizard() {
     return () => clearTimeout(timer);
   }, [formData, currentStepId, isLoading, saveDraft]);
 
-  // ── Stable handlers ──────────────────────────────────────────
+  // Keep current step valid when visible steps change (e.g. gender change)
+  useEffect(() => {
+    if (!visibleStepIds.includes(currentStepId) && visibleStepIds.length > 0) {
+      setCurrentStepId(visibleStepIds[0]);
+    }
+  }, [visibleStepIds, currentStepId]);
+
   const handleFieldChange = useCallback((field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
@@ -225,7 +231,7 @@ export default function SubmitRequestWizard() {
     for (const stepId of visibleStepIdsRef.current) {
       const error = validateStep(stepId, formDataRef.current);
       if (error) {
-        toast.error(`❌ ${error}`);
+        toast.error(error);
         setCurrentStepId(stepId);
         return;
       }
@@ -261,7 +267,7 @@ export default function SubmitRequestWizard() {
     }
   }, [user, willBeFree, clearDraft, navigate, refetch]);
 
-  // ✅ whyHelp step always writes to "description" (backend field)
+  // whyHelp always writes to "description" (backend field)
   const stableOnChange = useCallback(
     (val: any) => {
       const stepId = currentStepIdRef.current;
@@ -289,7 +295,7 @@ export default function SubmitRequestWizard() {
     setForceNewCase(true);
   }, [clearDraft]);
 
-  // ✅ whyHelp step always reads from "description"
+  // whyHelp always reads from "description"
   const currentValue =
     currentStepId === "whyHelp"
       ? formData.description
@@ -345,7 +351,7 @@ export default function SubmitRequestWizard() {
 
   const CurrentStepComponent = STEP_COMPONENTS[currentStepId];
 
-  // ── Loading ──────────────────────────────────────────────────
+  // Loading
   if (isLoading || statsLoading) {
     return (
       <Layout>
@@ -356,13 +362,13 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // ── Suspension ───────────────────────────────────────────────
+  // Suspension
   if (stats.isSuspended) {
     return (
       <Layout>
         <div className="max-w-xl mx-auto px-4 py-16 text-center">
           <div className="rounded-2xl border border-red-300 bg-red-50 dark:bg-red-950/20 p-8 space-y-6">
-            <h1 className="text-2xl font-bold text-red-700">🚫 Account Suspended</h1>
+            <h1 className="text-2xl font-bold text-red-700">Account Suspended</h1>
             <p>Your account is suspended. Please unlock it first.</p>
             <Button onClick={() => navigate({ to: "/wallet" })}>Go to Wallet</Button>
           </div>
@@ -371,7 +377,7 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // ── Feedback required (completed case, no feedback after 24h) ─
+  // Feedback required
   if (stats.blockedByFeedback) {
     return (
       <Layout>
@@ -397,28 +403,28 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // ── Pending case ─────────────────────────────────────────────
+  // Pending case
   if (stats.activeCase?.status === "pending" && !forceNewCase) {
     return (
       <Layout>
         <div className="max-w-xl mx-auto px-4 py-16 text-center">
           <div className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-8 space-y-5">
-            <h1 className="text-2xl font-bold text-amber-800">⏳ کیس زیر نظر ہے</h1>
+            <h1 className="text-2xl font-bold text-amber-800">Case Under Review</h1>
             <p className="text-base">
-              آپ کا کیس <strong>"{stats.activeCase.title}"</strong> جمع ہو چکا ہے اور
-              ابھی <strong>Pending</strong> میں ہے۔
+              Your case <strong>"{stats.activeCase.title}"</strong> has been submitted
+              and is currently <strong>Pending</strong>.
             </p>
             <p className="text-sm text-muted-foreground">
-              نیا کیس تبھی جمع کر سکیں گے جب یہ منظور، مسترد یا مکمل ہو جائے۔
+              You can submit a new case only after this one is approved, rejected, or completed.
             </p>
             <div className="flex flex-col gap-3">
               <Button asChild className="w-full">
                 <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
-                  میرا کیس دیکھیں
+                  View My Case
                 </Link>
               </Button>
               <Button variant="outline" asChild className="w-full">
-                <Link to="/my-cases">میرے تمام کیسز</Link>
+                <Link to="/my-cases">My Cases</Link>
               </Button>
             </div>
           </div>
@@ -427,29 +433,28 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // ── Approved / live case ─────────────────────────────────────
+  // Approved / live case
   if (stats.activeCase?.status === "approved" && !forceNewCase) {
     return (
       <Layout>
         <div className="max-w-xl mx-auto px-4 py-16 text-center">
           <div className="rounded-2xl border border-green-300 bg-green-50 dark:bg-green-950/20 p-8 space-y-5">
-            <h1 className="text-2xl font-bold text-green-800">✅ کیس منظور ہو چکا</h1>
+            <h1 className="text-2xl font-bold text-green-800">Case Approved</h1>
             <p className="text-base">
-              <strong>"{stats.activeCase.title}"</strong> live ہے — لوگ اس میں
-              contribution / مدد کر رہے ہیں۔
+              <strong>"{stats.activeCase.title}"</strong> is live. People can contribute
+              and help on this case.
             </p>
             <p className="text-sm text-muted-foreground">
-              جب کیس مکمل ہو جائے گا تو آپ کو payment proof اور feedback کا صفحہ
-              نظر آئے گا۔
+              When the case is completed, you will see payment proof and the feedback page.
             </p>
             <div className="flex flex-col gap-3">
               <Button asChild className="w-full">
                 <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
-                  کیس کا صفحہ کھولیں
+                  Open Case Page
                 </Link>
               </Button>
               <Button variant="outline" asChild className="w-full">
-                <Link to="/my-cases">میرے تمام کیسز</Link>
+                <Link to="/my-cases">My Cases</Link>
               </Button>
             </div>
           </div>
@@ -458,39 +463,39 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // ── Rejected case — show reason + resubmit ───────────────────
+  // Rejected case
   if (stats.activeCase?.status === "rejected" && !forceNewCase) {
     return (
       <Layout>
         <div className="max-w-xl mx-auto px-4 py-16 text-center">
           <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-8 space-y-5">
-            <h1 className="text-2xl font-bold text-red-700">❌ کیس مسترد ہو گیا</h1>
+            <h1 className="text-2xl font-bold text-red-700">Case Rejected</h1>
             <p className="text-base">
-              <strong>"{stats.activeCase.title}"</strong> ایڈمن نے مسترد کر دیا۔
+              <strong>"{stats.activeCase.title}"</strong> was rejected by the admin team.
             </p>
             {stats.activeCase.rejectionReason ? (
               <div className="rounded-lg bg-white dark:bg-card border p-4 text-left text-sm">
-                <p className="font-semibold mb-1">وجہ / Reason:</p>
+                <p className="font-semibold mb-1">Reason:</p>
                 <p className="text-muted-foreground whitespace-pre-wrap">
                   {stats.activeCase.rejectionReason}
                 </p>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                تفصیلی وجہ کیس کے صفحے پر دیکھ سکتے ہیں۔
+                You can view more details on the case page.
               </p>
             )}
             <div className="flex flex-col gap-3">
               <Button className="w-full" onClick={startFreshCase}>
-                پھر سے کیس جمع کروائیں
+                Submit a New Case
               </Button>
               <Button variant="outline" asChild className="w-full">
                 <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
-                  مسترد شدہ کیس دیکھیں
+                  View Rejected Case
                 </Link>
               </Button>
               <Button variant="ghost" asChild className="w-full">
-                <Link to="/my-cases">میرے تمام کیسز</Link>
+                <Link to="/my-cases">My Cases</Link>
               </Button>
             </div>
           </div>
@@ -499,12 +504,12 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // ── Main wizard form ─────────────────────────────────────────
+  // Main wizard form
   return (
     <Layout>
       <div className="max-w-2xl mx-auto px-4 py-6">
         <SubmitTopBar isFree={willBeFree} balance={stats.balance} />
-        <StepProgress current={currentIndex + 1} total={totalSteps} />
+        <StepProgress current={Math.max(currentIndex + 1, 1)} total={Math.max(totalSteps, 1)} />
         <div className="mt-6">
           {CurrentStepComponent && (
             <CurrentStepComponent key={currentStepId} {...stepProps} />
@@ -512,7 +517,7 @@ export default function SubmitRequestWizard() {
         </div>
         {currentIndex > 0 && (
           <p className="mt-4 text-xs text-muted-foreground text-center">
-            💾 Your progress is saved automatically.
+            Your progress is saved automatically.
           </p>
         )}
       </div>
