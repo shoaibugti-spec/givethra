@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// FIXED: blinking + status gates + whyHelp→description + genderDocuments + English only
+// Complete: blinking fix + status gates + genderDocuments + paymentReceiver + whyHelp→description + English only
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import StepCategoryDetails from "./steps/StepCategoryDetails";
 import StepPeopertyOwnership from "./steps/StepPeopertyOwnership";
 import StepRentedDocuments from "./steps/StepRentedDocuments";
 import StepOwnedDocuments from "./steps/StepOwnedDocuments";
+import StepPaymentReceiver from "./steps/StepPaymentReceiver";
 import StepWhyHelp from "./steps/StepWhyHelp";
 import StepDebtTotal from "./steps/StepDebtTotal";
 import StepAmount from "./steps/StepAmount";
@@ -51,7 +52,6 @@ import { useUserSubmitStats } from "./hooks/useUserSubmitStats";
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
 
-// Module-level — never recreated on render
 const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   category: StepCategory,
   title: StepTitle,
@@ -73,6 +73,7 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   propertyOwnership: StepPeopertyOwnership,
   rentedDocuments: StepRentedDocuments,
   ownedDocuments: StepOwnedDocuments,
+  paymentReceiver: StepPaymentReceiver,
   whyHelp: StepWhyHelp,
   debtTotal: StepDebtTotal,
   amount: StepAmount,
@@ -90,6 +91,7 @@ const STEPS_NEEDING_FORMDATA = new Set([
   "categoryDetails",
   "rentedDocuments",
   "ownedDocuments",
+  "paymentReceiver",
   "debtTotal",
   "selfie",
   "video",
@@ -129,6 +131,12 @@ const INITIAL_FORM = {
   landlordCnicUrl: "",
   ownerCnicUrl: "",
   ownerRelation: "",
+  receiverName: "",
+  receiverContact: "",
+  receiverBank: "",
+  receiverAccount: "",
+  receiverAddress: "",
+  receiverShopName: "",
   description: "",
   debtTotalAmount: "",
   amount: "",
@@ -190,7 +198,7 @@ export default function SubmitRequestWizard() {
     return () => clearTimeout(timer);
   }, [formData, currentStepId, isLoading, saveDraft]);
 
-  // Keep current step valid when visible steps change (e.g. gender change)
+  // Keep current step valid when visible steps change
   useEffect(() => {
     if (!visibleStepIds.includes(currentStepId) && visibleStepIds.length > 0) {
       setCurrentStepId(visibleStepIds[0]);
@@ -267,7 +275,7 @@ export default function SubmitRequestWizard() {
     }
   }, [user, willBeFree, clearDraft, navigate, refetch]);
 
-  // whyHelp always writes to "description" (backend field)
+  // whyHelp always writes to "description"
   const stableOnChange = useCallback(
     (val: any) => {
       const stepId = currentStepIdRef.current;
@@ -415,7 +423,8 @@ export default function SubmitRequestWizard() {
               and is currently <strong>Pending</strong>.
             </p>
             <p className="text-sm text-muted-foreground">
-              You can submit a new case only after this one is approved, rejected, or completed.
+              You can submit a new case only after this one is approved, rejected, or
+              completed.
             </p>
             <div className="flex flex-col gap-3">
               <Button asChild className="w-full">
@@ -445,7 +454,8 @@ export default function SubmitRequestWizard() {
               and help on this case.
             </p>
             <p className="text-sm text-muted-foreground">
-              When the case is completed, you will see payment proof and the feedback page.
+              When the case is completed, you will see payment proof and the feedback
+              page.
             </p>
             <div className="flex flex-col gap-3">
               <Button asChild className="w-full">
@@ -509,7 +519,10 @@ export default function SubmitRequestWizard() {
     <Layout>
       <div className="max-w-2xl mx-auto px-4 py-6">
         <SubmitTopBar isFree={willBeFree} balance={stats.balance} />
-        <StepProgress current={Math.max(currentIndex + 1, 1)} total={Math.max(totalSteps, 1)} />
+        <StepProgress
+          current={Math.max(currentIndex + 1, 1)}
+          total={Math.max(totalSteps, 1)}
+        />
         <div className="mt-6">
           {CurrentStepComponent && (
             <CurrentStepComponent key={currentStepId} {...stepProps} />
