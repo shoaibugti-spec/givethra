@@ -1,9 +1,16 @@
 // src/frontend/src/pages/submit-request/steps/StepNoJobDocument.tsx
-import { Label } from "@/components/ui/label";
 import { StepNavigation } from "../shared/StepNavigation";
 import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function StepNoJobDocument({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
+export default function StepNoJobDocument({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
   const { statementUrl } = formData;
 
   const setDoc = (key: string, url: string) => {
@@ -13,19 +20,28 @@ export default function StepNoJobDocument({ formData, setFormData, onNext, onBac
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold">📎 Upload your bank statement</h2>
+        <h2 className="text-2xl font-bold">Upload your bank statement</h2>
         <p className="text-sm text-muted-foreground">
-          Since you don't have a job, we need your bank statement for verification.
+          Required because you selected that you do not have a job.
         </p>
         <DocBox
-          label="Last 6 Months Bank Statement"
+          label="Last 6 months bank statement"
           required
-          hint="Bank, EasyPaisa or JazzCash statement"
+          hint="Original bank statement preferred — EasyPaisa/JazzCash alone is weak for serious cases"
           accept=".pdf,image/*"
           onUpload={(url) => setDoc("statementUrl", url)}
           value={statementUrl}
         />
       </div>
+
+      <StepGuide
+        lines={[
+          "Upload a clear 6-month bank statement.",
+          "For serious cases, prefer an original bank statement over only a micro-wallet history.",
+          "This helps verification of your financial need.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
