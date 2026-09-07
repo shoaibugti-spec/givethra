@@ -1,45 +1,64 @@
 // src/frontend/src/pages/submit-request/steps/StepRentedDocuments.tsx
-import { Label } from "@/components/ui/label";
 import { StepNavigation } from "../shared/StepNavigation";
 import { DocBox } from "../shared/DocBox";
+import { StepGuide } from "../shared/StepGuide";
 
-export default function StepRentedDocuments({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { rentalAgreementUrl, landlordCnicUrl } = formData;
+export default function StepRentedDocuments({
+  formData,
+  setFormData,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+}: any) {
+  const rentalAgreementUrl = formData?.rentalAgreementUrl || "";
+  const landlordCnicUrl = formData?.landlordCnicUrl || "";
 
   const setDoc = (key: string, url: string) => {
     setFormData((prev: any) => ({ ...prev, [key]: url }));
   };
 
+  const isValid = !!rentalAgreementUrl && !!landlordCnicUrl;
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold">📎 Tenant Documents</h2>
+        <h2 className="text-2xl font-bold">Rented property documents</h2>
         <p className="text-sm text-muted-foreground">
-          Since you rent, please upload these documents for verification.
+          Upload documents that prove you are living in a rented property.
         </p>
         <div className="space-y-4">
           <DocBox
-            label="Rental Agreement / Contract"
+            label="Rental agreement"
             required
-            hint="Clear photo of your rental agreement or lease document"
+            hint="Clear photo of the rent agreement"
             onUpload={(url) => setDoc("rentalAgreementUrl", url)}
             value={rentalAgreementUrl}
           />
           <DocBox
-            label="Landlord's CNIC"
+            label="Landlord CNIC"
             required
-            hint="CNIC of the landlord or any document proving property ownership"
+            hint="Front side of landlord CNIC"
             onUpload={(url) => setDoc("landlordCnicUrl", url)}
             value={landlordCnicUrl}
           />
         </div>
       </div>
+
+      <StepGuide
+        lines={[
+          "Both rental agreement and landlord CNIC are required.",
+          "Photos must be clear and readable.",
+          "Names should match other details in your case where possible.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
         isFirst={isFirst}
         isLast={isLast}
-        disabled={!rentalAgreementUrl || !landlordCnicUrl}
+        disabled={!isValid}
       />
     </div>
   );
