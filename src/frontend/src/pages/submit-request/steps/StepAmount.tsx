@@ -1,62 +1,69 @@
 // src/frontend/src/pages/submit-request/steps/StepAmount.tsx
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StepNavigation } from "../shared/StepNavigation";
-import { CASE_CURRENCIES, CURRENCY_SYMBOLS, getMaxLimit } from "../constants";
+import { StepGuide } from "../shared/StepGuide";
+import { getMaxLimit, getCategoryLimit } from "../constants";
 
-export default function StepAmount({ value, formData, setFormData, onChange, onNext, onBack, isFirst, isLast }: any) {
-  const { currency, category } = formData;
-  const sym = CURRENCY_SYMBOLS[currency] || currency;
+export default function StepAmount({
+  value,
+  onChange,
+  onNext,
+  onBack,
+  isFirst,
+  isLast,
+  formData,
+}: any) {
+  const category = formData?.category || "";
   const maxLimit = getMaxLimit(category);
+  const limitInfo = getCategoryLimit(category);
+  const amountNum = parseFloat(value) || 0;
+  const overMax = maxLimit != null && amountNum > maxLimit;
+  const isValid = amountNum > 0 && !overMax;
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold">💰 How much do you need?</h2>
-        <p className="text-sm text-muted-foreground">Enter the verified amount you need for this case.</p>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Amount Needed *</Label>
-            <div className="flex gap-2">
-              <div className="w-28">
-                <Select value={currency} onValueChange={(v) => setFormData((prev: any) => ({ ...prev, currency: v }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CASE_CURRENCIES.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
-                  {sym}
-                </span>
-                <Input
-                  type="number"
-                  value={value}
-                  onChange={(e) => onChange(e.target.value)}
-                  placeholder="e.g. 31000"
-                  className="pl-12 text-lg py-6"
-                  autoFocus
-                />
-              </div>
-            </div>
-            {maxLimit && (
-              <p className="text-xs text-amber-600">⚠️ Maximum allowed: Rs {maxLimit.toLocaleString()}</p>
-            )}
-          </div>
-        </div>
+        <h2 className="text-2xl font-bold">How much help do you need?</h2>
+        <p className="text-sm text-muted-foreground">
+          Enter the amount required for this case.
+          {limitInfo?.label ? ` Policy: ${limitInfo.label}.` : ""}
+        </p>
+        <Label>Amount needed *</Label>
+        <Input
+          type="number"
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Enter amount"
+          className="text-lg py-6"
+          autoFocus
+        />
+        {overMax && (
+          <p className="text-sm text-red-600">
+            Amount cannot exceed Rs {maxLimit?.toLocaleString()}.
+          </p>
+        )}
       </div>
+
+      <StepGuide
+        lines={[
+          limitInfo?.label
+            ? `Category policy: ${limitInfo.label}.`
+            : "Enter only the amount required for this verified need.",
+          maxLimit
+            ? `Maximum allowed for this category is Rs ${maxLimit.toLocaleString()}.`
+            : "Amount should match your documents and bill/estimate.",
+          "Do not inflate the amount — mismatched amounts are rejected.",
+          "Fixed-stipend categories are handled automatically and may skip this step.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
         isFirst={isFirst}
         isLast={isLast}
-        disabled={!value || parseFloat(value) <= 0}
+        disabled={!isValid}
       />
     </div>
   );
