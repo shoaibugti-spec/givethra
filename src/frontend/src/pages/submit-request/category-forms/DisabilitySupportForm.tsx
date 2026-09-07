@@ -6,7 +6,20 @@ import { useState } from "react";
 import { StepNavigation } from "../shared/StepNavigation";
 
 export default function DisabilitySupportForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields, catDocUrls, disabilityMode, disabilityShopName, disabilityShopContact, disabilityHospital, disabilityBankTitle, disabilityBankNumber, treatmentAmount, treatmentExpiry, treatmentPatientNumber, disabilityType } = formData;
+  const {
+    catDocUrls = {},
+    disabilityMode,
+    disabilityShopName,
+    disabilityShopContact,
+    disabilityHospital,
+    disabilityBankTitle,
+    disabilityBankNumber,
+    treatmentAmount,
+    treatmentExpiry,
+    treatmentPatientNumber,
+    disabilityType,
+  } = formData;
+
   const [search, setSearch] = useState("");
   const [isOther, setIsOther] = useState(false);
 
@@ -24,11 +37,34 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
     }));
   };
 
-  const filteredHospitals = HEALTH_INSTITUTES.filter((n) =>
-    n.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 8);
+  const filteredHospitals = (HEALTH_INSTITUTES || [])
+    .filter((n: string) => n.toLowerCase().includes(search.toLowerCase()))
+    .slice(0, 8);
 
-  const isValid = catDocUrls.disability_cnic && catDocUrls.disability_photo && disabilityType && disabilityMode;
+  const isValid = (() => {
+    if (!catDocUrls.disability_cnic || !catDocUrls.disability_photo) return false;
+    if (!disabilityType || !disabilityMode) return false;
+
+    if (disabilityMode === "product") {
+      return (
+        !!disabilityShopName?.trim() &&
+        !!disabilityShopContact?.trim() &&
+        !!catDocUrls.product_receipt
+      );
+    }
+    if (disabilityMode === "treatment") {
+      return (
+        !!disabilityHospital?.trim() &&
+        !!treatmentAmount &&
+        !!treatmentExpiry &&
+        !!treatmentPatientNumber?.trim()
+      );
+    }
+    if (disabilityMode === "stipend") {
+      return !!disabilityBankTitle?.trim() && !!disabilityBankNumber?.trim();
+    }
+    return false;
+  })();
 
   return (
     <BaseCategoryForm
@@ -51,7 +87,7 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
             key="disability_cnic"
             required
             hint="REQUIRED — CNIC that marks the person as disabled, or an official disability certificate"
-            onUpload={(url) => setDoc("disability_cnic", url)}
+            onUpload={(url: string) => setDoc("disability_cnic", url)}
             value={catDocUrls.disability_cnic}
           />
           <FileUpload
@@ -59,7 +95,7 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
             key="disability_photo"
             required
             hint="A clear photo showing the disability, for verification"
-            onUpload={(url) => setDoc("disability_photo", url)}
+            onUpload={(url: string) => setDoc("disability_photo", url)}
             value={catDocUrls.disability_photo}
           />
         </div>
@@ -73,7 +109,9 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
                 type="button"
                 onClick={() => setField("disabilityType", opt)}
                 className={`px-2 py-2 rounded-lg border text-xs font-medium text-left ${
-                  disabilityType === opt ? "bg-primary text-white border-primary" : "border-border"
+                  disabilityType === opt
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                 }`}
               >
                 {opt}
@@ -95,7 +133,9 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
                 type="button"
                 onClick={() => setField("disabilityMode", o.v)}
                 className={`px-3 py-2.5 rounded-lg border text-sm font-medium text-left ${
-                  disabilityMode === o.v ? "bg-primary text-white border-primary" : "border-border"
+                  disabilityMode === o.v
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                 }`}
               >
                 {o.l}
@@ -110,14 +150,14 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
             <TextInput
               field="Shop Name"
               value={disabilityShopName}
-              onChange={(v) => setField("disabilityShopName", v)}
+              onChange={(v: string) => setField("disabilityShopName", v)}
               placeholder="Shop name"
               required
             />
             <TextInput
               field="Shop Contact Number"
               value={disabilityShopContact}
-              onChange={(v) => setField("disabilityShopContact", v)}
+              onChange={(v: string) => setField("disabilityShopContact", v)}
               placeholder="Phone number"
               required
             />
@@ -126,7 +166,7 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
               key="product_receipt"
               required
               hint="Photo of the shop's quotation showing the product & price"
-              onUpload={(url) => setDoc("product_receipt", url)}
+              onUpload={(url: string) => setDoc("product_receipt", url)}
               value={catDocUrls.product_receipt}
             />
           </div>
@@ -147,7 +187,7 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
                 />
                 {search.length >= 2 && (
                   <div className="rounded-xl border divide-y overflow-hidden max-h-48 overflow-y-auto">
-                    {filteredHospitals.map((n) => (
+                    {filteredHospitals.map((n: string) => (
                       <button
                         key={n}
                         type="button"
@@ -187,14 +227,14 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
               <TextInput
                 field="Hospital Name"
                 value={disabilityHospital}
-                onChange={(v) => setField("disabilityHospital", v)}
+                onChange={(v: string) => setField("disabilityHospital", v)}
                 placeholder="Full hospital name"
               />
             )}
             <TextInput
               field="Treatment Amount"
               value={treatmentAmount}
-              onChange={(v) => setField("treatmentAmount", v)}
+              onChange={(v: string) => setField("treatmentAmount", v)}
               placeholder="Total amount on hospital bill"
               type="number"
               required
@@ -203,7 +243,7 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
               <Label>Bill Expiry Date *</Label>
               <input
                 type="date"
-                value={treatmentExpiry}
+                value={treatmentExpiry || ""}
                 onChange={(e) => setField("treatmentExpiry", e.target.value)}
                 className="w-full px-4 py-2.5 rounded-lg border"
               />
@@ -211,7 +251,7 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
             <TextInput
               field="Patient / Bill Number"
               value={treatmentPatientNumber}
-              onChange={(v) => setField("treatmentPatientNumber", v)}
+              onChange={(v: string) => setField("treatmentPatientNumber", v)}
               placeholder="Patient number or bill number from hospital"
               required
             />
@@ -224,14 +264,14 @@ export default function DisabilitySupportForm({ formData, setFormData, onNext, o
             <TextInput
               field="Account Title"
               value={disabilityBankTitle}
-              onChange={(v) => setField("disabilityBankTitle", v)}
+              onChange={(v: string) => setField("disabilityBankTitle", v)}
               placeholder="Your name as on account"
               required
             />
             <TextInput
               field="Bank Account / EasyPaisa / JazzCash Number"
               value={disabilityBankNumber}
-              onChange={(v) => setField("disabilityBankNumber", v)}
+              onChange={(v: string) => setField("disabilityBankNumber", v)}
               placeholder="Account number"
               required
             />
