@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 
 export default function MarriageSupportForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields, catDocUrls } = formData;
+  const { catFields = {}, catDocUrls = {} } = formData;
 
   const setField = (key: string, value: any) => {
     setFormData((prev: any) => ({
@@ -19,20 +19,27 @@ export default function MarriageSupportForm({ formData, setFormData, onNext, onB
     }));
   };
 
-  const relationOptions = ["My daughter", "My son", "My sister", "My brother", "Myself", "Other relative"];
+  const relationOptions = [
+    "My daughter",
+    "My son",
+    "My sister",
+    "My brother",
+    "Myself",
+    "Other relative",
+  ];
 
   const isValid =
-    catFields.relation &&
-    catFields.person_name?.trim() &&
-    catFields.person_age &&
-    catFields.vendor_name?.trim() &&
-    catFields.vendor_contact?.trim() &&
-    catFields.vendor_bank?.trim() &&
-    catFields.vendor_account?.trim() &&
-    catFields.marriage_amount &&
-    catFields.marriage_date &&
-    catDocUrls.relation_proof &&
-    catDocUrls.marriage_quotation;
+    !!catFields.relation &&
+    !!catFields.person_name?.trim() &&
+    !!catFields.person_age &&
+    !!catFields.vendor_name?.trim() &&
+    !!catFields.vendor_contact?.trim() &&
+    !!catFields.vendor_bank?.trim() &&
+    !!catFields.vendor_account?.trim() &&
+    !!catFields.marriage_amount &&
+    !!catFields.marriage_date &&
+    !!catDocUrls.relation_proof &&
+    !!catDocUrls.marriage_quotation;
 
   return (
     <BaseCategoryForm
@@ -45,6 +52,7 @@ export default function MarriageSupportForm({ formData, setFormData, onNext, onB
       title="💍 Marriage Support"
       subtitle="Provide marriage expense details for verification."
       guide="📌 One case = ONE marriage only. Provide vendor details for verification."
+      disabled={!isValid}
     >
       <div className="space-y-3">
         <div className="space-y-2">
@@ -56,7 +64,9 @@ export default function MarriageSupportForm({ formData, setFormData, onNext, onB
                 type="button"
                 onClick={() => setField("relation", opt)}
                 className={`px-2 py-2 rounded-lg border text-xs font-medium text-left ${
-                  catFields.relation === opt ? "bg-primary text-white border-primary" : "border-border"
+                  catFields.relation === opt
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                 }`}
               >
                 {opt}
@@ -68,14 +78,14 @@ export default function MarriageSupportForm({ formData, setFormData, onNext, onB
         <TextInput
           field="Person Getting Married"
           value={catFields.person_name}
-          onChange={(v) => setField("person_name", v)}
+          onChange={(v: string) => setField("person_name", v)}
           placeholder="Full name of the person"
         />
 
         <TextInput
           field="Age"
           value={catFields.person_age}
-          onChange={(v) => setField("person_age", v)}
+          onChange={(v: string) => setField("person_age", v)}
           placeholder="Age of the person"
           type="number"
         />
@@ -83,35 +93,35 @@ export default function MarriageSupportForm({ formData, setFormData, onNext, onB
         <TextInput
           field="Marriage Vendor Name"
           value={catFields.vendor_name}
-          onChange={(v) => setField("vendor_name", v)}
+          onChange={(v: string) => setField("vendor_name", v)}
           placeholder="Name of the marriage vendor"
         />
 
         <TextInput
           field="Vendor Contact Number"
           value={catFields.vendor_contact}
-          onChange={(v) => setField("vendor_contact", v)}
+          onChange={(v: string) => setField("vendor_contact", v)}
           placeholder="Phone number for verification"
         />
 
         <TextInput
           field="Vendor Bank Name"
           value={catFields.vendor_bank}
-          onChange={(v) => setField("vendor_bank", v)}
+          onChange={(v: string) => setField("vendor_bank", v)}
           placeholder="Bank name"
         />
 
         <TextInput
           field="Vendor Account Number"
           value={catFields.vendor_account}
-          onChange={(v) => setField("vendor_account", v)}
+          onChange={(v: string) => setField("vendor_account", v)}
           placeholder="Account number"
         />
 
         <TextInput
           field="Total Marriage Expenses"
           value={catFields.marriage_amount}
-          onChange={(v) => setField("marriage_amount", v)}
+          onChange={(v: string) => setField("marriage_amount", v)}
           placeholder="e.g. 500000"
           type="number"
         />
@@ -131,7 +141,7 @@ export default function MarriageSupportForm({ formData, setFormData, onNext, onB
           key="relation_proof"
           required
           hint="Proof that you are related to the person getting married"
-          onUpload={(url) => setDoc("relation_proof", url)}
+          onUpload={(url: string) => setDoc("relation_proof", url)}
           value={catDocUrls.relation_proof}
         />
 
@@ -140,7 +150,7 @@ export default function MarriageSupportForm({ formData, setFormData, onNext, onB
           key="marriage_quotation"
           required
           hint="List of items needed for the marriage"
-          onUpload={(url) => setDoc("marriage_quotation", url)}
+          onUpload={(url: string) => setDoc("marriage_quotation", url)}
           value={catDocUrls.marriage_quotation}
         />
       </div>
