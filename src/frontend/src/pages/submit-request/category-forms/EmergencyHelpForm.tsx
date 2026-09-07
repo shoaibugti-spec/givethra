@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { BaseCategoryForm, TextInput, FileUpload } from "./BaseCategoryForm";
 
 export default function EmergencyHelpForm({ formData, setFormData, onNext, onBack, isFirst, isLast }: any) {
-  const { catFields, catDocUrls } = formData;
+  const { catFields = {}, catDocUrls = {} } = formData;
 
   const setField = (key: string, value: any) => {
     setFormData((prev: any) => ({
@@ -19,15 +19,21 @@ export default function EmergencyHelpForm({ formData, setFormData, onNext, onBac
     }));
   };
 
-  const emergencyTypes = ["Medical Emergency", "Natural Disaster", "Accident", "Urgent Family Matter", "Other"];
+  const emergencyTypes = [
+    "Medical Emergency",
+    "Natural Disaster",
+    "Accident",
+    "Urgent Family Matter",
+    "Other",
+  ];
 
   const isValid =
-    catFields.emergency_type &&
-    catFields.emergency_description?.trim() &&
-    catFields.emergency_location?.trim() &&
-    catFields.emergency_amount &&
-    catFields.emergency_date &&
-    catDocUrls.emergency_proof;
+    !!catFields.emergency_type &&
+    !!catFields.emergency_description?.trim() &&
+    !!catFields.emergency_location?.trim() &&
+    !!catFields.emergency_amount &&
+    !!catFields.emergency_date &&
+    !!catDocUrls.emergency_proof;
 
   return (
     <BaseCategoryForm
@@ -40,6 +46,7 @@ export default function EmergencyHelpForm({ formData, setFormData, onNext, onBac
       title="🚨 Emergency Help"
       subtitle="Provide emergency help details."
       guide="⚡ For urgent situations only. Please provide proof of the emergency."
+      disabled={!isValid}
     >
       <div className="space-y-3">
         <div className="space-y-2">
@@ -51,7 +58,9 @@ export default function EmergencyHelpForm({ formData, setFormData, onNext, onBac
                 type="button"
                 onClick={() => setField("emergency_type", opt)}
                 className={`px-2 py-2 rounded-lg border text-xs font-medium ${
-                  catFields.emergency_type === opt ? "bg-primary text-white border-primary" : "border-border"
+                  catFields.emergency_type === opt
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                 }`}
               >
                 {opt}
@@ -63,21 +72,21 @@ export default function EmergencyHelpForm({ formData, setFormData, onNext, onBac
         <TextInput
           field="Emergency Description"
           value={catFields.emergency_description}
-          onChange={(v) => setField("emergency_description", v)}
+          onChange={(v: string) => setField("emergency_description", v)}
           placeholder="Describe the emergency in detail"
         />
 
         <TextInput
           field="Emergency Location"
           value={catFields.emergency_location}
-          onChange={(v) => setField("emergency_location", v)}
+          onChange={(v: string) => setField("emergency_location", v)}
           placeholder="Complete address or location"
         />
 
         <TextInput
           field="Amount Needed"
           value={catFields.emergency_amount}
-          onChange={(v) => setField("emergency_amount", v)}
+          onChange={(v: string) => setField("emergency_amount", v)}
           placeholder="e.g. 20000"
           type="number"
         />
@@ -97,7 +106,7 @@ export default function EmergencyHelpForm({ formData, setFormData, onNext, onBac
           key="emergency_proof"
           required
           hint="Clear photo of the emergency situation, hospital report, or any proof"
-          onUpload={(url) => setDoc("emergency_proof", url)}
+          onUpload={(url: string) => setDoc("emergency_proof", url)}
           value={catDocUrls.emergency_proof}
         />
       </div>
