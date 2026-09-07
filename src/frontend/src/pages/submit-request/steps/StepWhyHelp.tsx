@@ -2,8 +2,9 @@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { StepNavigation } from "../shared/StepNavigation";
+import { StepGuide } from "../shared/StepGuide";
 
-const MIN_WORDS = 500;
+const MIN_WORDS = 200;
 
 function countWords(text: string): number {
   const t = (text || "").trim();
@@ -29,38 +30,39 @@ export default function StepWhyHelp({
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">Why do you need this help?</h2>
         <p className="text-sm text-muted-foreground">
-          اپنے مسئلے کی مکمل تفصیل لکھیں — Heroes اسی متن سے سمجھتے ہیں کہ مدد کیوں
-          ضروری ہے۔ جتنا واضح لکھیں گے، اتنا بہتر۔
+          Describe your situation in detail. Heroes read this to understand your need
+          and decide whether to help.
         </p>
-        <Label>Explain Your Situation *</Label>
+        <Label>Explain your situation *</Label>
         <Textarea
           value={text}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="شروع سے آخر تک اپنا مسئلہ تفصیل سے بیان کریں: کیا ہوا، کب سے، موجودہ حالت، خاندان کی صورتحال، اور مدد سے کیا بدلاؤ آئے گا۔ کم از کم 500 الفاظ..."
-          rows={14}
-          className="text-base min-h-[280px]"
+          placeholder="Explain from the beginning: what happened, since when, your current situation, family circumstances, and how this help will change things. Write at least 200 words..."
+          rows={12}
+          className="text-base min-h-[240px]"
           autoFocus
         />
         <div className="flex items-center justify-between gap-2 text-xs">
-          <p
-            className={
-              isValid
-                ? "text-green-600 font-medium"
-                : "text-amber-700 dark:text-amber-400"
-            }
-          >
+          <p className={isValid ? "text-green-600 font-medium" : "text-amber-700 dark:text-amber-400"}>
             {isValid
-              ? `✓ ${words} الفاظ — آگے بڑھ سکتے ہیں`
-              : `ابھی ${words} الفاظ — کم از کم ${MIN_WORDS} الفاظ درکار (مزید ${remaining})`}
+              ? `✓ ${words} words — you can continue`
+              : `${words} words so far — at least \( {MIN_WORDS} required ( \){remaining} more)`}
           </p>
-          <p className="text-muted-foreground tabular-nums">{words} / {MIN_WORDS}+</p>
+          <p className="text-muted-foreground tabular-nums">
+            {words} / {MIN_WORDS}+
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground rounded-lg bg-muted/50 p-3">
-          💡 کم از کم <strong>500 الفاظ</strong> لکھیں۔ مسئلہ، پس منظر، اور مدد کی
-          ضرورت واضح طور پر بیان کریں۔ جتنا زیادہ درست لکھیں گے اتنا ہی Heroes کو
-          سمجھنے میں آسانی ہوگی۔
-        </p>
       </div>
+
+      <StepGuide
+        lines={[
+          `Write at least ${MIN_WORDS} words. More detail is always better.`,
+          "Cover what happened, when it started, your current situation, and why you need help now.",
+          "Be honest and clear. Heroes use this text to verify and decide.",
+          "Do not copy a short one-line summary — explain the full story.",
+        ]}
+      />
+
       <StepNavigation
         onNext={onNext}
         onBack={onBack}
