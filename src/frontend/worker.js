@@ -2,6 +2,19 @@
 // Givethra - Complete Cloudflare Worker with all APIs including Onboarding Status
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
 // Assistant REMOVED - shoaibugti@gmail.com is no longer assistant.
+//
+// 🔥 FIXED (this pass — root cause of ProfilePage stats "not showing correctly"):
+// canAccessUser(user, userId) used to do `user.user_id === userId` as its last check.
+// If the request's auth session failed to verify (expired/rotated JWT_SECRET, missing
+// header, etc.) `user` is `null`, and reading `.user_id` off `null` THROWS. That
+// exception is caught by the top-level try/catch in `fetch()` and turned into an
+// HTTP 500 — but the frontend's `readArrayResponse()` helper (used by getCasesByUser,
+// getCaseResolutionsByHero, getCaseUnlocksByHero) has no `res.ok` check: it just tries
+// to parse JSON and falls back to `[]` on anything that isn't an array. The net
+// result was a *silent* failure — no error, no toast, just every stat quietly
+// reading 0 — every single time the session token wasn't valid, on every endpoint
+// that gates access with canAccessUser(user, someUserId). Fixed by short-circuiting
+// on a null user before touching `.user_id`.
 
 const PUBLIC_ORIGIN = "https://givethra.org";
 
@@ -334,8 +347,14 @@ function requestedUserId(url) {
   return url.searchParams.get("user_id") || "";
 }
 
+// 🔥 FIXED: was `user.user_id === userId` — if `user` is null (session invalid or
+// missing), that line threw a TypeError instead of returning `false`. The thrown
+// error was caught far away in fetch()'s top-level try/catch and turned into an
+// opaque HTTP 500, which the frontend's array-reading helpers then silently turned
+// into `[]`. Now a null user is simply treated as "not this user" — no exception,
+// and a clean 403 is returned instead of a mysterious, silently-swallowed 500.
 function canAccessUser(user, userId) {
-  return isAdmin(user) || !userId || user.user_id === userId;
+  return isAdmin(user) || !userId || Boolean(user && user.user_id === userId);
 }
 
 async function maybeAutoSuspendForMissingFeedback(env, userId) {
@@ -544,7 +563,7 @@ async function handleProfile(request, env, user, parts, origin) {
 // ============================================================
 async function handleKyc(request, env, user, url, parts, origin) {
   const queryUser = requestedUserId(url);
-  const target = queryUser || user.user_id;
+  const target = queryUser || user?.user_id || "";
   // 🔥 FIX: Allow public access to GET (only status) so other users' profiles can load
   // We'll still check ownership for PUT/POST
   if (request.method === "GET") {
@@ -675,7 +694,7 @@ async function handleCases(request, env, user, url, parts, origin) {
       if (!row) return json({ error: "Not found" }, 404, origin);
 
       const status = String(row.status || "").toLowerCase();
-      let allowed = isAdmin(user) || row.user_id === user.user_id || ["approved", "published", "active"].includes(status);
+      let allowed = isAdmin(user) || row.user_id === user?.user_id || ["approved", "published", "active"].includes(status);
 
       if (!allowed && status === "completed" && user?.user_id) {
         const access = await env.DB.prepare(
@@ -1878,7 +1897,7 @@ async function handleRequest(request, env, ctx) {
         const body = await readJson(request);
         const target = String(body?.user_id || "").trim();
         if (!target) return json({ error: "User ID is required" }, 400, origin);
-        const existing = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ? ORDER BY suspended_at DESC LIMIT 1").bind(target).first();
+        const existing = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(target).first();
         const active = body?.is_active ? 1 : 0;
         const suspensionCount = body?.suspension_count ?? existing?.suspension_count ?? 0;
         const suspendedAt = body?.suspended_at ?? existing?.suspended_at ?? (active ? now() : null);
