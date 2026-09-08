@@ -1,6 +1,7 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
 // Complete: status gates + genderDocuments + paymentReceiver + terms→confirmed
 // + completion cooldown (30 days) + early request (after 15 days)
+// Top bar: Credits centered + WhatsApp Channel | 24/7 Support (no Urdu button)
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
+import { MessageCircle } from "lucide-react";
 
 import StepCategory from "./steps/StepCategory";
 import StepTitle from "./steps/StepTitle";
@@ -39,7 +41,6 @@ import StepSelfie from "./steps/StepSelfie";
 import StepVideo from "./steps/StepVideo";
 import StepTerms from "./steps/StepTerms";
 
-import { SubmitTopBar } from "./shared/TopBar";
 import { StepProgress } from "./shared/StepProgress";
 
 import { useVisibleSteps } from "./hooks/useVisibleSteps";
@@ -50,6 +51,12 @@ import { formatRemaining } from "@/lib/completionCooldown";
 
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
+
+/** Same links as HomePage */
+const WHATSAPP_CHANNEL_URL =
+  "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
+const SUPPORT_WHATSAPP_URL =
+  "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 
 const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   category: StepCategory,
@@ -147,6 +154,49 @@ const INITIAL_FORM = {
   isEarlyRequest: false,
 };
 
+/** Inline top bar — no LanguageSwitcher / no Urdu */
+function WizardTopBar({ isFree, balance }: { isFree: boolean; balance: number }) {
+  return (
+    <div className="mb-4 border-b border-border pb-3 space-y-2">
+      <div className="flex justify-center">
+        <span
+          className={
+            isFree
+              ? "text-green-600 font-semibold text-sm"
+              : "text-primary font-semibold text-sm"
+          }
+        >
+          {isFree ? "FREE Case" : `Credits: ${balance}`}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-center gap-3 flex-wrap text-sm">
+        <a
+          href={WHATSAPP_CHANNEL_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-green-600 transition-colors"
+        >
+          <MessageCircle className="h-4 w-4 text-green-600 shrink-0" />
+          <span>WhatsApp Channel</span>
+        </a>
+
+        <span className="text-muted-foreground select-none">|</span>
+
+        <a
+          href={SUPPORT_WHATSAPP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-primary transition-colors"
+        >
+          <MessageCircle className="h-4 w-4 text-primary shrink-0" />
+          <span>24/7 Support</span>
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default function SubmitRequestWizard() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -197,7 +247,6 @@ export default function SubmitRequestWizard() {
     setIsLoading(false);
   }, [isAuthenticated, navigate, loadDraft]);
 
-  // Early request from Home banner ?early=1
   useEffect(() => {
     if (typeof window === "undefined") return;
     const early = new URLSearchParams(window.location.search).get("early") === "1";
@@ -416,7 +465,7 @@ export default function SubmitRequestWizard() {
           <div className="rounded-2xl border bg-card p-8 space-y-4">
             <h1 className="text-2xl font-bold">Please Share Your Feedback First</h1>
             <p>
-              Your case "<strong>{stats.blockedByFeedback.caseTitle}</strong>" was
+              Your case &quot;<strong>{stats.blockedByFeedback.caseTitle}</strong>&quot; was
               completed. Before submitting a new case, please share your feedback
               (message + video).
             </p>
@@ -434,7 +483,6 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // ── Completion cooldown (ONLY after COMPLETED cases) ──
   const inCooldown =
     cooldown.phase === "waiting" ||
     cooldown.phase === "early_available" ||
@@ -501,7 +549,7 @@ export default function SubmitRequestWizard() {
           <div className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-8 space-y-5">
             <h1 className="text-2xl font-bold text-amber-800">Case Under Review</h1>
             <p className="text-base">
-              Your case <strong>"{stats.activeCase.title}"</strong> has been submitted
+              Your case <strong>&quot;{stats.activeCase.title}&quot;</strong> has been submitted
               and is currently <strong>Pending</strong>.
             </p>
             <p className="text-sm text-muted-foreground">
@@ -510,12 +558,12 @@ export default function SubmitRequestWizard() {
             </p>
             <div className="flex flex-col gap-3">
               <Button asChild className="w-full">
+                <Link to="/">Back to Home</Link>
+              </Button>
+              <Button variant="outline" asChild className="w-full">
                 <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
                   View My Case
                 </Link>
-              </Button>
-              <Button variant="outline" asChild className="w-full">
-                <Link to="/my-cases">My Cases</Link>
               </Button>
             </div>
           </div>
@@ -531,17 +579,17 @@ export default function SubmitRequestWizard() {
           <div className="rounded-2xl border border-green-300 bg-green-50 dark:bg-green-950/20 p-8 space-y-5">
             <h1 className="text-2xl font-bold text-green-800">Case Approved</h1>
             <p className="text-base">
-              <strong>"{stats.activeCase.title}"</strong> is live. People can contribute
+              <strong>&quot;{stats.activeCase.title}&quot;</strong> is live. People can contribute
               and help on this case.
             </p>
             <div className="flex flex-col gap-3">
               <Button asChild className="w-full">
+                <Link to="/">Back to Home</Link>
+              </Button>
+              <Button variant="outline" asChild className="w-full">
                 <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
                   Open Case Page
                 </Link>
-              </Button>
-              <Button variant="outline" asChild className="w-full">
-                <Link to="/my-cases">My Cases</Link>
               </Button>
             </div>
           </div>
@@ -557,7 +605,7 @@ export default function SubmitRequestWizard() {
           <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-8 space-y-5">
             <h1 className="text-2xl font-bold text-red-700">Case Rejected</h1>
             <p className="text-base">
-              <strong>"{stats.activeCase.title}"</strong> was rejected by the admin team.
+              <strong>&quot;{stats.activeCase.title}&quot;</strong> was rejected by the admin team.
             </p>
             {stats.activeCase.rejectionReason ? (
               <div className="rounded-lg bg-white dark:bg-card border p-4 text-left text-sm">
@@ -576,12 +624,12 @@ export default function SubmitRequestWizard() {
                 Submit a New Case
               </Button>
               <Button variant="outline" asChild className="w-full">
+                <Link to="/">Back to Home</Link>
+              </Button>
+              <Button variant="ghost" asChild className="w-full">
                 <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
                   View Rejected Case
                 </Link>
-              </Button>
-              <Button variant="ghost" asChild className="w-full">
-                <Link to="/my-cases">My Cases</Link>
               </Button>
             </div>
           </div>
@@ -604,7 +652,10 @@ export default function SubmitRequestWizard() {
             </p>
           </div>
         )}
-        <SubmitTopBar isFree={willBeFree} balance={stats.balance} />
+
+        {/* Credits center + WhatsApp Channel | 24/7 Support — no Urdu */}
+        <WizardTopBar isFree={willBeFree} balance={stats.balance} />
+
         <StepProgress
           current={Math.max(currentIndex + 1, 1)}
           total={Math.max(totalSteps, 1)}
