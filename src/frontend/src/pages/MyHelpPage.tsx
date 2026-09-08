@@ -347,7 +347,7 @@ export default function MyHelpPage() {
                   const isRejected = record.status === "rejected";
                   const isUnlockOnly = record.isUnlockOnly;
 
-                  // 🔥 FIXED: 4 الگ UI blocks (حصہ 2 کے مطابق)
+                  // 🔥 FIXED: 4 separate UI blocks
                   if (isUnlockOnly) {
                     return (
                       <div
@@ -428,10 +428,10 @@ export default function MyHelpPage() {
                             </div>
                           )}
 
-                          {/* 3 outcomes کے مطابق پیغام */}
+                          {/* 🔥 ENGLISH TRANSLATION: Unlock-only completed case message */}
                           {isUnlockOnly && record.caseCompletedByOther && (
                             <div className="w-full mt-1 rounded-lg bg-blue-100 dark:bg-blue-950/30 p-2 text-xs text-blue-700">
-                              🙏 یہ کیس مکمل ہو چکا ہے — کسی اور کی مدد سے یہ پورا ہوا۔ آپ کا unlock بھی اس سفر کا حصہ تھا، شکریہ! نیا کیس تلاش کریں اور مکمل Hero بنیں۔ <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate({ to: "/cases" })}>Browse More Cases</Button>
+                              🙏 This case has been completed — someone else helped to complete it. Your unlock was also part of this journey, thank you! Find a new case and become a complete Hero. <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate({ to: "/cases" })}>Browse More Cases</Button>
                             </div>
                           )}
                           {isUnlockOnly && !record.caseCompletedByOther && (
