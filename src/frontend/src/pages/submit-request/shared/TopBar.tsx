@@ -1,9 +1,12 @@
 // src/frontend/src/pages/submit-request/shared/TopBar.tsx
+// NO LanguageSwitcher / NO Urdu button here.
+// Credits centered on top. WhatsApp Channel + 24/7 Support one line below.
+
 import { MessageCircle } from "lucide-react";
 
-/** Same links as HomePage */
 const WHATSAPP_CHANNEL_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
+
 const SUPPORT_WHATSAPP_URL =
   "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 
@@ -15,8 +18,8 @@ export function SubmitTopBar({
   balance: number;
 }) {
   return (
-    <div className="mb-4 border-b pb-3 space-y-2">
-      {/* Credits — centered on top */}
+    <div className="mb-4 border-b border-border pb-3 space-y-2">
+      {/* Row 1: Credits — center */}
       <div className="flex justify-center">
         <span
           className={
@@ -29,7 +32,7 @@ export function SubmitTopBar({
         </span>
       </div>
 
-      {/* WhatsApp Channel + 24/7 Support — one line, centered */}
+      {/* Row 2: WhatsApp Channel | 24/7 Support — one line, center */}
       <div className="flex items-center justify-center gap-3 flex-wrap text-sm">
         <a
           href={WHATSAPP_CHANNEL_URL}
@@ -56,3 +59,5 @@ export function SubmitTopBar({
     </div>
   );
 }
+
+export default SubmitTopBar;
