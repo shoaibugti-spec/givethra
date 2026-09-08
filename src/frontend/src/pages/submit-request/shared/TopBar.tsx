@@ -1,6 +1,7 @@
 // src/frontend/src/pages/submit-request/shared/TopBar.tsx
-// NO LanguageSwitcher / NO Urdu button here.
-// Credits centered on top. WhatsApp Channel + 24/7 Support one line below.
+// NO LanguageSwitcher / NO Urdu button
+// Credits centered on top
+// WhatsApp Channel | 24/7 Support one line below (same links as HomePage)
 
 import { MessageCircle } from "lucide-react";
 
@@ -19,7 +20,7 @@ export function SubmitTopBar({
 }) {
   return (
     <div className="mb-4 border-b border-border pb-3 space-y-2">
-      {/* Row 1: Credits — center */}
+      {/* Credits — center, top */}
       <div className="flex justify-center">
         <span
           className={
@@ -32,7 +33,7 @@ export function SubmitTopBar({
         </span>
       </div>
 
-      {/* Row 2: WhatsApp Channel | 24/7 Support — one line, center */}
+      {/* WhatsApp Channel | 24/7 Support — one line, center */}
       <div className="flex items-center justify-center gap-3 flex-wrap text-sm">
         <a
           href={WHATSAPP_CHANNEL_URL}
