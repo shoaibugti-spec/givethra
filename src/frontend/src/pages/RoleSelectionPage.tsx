@@ -1,6 +1,6 @@
 // src/frontend/src/pages/RoleSelectionPage.tsx
 // Givethra - Full-Color Auto-Slide Boxes
-// Requester button → the guided onboarding route after KYC approval
+// Requester button → NeedHelpPage after KYC approval
 
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -145,7 +145,7 @@ export default function RoleSelectionPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // 🔥 Requester button handler (hero handler removed)
+  // 🔥 Requester button handler – now redirects to NeedHelpPage after KYC
   const handleRequesterClick = async () => {
     setRole("requester");
     setAuthRole("help_seeker");
@@ -155,7 +155,7 @@ export default function RoleSelectionPage() {
         to: "/sign-in",
         search: {
           role: "requester",
-          redirect: "/onboarding-submit",
+          redirect: "/need-help", // <-- now goes to NeedHelpPage
         },
       });
       return;
@@ -165,7 +165,7 @@ export default function RoleSelectionPage() {
       const kyc = await getKycStatus(user!.id);
       const status = String(kyc?.status || "none").trim().toLowerCase();
       if (status === "approved") {
-        navigate({ to: "/onboarding-submit" });
+        navigate({ to: "/need-help" }); // <-- KYC approved → NeedHelpPage
       } else {
         navigate({ to: "/kyc" });
       }
