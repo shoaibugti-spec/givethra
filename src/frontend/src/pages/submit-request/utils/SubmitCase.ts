@@ -20,11 +20,12 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
   const catDocUrls = formData.catDocUrls || {};
   const genderDocUrls = formData.genderDocUrls || {};
 
-  // Merge all uploaded document URLs for photo_urls
   const photoUrls = [
     ...Object.values(catDocUrls),
     ...Object.values(genderDocUrls),
   ].filter(Boolean) as string[];
+
+  const isEarlyRequest = formData.isEarlyRequest === true;
 
   const caseData = {
     user_id: userId,
@@ -65,17 +66,18 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
       landlord_cnic_url: formData.landlordCnicUrl,
       owner_cnic_url: formData.ownerCnicUrl,
       owner_relation: formData.ownerRelation,
-      // Payment receiver (parity with SubmitRequestPage)
       receiver_name: formData.receiverName || "",
       receiver_contact: formData.receiverContact || "",
       receiver_bank: formData.receiverBank || "",
       receiver_account: formData.receiverAccount || "",
       receiver_address: formData.receiverAddress || "",
       receiver_shop_name: formData.receiverShopName || "",
-      // Gender / identity documents
       gender_doc_urls: genderDocUrls,
       cat_doc_urls: catDocUrls,
       ref_number: formData.refNumber || "",
+      // Early request after completed case (15–30 day window)
+      is_early_request: isEarlyRequest,
+      was_early_request: isEarlyRequest,
     },
     photo_urls: photoUrls,
     selfie_url: formData.selfieUrl,
@@ -83,6 +85,7 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
     status: "pending",
     submitted_at: new Date().toISOString(),
     was_free: isFree,
+    is_early_request: isEarlyRequest,
   };
 
   await insertCaseSubmission(caseData);
@@ -91,19 +94,33 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
     await sendNotification(
       userId,
       "system",
-      "Case Submitted FREE",
-      `Your case "${formData.title}" was submitted FREE and is under review.`,
+      isEarlyRequest ? "Early Request Submitted FREE" : "Case Submitted FREE",
+      isEarlyRequest
+        ? `Your early request "${formData.title}" was submitted FREE and is under admin review.`
+        : `Your case "${formData.title}" was submitted FREE and is under review.`,
       "/my-cases"
     );
-    return { success: true, message: "Your case is FREE! Submitted for review." };
+    return {
+      success: true,
+      message: isEarlyRequest
+        ? "Early request submitted FREE. Admin will review — approval is not guaranteed."
+        : "Your case is FREE! Submitted for review.",
+    };
   }
 
   await sendNotification(
     userId,
     "system",
-    "Case Submitted",
-    `Your case "${formData.title}" was submitted and is under review.`,
+    isEarlyRequest ? "Early Request Submitted" : "Case Submitted",
+    isEarlyRequest
+      ? `Your early request "${formData.title}" is under admin review.`
+      : `Your case "${formData.title}" was submitted and is under review.`,
     "/my-cases"
   );
-  return { success: true, message: "Case submitted! Under review." };
+  return {
+    success: true,
+    message: isEarlyRequest
+      ? "Early request submitted. Admin will review — approval is not guaranteed."
+      : "Case submitted! Under review.",
+  };
 }
