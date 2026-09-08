@@ -1,5 +1,6 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// Complete: blinking fix + status gates + genderDocuments + paymentReceiver + whyHelp→description + English only
+// Complete: status gates + genderDocuments + paymentReceiver + terms→confirmed
+// + completion cooldown (30 days) + early request (after 15 days)
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
-// All steps
 import StepCategory from "./steps/StepCategory";
 import StepTitle from "./steps/StepTitle";
 import StepShortDesc from "./steps/StepShortDesc";
@@ -39,16 +39,15 @@ import StepSelfie from "./steps/StepSelfie";
 import StepVideo from "./steps/StepVideo";
 import StepTerms from "./steps/StepTerms";
 
-// Shared
 import { SubmitTopBar } from "./shared/TopBar";
 import { StepProgress } from "./shared/StepProgress";
 
-// Hooks
 import { useVisibleSteps } from "./hooks/useVisibleSteps";
 import { useSubmitDraft } from "./hooks/useSubmitDraft";
 import { useUserSubmitStats } from "./hooks/useUserSubmitStats";
+import { useCompletionCooldown } from "@/hooks/useCompletionCooldown";
+import { formatRemaining } from "@/lib/completionCooldown";
 
-// Utils
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
 
@@ -145,6 +144,7 @@ const INITIAL_FORM = {
   selfieUrl: "",
   videoUrl: "",
   confirmed: false,
+  isEarlyRequest: false,
 };
 
 export default function SubmitRequestWizard() {
@@ -156,9 +156,12 @@ export default function SubmitRequestWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [forceNewCase, setForceNewCase] = useState(false);
+  const [allowEarlyFlow, setAllowEarlyFlow] = useState(false);
 
   const { saveDraft, loadDraft, clearDraft } = useSubmitDraft();
   const { stats, loading: statsLoading, refetch } = useUserSubmitStats(user?.id);
+  const { cooldown, remainingLabel, loading: cooldownLoading } =
+    useCompletionCooldown(user?.id);
 
   const visibleStepIds = useVisibleSteps(formData);
   const currentIndex = visibleStepIds.indexOf(currentStepId);
@@ -176,6 +179,10 @@ export default function SubmitRequestWizard() {
   formDataRef.current = formData;
   const visibleStepIdsRef = useRef(visibleStepIds);
   visibleStepIdsRef.current = visibleStepIds;
+  const allowEarlyFlowRef = useRef(allowEarlyFlow);
+  allowEarlyFlowRef.current = allowEarlyFlow;
+  const cooldownRef = useRef(cooldown);
+  cooldownRef.current = cooldown;
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -190,6 +197,15 @@ export default function SubmitRequestWizard() {
     setIsLoading(false);
   }, [isAuthenticated, navigate, loadDraft]);
 
+  // Early request from Home banner ?early=1
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const early = new URLSearchParams(window.location.search).get("early") === "1";
+    if (early && cooldown.phase === "early_available") {
+      setAllowEarlyFlow(true);
+    }
+  }, [cooldown.phase]);
+
   useEffect(() => {
     if (isLoading) return;
     const timer = setTimeout(() => {
@@ -198,7 +214,6 @@ export default function SubmitRequestWizard() {
     return () => clearTimeout(timer);
   }, [formData, currentStepId, isLoading, saveDraft]);
 
-  // Keep current step valid when visible steps change
   useEffect(() => {
     if (!visibleStepIds.includes(currentStepId) && visibleStepIds.length > 0) {
       setCurrentStepId(visibleStepIds[0]);
@@ -260,11 +275,20 @@ export default function SubmitRequestWizard() {
       return;
     }
 
+    const isEarly =
+      allowEarlyFlowRef.current &&
+      cooldownRef.current.phase === "early_available";
+
     setSubmitting(true);
     try {
-      const result = await submitCase(formDataRef.current, user!.id, willBeFree);
+      const payload = {
+        ...formDataRef.current,
+        isEarlyRequest: isEarly,
+      };
+      const result = await submitCase(payload, user!.id, willBeFree);
       clearDraft();
       setForceNewCase(false);
+      setAllowEarlyFlow(false);
       toast.success(result.message);
       refetch();
       navigate({ to: "/my-cases" });
@@ -275,12 +299,13 @@ export default function SubmitRequestWizard() {
     }
   }, [user, willBeFree, clearDraft, navigate, refetch]);
 
-  // whyHelp always writes to "description"
   const stableOnChange = useCallback(
     (val: any) => {
       const stepId = currentStepIdRef.current;
       if (stepId === "whyHelp") {
         handleFieldChange("description", val);
+      } else if (stepId === "terms") {
+        handleFieldChange("confirmed", val === true || val === "true");
       } else {
         handleFieldChange(stepId, val);
       }
@@ -303,11 +328,12 @@ export default function SubmitRequestWizard() {
     setForceNewCase(true);
   }, [clearDraft]);
 
-  // whyHelp always reads from "description"
   const currentValue =
     currentStepId === "whyHelp"
       ? formData.description
-      : formData[currentStepId as keyof typeof formData];
+      : currentStepId === "terms"
+        ? formData.confirmed
+        : formData[currentStepId as keyof typeof formData];
 
   const needsFormData = STEPS_NEEDING_FORMDATA.has(currentStepId);
 
@@ -359,8 +385,7 @@ export default function SubmitRequestWizard() {
 
   const CurrentStepComponent = STEP_COMPONENTS[currentStepId];
 
-  // Loading
-  if (isLoading || statsLoading) {
+  if (isLoading || statsLoading || cooldownLoading) {
     return (
       <Layout>
         <div className="max-w-2xl mx-auto px-4 py-20 text-center">
@@ -370,7 +395,6 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // Suspension
   if (stats.isSuspended) {
     return (
       <Layout>
@@ -385,7 +409,6 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // Feedback required
   if (stats.blockedByFeedback) {
     return (
       <Layout>
@@ -395,7 +418,7 @@ export default function SubmitRequestWizard() {
             <p>
               Your case "<strong>{stats.blockedByFeedback.caseTitle}</strong>" was
               completed. Before submitting a new case, please share your feedback
-              (message + 90-second video).
+              (message + video).
             </p>
             <Button asChild>
               <Link
@@ -411,7 +434,66 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // Pending case
+  // ── Completion cooldown (ONLY after COMPLETED cases) ──
+  const inCooldown =
+    cooldown.phase === "waiting" ||
+    cooldown.phase === "early_available" ||
+    cooldown.phase === "early_locked";
+
+  if (inCooldown && !(allowEarlyFlow && cooldown.phase === "early_available")) {
+    return (
+      <Layout>
+        <div className="max-w-xl mx-auto px-4 py-16 text-center">
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 p-8 space-y-5">
+            <h1 className="text-2xl font-bold text-rose-800">
+              Your Help Was Completed
+            </h1>
+            <p className="text-base">
+              You can submit another case after 30 Days
+            </p>
+            <p className="text-lg font-semibold tabular-nums">
+              ⏳ {formatRemaining(cooldown.remainingMs)}
+            </p>
+            {cooldown.lastCompletedTitle && (
+              <p className="text-sm text-muted-foreground">
+                Last completed: “{cooldown.lastCompletedTitle}”
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground">
+              Your previous case was successfully completed. We appreciate your
+              trust. Please allow time for others to receive help too.
+            </p>
+
+            {cooldown.phase === "early_available" && (
+              <div className="rounded-xl border bg-white/90 dark:bg-card p-4 space-y-3 text-left">
+                <p className="text-sm font-semibold">Need Help Again?</p>
+                <p className="text-xs text-muted-foreground">
+                  If you have a genuine new problem, you may submit one early
+                  request for review. Approval is not guaranteed. If rejected, you
+                  must wait until the full 30-day period ends.
+                </p>
+                <Button className="w-full" onClick={() => setAllowEarlyFlow(true)}>
+                  Request Early Review
+                </Button>
+              </div>
+            )}
+
+            {cooldown.phase === "early_locked" && (
+              <p className="text-sm text-red-600">
+                Your early request was not approved. Please wait {remainingLabel}{" "}
+                before submitting again.
+              </p>
+            )}
+
+            <Button variant="outline" asChild className="w-full">
+              <Link to="/">Back to Home</Link>
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (stats.activeCase?.status === "pending" && !forceNewCase) {
     return (
       <Layout>
@@ -442,7 +524,6 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // Approved / live case
   if (stats.activeCase?.status === "approved" && !forceNewCase) {
     return (
       <Layout>
@@ -452,10 +533,6 @@ export default function SubmitRequestWizard() {
             <p className="text-base">
               <strong>"{stats.activeCase.title}"</strong> is live. People can contribute
               and help on this case.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              When the case is completed, you will see payment proof and the feedback
-              page.
             </p>
             <div className="flex flex-col gap-3">
               <Button asChild className="w-full">
@@ -473,7 +550,6 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // Rejected case
   if (stats.activeCase?.status === "rejected" && !forceNewCase) {
     return (
       <Layout>
@@ -514,10 +590,20 @@ export default function SubmitRequestWizard() {
     );
   }
 
-  // Main wizard form
   return (
     <Layout>
       <div className="max-w-2xl mx-auto px-4 py-6">
+        {allowEarlyFlow && cooldown.phase === "early_available" && (
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
+            <p className="font-semibold text-amber-900 dark:text-amber-100">
+              Early review request
+            </p>
+            <p className="text-xs text-amber-900/80 dark:text-amber-100/80 mt-1">
+              You are submitting inside the 30-day window. Admin will review this as an
+              early request. Approval is not guaranteed.
+            </p>
+          </div>
+        )}
         <SubmitTopBar isFree={willBeFree} balance={stats.balance} />
         <StepProgress
           current={Math.max(currentIndex + 1, 1)}
