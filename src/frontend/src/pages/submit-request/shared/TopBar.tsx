@@ -1,7 +1,9 @@
 // src/frontend/src/pages/submit-request/shared/TopBar.tsx
 import { MessageCircle } from "lucide-react";
 
-/** Same 24/7 support link as HomePage */
+/** Same links as HomePage */
+const WHATSAPP_CHANNEL_URL =
+  "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const SUPPORT_WHATSAPP_URL =
   "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 
@@ -13,26 +15,44 @@ export function SubmitTopBar({
   balance: number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-1 py-2 border-b mb-4">
-      <a
-        href={SUPPORT_WHATSAPP_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-green-600 transition-colors min-w-0"
-      >
-        <MessageCircle className="h-5 w-5 text-green-600 shrink-0" />
-        <span className="truncate">24/7 Support</span>
-      </a>
+    <div className="mb-4 border-b pb-3 space-y-2">
+      {/* Credits — centered on top */}
+      <div className="flex justify-center">
+        <span
+          className={
+            isFree
+              ? "text-green-600 font-semibold text-sm"
+              : "text-primary font-semibold text-sm"
+          }
+        >
+          {isFree ? "FREE Case" : `Credits: ${balance}`}
+        </span>
+      </div>
 
-      <span
-        className={
-          isFree
-            ? "text-green-600 font-semibold text-sm shrink-0"
-            : "text-primary font-semibold text-sm shrink-0"
-        }
-      >
-        {isFree ? "FREE Case" : `Credits: ${balance}`}
-      </span>
+      {/* WhatsApp Channel + 24/7 Support — one line, centered */}
+      <div className="flex items-center justify-center gap-3 flex-wrap text-sm">
+        <a
+          href={WHATSAPP_CHANNEL_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-green-600 transition-colors"
+        >
+          <MessageCircle className="h-4 w-4 text-green-600 shrink-0" />
+          <span>WhatsApp Channel</span>
+        </a>
+
+        <span className="text-muted-foreground select-none">|</span>
+
+        <a
+          href={SUPPORT_WHATSAPP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-primary transition-colors"
+        >
+          <MessageCircle className="h-4 w-4 text-primary shrink-0" />
+          <span>24/7 Support</span>
+        </a>
+      </div>
     </div>
   );
 }
