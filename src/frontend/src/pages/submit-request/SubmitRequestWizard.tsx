@@ -1,7 +1,5 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// Complete: status gates + genderDocuments + paymentReceiver + terms→confirmed
-// + completion cooldown (30 days) + early request (after 15 days)
-// Top bar: Credits centered + WhatsApp Channel | 24/7 Support (no Urdu button)
+// Top bar (Credits + WhatsApp) shows on EVERY screen — form AND status gates
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -52,7 +50,6 @@ import { formatRemaining } from "@/lib/completionCooldown";
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
 
-/** Same links as HomePage */
 const WHATSAPP_CHANNEL_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const SUPPORT_WHATSAPP_URL =
@@ -154,43 +151,46 @@ const INITIAL_FORM = {
   isEarlyRequest: false,
 };
 
-/** Inline top bar — no LanguageSwitcher / no Urdu */
-function WizardTopBar({ isFree, balance }: { isFree: boolean; balance: number }) {
+/** Visible on every screen — Credits center + WhatsApp row */
+function WizardTopBar({
+  isFree,
+  balance,
+}: {
+  isFree: boolean;
+  balance: number;
+}) {
   return (
-    <div className="mb-4 border-b border-border pb-3 space-y-2">
+    <div className="mb-4 rounded-xl border-2 border-green-500 bg-green-50 dark:bg-green-950/30 p-4 space-y-3">
       <div className="flex justify-center">
         <span
           className={
             isFree
-              ? "text-green-600 font-semibold text-sm"
-              : "text-primary font-semibold text-sm"
+              ? "text-green-700 font-bold text-base"
+              : "text-primary font-bold text-base"
           }
         >
           {isFree ? "FREE Case" : `Credits: ${balance}`}
         </span>
       </div>
-
       <div className="flex items-center justify-center gap-3 flex-wrap text-sm">
         <a
           href={WHATSAPP_CHANNEL_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-green-600 transition-colors"
+          className="inline-flex items-center gap-1.5 font-semibold text-green-700 hover:underline"
         >
-          <MessageCircle className="h-4 w-4 text-green-600 shrink-0" />
-          <span>WhatsApp Channel</span>
+          <MessageCircle className="h-4 w-4 shrink-0" />
+          WhatsApp Channel
         </a>
-
-        <span className="text-muted-foreground select-none">|</span>
-
+        <span className="text-muted-foreground">|</span>
         <a
           href={SUPPORT_WHATSAPP_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-primary transition-colors"
+          className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
         >
-          <MessageCircle className="h-4 w-4 text-primary shrink-0" />
-          <span>24/7 Support</span>
+          <MessageCircle className="h-4 w-4 shrink-0" />
+          24/7 Support
         </a>
       </div>
     </div>
@@ -222,6 +222,7 @@ export default function SubmitRequestWizard() {
   const canUseFree =
     !stats.isSuspended && !stats.isFreeDisabled && stats.freeCasesUsed < 2;
   const willBeFree = canUseFree;
+  const balance = stats.balance ?? 0;
 
   const currentStepIdRef = useRef(currentStepId);
   currentStepIdRef.current = currentStepId;
@@ -236,7 +237,7 @@ export default function SubmitRequestWizard() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate({ to: "/sign-in", search: { redirect: "/onboarding-submit" } });
+      navigate({ to: "/sign-in", search: { redirect: "/submit-request" } });
       return;
     }
     const saved = loadDraft();
@@ -249,7 +250,8 @@ export default function SubmitRequestWizard() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const early = new URLSearchParams(window.location.search).get("early") === "1";
+    const early =
+      new URLSearchParams(window.location.search).get("early") === "1";
     if (early && cooldown.phase === "early_available") {
       setAllowEarlyFlow(true);
     }
@@ -434,52 +436,50 @@ export default function SubmitRequestWizard() {
 
   const CurrentStepComponent = STEP_COMPONENTS[currentStepId];
 
+  // Shared shell: always show Credits + WhatsApp on top
+  const shell = (body: React.ReactNode) => (
+    <Layout>
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        <WizardTopBar isFree={willBeFree} balance={balance} />
+        {body}
+      </div>
+    </Layout>
+  );
+
   if (isLoading || statsLoading || cooldownLoading) {
-    return (
-      <Layout>
-        <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-          Loading Submit Request Wizard...
-        </div>
-      </Layout>
+    return shell(
+      <div className="py-16 text-center">Loading Submit Request Wizard...</div>
     );
   }
 
   if (stats.isSuspended) {
-    return (
-      <Layout>
-        <div className="max-w-xl mx-auto px-4 py-16 text-center">
-          <div className="rounded-2xl border border-red-300 bg-red-50 dark:bg-red-950/20 p-8 space-y-6">
-            <h1 className="text-2xl font-bold text-red-700">Account Suspended</h1>
-            <p>Your account is suspended. Please unlock it first.</p>
-            <Button onClick={() => navigate({ to: "/wallet" })}>Go to Wallet</Button>
-          </div>
-        </div>
-      </Layout>
+    return shell(
+      <div className="rounded-2xl border border-red-300 bg-red-50 dark:bg-red-950/20 p-8 space-y-6 text-center">
+        <h1 className="text-2xl font-bold text-red-700">Account Suspended</h1>
+        <p>Your account is suspended. Please unlock it first.</p>
+        <Button onClick={() => navigate({ to: "/wallet" })}>Go to Wallet</Button>
+      </div>
     );
   }
 
   if (stats.blockedByFeedback) {
-    return (
-      <Layout>
-        <div className="max-w-xl mx-auto px-4 py-16 text-center">
-          <div className="rounded-2xl border bg-card p-8 space-y-4">
-            <h1 className="text-2xl font-bold">Please Share Your Feedback First</h1>
-            <p>
-              Your case &quot;<strong>{stats.blockedByFeedback.caseTitle}</strong>&quot; was
-              completed. Before submitting a new case, please share your feedback
-              (message + video).
-            </p>
-            <Button asChild>
-              <Link
-                to="/cases/$id"
-                params={{ id: stats.blockedByFeedback.caseId }}
-              >
-                Go to My Completed Case
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </Layout>
+    return shell(
+      <div className="rounded-2xl border bg-card p-8 space-y-4 text-center">
+        <h1 className="text-2xl font-bold">Please Share Your Feedback First</h1>
+        <p>
+          Your case &quot;<strong>{stats.blockedByFeedback.caseTitle}</strong>&quot;
+          was completed. Before submitting a new case, please share your feedback
+          (message + video).
+        </p>
+        <Button asChild>
+          <Link
+            to="/cases/$id"
+            params={{ id: stats.blockedByFeedback.caseId }}
+          >
+            Go to My Completed Case
+          </Link>
+        </Button>
+      </div>
     );
   }
 
@@ -489,188 +489,144 @@ export default function SubmitRequestWizard() {
     cooldown.phase === "early_locked";
 
   if (inCooldown && !(allowEarlyFlow && cooldown.phase === "early_available")) {
-    return (
-      <Layout>
-        <div className="max-w-xl mx-auto px-4 py-16 text-center">
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 p-8 space-y-5">
-            <h1 className="text-2xl font-bold text-rose-800">
-              Your Help Was Completed
-            </h1>
-            <p className="text-base">
-              You can submit another case after 30 Days
+    return shell(
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 p-8 space-y-5 text-center">
+        <h1 className="text-2xl font-bold text-rose-800">
+          Your Help Was Completed
+        </h1>
+        <p className="text-base">You can submit another case after 30 Days</p>
+        <p className="text-lg font-semibold tabular-nums">
+          ⏳ {formatRemaining(cooldown.remainingMs)}
+        </p>
+        {cooldown.lastCompletedTitle && (
+          <p className="text-sm text-muted-foreground">
+            Last completed: “{cooldown.lastCompletedTitle}”
+          </p>
+        )}
+        {cooldown.phase === "early_available" && (
+          <div className="rounded-xl border bg-white/90 dark:bg-card p-4 space-y-3 text-left">
+            <p className="text-sm font-semibold">Need Help Again?</p>
+            <p className="text-xs text-muted-foreground">
+              You may submit one early request for review. Approval is not
+              guaranteed.
             </p>
-            <p className="text-lg font-semibold tabular-nums">
-              ⏳ {formatRemaining(cooldown.remainingMs)}
-            </p>
-            {cooldown.lastCompletedTitle && (
-              <p className="text-sm text-muted-foreground">
-                Last completed: “{cooldown.lastCompletedTitle}”
-              </p>
-            )}
-            <p className="text-sm text-muted-foreground">
-              Your previous case was successfully completed. We appreciate your
-              trust. Please allow time for others to receive help too.
-            </p>
-
-            {cooldown.phase === "early_available" && (
-              <div className="rounded-xl border bg-white/90 dark:bg-card p-4 space-y-3 text-left">
-                <p className="text-sm font-semibold">Need Help Again?</p>
-                <p className="text-xs text-muted-foreground">
-                  If you have a genuine new problem, you may submit one early
-                  request for review. Approval is not guaranteed. If rejected, you
-                  must wait until the full 30-day period ends.
-                </p>
-                <Button className="w-full" onClick={() => setAllowEarlyFlow(true)}>
-                  Request Early Review
-                </Button>
-              </div>
-            )}
-
-            {cooldown.phase === "early_locked" && (
-              <p className="text-sm text-red-600">
-                Your early request was not approved. Please wait {remainingLabel}{" "}
-                before submitting again.
-              </p>
-            )}
-
-            <Button variant="outline" asChild className="w-full">
-              <Link to="/">Back to Home</Link>
+            <Button className="w-full" onClick={() => setAllowEarlyFlow(true)}>
+              Request Early Review
             </Button>
           </div>
-        </div>
-      </Layout>
+        )}
+        {cooldown.phase === "early_locked" && (
+          <p className="text-sm text-red-600">
+            Your early request was not approved. Please wait {remainingLabel}{" "}
+            before submitting again.
+          </p>
+        )}
+        <Button variant="outline" asChild className="w-full">
+          <Link to="/home">Back to Home</Link>
+        </Button>
+      </div>
     );
   }
 
   if (stats.activeCase?.status === "pending" && !forceNewCase) {
-    return (
-      <Layout>
-        <div className="max-w-xl mx-auto px-4 py-16 text-center">
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-8 space-y-5">
-            <h1 className="text-2xl font-bold text-amber-800">Case Under Review</h1>
-            <p className="text-base">
-              Your case <strong>&quot;{stats.activeCase.title}&quot;</strong> has been submitted
-              and is currently <strong>Pending</strong>.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              You can submit a new case only after this one is approved, rejected, or
-              completed.
-            </p>
-            <div className="flex flex-col gap-3">
-              <Button asChild className="w-full">
-                <Link to="/">Back to Home</Link>
-              </Button>
-              <Button variant="outline" asChild className="w-full">
-                <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
-                  View My Case
-                </Link>
-              </Button>
-            </div>
-          </div>
+    return shell(
+      <div className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-8 space-y-5 text-center">
+        <h1 className="text-2xl font-bold text-amber-800">Case Under Review</h1>
+        <p className="text-base">
+          Your case <strong>&quot;{stats.activeCase.title}&quot;</strong> is{" "}
+          <strong>Pending</strong>.
+        </p>
+        <div className="flex flex-col gap-3">
+          <Button asChild className="w-full">
+            <Link to="/home">Back to Home</Link>
+          </Button>
+          <Button variant="outline" asChild className="w-full">
+            <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
+              View My Case
+            </Link>
+          </Button>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   if (stats.activeCase?.status === "approved" && !forceNewCase) {
-    return (
-      <Layout>
-        <div className="max-w-xl mx-auto px-4 py-16 text-center">
-          <div className="rounded-2xl border border-green-300 bg-green-50 dark:bg-green-950/20 p-8 space-y-5">
-            <h1 className="text-2xl font-bold text-green-800">Case Approved</h1>
-            <p className="text-base">
-              <strong>&quot;{stats.activeCase.title}&quot;</strong> is live. People can contribute
-              and help on this case.
-            </p>
-            <div className="flex flex-col gap-3">
-              <Button asChild className="w-full">
-                <Link to="/">Back to Home</Link>
-              </Button>
-              <Button variant="outline" asChild className="w-full">
-                <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
-                  Open Case Page
-                </Link>
-              </Button>
-            </div>
-          </div>
+    return shell(
+      <div className="rounded-2xl border border-green-300 bg-green-50 dark:bg-green-950/20 p-8 space-y-5 text-center">
+        <h1 className="text-2xl font-bold text-green-800">Case Approved</h1>
+        <p className="text-base">
+          <strong>&quot;{stats.activeCase.title}&quot;</strong> is live.
+        </p>
+        <div className="flex flex-col gap-3">
+          <Button asChild className="w-full">
+            <Link to="/home">Back to Home</Link>
+          </Button>
+          <Button variant="outline" asChild className="w-full">
+            <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
+              Open Case Page
+            </Link>
+          </Button>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   if (stats.activeCase?.status === "rejected" && !forceNewCase) {
-    return (
-      <Layout>
-        <div className="max-w-xl mx-auto px-4 py-16 text-center">
-          <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-8 space-y-5">
-            <h1 className="text-2xl font-bold text-red-700">Case Rejected</h1>
-            <p className="text-base">
-              <strong>&quot;{stats.activeCase.title}&quot;</strong> was rejected by the admin team.
+    return shell(
+      <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-8 space-y-5 text-center">
+        <h1 className="text-2xl font-bold text-red-700">Case Rejected</h1>
+        <p className="text-base">
+          <strong>&quot;{stats.activeCase.title}&quot;</strong> was rejected.
+        </p>
+        {stats.activeCase.rejectionReason && (
+          <div className="rounded-lg bg-white dark:bg-card border p-4 text-left text-sm">
+            <p className="font-semibold mb-1">Reason:</p>
+            <p className="text-muted-foreground whitespace-pre-wrap">
+              {stats.activeCase.rejectionReason}
             </p>
-            {stats.activeCase.rejectionReason ? (
-              <div className="rounded-lg bg-white dark:bg-card border p-4 text-left text-sm">
-                <p className="font-semibold mb-1">Reason:</p>
-                <p className="text-muted-foreground whitespace-pre-wrap">
-                  {stats.activeCase.rejectionReason}
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                You can view more details on the case page.
-              </p>
-            )}
-            <div className="flex flex-col gap-3">
-              <Button className="w-full" onClick={startFreshCase}>
-                Submit a New Case
-              </Button>
-              <Button variant="outline" asChild className="w-full">
-                <Link to="/">Back to Home</Link>
-              </Button>
-              <Button variant="ghost" asChild className="w-full">
-                <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
-                  View Rejected Case
-                </Link>
-              </Button>
-            </div>
           </div>
+        )}
+        <div className="flex flex-col gap-3">
+          <Button className="w-full" onClick={startFreshCase}>
+            Submit a New Case
+          </Button>
+          <Button variant="outline" asChild className="w-full">
+            <Link to="/home">Back to Home</Link>
+          </Button>
         </div>
-      </Layout>
+      </div>
     );
   }
 
-  return (
-    <Layout>
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {allowEarlyFlow && cooldown.phase === "early_available" && (
-          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
-            <p className="font-semibold text-amber-900 dark:text-amber-100">
-              Early review request
-            </p>
-            <p className="text-xs text-amber-900/80 dark:text-amber-100/80 mt-1">
-              You are submitting inside the 30-day window. Admin will review this as an
-              early request. Approval is not guaranteed.
-            </p>
-          </div>
-        )}
-
-        {/* Credits center + WhatsApp Channel | 24/7 Support — no Urdu */}
-        <WizardTopBar isFree={willBeFree} balance={stats.balance} />
-
-        <StepProgress
-          current={Math.max(currentIndex + 1, 1)}
-          total={Math.max(totalSteps, 1)}
-        />
-        <div className="mt-6">
-          {CurrentStepComponent && (
-            <CurrentStepComponent key={currentStepId} {...stepProps} />
-          )}
-        </div>
-        {currentIndex > 0 && (
-          <p className="mt-4 text-xs text-muted-foreground text-center">
-            Your progress is saved automatically.
+  // Main form steps
+  return shell(
+    <>
+      {allowEarlyFlow && cooldown.phase === "early_available" && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
+          <p className="font-semibold text-amber-900 dark:text-amber-100">
+            Early review request
           </p>
+          <p className="text-xs text-amber-900/80 dark:text-amber-100/80 mt-1">
+            Admin will review this as an early request. Approval is not
+            guaranteed.
+          </p>
+        </div>
+      )}
+
+      <StepProgress
+        current={Math.max(currentIndex + 1, 1)}
+        total={Math.max(totalSteps, 1)}
+      />
+      <div className="mt-6">
+        {CurrentStepComponent && (
+          <CurrentStepComponent key={currentStepId} {...stepProps} />
         )}
       </div>
-    </Layout>
+      {currentIndex > 0 && (
+        <p className="mt-4 text-xs text-muted-foreground text-center">
+          Your progress is saved automatically.
+        </p>
+      )}
+    </>
   );
 }
