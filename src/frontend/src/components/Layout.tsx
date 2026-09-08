@@ -43,9 +43,19 @@ const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 
 export { NavLink };
 
-function NavLink({ to, children, onClick }: { to: string; children: React.ReactNode; onClick?: () => void }) {
+function NavLink({
+  to,
+  children,
+  onClick,
+}: {
+  to: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+}) {
   const router = useRouterState();
-  const isActive = router.location.pathname === to || router.location.pathname.startsWith(`${to}/`);
+  const isActive =
+    router.location.pathname === to ||
+    router.location.pathname.startsWith(`${to}/`);
   return (
     <Link
       to={to}
@@ -62,7 +72,7 @@ function NavLink({ to, children, onClick }: { to: string; children: React.ReactN
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
-  const { isAuthenticated, logout, user } = useAuth(); // isAssistant removed
+  const { isAuthenticated, logout, user } = useAuth();
   const { role } = useRole();
   const navigate = useNavigate();
   const router = useRouterState();
@@ -72,6 +82,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
+
+  const pathname = router.location.pathname;
+  // Hide language (Urdu) button on submit / wizard pages
+  const hideLanguageOnSubmit =
+    pathname === "/submit-request" ||
+    pathname.startsWith("/submit-request/") ||
+    pathname === "/onboarding-submit" ||
+    pathname.startsWith("/onboarding-submit/") ||
+    pathname === "/need-help" ||
+    pathname.startsWith("/need-help/");
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
@@ -87,32 +107,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     window.addEventListener("notification-updated", handleNotificationUpdate);
     return () => {
       clearInterval(interval);
-      window.removeEventListener("notification-updated", handleNotificationUpdate);
+      window.removeEventListener(
+        "notification-updated",
+        handleNotificationUpdate
+      );
     };
   }, [isAuthenticated, user]);
 
   const fetchPostCount = async () => {
     try {
       const data = await getCommunityPosts();
-      if (!Array.isArray(data)) { setPostCount(0); return; }
-      const actorKey = isAuthenticated && user?.id ? user.id : getGuestId();
+      if (!Array.isArray(data)) {
+        setPostCount(0);
+        return;
+      }
+      const actorKey =
+        isAuthenticated && user?.id ? user.id : getGuestId();
       const seenKey = `givethra_community_seen_at:${actorKey}`;
       const currentPath = router.location.pathname;
       const newestPostAt = data.reduce((latest: number, post: any) => {
         const timestamp = Date.parse(post?.created_at || "");
-        return Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+        return Number.isFinite(timestamp)
+          ? Math.max(latest, timestamp)
+          : latest;
       }, 0);
-      if (currentPath === "/community" || currentPath.startsWith("/community/")) {
+      if (
+        currentPath === "/community" ||
+        currentPath.startsWith("/community/")
+      ) {
         if (newestPostAt) localStorage.setItem(seenKey, String(newestPostAt));
         setPostCount(0);
         return;
       }
       const seenAt = Number(localStorage.getItem(seenKey) || 0);
-      setPostCount(data.filter((post: any) => Date.parse(post?.created_at || "") > seenAt).length);
+      setPostCount(
+        data.filter(
+          (post: any) => Date.parse(post?.created_at || "") > seenAt
+        ).length
+      );
     } catch {
       // Keep the current badge stable if a transient refresh fails.
     }
   };
+
   useEffect(() => {
     fetchPostCount();
     const interval = setInterval(fetchPostCount, 600000);
@@ -132,14 +169,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
   const isRouteActive = (to: string) =>
-    router.location.pathname === to || router.location.pathname.startsWith(`${to}/`);
+    router.location.pathname === to ||
+    router.location.pathname.startsWith(`${to}/`);
 
-  const iconLinkClass = (to: string) => cn(
-    "relative h-10 w-10 flex items-center justify-center rounded-full transition-colors duration-200",
-    isRouteActive(to)
-      ? "bg-primary text-primary-foreground shadow-sm"
-      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-  );
+  const iconLinkClass = (to: string) =>
+    cn(
+      "relative h-10 w-10 flex items-center justify-center rounded-full transition-colors duration-200",
+      isRouteActive(to)
+        ? "bg-primary text-primary-foreground shadow-sm"
+        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+    );
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -155,11 +194,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
-          <Link to="/" aria-label="Givethra home" className="flex items-center gap-1.5 shrink-0">
+          <Link
+            to="/"
+            aria-label="Givethra home"
+            className="flex items-center gap-1.5 shrink-0"
+          >
             <div className="hidden md:flex h-8 w-8 rounded-lg bg-primary items-center justify-center">
               <Heart className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-lg text-primary">Givethra</span>
+            <span className="font-display font-bold text-lg text-primary">
+              Givethra
+            </span>
           </Link>
 
           <div className="flex-1 flex items-center justify-center">
@@ -167,8 +212,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <LanguageSwitcher />
-            <Link to="/community" aria-label="Community" aria-current={isRouteActive("/community") ? "page" : undefined} className={iconLinkClass("/community")}>
+            {/* Urdu/language button hidden on submit wizard pages */}
+            {!hideLanguageOnSubmit && <LanguageSwitcher />}
+
+            <Link
+              to="/community"
+              aria-label="Community"
+              aria-current={isRouteActive("/community") ? "page" : undefined}
+              className={iconLinkClass("/community")}
+            >
               <MessageSquare className="h-5 w-5" />
               {postCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
@@ -179,7 +231,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {isAuthenticated && (
               <>
-                <Link to="/notifications" aria-label="Notifications" aria-current={isRouteActive("/notifications") ? "page" : undefined} className={iconLinkClass("/notifications")}>
+                <Link
+                  to="/notifications"
+                  aria-label="Notifications"
+                  aria-current={
+                    isRouteActive("/notifications") ? "page" : undefined
+                  }
+                  className={iconLinkClass("/notifications")}
+                >
                   <Bell className="h-5 w-5" />
                   {notifCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
@@ -187,93 +246,214 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </Link>
-                <button type="button" onClick={toggleTheme} aria-label="Toggle theme" className="hidden md:flex h-10 w-10 rounded-full items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  aria-label="Toggle theme"
+                  className="hidden md:flex h-10 w-10 rounded-full items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
                 </button>
-                <Link to="/profile/$id" params={{ id: "me" }} aria-label="Profile" aria-current={isRouteActive("/profile") ? "page" : undefined} className="hidden md:flex h-10 items-center gap-2 px-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors overflow-hidden">
+                <Link
+                  to="/profile/$id"
+                  params={{ id: "me" }}
+                  aria-label="Profile"
+                  aria-current={isRouteActive("/profile") ? "page" : undefined}
+                  className="hidden md:flex h-10 items-center gap-2 px-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors overflow-hidden"
+                >
                   <User className="h-5 w-5" />
-                  <span className="text-sm font-medium max-w-[120px] truncate">{displayName || "My Profile"}</span>
+                  <span className="text-sm font-medium max-w-[120px] truncate">
+                    {displayName || "My Profile"}
+                  </span>
                 </Link>
-                <Button variant="outline" size="sm" onClick={handleLogout} className="hidden md:flex ml-1">Logout</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="hidden md:flex ml-1"
+                >
+                  Logout
+                </Button>
               </>
             )}
             {!isAuthenticated && (
               <div className="hidden md:flex items-center gap-1">
-                <Link to="/sign-in"><Button variant="ghost" size="sm">Sign in</Button></Link>
-                <Link to="/sign-up"><Button size="sm" className="font-semibold">Get Started</Button></Link>
+                <Link to="/sign-in">
+                  <Button variant="ghost" size="sm">
+                    Sign in
+                  </Button>
+                </Link>
+                <Link to="/sign-up">
+                  <Button size="sm" className="font-semibold">
+                    Get Started
+                  </Button>
+                </Link>
               </div>
             )}
           </div>
         </div>
 
-        {/* Desktop Navigation Links - Assistant link removed */}
+        {/* Desktop Navigation Links */}
         <div className="hidden md:block border-t border-border/50">
           <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
             <NavLink to="/cases">Browse Cases</NavLink>
-            {isAuthenticated && (role === "hero" ? <NavLink to="/my-help">My Help</NavLink> : <NavLink to="/my-cases">My Cases</NavLink>)}
-            {isAuthenticated && role !== "hero" && <NavLink to="/submit-request">Submit a Case</NavLink>}
-            {isAuthenticated && <NavLink to="/support">Help & Support</NavLink>}
+            {isAuthenticated &&
+              (role === "hero" ? (
+                <NavLink to="/my-help">My Help</NavLink>
+              ) : (
+                <NavLink to="/my-cases">My Cases</NavLink>
+              ))}
+            {isAuthenticated && role !== "hero" && (
+              <NavLink to="/submit-request">Submit a Case</NavLink>
+            )}
+            {isAuthenticated && (
+              <NavLink to="/support">Help & Support</NavLink>
+            )}
             {isAdmin && <NavLink to="/admin">Admin</NavLink>}
             <NavLink to="/about">About</NavLink>
             <NavLink to="/faq">FAQ</NavLink>
           </div>
         </div>
 
-        {/* ===== MOBILE MENU (SANDWICH) ===== */}
+        {/* ===== MOBILE MENU ===== */}
         {menuOpen && (
           <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
-            <NavLink to="/cases" onClick={closeMenu}>Browse Cases</NavLink>
+            <NavLink to="/cases" onClick={closeMenu}>
+              Browse Cases
+            </NavLink>
             {isAuthenticated && (
               <>
-                <div className="py-1"><NavLink to={role === "hero" ? "/my-help" : "/my-cases"} onClick={closeMenu}>{role === "hero" ? "My Help" : "My Cases"}</NavLink></div>
-                {role !== "hero" && <div className="py-1"><NavLink to="/submit-request" onClick={closeMenu}>Submit a Case</NavLink></div>}
-                <div className="py-1"><NavLink to="/support" onClick={closeMenu}>Help & Support</NavLink></div>
+                <div className="py-1">
+                  <NavLink
+                    to={role === "hero" ? "/my-help" : "/my-cases"}
+                    onClick={closeMenu}
+                  >
+                    {role === "hero" ? "My Help" : "My Cases"}
+                  </NavLink>
+                </div>
+                {role !== "hero" && (
+                  <div className="py-1">
+                    <NavLink to="/submit-request" onClick={closeMenu}>
+                      Submit a Case
+                    </NavLink>
+                  </div>
+                )}
+                <div className="py-1">
+                  <NavLink to="/support" onClick={closeMenu}>
+                    Help & Support
+                  </NavLink>
+                </div>
               </>
             )}
-            {isAdmin && <div className="py-1"><NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink></div>}
-            {/* Assistant Dashboard link REMOVED */}
-            <div className="py-1"><NavLink to="/about" onClick={closeMenu}>About</NavLink></div>
-            <div className="py-1"><NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink></div>
+            {isAdmin && (
+              <div className="py-1">
+                <NavLink to="/admin" onClick={closeMenu}>
+                  Admin Panel
+                </NavLink>
+              </div>
+            )}
+            <div className="py-1">
+              <NavLink to="/about" onClick={closeMenu}>
+                About
+              </NavLink>
+            </div>
+            <div className="py-1">
+              <NavLink to="/faq" onClick={closeMenu}>
+                FAQ
+              </NavLink>
+            </div>
 
             {isAuthenticated && (
               <>
                 <div className="pt-3 mt-1 border-t border-border">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Account</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    Account
+                  </p>
                 </div>
                 <div className="py-1 flex items-center gap-2">
                   <Settings className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/settings" onClick={closeMenu}>Settings</NavLink>
+                  <NavLink to="/settings" onClick={closeMenu}>
+                    Settings
+                  </NavLink>
                 </div>
                 <div className="py-1 flex items-center gap-2">
                   <Lock className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/privacy" onClick={closeMenu}>Privacy Policy</NavLink>
+                  <NavLink to="/privacy" onClick={closeMenu}>
+                    Privacy Policy
+                  </NavLink>
                 </div>
                 <div className="py-1 flex items-center gap-2">
                   <Shield className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/security" onClick={closeMenu}>Security</NavLink>
+                  <NavLink to="/security" onClick={closeMenu}>
+                    Security
+                  </NavLink>
                 </div>
                 <div className="py-1 flex items-center gap-2">
                   <KeyRound className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/account-privacy" onClick={closeMenu}>Account Privacy</NavLink>
+                  <NavLink to="/account-privacy" onClick={closeMenu}>
+                    Account Privacy
+                  </NavLink>
                 </div>
               </>
             )}
 
             <div className="pt-1">
-              <button type="button" onClick={() => { toggleTheme(); closeMenu(); }} className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors">
-                {theme === "dark" ? <><Sun className="h-4 w-4" /> Light Mode</> : <><Moon className="h-4 w-4" /> Dark Mode</>}
+              <button
+                type="button"
+                onClick={() => {
+                  toggleTheme();
+                  closeMenu();
+                }}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors"
+              >
+                {theme === "dark" ? (
+                  <>
+                    <Sun className="h-4 w-4" /> Light Mode
+                  </>
+                ) : (
+                  <>
+                    <Moon className="h-4 w-4" /> Dark Mode
+                  </>
+                )}
               </button>
             </div>
             <div className="pt-3 border-t border-border mt-2 space-y-2">
               {isAuthenticated ? (
                 <>
-                  <Link to="/profile/$id" params={{ id: "me" }} onClick={closeMenu}><Button variant="outline" size="sm" className="w-full"><Shield className="h-4 w-4 mr-2" /> Profile</Button></Link>
-                  <Button variant="ghost" size="sm" className="w-full" onClick={handleLogout}>Logout</Button>
+                  <Link
+                    to="/profile/$id"
+                    params={{ id: "me" }}
+                    onClick={closeMenu}
+                  >
+                    <Button variant="outline" size="sm" className="w-full">
+                      <Shield className="h-4 w-4 mr-2" /> Profile
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </Button>
                 </>
               ) : (
                 <>
-                  <Link to="/sign-in" onClick={closeMenu}><Button variant="outline" size="sm" className="w-full">Sign in</Button></Link>
-                  <Link to="/sign-up" onClick={closeMenu}><Button size="sm" className="w-full font-semibold">Get Started</Button></Link>
+                  <Link to="/sign-in" onClick={closeMenu}>
+                    <Button variant="outline" size="sm" className="w-full">
+                      Sign in
+                    </Button>
+                  </Link>
+                  <Link to="/sign-up" onClick={closeMenu}>
+                    <Button size="sm" className="w-full font-semibold">
+                      Get Started
+                    </Button>
+                  </Link>
                 </>
               )}
             </div>
@@ -291,23 +471,54 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
                   <Heart className="h-3.5 w-3.5 text-primary-foreground" />
                 </div>
-                <span className="font-display font-bold text-foreground">Givethra</span>
+                <span className="font-display font-bold text-foreground">
+                  Givethra
+                </span>
               </div>
-              <p className="text-xs text-muted-foreground max-w-xs">Verified Help. Real Impact.</p>
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Verified Help. Real Impact.
+              </p>
               <div className="flex items-center gap-3 pt-1">
-                <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <a
+                  href={FACEBOOK_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
+                >
                   <Facebook className="h-4 w-4" />
                 </a>
-                <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <a
+                  href={INSTAGRAM_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Instagram"
+                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
+                >
                   <Instagram className="h-4 w-4" />
                 </a>
-                <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <a
+                  href={LINKEDIN_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="LinkedIn"
+                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
+                >
                   <Linkedin className="h-4 w-4" />
                 </a>
-                <a href="mailto:info@givethra.org" aria-label="Email" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <a
+                  href="mailto:info@givethra.org"
+                  aria-label="Email"
+                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
+                >
                   <Mail className="h-4 w-4" />
                 </a>
-                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Channel" className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <a
+                  href={WHATSAPP_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="WhatsApp Channel"
+                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
+                >
                   <MessageCircle className="h-4 w-4" />
                 </a>
               </div>
@@ -321,15 +532,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 { to: "/community-guidelines", label: "Community Guidelines" },
                 { to: "/contact", label: "Contact Us" },
               ].map(({ to, label }) => (
-                <Link key={to} to={to} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  key={to}
+                  to={to}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
                   {label}
                 </Link>
               ))}
             </nav>
           </div>
           <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-1">
-            <p>&copy; {new Date().getFullYear()} Givethra. All rights reserved.</p>
-            <p>Givethra™ is a humanitarian platform connecting verified people with verified help.</p>
+            <p>
+              &copy; {new Date().getFullYear()} Givethra. All rights reserved.
+            </p>
+            <p>
+              Givethra™ is a humanitarian platform connecting verified people
+              with verified help.
+            </p>
           </div>
         </div>
       </footer>
