@@ -3,6 +3,7 @@
 // This is the main dashboard page shown after role selection
 
 import InstallButton from "@/components/InstallButton";
+import CompletionCooldownBanner from "@/components/CompletionCooldownBanner";
 import Layout from "@/components/Layout";
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -950,6 +951,9 @@ export default function HomePage() {
         {/* Keep the existing automatic install/download prompt */}
         <InstallButton />
 
+        {/* 30-day counter after COMPLETED case only — Home Page */}
+        <CompletionCooldownBanner />
+
         {ANNOUNCEMENT && (
           <div className="bg-primary text-primary-foreground overflow-hidden relative h-9 flex items-center border-b border-primary/30">
             <div className="absolute left-0 top-0 bottom-0 z-10 bg-primary px-2 flex items-center">
@@ -1888,7 +1892,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Android Download Card intentionally removed from HomePage */}
+        {/* Android Download card intentionally removed from HomePage */}
 
         <section className="py-10 px-4 bg-background">
           <div className="max-w-4xl mx-auto space-y-6">
