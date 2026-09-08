@@ -1,6 +1,5 @@
 // src/frontend/src/components/Layout.tsx
 import { Button } from "@/components/ui/button";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { cn } from "@/lib/utils";
@@ -34,7 +33,6 @@ import {
 import RoleSwitcher from "@/components/RoleSwitcher";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
-// ASSISTANT_EMAIL REMOVED
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
@@ -82,16 +80,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
-
-  const pathname = router.location.pathname;
-  // Hide language (Urdu) button on submit / wizard pages
-  const hideLanguageOnSubmit =
-    pathname === "/submit-request" ||
-    pathname.startsWith("/submit-request/") ||
-    pathname === "/onboarding-submit" ||
-    pathname.startsWith("/onboarding-submit/") ||
-    pathname === "/need-help" ||
-    pathname.startsWith("/need-help/");
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
@@ -212,8 +200,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {/* Urdu/language button hidden on submit wizard pages */}
-            {!hideLanguageOnSubmit && <LanguageSwitcher />}
+            {/* LanguageSwitcher (Urdu button) removed completely */}
 
             <Link
               to="/community"
