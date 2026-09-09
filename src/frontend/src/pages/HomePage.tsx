@@ -62,6 +62,11 @@ import {
   getUnlockCount,
   getUnreadNotificationsCount,
   getProfile,
+  getCommunityPosts,
+  createCommunityPost,
+  getUserSupports,
+  toggleLike,
+  supportPost,
 } from "@/lib/api";
 
 const FACEBOOK_URL =
@@ -261,6 +266,122 @@ const TRUST_BADGES = [
     color: "text-orange-600",
   },
 ];
+
+function HomeSocialDashboard() {
+  const { user } = useAuth();
+  const { role } = useRole();
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [supports, setSupports] = useState(0);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [feedTab, setFeedTab] = useState<"for-you" | "my-heroes" | "my-posts">("for-you");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [busyPost, setBusyPost] = useState<string | null>(null);
+
+  const loadHomeData = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    const [walletResult, supportResult, postsResult] = await Promise.allSettled([
+      getWallet(user.id),
+      getUserSupports(user.id),
+      getCommunityPosts(feedTab),
+    ]);
+    if (walletResult.status === "fulfilled") setWalletBalance(Number(walletResult.value?.balance || 0));
+    if (supportResult.status === "fulfilled") setSupports(Number(supportResult.value?.supports || 0));
+    if (postsResult.status === "fulfilled") setPosts(Array.isArray(postsResult.value) ? postsResult.value : []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadHomeData(); }, [user?.id, feedTab]);
+
+  const submitPost = async () => {
+    const text = message.trim();
+    if (!text || !user?.id) return;
+    setPosting(true);
+    try {
+      const created = await createCommunityPost({ message: text, user_id: user.id, display_name: user.fullName || "User", is_guest: false });
+      setPosts((current) => [{ ...created, display_name: created?.display_name || user.fullName || "User", message: text, likes_count: 0, support_count: 0 }, ...current]);
+      setMessage("");
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const reactToPost = async (post: any, kind: "like" | "support") => {
+    if (!post?.id) return;
+    setBusyPost(`${kind}:${post.id}`);
+    try {
+      if (kind === "like") await toggleLike(String(post.id));
+      else await supportPost(String(post.id));
+      setPosts((current) => current.map((item) => item.id === post.id ? {
+        ...item,
+        likes_count: kind === "like" ? Number(item.likes_count || 0) + 1 : item.likes_count,
+        support_count: kind === "support" ? Number(item.support_count || 0) + 1 : item.support_count,
+      } : item));
+      if (kind === "support") setSupports((value) => value + 1);
+    } finally {
+      setBusyPost(null);
+    }
+  };
+
+  return (
+    <Layout>
+      <div className="min-h-screen bg-muted/20 pb-24">
+        <div className="mx-auto max-w-3xl space-y-4 px-3 py-4 md:px-5 md:py-7">
+          <section className="rounded-2xl bg-card px-5 py-5 shadow-sm border border-border">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Givethra Home</p>
+                <h1 className="mt-1 text-2xl font-bold text-foreground md:text-3xl">Welcome {role === "hero" ? "Hero" : "Requester"}</h1>
+                <p className="mt-1 text-sm text-muted-foreground">{role === "hero" ? "Your kindness creates real impact." : "Share your journey and connect with support."}</p>
+              </div>
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
+                {(user?.fullName || "U").slice(0, 1).toUpperCase()}
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-primary/5 border border-primary/15 p-3">
+                <p className="text-xs text-muted-foreground">Wallet / Credits</p>
+                <p className="mt-1 text-xl font-bold text-primary">{walletBalance.toLocaleString()}</p>
+              </div>
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 dark:bg-amber-950/20">
+                <p className="text-xs text-muted-foreground">Support Balance</p>
+                <p className="mt-1 text-xl font-bold text-amber-600">{supports.toLocaleString()} <span className="text-xs font-medium">Supports</span></p>
+                <p className="text-[10px] text-muted-foreground">100 Supports = 1 Credit</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">{(user?.fullName || "U").slice(0, 1).toUpperCase()}</div>
+              <div className="min-w-0 flex-1">
+                <p className="mb-2 text-sm font-semibold">{user?.fullName || "Your profile"}</p>
+                <textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="What’s on your mind to share?" rows={3} className="w-full resize-none rounded-xl border border-border bg-muted/20 p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+                <div className="mt-3 flex justify-end"><Button onClick={submitPost} disabled={posting || !message.trim()}>{posting ? "Posting..." : "Post"}</Button></div>
+              </div>
+            </div>
+          </section>
+
+          <div className="flex gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
+            {[ ["for-you", "For You"], ["my-heroes", "My Heroes"], ["my-posts", "My Support"] ].map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setFeedTab(value as typeof feedTab)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${feedTab === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>{label}</button>
+            ))}
+          </div>
+
+          {loading ? <div className="py-12 text-center text-sm text-muted-foreground">Loading your feed...</div> : posts.length === 0 ? <div className="rounded-2xl border border-dashed bg-card py-12 text-center text-sm text-muted-foreground">No posts yet. Be the first to share something.</div> : posts.map((post) => (
+            <article key={post.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">{String(post.display_name || "U").slice(0, 1).toUpperCase()}</div><div><p className="text-sm font-semibold">{post.display_name || "User"}</p><p className="text-xs text-muted-foreground">Verified community member</p></div></div>
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{post.message}</p>
+              <div className="mt-4 flex gap-2 border-t border-border pt-3"><button type="button" disabled={busyPost === `like:${post.id}`} onClick={() => reactToPost(post, "like")} className="rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted">Like · {Number(post.likes_count || 0)}</button><button type="button" disabled={busyPost === `support:${post.id}`} onClick={() => reactToPost(post, "support")} className="rounded-full px-3 py-1.5 text-xs text-primary hover:bg-primary/10">Support · {Number(post.support_count || 0)}</button></div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
+}
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -944,7 +1065,9 @@ export default function HomePage() {
       </button>
     );
   }
+  return <HomeSocialDashboard />;
 
+  /* Retained below as legacy reference while the social Home is active. */
   return (
     <Layout>
       <div className="bg-background pb-20 md:pb-0">
