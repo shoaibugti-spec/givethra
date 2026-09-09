@@ -22,7 +22,9 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate({ to: redirect === "/need-help" ? "/need-help" : "/" });
+      if (redirect === "/need-help") navigate({ to: "/need-help" });
+      else if (redirect === "/community") navigate({ to: "/community" });
+      else navigate({ to: "/" });
     }
   }, [isAuthenticated, navigate, redirect]);
 

@@ -206,6 +206,12 @@ export default function CommunityPage() {
 
   const visiblePosts = posts;
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate({ to: "/sign-in", search: { redirect: "/community" } });
+    }
+  }, [isAuthenticated, navigate]);
+
 
   // ------------------------------------------------------------
   // Posts load

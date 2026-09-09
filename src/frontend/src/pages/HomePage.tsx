@@ -1974,47 +1974,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {!isAuthenticated && (
-          <section className="py-10 px-4 bg-primary text-primary-foreground">
-            <div className="max-w-xl mx-auto text-center space-y-4">
-              <h2 className="font-display text-2xl font-bold">
-                Ready to make a difference?
-              </h2>
-
-              <p className="text-primary-foreground/80 text-sm">
-                Join Heroes changing lives through verified, direct support.
-              </p>
-
-              <div className="flex gap-3 justify-center">
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  onClick={() =>
-                    navigate({
-                      to: "/become-hero",
-                    })
-                  }
-                  className="h-11 px-6 font-semibold"
-                >
-                  Become a Hero
-                </Button>
-
-                <Button
-                  size="lg"
-                  onClick={() =>
-                    navigate({
-                      to: "/sign-up",
-                    })
-                  }
-                  className="h-11 px-6 font-semibold bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                >
-                  Request Help
-                </Button>
-              </div>
-            </div>
-          </section>
-        )}
-
         <section className="py-10 px-4 bg-card border-t border-border">
           <div className="max-w-2xl mx-auto text-center space-y-5">
 

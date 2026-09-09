@@ -87,7 +87,7 @@ const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
 
 export default function RoleSelectionPage() {
-  const { setRole: setAuthRole } = useAuth();
+  const { isAuthenticated, setRole: setAuthRole } = useAuth();
   const { setRole } = useRole();
   const navigate = useNavigate();
 
@@ -152,6 +152,14 @@ export default function RoleSelectionPage() {
     navigate({ to: "/need-help" });
   };
 
+  const handleCommunityClick = () => {
+    if (!isAuthenticated) {
+      navigate({ to: "/sign-in", search: { redirect: "/community" } });
+      return;
+    }
+    navigate({ to: "/community" });
+  };
+
   const SlideContent = ({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) => (
     <div className="flex flex-col items-center justify-center w-full h-full text-white">
       <div className="mb-2">{icon}</div>
@@ -177,13 +185,21 @@ export default function RoleSelectionPage() {
               A trusted platform where real people with genuine needs get support
               from kind-hearted Heroes.
             </p>
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/sign-in" })}
+              className="mx-auto inline-flex items-center justify-center rounded-full bg-primary px-7 py-3 text-sm font-bold text-primary-foreground shadow-md transition hover:bg-primary/90 active:scale-[.98]"
+            >
+              Sign in with Google
+            </button>
           </div>
           <p className="text-sm text-muted-foreground">How are you today?</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:gap-5">
-          <Link
-            to="/community"
+          <button
+            type="button"
+            onClick={handleCommunityClick}
             className="group flex items-center justify-center rounded-3xl bg-teal-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-teal-700 aspect-square"
           >
             <SlideContent
@@ -191,7 +207,7 @@ export default function RoleSelectionPage() {
               title={COMMUNITY_SLIDES[communityIndex].title}
               desc={COMMUNITY_SLIDES[communityIndex].desc}
             />
-          </Link>
+          </button>
 
           {/* Hero button 1 – active cases */}
           <button
