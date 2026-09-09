@@ -18,7 +18,6 @@ import {
   Linkedin,
   MessageCircle,
   Mail,
-  MessageSquare,
   Settings,
   Lock,
   KeyRound,
@@ -27,8 +26,6 @@ import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 import {
   getUnreadNotificationsCount,
-  getCommunityPosts,
-  getGuestId,
 } from "@/lib/api";
 import RoleSwitcher from "@/components/RoleSwitcher";
 
@@ -76,7 +73,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouterState();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifCount, setNotifCount] = useState(0);
-  const [postCount, setPostCount] = useState(0);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
@@ -101,53 +97,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       );
     };
   }, [isAuthenticated, user]);
-
-  const fetchPostCount = async () => {
-    try {
-      const data = await getCommunityPosts();
-      if (!Array.isArray(data)) {
-        setPostCount(0);
-        return;
-      }
-      const actorKey =
-        isAuthenticated && user?.id ? user.id : getGuestId();
-      const seenKey = `givethra_community_seen_at:${actorKey}`;
-      const currentPath = router.location.pathname;
-      const newestPostAt = data.reduce((latest: number, post: any) => {
-        const timestamp = Date.parse(post?.created_at || "");
-        return Number.isFinite(timestamp)
-          ? Math.max(latest, timestamp)
-          : latest;
-      }, 0);
-      if (
-        currentPath === "/community" ||
-        currentPath.startsWith("/community/")
-      ) {
-        if (newestPostAt) localStorage.setItem(seenKey, String(newestPostAt));
-        setPostCount(0);
-        return;
-      }
-      const seenAt = Number(localStorage.getItem(seenKey) || 0);
-      setPostCount(
-        data.filter(
-          (post: any) => Date.parse(post?.created_at || "") > seenAt
-        ).length
-      );
-    } catch {
-      // Keep the current badge stable if a transient refresh fails.
-    }
-  };
-
-  useEffect(() => {
-    fetchPostCount();
-    const interval = setInterval(fetchPostCount, 600000);
-    const handlePostUpdate = () => fetchPostCount();
-    window.addEventListener("post-updated", handlePostUpdate);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("post-updated", handlePostUpdate);
-    };
-  }, [isAuthenticated, user?.id, router.location.pathname]);
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => {
@@ -201,20 +150,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-1 shrink-0">
             {/* LanguageSwitcher (Urdu button) removed completely */}
-
-            <Link
-              to="/community"
-              aria-label="Community"
-              aria-current={isRouteActive("/community") ? "page" : undefined}
-              className={iconLinkClass("/community")}
-            >
-              <MessageSquare className="h-5 w-5" />
-              {postCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-                  {postCount > 99 ? "99+" : postCount}
-                </span>
-              )}
-            </Link>
 
             {isAuthenticated && (
               <>

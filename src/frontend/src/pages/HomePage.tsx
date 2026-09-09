@@ -51,6 +51,7 @@ import {
   GraduationCap,
   Stethoscope,
   ShoppingCart,
+  Share2,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -65,8 +66,9 @@ import {
   getCommunityPosts,
   createCommunityPost,
   getUserSupports,
-  toggleLike,
   supportPost,
+  followUser,
+  unfollowUser,
 } from "@/lib/api";
 
 const FACEBOOK_URL =
@@ -308,18 +310,33 @@ function HomeSocialDashboard() {
     }
   };
 
-  const reactToPost = async (post: any, kind: "like" | "support") => {
+  const sharePost = async (post: any) => {
+    const text = `${post.display_name || "Givethra member"}: ${post.message || ""}`;
+    const url = `${window.location.origin}/community`;
+    if (navigator.share) await navigator.share({ title: "Givethra post", text, url });
+    else await navigator.clipboard?.writeText(`${text}\n${url}`);
+  };
+  const reactToPost = async (post: any) => {
     if (!post?.id) return;
-    setBusyPost(`${kind}:${post.id}`);
+    setBusyPost(`support:${post.id}`);
     try {
-      if (kind === "like") await toggleLike(String(post.id));
-      else await supportPost(String(post.id));
+      await supportPost(String(post.id));
       setPosts((current) => current.map((item) => item.id === post.id ? {
         ...item,
-        likes_count: kind === "like" ? Number(item.likes_count || 0) + 1 : item.likes_count,
-        support_count: kind === "support" ? Number(item.support_count || 0) + 1 : item.support_count,
+        support_count: Number(item.support_count || 0) + 1,
       } : item));
-      if (kind === "support") setSupports((value) => value + 1);
+      setSupports((value) => value + 1);
+    } finally {
+      setBusyPost(null);
+    }
+  };
+  const togglePostHero = async (post: any) => {
+    if (!post?.user_id || post.user_id === user?.id) return;
+    setBusyPost(`hero:${post.id}`);
+    try {
+      if (post.is_following) await unfollowUser(String(post.user_id));
+      else await followUser(String(post.user_id));
+      setPosts((current) => current.map((item) => item.id === post.id ? { ...item, is_following: !post.is_following } : item));
     } finally {
       setBusyPost(null);
     }
@@ -372,9 +389,9 @@ function HomeSocialDashboard() {
 
           {loading ? <div className="py-12 text-center text-sm text-muted-foreground">Loading your feed...</div> : posts.length === 0 ? <div className="rounded-2xl border border-dashed bg-card py-12 text-center text-sm text-muted-foreground">No posts yet. Be the first to share something.</div> : posts.map((post) => (
             <article key={post.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">{String(post.display_name || "U").slice(0, 1).toUpperCase()}</div><div><p className="text-sm font-semibold">{post.display_name || "User"}</p><p className="text-xs text-muted-foreground">Verified community member</p></div></div>
+              <div className="flex items-center gap-3"><Link to="/profile/$id" params={{ id: String(post.user_id || "me") }} className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-bold text-primary">{post.avatar_url ? <img src={post.avatar_url} alt="" className="h-full w-full object-cover" /> : String(post.display_name || "U").slice(0, 1).toUpperCase()}</Link><div className="min-w-0"><div className="flex items-center gap-2"><Link to="/profile/$id" params={{ id: String(post.user_id || "me") }} className="truncate text-sm font-semibold hover:text-primary">{post.display_name || "User"}</Link>{post.user_id && post.user_id !== user?.id && <button type="button" disabled={busyPost === `hero:${post.id}`} onClick={() => togglePostHero(post)} className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">{post.is_following ? "Hero ✓" : "Hero"}</button>}</div><p className="text-xs text-muted-foreground">Verified community member</p></div></div>
               <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{post.message}</p>
-              <div className="mt-4 flex gap-2 border-t border-border pt-3"><button type="button" disabled={busyPost === `like:${post.id}`} onClick={() => reactToPost(post, "like")} className="rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted">Like · {Number(post.likes_count || 0)}</button><button type="button" disabled={busyPost === `support:${post.id}`} onClick={() => reactToPost(post, "support")} className="rounded-full px-3 py-1.5 text-xs text-primary hover:bg-primary/10">Support · {Number(post.support_count || 0)}</button></div>
+              <div className="mt-4 flex gap-2 border-t border-border pt-3"><button type="button" disabled={busyPost === `support:${post.id}`} onClick={() => reactToPost(post)} className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10">🫴🏻 Support · {Number(post.support_count || 0)}</button><button type="button" onClick={() => sharePost(post)} className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"><Share2 className="h-4 w-4" /> Share</button></div>
             </article>
           ))}
         </div>

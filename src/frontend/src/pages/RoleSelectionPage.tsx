@@ -45,7 +45,7 @@ import { useEffect, useRef, useState } from "react";
 import { getApprovedCases } from "@/lib/api";
 
 const COMMUNITY_SLIDES = [
-  { icon: <Users className="w-8 h-8" />, title: "Community", desc: "Connect with people who care" },
+  { icon: <Users className="w-8 h-8" />, title: "Welcome Givethra Home", desc: "Connect with people who care" },
   { icon: <Share2 className="w-8 h-8" />, title: "Connect & Share", desc: "Share your story, find support" },
   { icon: <HeartHandshake className="w-8 h-8" />, title: "Support Others", desc: "Every kind word matters" },
   { icon: <ThumbsUp className="w-8 h-8" />, title: "Like • Comment • Share", desc: "Engage with the community" },
@@ -212,11 +212,7 @@ export default function RoleSelectionPage() {
   };
 
   const handleCommunityClick = () => {
-    if (!isAuthenticated) {
-      navigate({ to: "/sign-in", search: { redirect: "/community" } });
-      return;
-    }
-    navigate({ to: "/community" });
+    navigate({ to: "/home" });
   };
 
   if (!isAuthenticated) {
@@ -260,10 +256,8 @@ export default function RoleSelectionPage() {
             />
           </button>
 
-          {/* Hero button 1 – active cases */}
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/become-hero" })}
+          {/* Active cases counter — informational only */}
+          <div
             className="group flex items-center justify-center rounded-3xl bg-rose-600 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-rose-700 aspect-square"
           >
             {activeSlides.length > 0 && (
@@ -273,7 +267,7 @@ export default function RoleSelectionPage() {
                 desc={activeSlides[activeIndex].desc}
               />
             )}
-          </button>
+          </div>
 
           {/* Hero button 2 – hero slides */}
           <button
