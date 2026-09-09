@@ -9,10 +9,14 @@ export function isTrulyCompletedHelp(resolution: any): boolean {
   if (!resolution) return false;
   const caseStatus = String(resolution?.case_status || "").trim().toLowerCase();
   if (caseStatus === "completed") return true;
-  // Additional safety: if the resolution itself says completed and admin confirmed
+  // A resolution explicitly marked completed is authoritative. Older rows may not
+  // have admin_confirmed populated even though the case was finalized.
   const status = String(resolution?.status || "").trim().toLowerCase();
+  if (status === "completed") return true;
+  // Additional safety for legacy rows: approved/verified/confirmed still require
+  // an explicit admin confirmation flag.
   const adminConfirmed = [1, "1", true, "true", "yes"].includes(resolution?.admin_confirmed);
-  if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status) && adminConfirmed) {
+  if (["approved", "verified", "confirmed", "seeker_confirmed"].includes(status) && adminConfirmed) {
     return true;
   }
   return false;

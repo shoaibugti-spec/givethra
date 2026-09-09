@@ -197,16 +197,17 @@ export default function MyHelpPage() {
           amount_needed: resolution.amount_paid || 0,
         };
 
-        const isApproved = isTrulyCompletedHelp(resolution);
+        const resolutionStatus = String(resolution?.status || "").trim().toLowerCase();
+        const isApproved = isTrulyCompletedHelp(resolution) || resolutionStatus === "completed" || String(caseRecord.status || "").toLowerCase() === "completed";
         const isContribution = isContributionResolution(resolution);
-        const statusDisplay = resolutionDisplayStatus(resolution);
+        const statusDisplay = isApproved ? "completed" : resolutionDisplayStatus(resolution);
 
         recordList.push({
           id: resolution.id,
           type: isContribution ? "contribution" : "direct",
           amount: Number(resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? 0),
-          transactionId: resolution.transaction_id,
-          receiptUrl: resolution.receipt_url,
+          transactionId: resolution.transaction_id || caseRecord.payment_transaction_id || "",
+          receiptUrl: resolution.receipt_url || caseRecord.payment_receipt_url || null,
           status: statusDisplay,
           completedAt: resolution.completed_at || resolution.admin_confirmed_at || resolution.submitted_at,
           caseId: caseId,

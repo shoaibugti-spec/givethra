@@ -81,10 +81,19 @@ export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): 
   let contributions = 0;
   let totalAmountHelped = 0;
   const amountByCurrency: Record<string, number> = {};
+  const unlockAmountByCase = new Map<string, { amount: number; currency: string }>();
+  for (const unlock of safeUnlocks) {
+    const caseId = String(unlock?.case_id || "");
+    const amount = Number(unlock?.pledged_amount ?? 0) || 0;
+    if (caseId && amount > 0 && !unlockAmountByCase.has(caseId)) {
+      unlockAmountByCase.set(caseId, { amount, currency: String(unlock?.currency || "USD").toUpperCase() });
+    }
+  }
 
   for (const resolution of completedResolutions) {
-    const amount = Number(resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? 0) || 0;
-    const currency = String(resolution.currency || resolution.case_currency || "USD").toUpperCase();
+    const fallback = unlockAmountByCase.get(String(resolution.case_id));
+    const amount = Number(resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? fallback?.amount ?? 0) || 0;
+    const currency = String(resolution.currency || resolution.case_currency || fallback?.currency || "USD").toUpperCase();
     totalAmountHelped += amount;
     amountByCurrency[currency] = (amountByCurrency[currency] || 0) + amount;
     if (isContributionResolution(resolution)) contributions += 1;
