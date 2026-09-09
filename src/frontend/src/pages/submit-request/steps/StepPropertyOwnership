@@ -1,4 +1,4 @@
-// src/frontend/src/pages/submit-request/steps/StepPeopertyOwnership.tsx
+// src/frontend/src/pages/submit-request/steps/StepPropertyOwnership.tsx
 import { Label } from "@/components/ui/label";
 import { StepNavigation } from "../shared/StepNavigation";
 import { StepGuide } from "../shared/StepGuide";
@@ -8,7 +8,8 @@ const OPTIONS = [
   { value: "owned", label: "Owned", icon: "📜" },
 ];
 
-export default function StepPeopertyOwnership({
+// ✅ فنکشن کا نام بھی درست املا (Property) کے ساتھ اپڈیٹ کر دیا گیا ہے
+export default function StepPropertyOwnership({
   value,
   onChange,
   onNext,
