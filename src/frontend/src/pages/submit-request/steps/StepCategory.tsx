@@ -65,7 +65,7 @@ const CategoryButton = memo(function CategoryButton({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: "6px",
+        gap: "8px", // آئیکون اور نام کے درمیان فاصلہ
         border: "none",
         cursor: "pointer",
         textAlign: "center",
@@ -77,18 +77,22 @@ const CategoryButton = memo(function CategoryButton({
         WebkitTapHighlightColor: "transparent",
         userSelect: "none",
         touchAction: "manipulation",
-        // Selected state shadow
         boxShadow: isSelected
           ? "inset 0 0 0 4px #000000, 0 6px 20px rgba(0,0,0,0.35)"
           : "inset 0 0 0 0px transparent, 0 2px 8px rgba(0,0,0,0.12)",
       }}
     >
+      {/* ✅ اوپر صرف آئیکون */}
       <span style={{ fontSize: "28px", lineHeight: 1, display: "block" }}>
         {cat.emoji}
       </span>
-      <span style={{ display: "block" }}>{cat.label}</span>
+      
+      {/* ✅ نیچے صرف نام */}
+      <span style={{ display: "block", fontSize: "14px", fontWeight: "600" }}>
+        {cat.label}
+      </span>
 
-      {/* ✅ ہمیشہ DOM میں موجود — صرف opacity بدلتی ہے۔ add/remove نہیں ہوتا = بلنک نہیں */}
+      {/* ✅ Selected state checkmark (صرف opacity بدلتی ہے، بلنک نہیں ہوتا) */}
       <span
         aria-hidden={!isSelected}
         style={{
@@ -129,7 +133,6 @@ const StepCategory = memo(function StepCategory({
   isFreeDisabled = false,
   freeCasesUsed = 0,
 }: Props) {
-  // ✅ Ref سے track کریں تاکہ handleSelect مستحکم رہے
   const valueRef = useRef(value);
   valueRef.current = value;
 
@@ -138,7 +141,7 @@ const StepCategory = memo(function StepCategory({
       if (id === valueRef.current) return;
       onChange(id);
     },
-    [onChange] // صرف onChange — value نہیں
+    [onChange]
   );
 
   const handleNext = useCallback(() => {
