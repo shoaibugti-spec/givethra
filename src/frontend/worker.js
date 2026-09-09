@@ -649,6 +649,27 @@ async function handleKyc(request, env, user, url, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+function normalizeUploadedUrl(value) {
+  if (typeof value !== "string" || !value) return value;
+  try {
+    const parsed = new URL(value);
+    const key = parsed.pathname === "/uploads" ? parsed.searchParams.get("key") : null;
+    if (key) return `${PUBLIC_ORIGIN}/uploads/${key}`;
+  } catch {
+    // Keep non-URL legacy values unchanged; the frontend will not render them.
+  }
+  return value;
+}
+
+function normalizeCaseMedia(value) {
+  if (typeof value === "string") return normalizeUploadedUrl(value);
+  if (Array.isArray(value)) return value.map(normalizeCaseMedia);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalizeCaseMedia(item)]));
+  }
+  return value;
+}
+
 function decodeCaseRow(row) {
   if (!row) return row;
   const result = { ...row };
@@ -656,6 +677,9 @@ function decodeCaseRow(row) {
     if (typeof result[field] === "string" && result[field]) {
       try { result[field] = JSON.parse(result[field]); } catch { /* preserve legacy plain strings */ }
     }
+  }
+  for (const field of ["selfie_url", "video_url", "photo_urls", "category_details"]) {
+    result[field] = normalizeCaseMedia(result[field]);
   }
   return result;
 }
