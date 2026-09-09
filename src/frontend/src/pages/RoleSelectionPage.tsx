@@ -86,8 +86,53 @@ const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
 
+function SignInLandingPage({ onSignIn }: { onSignIn: () => void }) {
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-10">
+      <div className="w-full max-w-4xl space-y-10">
+        <section className="rounded-[2rem] border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-teal-50 p-8 text-center shadow-sm md:p-14">
+          <p className="text-sm font-bold uppercase tracking-[0.24em] text-primary">Givethra</p>
+          <h1 className="mt-5 text-4xl font-bold leading-tight text-foreground md:text-6xl">
+            Verified Help.<br />
+            <span className="text-primary">Real Impact.</span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+            Real people. Genuine needs. Secure, verified support from a global community.
+            Sign in once, complete your identity verification, and choose how you want to participate.
+          </p>
+          <button
+            type="button"
+            onClick={onSignIn}
+            className="mt-8 inline-flex h-12 items-center justify-center rounded-full bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90 active:scale-[.98]"
+          >
+            Sign in with Google
+          </button>
+        </section>
+        <section className="grid gap-4 sm:grid-cols-4" aria-label="Givethra trust principles">
+          {[
+            ["Verified", "Identity and cases are reviewed."],
+            ["Secure", "Private documents stay protected."],
+            ["Compassion", "Support reaches genuine needs."],
+            ["Connected", "A global community helps together."],
+          ].map(([title, description]) => (
+            <div key={title} className="rounded-2xl border bg-card p-5 text-center shadow-sm">
+              <ShieldCheck className="mx-auto h-6 w-6 text-primary" />
+              <h2 className="mt-3 font-bold text-foreground">{title}</h2>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+            </div>
+          ))}
+        </section>
+        <footer className="flex flex-wrap justify-center gap-x-5 gap-y-2 border-t border-border pt-5 text-sm text-muted-foreground">
+          <Link to="/about">About</Link><Link to="/faq">FAQ</Link><Link to="/privacy">Privacy</Link>
+          <Link to="/terms">Terms</Link><Link to="/community-guidelines">Community Guidelines</Link><Link to="/contact">Contact</Link>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 export default function RoleSelectionPage() {
-  const { isAuthenticated, setRole: setAuthRole } = useAuth();
+  const { isAuthenticated, loginWithGoogle, setRole: setAuthRole } = useAuth();
   const { setRole } = useRole();
   const navigate = useNavigate();
 
@@ -159,6 +204,10 @@ export default function RoleSelectionPage() {
     }
     navigate({ to: "/community" });
   };
+
+  if (!isAuthenticated) {
+    return <SignInLandingPage onSignIn={loginWithGoogle} />;
+  }
 
   const SlideContent = ({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) => (
     <div className="flex flex-col items-center justify-center w-full h-full text-white">

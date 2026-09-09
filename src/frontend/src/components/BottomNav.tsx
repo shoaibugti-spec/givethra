@@ -20,7 +20,7 @@ export default function BottomNav() {
 
   // KYC is a hard gate and onboarding has its own fixed navigation controls.
   // Do not render the global navigation in either flow.
-  if (currentPath === "/" || currentPath === "/kyc" || currentPath === "/onboarding" || currentPath === "/onboarding-submit") return null;
+  if (currentPath === "/" || currentPath === "/sign-in" || currentPath === "/kyc" || currentPath === "/onboarding" || currentPath === "/onboarding-submit") return null;
 
   // Define navigation items based on role
   const getNavItems = () => {

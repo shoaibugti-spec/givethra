@@ -267,6 +267,13 @@ function RootLayout() {
         const isPublic = publicPaths.includes(location.pathname);
         const isRequester = role === "requester";
 
+        // Every authenticated visitor completes KYC before entering the role hub.
+        // The KYC page itself remains the only exception while approval is pending.
+        if (!isAdmin && location.pathname === "/" && status !== "approved") {
+          if (!cancelled) navigate({ to: "/kyc" });
+          return;
+        }
+
         if (
           !isAdmin &&
           isRequester &&
