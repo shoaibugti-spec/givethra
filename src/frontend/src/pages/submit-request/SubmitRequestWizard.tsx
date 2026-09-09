@@ -1,6 +1,4 @@
 // src/frontend/src/pages/submit-request/SubmitRequestWizard.tsx
-// Top bar (Credits + WhatsApp) shows on EVERY screen — form AND status gates
-
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -26,7 +24,8 @@ import StepJobStatus from "./steps/StepJobStatus";
 import StepJobDocuments from "./steps/StepJobDocuments";
 import StepNoJobDocument from "./steps/StepNoJobDocument";
 import StepCategoryDetails from "./steps/StepCategoryDetails";
-import StepPeopertyOwnership from "./steps/StepPeopertyOwnership";
+// FIX 1: املا کی درستگی (اگر آپ کی فائل کا نام بھی غلط ہے، تو اسے Rename کر کے Property کر لیں)
+import StepPropertyOwnership from "./steps/StepPropertyOwnership"; 
 import StepRentedDocuments from "./steps/StepRentedDocuments";
 import StepOwnedDocuments from "./steps/StepOwnedDocuments";
 import StepPaymentReceiver from "./steps/StepPaymentReceiver";
@@ -40,20 +39,16 @@ import StepVideo from "./steps/StepVideo";
 import StepTerms from "./steps/StepTerms";
 
 import { StepProgress } from "./shared/StepProgress";
-
 import { useVisibleSteps } from "./hooks/useVisibleSteps";
 import { useSubmitDraft } from "./hooks/useSubmitDraft";
 import { useUserSubmitStats } from "./hooks/useUserSubmitStats";
 import { useCompletionCooldown } from "@/hooks/useCompletionCooldown";
 import { formatRemaining } from "@/lib/completionCooldown";
-
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
 
-const WHATSAPP_CHANNEL_URL =
-  "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
-const SUPPORT_WHATSAPP_URL =
-  "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
+const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
+const SUPPORT_WHATSAPP_URL = "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 
 const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   category: StepCategory,
@@ -73,7 +68,7 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   jobDocuments: StepJobDocuments,
   noJobDocument: StepNoJobDocument,
   categoryDetails: StepCategoryDetails,
-  propertyOwnership: StepPeopertyOwnership,
+  propertyOwnership: StepPropertyOwnership, // FIX 1 Applied Here
   rentedDocuments: StepRentedDocuments,
   ownedDocuments: StepOwnedDocuments,
   paymentReceiver: StepPaymentReceiver,
@@ -88,18 +83,9 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
 };
 
 const STEPS_NEEDING_FORMDATA = new Set([
-  "jobDocuments",
-  "noJobDocument",
-  "genderDocuments",
-  "categoryDetails",
-  "rentedDocuments",
-  "ownedDocuments",
-  "paymentReceiver",
-  "debtTotal",
-  "selfie",
-  "video",
-  "amount",
-  "deadline",
+  "jobDocuments", "noJobDocument", "genderDocuments", "categoryDetails",
+  "rentedDocuments", "ownedDocuments", "paymentReceiver", "debtTotal",
+  "selfie", "video", "amount", "deadline",
 ]);
 
 const PLACEHOLDERS: Record<string, string> = {
@@ -111,86 +97,32 @@ const PLACEHOLDERS: Record<string, string> = {
 };
 
 const INITIAL_FORM = {
-  category: "",
-  title: "",
-  shortDesc: "",
-  country: "",
-  city: "",
-  urgency: "",
-  gender: "",
-  maritalStatus: "",
-  isOrphan: "",
-  orphanParent: "",
-  genderDocUrls: {},
-  seekerName: "",
-  seekerContact: "",
-  jobStatus: "",
-  salarySlipUrl: "",
-  statementUrl: "",
-  catFields: {},
-  catDocUrls: {},
-  propertyOwnership: "",
-  rentalAgreementUrl: "",
-  landlordCnicUrl: "",
-  ownerCnicUrl: "",
-  ownerRelation: "",
-  receiverName: "",
-  receiverContact: "",
-  receiverBank: "",
-  receiverAccount: "",
-  receiverAddress: "",
-  receiverShopName: "",
-  description: "",
-  debtTotalAmount: "",
-  amount: "",
-  currency: "PKR",
-  deadline: "",
-  selfieUrl: "",
-  videoUrl: "",
-  confirmed: false,
-  isEarlyRequest: false,
+  category: "", title: "", shortDesc: "", country: "", city: "",
+  urgency: "", gender: "", maritalStatus: "", isOrphan: "", orphanParent: "",
+  genderDocUrls: {}, seekerName: "", seekerContact: "", jobStatus: "",
+  salarySlipUrl: "", statementUrl: "", catFields: {}, catDocUrls: {},
+  propertyOwnership: "", rentalAgreementUrl: "", landlordCnicUrl: "",
+  ownerCnicUrl: "", ownerRelation: "", receiverName: "", receiverContact: "",
+  receiverBank: "", receiverAccount: "", receiverAddress: "", receiverShopName: "",
+  description: "", debtTotalAmount: "", amount: "", currency: "PKR",
+  deadline: "", selfieUrl: "", videoUrl: "", confirmed: false, isEarlyRequest: false,
 };
 
-/** Visible on every screen — Credits center + WhatsApp row */
-function WizardTopBar({
-  isFree,
-  balance,
-}: {
-  isFree: boolean;
-  balance: number;
-}) {
+function WizardTopBar({ isFree, balance }: { isFree: boolean; balance: number }) {
   return (
     <div className="mb-4 rounded-xl border-2 border-green-500 bg-green-50 dark:bg-green-950/30 p-4 space-y-3">
       <div className="flex justify-center">
-        <span
-          className={
-            isFree
-              ? "text-green-700 font-bold text-base"
-              : "text-primary font-bold text-base"
-          }
-        >
+        <span className={isFree ? "text-green-700 font-bold text-base" : "text-primary font-bold text-base"}>
           {isFree ? "FREE Case" : `Credits: ${balance}`}
         </span>
       </div>
       <div className="flex items-center justify-center gap-3 flex-wrap text-sm">
-        <a
-          href={WHATSAPP_CHANNEL_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 font-semibold text-green-700 hover:underline"
-        >
-          <MessageCircle className="h-4 w-4 shrink-0" />
-          WhatsApp Channel
+        <a href={WHATSAPP_CHANNEL_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-green-700 hover:underline">
+          <MessageCircle className="h-4 w-4 shrink-0" /> WhatsApp Channel
         </a>
         <span className="text-muted-foreground">|</span>
-        <a
-          href={SUPPORT_WHATSAPP_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
-        >
-          <MessageCircle className="h-4 w-4 shrink-0" />
-          24/7 Support
+        <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline">
+          <MessageCircle className="h-4 w-4 shrink-0" /> 24/7 Support
         </a>
       </div>
     </div>
@@ -210,8 +142,7 @@ export default function SubmitRequestWizard() {
 
   const { saveDraft, loadDraft, clearDraft } = useSubmitDraft();
   const { stats, loading: statsLoading, refetch } = useUserSubmitStats(user?.id);
-  const { cooldown, remainingLabel, loading: cooldownLoading } =
-    useCompletionCooldown(user?.id);
+  const { cooldown, remainingLabel, loading: cooldownLoading } = useCompletionCooldown(user?.id);
 
   const visibleStepIds = useVisibleSteps(formData);
   const currentIndex = visibleStepIds.indexOf(currentStepId);
@@ -219,11 +150,11 @@ export default function SubmitRequestWizard() {
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === totalSteps - 1;
 
-  const canUseFree =
-    !stats.isSuspended && !stats.isFreeDisabled && stats.freeCasesUsed < 2;
+  const canUseFree = !stats.isSuspended && !stats.isFreeDisabled && stats.freeCasesUsed < 2;
   const willBeFree = canUseFree;
   const balance = stats.balance ?? 0;
 
+  // Refs for stable access inside callbacks/timeouts
   const currentStepIdRef = useRef(currentStepId);
   currentStepIdRef.current = currentStepId;
   const formDataRef = useRef(formData);
@@ -250,8 +181,7 @@ export default function SubmitRequestWizard() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const early =
-      new URLSearchParams(window.location.search).get("early") === "1";
+    const early = new URLSearchParams(window.location.search).get("early") === "1";
     if (early && cooldown.phase === "early_available") {
       setAllowEarlyFlow(true);
     }
@@ -326,16 +256,11 @@ export default function SubmitRequestWizard() {
       return;
     }
 
-    const isEarly =
-      allowEarlyFlowRef.current &&
-      cooldownRef.current.phase === "early_available";
+    const isEarly = allowEarlyFlowRef.current && cooldownRef.current.phase === "early_available";
 
     setSubmitting(true);
     try {
-      const payload = {
-        ...formDataRef.current,
-        isEarlyRequest: isEarly,
-      };
+      const payload = { ...formDataRef.current, isEarlyRequest: isEarly };
       const result = await submitCase(payload, user!.id, willBeFree);
       clearDraft();
       setForceNewCase(false);
@@ -379,12 +304,13 @@ export default function SubmitRequestWizard() {
     setForceNewCase(true);
   }, [clearDraft]);
 
+  // FIX 2: Prevent undefined value crashes by providing a fallback empty string
   const currentValue =
     currentStepId === "whyHelp"
       ? formData.description
       : currentStepId === "terms"
-        ? formData.confirmed
-        : formData[currentStepId as keyof typeof formData];
+      ? formData.confirmed
+      : (formData[currentStepId as keyof typeof formData] ?? "");
 
   const needsFormData = STEPS_NEEDING_FORMDATA.has(currentStepId);
 
@@ -400,7 +326,6 @@ export default function SubmitRequestWizard() {
     };
 
     const extra: any = {};
-
     if (currentStepId === "category") {
       extra.willBeFree = willBeFree;
       extra.isFreeDisabled = stats.isFreeDisabled;
@@ -417,26 +342,11 @@ export default function SubmitRequestWizard() {
     }
 
     return { ...common, ...extra };
-  }, [
-    currentStepId,
-    currentValue,
-    stableOnChange,
-    handleNext,
-    handleBack,
-    handleSubmit,
-    isFirst,
-    isLast,
-    submitting,
-    willBeFree,
-    stats.isFreeDisabled,
-    stats.freeCasesUsed,
-    needsFormData ? formData : null,
-    stableSetFormData,
-  ]);
+    // FIX 3: Cleaned up dependency array for stability
+  }, [currentStepId, currentValue, stableOnChange, handleNext, handleBack, handleSubmit, isFirst, isLast, submitting, willBeFree, stats.isFreeDisabled, stats.freeCasesUsed, formData, stableSetFormData, needsFormData]);
 
   const CurrentStepComponent = STEP_COMPONENTS[currentStepId];
 
-  // Shared shell: always show Credits + WhatsApp on top
   const shell = (body: React.ReactNode) => (
     <Layout>
       <div className="max-w-2xl mx-auto px-4 py-6">
@@ -447,9 +357,7 @@ export default function SubmitRequestWizard() {
   );
 
   if (isLoading || statsLoading || cooldownLoading) {
-    return shell(
-      <div className="py-16 text-center">Loading Submit Request Wizard...</div>
-    );
+    return shell(<div className="py-16 text-center">Loading Submit Request Wizard...</div>);
   }
 
   if (stats.isSuspended) {
@@ -466,60 +374,34 @@ export default function SubmitRequestWizard() {
     return shell(
       <div className="rounded-2xl border bg-card p-8 space-y-4 text-center">
         <h1 className="text-2xl font-bold">Please Share Your Feedback First</h1>
-        <p>
-          Your case &quot;<strong>{stats.blockedByFeedback.caseTitle}</strong>&quot;
-          was completed. Before submitting a new case, please share your feedback
-          (message + video).
-        </p>
+        <p>Your case &quot;<strong>{stats.blockedByFeedback.caseTitle}</strong>&quot; was completed. Before submitting a new case, please share your feedback (message + video).</p>
         <Button asChild>
-          <Link
-            to="/cases/$id"
-            params={{ id: stats.blockedByFeedback.caseId }}
-          >
-            Go to My Completed Case
-          </Link>
+          <Link to="/cases/$id" params={{ id: stats.blockedByFeedback.caseId }}>Go to My Completed Case</Link>
         </Button>
       </div>
     );
   }
 
-  const inCooldown =
-    cooldown.phase === "waiting" ||
-    cooldown.phase === "early_available" ||
-    cooldown.phase === "early_locked";
+  const inCooldown = cooldown.phase === "waiting" || cooldown.phase === "early_available" || cooldown.phase === "early_locked";
 
   if (inCooldown && !(allowEarlyFlow && cooldown.phase === "early_available")) {
     return shell(
       <div className="rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 p-8 space-y-5 text-center">
-        <h1 className="text-2xl font-bold text-rose-800">
-          Your Help Was Completed
-        </h1>
+        <h1 className="text-2xl font-bold text-rose-800">Your Help Was Completed</h1>
         <p className="text-base">You can submit another case after 30 Days</p>
-        <p className="text-lg font-semibold tabular-nums">
-          ⏳ {formatRemaining(cooldown.remainingMs)}
-        </p>
+        <p className="text-lg font-semibold tabular-nums">⏳ {formatRemaining(cooldown.remainingMs)}</p>
         {cooldown.lastCompletedTitle && (
-          <p className="text-sm text-muted-foreground">
-            Last completed: “{cooldown.lastCompletedTitle}”
-          </p>
+          <p className="text-sm text-muted-foreground">Last completed: “{cooldown.lastCompletedTitle}”</p>
         )}
         {cooldown.phase === "early_available" && (
           <div className="rounded-xl border bg-white/90 dark:bg-card p-4 space-y-3 text-left">
             <p className="text-sm font-semibold">Need Help Again?</p>
-            <p className="text-xs text-muted-foreground">
-              You may submit one early request for review. Approval is not
-              guaranteed.
-            </p>
-            <Button className="w-full" onClick={() => setAllowEarlyFlow(true)}>
-              Request Early Review
-            </Button>
+            <p className="text-xs text-muted-foreground">You may submit one early request for review. Approval is not guaranteed.</p>
+            <Button className="w-full" onClick={() => setAllowEarlyFlow(true)}>Request Early Review</Button>
           </div>
         )}
         {cooldown.phase === "early_locked" && (
-          <p className="text-sm text-red-600">
-            Your early request was not approved. Please wait {remainingLabel}{" "}
-            before submitting again.
-          </p>
+          <p className="text-sm text-red-600">Your early request was not approved. Please wait {remainingLabel} before submitting again.</p>
         )}
         <Button variant="outline" asChild className="w-full">
           <Link to="/home">Back to Home</Link>
@@ -532,19 +414,10 @@ export default function SubmitRequestWizard() {
     return shell(
       <div className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-8 space-y-5 text-center">
         <h1 className="text-2xl font-bold text-amber-800">Case Under Review</h1>
-        <p className="text-base">
-          Your case <strong>&quot;{stats.activeCase.title}&quot;</strong> is{" "}
-          <strong>Pending</strong>.
-        </p>
+        <p className="text-base">Your case <strong>&quot;{stats.activeCase.title}&quot;</strong> is <strong>Pending</strong>.</p>
         <div className="flex flex-col gap-3">
-          <Button asChild className="w-full">
-            <Link to="/home">Back to Home</Link>
-          </Button>
-          <Button variant="outline" asChild className="w-full">
-            <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
-              View My Case
-            </Link>
-          </Button>
+          <Button asChild className="w-full"><Link to="/home">Back to Home</Link></Button>
+          <Button variant="outline" asChild className="w-full"><Link to="/cases/$id" params={{ id: stats.activeCase.id }}>View My Case</Link></Button>
         </div>
       </div>
     );
@@ -554,18 +427,10 @@ export default function SubmitRequestWizard() {
     return shell(
       <div className="rounded-2xl border border-green-300 bg-green-50 dark:bg-green-950/20 p-8 space-y-5 text-center">
         <h1 className="text-2xl font-bold text-green-800">Case Approved</h1>
-        <p className="text-base">
-          <strong>&quot;{stats.activeCase.title}&quot;</strong> is live.
-        </p>
+        <p className="text-base"><strong>&quot;{stats.activeCase.title}&quot;</strong> is live.</p>
         <div className="flex flex-col gap-3">
-          <Button asChild className="w-full">
-            <Link to="/home">Back to Home</Link>
-          </Button>
-          <Button variant="outline" asChild className="w-full">
-            <Link to="/cases/$id" params={{ id: stats.activeCase.id }}>
-              Open Case Page
-            </Link>
-          </Button>
+          <Button asChild className="w-full"><Link to="/home">Back to Home</Link></Button>
+          <Button variant="outline" asChild className="w-full"><Link to="/cases/$id" params={{ id: stats.activeCase.id }}>Open Case Page</Link></Button>
         </div>
       </div>
     );
@@ -575,57 +440,35 @@ export default function SubmitRequestWizard() {
     return shell(
       <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-8 space-y-5 text-center">
         <h1 className="text-2xl font-bold text-red-700">Case Rejected</h1>
-        <p className="text-base">
-          <strong>&quot;{stats.activeCase.title}&quot;</strong> was rejected.
-        </p>
+        <p className="text-base"><strong>&quot;{stats.activeCase.title}&quot;</strong> was rejected.</p>
         {stats.activeCase.rejectionReason && (
           <div className="rounded-lg bg-white dark:bg-card border p-4 text-left text-sm">
             <p className="font-semibold mb-1">Reason:</p>
-            <p className="text-muted-foreground whitespace-pre-wrap">
-              {stats.activeCase.rejectionReason}
-            </p>
+            <p className="text-muted-foreground whitespace-pre-wrap">{stats.activeCase.rejectionReason}</p>
           </div>
         )}
         <div className="flex flex-col gap-3">
-          <Button className="w-full" onClick={startFreshCase}>
-            Submit a New Case
-          </Button>
-          <Button variant="outline" asChild className="w-full">
-            <Link to="/home">Back to Home</Link>
-          </Button>
+          <Button className="w-full" onClick={startFreshCase}>Submit a New Case</Button>
+          <Button variant="outline" asChild className="w-full"><Link to="/home">Back to Home</Link></Button>
         </div>
       </div>
     );
   }
 
-  // Main form steps
   return shell(
     <>
       {allowEarlyFlow && cooldown.phase === "early_available" && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
-          <p className="font-semibold text-amber-900 dark:text-amber-100">
-            Early review request
-          </p>
-          <p className="text-xs text-amber-900/80 dark:text-amber-100/80 mt-1">
-            Admin will review this as an early request. Approval is not
-            guaranteed.
-          </p>
+          <p className="font-semibold text-amber-900 dark:text-amber-100">Early review request</p>
+          <p className="text-xs text-amber-900/80 dark:text-amber-100/80 mt-1">Admin will review this as an early request. Approval is not guaranteed.</p>
         </div>
       )}
-
-      <StepProgress
-        current={Math.max(currentIndex + 1, 1)}
-        total={Math.max(totalSteps, 1)}
-      />
+      <StepProgress current={Math.max(currentIndex + 1, 1)} total={Math.max(totalSteps, 1)} />
       <div className="mt-6">
-        {CurrentStepComponent && (
-          <CurrentStepComponent key={currentStepId} {...stepProps} />
-        )}
+        {CurrentStepComponent && <CurrentStepComponent key={currentStepId} {...stepProps} />}
       </div>
       {currentIndex > 0 && (
-        <p className="mt-4 text-xs text-muted-foreground text-center">
-          Your progress is saved automatically.
-        </p>
+        <p className="mt-4 text-xs text-muted-foreground text-center">Your progress is saved automatically.</p>
       )}
     </>
   );
