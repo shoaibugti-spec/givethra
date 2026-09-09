@@ -221,6 +221,17 @@ export default function MyCasesPage() {
           </div>
         )}
 
+        {statusKey === "completed" && (c.payment_transaction_id || c.payment_receipt_url) && (
+          <div className="rounded-xl border border-teal-200 bg-teal-50/60 p-3 space-y-2 text-xs text-teal-800">
+            <p className="font-semibold">Payment received and verified</p>
+            {c.payment_transaction_id && <p>TXN: <span className="font-mono font-medium">{c.payment_transaction_id}</span></p>}
+            <div className="flex flex-wrap gap-2">
+              {c.payment_receipt_url && <a href={c.payment_receipt_url} target="_blank" rel="noopener noreferrer" className="rounded-md border border-teal-300 bg-white px-2.5 py-1.5 font-medium hover:bg-teal-100">View payment proof</a>}
+              <button type="button" onClick={() => window.open(`/affidavit/${encodeURIComponent(c.id)}`, "_blank", "noopener,noreferrer")} className="rounded-md border border-teal-300 bg-white px-2.5 py-1.5 font-medium hover:bg-teal-100">View affidavit</button>
+            </div>
+          </div>
+        )}
+
         {isExpired && (
           <div className="space-y-3">
             <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">

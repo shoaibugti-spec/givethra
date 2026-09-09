@@ -467,6 +467,7 @@ export default function MyHelpPage() {
                               {record.amount > 0 && <span className="font-medium text-foreground">{s} {record.amount} {cur}</span>}
                             </div>
                             {record.transactionId && <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{record.transactionId}</span></p>}
+                            {record.receiptUrl && <a href={record.receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex text-xs font-medium text-primary hover:underline">View payment proof</a>}
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -512,6 +513,7 @@ export default function MyHelpPage() {
                             {record.amount > 0 && <span className="font-medium text-foreground">{s} {record.amount} {cur}</span>}
                           </div>
                           {record.transactionId && <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{record.transactionId}</span></p>}
+                          {record.receiptUrl && <a href={record.receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex text-xs font-medium text-primary hover:underline">View payment proof</a>}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">

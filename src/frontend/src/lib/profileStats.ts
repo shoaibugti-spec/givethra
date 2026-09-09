@@ -68,10 +68,14 @@ export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): 
   const safeUnlocks = Array.isArray(unlocks) ? unlocks : [];
   const safeResolutions = Array.isArray(resolutions) ? resolutions : [];
 
-  const helpUnlocks = safeUnlocks.filter(isHelpUnlock);
-
   const completedResolutions = safeResolutions.filter(isTrulyCompletedHelp);
   const resolvedCaseIds = new Set(completedResolutions.map((resolution) => String(resolution.case_id)));
+  const helpCaseIds = new Set([
+    ...safeUnlocks
+      .filter((unlock) => isHelpUnlock(unlock) || resolvedCaseIds.has(String(unlock?.case_id)))
+      .map((unlock) => String(unlock.case_id)),
+    ...completedResolutions.map((resolution) => String(resolution.case_id)),
+  ].filter((caseId) => caseId && caseId !== "undefined"));
 
   let directHelps = 0;
   let contributions = 0;
@@ -88,12 +92,12 @@ export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): 
   }
 
   return {
-    totalUnlocks: helpUnlocks.length,
+    totalUnlocks: helpCaseIds.size,
     directHelps,
     contributions,
     totalAmountHelped,
     amountByCurrency,
-    activeUnlocked: helpUnlocks.filter((unlock) => !resolvedCaseIds.has(String(unlock.case_id))).length,
+    activeUnlocked: [...helpCaseIds].filter((caseId) => !resolvedCaseIds.has(caseId)).length,
   };
 }
 

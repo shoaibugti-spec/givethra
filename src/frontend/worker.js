@@ -676,8 +676,8 @@ async function handleCases(request, env, user, url, parts, origin) {
       const publicVisitor = !user;
       const visibility = isAdmin(user) || publicVisitor ? " AND lower(status) IN ('approved', 'published', 'active', 'completed')" : " AND (user_id = ? OR lower(status) IN ('approved', 'published', 'active', 'completed'))";
       const params = isAdmin(user) || publicVisitor ? ids : [...ids, user.user_id];
-      const rows = await env.DB.prepare(`SELECT * FROM case_submissions WHERE id IN (${placeholders})${visibility}`).bind(...params).all();
-      const found = new Map((rows.results || []).map((row) => [row.id, decodeCaseRow(row)]));
+      const rows = await env.DB.prepare(`SELECT c.*, CASE WHEN EXISTS (SELECT 1 FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed') THEN 'completed' ELSE c.status END AS effective_status, (SELECT r.transaction_id FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_transaction_id, (SELECT r.receipt_url FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_receipt_url FROM case_submissions c WHERE c.id IN (${placeholders})${visibility.replace(/status/g, "c.status")}`).bind(...params).all();
+      const found = new Map((rows.results || []).map((row) => [row.id, decodeCaseRow({ ...row, status: row.effective_status || row.status })]));
       return json(ids.map((value) => found.get(value)).filter(Boolean), 200, origin);
     }
     if (parts[2] && parts[2] !== "counts" && parts[2] !== "category-counts") {
@@ -722,9 +722,9 @@ async function handleCases(request, env, user, url, parts, origin) {
       const counts = Object.fromEntries((rows.results || []).filter((row) => row.category).map((row) => [row.category, Number(row.count || 0)]));
       return json(counts, 200, origin);
     }
-    const sql = target ? "SELECT * FROM case_submissions WHERE user_id = ? ORDER BY submitted_at DESC" : "SELECT * FROM case_submissions ORDER BY submitted_at DESC";
+    const sql = target ? "SELECT c.*, CASE WHEN EXISTS (SELECT 1 FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed') THEN 'completed' ELSE c.status END AS effective_status, (SELECT r.transaction_id FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_transaction_id, (SELECT r.receipt_url FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_receipt_url FROM case_submissions c WHERE c.user_id = ? ORDER BY c.submitted_at DESC" : "SELECT c.*, CASE WHEN EXISTS (SELECT 1 FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed') THEN 'completed' ELSE c.status END AS effective_status, (SELECT r.transaction_id FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_transaction_id, (SELECT r.receipt_url FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_receipt_url FROM case_submissions c ORDER BY c.submitted_at DESC";
     const rows = target ? await env.DB.prepare(sql).bind(target).all() : await env.DB.prepare(sql).all();
-    return json((rows.results || []).map(decodeCaseRow), 200, origin);
+    return json((rows.results || []).map((row) => decodeCaseRow({ ...row, status: row.effective_status || row.status })), 200, origin);
   }
   if (request.method === "POST" && !parts[2]) {
     if (!user) return json({ error: "Authentication required" }, 401, origin);

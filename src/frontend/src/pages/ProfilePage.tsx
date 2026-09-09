@@ -640,8 +640,8 @@ export default function ProfilePage() {
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
               <div className="text-2xl font-bold text-foreground">
                 {Object.entries(heroStats.amountByCurrency).length > 0
-                  ? Object.entries(heroStats.amountByCurrency).map(([currency, amount]) => `${currency} ${amount.toFixed(2)}`).join(" · ")
-                  : "USD 0.00"}
+                  ? Object.values(heroStats.amountByCurrency).map((amount) => amount.toFixed(2)).join(" · ")
+                  : "0.00"}
               </div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <HandCoins className="h-3 w-3" /> Total Amount Helped
@@ -707,8 +707,8 @@ export default function ProfilePage() {
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
               <div className="text-2xl font-bold text-green-600">
                 {Object.entries(requesterStats.helpByCurrency).length > 0
-                  ? Object.entries(requesterStats.helpByCurrency).map(([currency, amount]) => `${currency} ${amount.toFixed(2)}`).join(" · ")
-                  : "PKR 0.00"}
+                  ? Object.values(requesterStats.helpByCurrency).map((amount) => amount.toFixed(2)).join(" · ")
+                  : "0.00"}
               </div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <HeartHandshake className="h-3 w-3" /> Total Help Received
@@ -762,7 +762,7 @@ export default function ProfilePage() {
                 <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-border p-3">
                   <span className="text-sm font-medium truncate">{r.case_title || `Case #${r.case_id ?? r.id}`}</span>
                   <span className="shrink-0 text-xs font-semibold text-green-600">
-                    {r.seeker_confirmed_amount ?? r.amount_paid ? `$${Number(r.seeker_confirmed_amount ?? r.amount_paid).toFixed(2)}` : ""}
+                    {r.seeker_confirmed_amount ?? r.amount_paid ? Number(r.seeker_confirmed_amount ?? r.amount_paid).toFixed(2) : ""}
                   </span>
                 </div>
               ))}
