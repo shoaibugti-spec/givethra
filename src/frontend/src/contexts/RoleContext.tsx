@@ -14,7 +14,24 @@ interface RoleContextType {
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>(null);
+  const [role, setRoleState] = useState<Role>(() => {
+    try {
+      const stored = window.localStorage.getItem("givethra_role");
+      return stored === "hero" || stored === "help_seeker" || stored === "requester" ? stored === "help_seeker" ? "requester" : stored : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const setRole = (nextRole: Role) => {
+    setRoleState(nextRole);
+    try {
+      if (nextRole) window.localStorage.setItem("givethra_role", nextRole === "requester" ? "help_seeker" : nextRole);
+      else window.localStorage.removeItem("givethra_role");
+    } catch {
+      // Storage restrictions must never block role switching.
+    }
+  };
 
   const clearRole = () => setRole(null);
 

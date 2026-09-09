@@ -98,6 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<UserPublic | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<UserRole>(() => {
+    const stored = safeLocalGet(ROLE_KEY);
+    return stored === "hero" || stored === "help_seeker" ? stored : null;
+  });
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -274,14 +278,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = "/";
   }, [queryClient]);
 
-  const storedRole = (safeLocalGet(ROLE_KEY) as UserRole) ?? null;
   const setRole = (r: UserRole) => {
     if (r) safeLocalSet(ROLE_KEY, r);
     else safeLocalRemove(ROLE_KEY);
+    setSelectedRole(r);
   };
 
   const isAuthenticated = !!userId && !!user;
-  const role: UserRole = isAuthenticated ? storedRole : null;
+  const role: UserRole = isAuthenticated ? selectedRole : null;
   const isAdmin = isAuthenticated && user?.email === ADMIN_EMAIL;
   const isAssistant = isAuthenticated && user?.email === ASSISTANT_EMAIL;  // ✅ نیا
 
