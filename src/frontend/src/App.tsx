@@ -262,6 +262,7 @@ function RootLayout() {
           "/community",
           "/heroes-wall",
           "/kindness-wall",
+          "/need-help",
         ];
         const isPublic = publicPaths.includes(location.pathname);
         const isRequester = role === "requester";
@@ -308,6 +309,7 @@ function RootLayout() {
         "/community",
         "/heroes-wall",
         "/kindness-wall",
+        "/need-help",
       ];
       if (!publicPaths.includes(location.pathname)) {
         navigate({ to: "/" });

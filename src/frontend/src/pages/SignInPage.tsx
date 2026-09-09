@@ -10,6 +10,7 @@ export default function SignInPage() {
   const navigate = useNavigate();
   const { loginWithGoogle, isLoggingIn, isAuthenticated, loginError, setRole: setAuthRole } = useAuth();
   const { setRole: setSelectedRole } = useRole();
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
 
   useEffect(() => {
     const selected = new URLSearchParams(window.location.search).get("role");
@@ -20,8 +21,10 @@ export default function SignInPage() {
   }, [setAuthRole, setSelectedRole]);
 
   useEffect(() => {
-    if (isAuthenticated) navigate({ to: "/" });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) {
+      navigate({ to: redirect === "/need-help" ? "/need-help" : "/" });
+    }
+  }, [isAuthenticated, navigate, redirect]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

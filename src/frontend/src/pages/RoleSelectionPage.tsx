@@ -42,7 +42,7 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getApprovedCases, getKycStatus } from "@/lib/api";
+import { getApprovedCases } from "@/lib/api";
 
 const COMMUNITY_SLIDES = [
   { icon: <Users className="w-8 h-8" />, title: "Community", desc: "Connect with people who care" },
@@ -87,7 +87,7 @@ const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
 
 export default function RoleSelectionPage() {
-  const { isAuthenticated, user, setRole: setAuthRole } = useAuth();
+  const { setRole: setAuthRole } = useAuth();
   const { setRole } = useRole();
   const navigate = useNavigate();
 
@@ -145,33 +145,11 @@ export default function RoleSelectionPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // 🔥 Requester button handler – now redirects to NeedHelpPage after KYC
-  const handleRequesterClick = async () => {
+  // Requester always opens Need Help first; that page owns sign-in and KYC handoff.
+  const handleRequesterClick = () => {
     setRole("requester");
     setAuthRole("help_seeker");
-
-    if (!isAuthenticated) {
-      navigate({
-        to: "/sign-in",
-        search: {
-          role: "requester",
-          redirect: "/need-help", // <-- now goes to NeedHelpPage
-        },
-      });
-      return;
-    }
-
-    try {
-      const kyc = await getKycStatus(user!.id);
-      const status = String(kyc?.status || "none").trim().toLowerCase();
-      if (status === "approved") {
-        navigate({ to: "/need-help" }); // <-- KYC approved → NeedHelpPage
-      } else {
-        navigate({ to: "/kyc" });
-      }
-    } catch {
-      navigate({ to: "/kyc" });
-    }
+    navigate({ to: "/need-help" });
   };
 
   const SlideContent = ({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) => (
