@@ -46,7 +46,7 @@ export default function StepWhyHelp({
           <p className={isValid ? "text-green-600 font-medium" : "text-amber-700 dark:text-amber-400"}>
             {isValid
               ? `✓ ${words} words — you can continue`
-              : `${words} words so far — at least \( {MIN_WORDS} required ( \){remaining} more)`}
+              : `${words} words so far — at least ${MIN_WORDS} required (${remaining} more)`}
           </p>
           <p className="text-muted-foreground tabular-nums">
             {words} / {MIN_WORDS}+

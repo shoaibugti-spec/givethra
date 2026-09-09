@@ -75,6 +75,10 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
       gender_doc_urls: genderDocUrls,
       cat_doc_urls: catDocUrls,
       ref_number: formData.refNumber || "",
+      institute_name: formData.instituteName || formData.catFields?.institute_name || "",
+      property_rental_agreement_url: formData.rentalAgreementUrl || "",
+      property_landlord_cnic_url: formData.landlordCnicUrl || "",
+      property_owner_cnic_url: formData.ownerCnicUrl || "",
       // Early request after completed case (15–30 day window)
       is_early_request: isEarlyRequest,
       was_early_request: isEarlyRequest,

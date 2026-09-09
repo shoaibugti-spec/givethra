@@ -208,25 +208,31 @@ export default function SubmitRequestWizard() {
   }, []);
 
   const handleSubmit = useCallback(async () => {
+    // Read the latest controlled state and normalize legacy/string draft values.
+    // This prevents a checked Terms box from racing the final validation pass.
+    const latest = formDataRef.current;
+    if (latest.confirmed === "true" || latest.confirmed === 1) {
+      latest.confirmed = true;
+    }
     for (const stepId of visibleStepIdsRef.current) {
-      const error = validateStep(stepId, formDataRef.current);
+      const error = validateStep(stepId, latest);
       if (error) {
         toast.error(error);
         setCurrentStepId(stepId);
         return;
       }
     }
-    if (!formDataRef.current.confirmed) {
+    if (latest.confirmed !== true) {
       toast.error("You must agree to the Terms & Conditions.");
       setCurrentStepId("terms");
       return;
     }
-    if (!formDataRef.current.selfieUrl) {
+    if (!latest.selfieUrl) {
       toast.error("Please take a live selfie");
       setCurrentStepId("selfie");
       return;
     }
-    if (!formDataRef.current.videoUrl) {
+    if (!latest.videoUrl) {
       toast.error("Please record a video appeal");
       setCurrentStepId("video");
       return;
@@ -236,7 +242,7 @@ export default function SubmitRequestWizard() {
 
     setSubmitting(true);
     try {
-      const payload = { ...formDataRef.current, isEarlyRequest: isEarly };
+      const payload = { ...latest, confirmed: true, isEarlyRequest: isEarly };
       const result = await submitCase(payload, user!.id, willBeFree);
       clearDraft();
       setForceNewCase(false);
