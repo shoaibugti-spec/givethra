@@ -184,12 +184,14 @@ export default function ProfilePage() {
     totalCompleted: 0,
     totalExpired: 0,
     totalHelpReceived: 0,
+    helpByCurrency: {},
   });
   const [heroStats, setHeroStats] = useState<HeroStats>({
     totalUnlocks: 0,
     directHelps: 0,
     contributions: 0,
     totalAmountHelped: 0,
+    amountByCurrency: {},
     activeUnlocked: 0,
   });
   const [helpedCases, setHelpedCases] = useState<any[]>([]);
@@ -637,7 +639,9 @@ export default function ProfilePage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
               <div className="text-2xl font-bold text-foreground">
-                {`$${heroStats.totalAmountHelped.toFixed(2)}`}
+                {Object.entries(heroStats.amountByCurrency).length > 0
+                  ? Object.entries(heroStats.amountByCurrency).map(([currency, amount]) => `${currency} ${amount.toFixed(2)}`).join(" · ")
+                  : "USD 0.00"}
               </div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <HandCoins className="h-3 w-3" /> Total Amount Helped
@@ -702,7 +706,9 @@ export default function ProfilePage() {
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
               <div className="text-2xl font-bold text-green-600">
-                {`$${requesterStats.totalHelpReceived.toFixed(2)}`}
+                {Object.entries(requesterStats.helpByCurrency).length > 0
+                  ? Object.entries(requesterStats.helpByCurrency).map(([currency, amount]) => `${currency} ${amount.toFixed(2)}`).join(" · ")
+                  : "PKR 0.00"}
               </div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <HeartHandshake className="h-3 w-3" /> Total Help Received

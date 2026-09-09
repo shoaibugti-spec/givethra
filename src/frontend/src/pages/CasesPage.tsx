@@ -160,6 +160,9 @@ export default function CasesPage() {
   });
 
   filtered = [...filtered].sort((a, b) => {
+    const activeRank = (status: unknown) => ["active", "live"].includes(String(status || "").toLowerCase()) ? 1 : 0;
+    const activeDifference = activeRank(b.status) - activeRank(a.status);
+    if (activeDifference !== 0) return activeDifference;
     if (sortBy === "newest")
       return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
     if (sortBy === "oldest")
@@ -176,6 +179,14 @@ export default function CasesPage() {
   const activeFilterCount = [filterCountry, filterCity, filterCat, filterUrgency].filter(
     (f) => f !== "all"
   ).length;
+  const categoryTabs = [
+    { label: "All", value: "all", count: cases.length },
+    ...CATEGORIES.map((category) => ({
+      label: category,
+      value: category,
+      count: cases.filter((item) => item.category === category).length,
+    })).filter((item) => item.count > 0),
+  ];
 
   function resetFilters() {
     setFilterCountry("all");
@@ -209,6 +220,23 @@ export default function CasesPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10 h-11"
           />
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide" aria-label="Case category tabs">
+          {categoryTabs.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setFilterCat(tab.value)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                filterCat === tab.value
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/50"
+              }`}
+            >
+              {tab.label} <span className="ml-1 opacity-75">{tab.count}</span>
+            </button>
+          ))}
         </div>
 
         <div className="flex gap-2">

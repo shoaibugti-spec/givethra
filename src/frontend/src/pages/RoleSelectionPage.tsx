@@ -86,12 +86,6 @@ const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
 
-const ROLE_HUB_SLIDES = [
-  { icon: <ShieldCheck className="h-8 w-8" />, title: "Verified Help", description: "Real people and genuine needs, carefully reviewed." },
-  { icon: <HeartHandshake className="h-8 w-8" />, title: "Real Impact", description: "Small acts of kindness become meaningful change." },
-  { icon: <Globe className="h-8 w-8" />, title: "Global Community", description: "Connect with people who care across borders." },
-  { icon: <Lock className="h-8 w-8" />, title: "Safe & Private", description: "Identity and personal documents stay protected." },
-];
 
 function SignInLandingPage({ onSignIn }: { onSignIn: () => void }) {
   return (
@@ -170,6 +164,7 @@ export default function RoleSelectionPage() {
           }),
         ]
       : [{ icon: <Bell className="w-8 h-8" />, title: "No active cases", desc: "Check back soon" }];
+  const roleHubSlides = [...activeSlides, ...COMMUNITY_SLIDES, ...HERO_SLIDES, ...REQUESTER_SLIDES];
 
   const [communityIndex, setCommunityIndex] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -201,13 +196,13 @@ export default function RoleSelectionPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setRoleHubSlideIndex((previous) => {
-        const next = (previous + 1) % ROLE_HUB_SLIDES.length;
+        const next = (previous + 1) % roleHubSlides.length;
         roleHubSliderRef.current?.children[next]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
         return next;
       });
     }, 4500);
     return () => clearInterval(interval);
-  }, []);
+  }, [roleHubSlides.length]);
 
   // Requester always opens Need Help first; that page owns sign-in and KYC handoff.
   const handleRequesterClick = () => {
@@ -241,11 +236,11 @@ export default function RoleSelectionPage() {
       <div className="max-w-4xl w-full space-y-12">
         <div className="space-y-4">
           <div ref={roleHubSliderRef} data-slide-index={roleHubSlideIndex} className="flex snap-x snap-mandatory overflow-x-auto rounded-3xl scrollbar-hide" aria-label="Givethra highlights">
-            {ROLE_HUB_SLIDES.map((slide) => (
-              <div key={slide.title} className="min-w-full snap-center rounded-3xl bg-gradient-to-br from-primary/10 via-card to-teal-50 px-6 py-8 text-center shadow-sm">
+            {roleHubSlides.map((slide, index) => (
+              <div key={`${slide.title}-${index}`} className="min-w-full snap-center rounded-3xl bg-gradient-to-br from-primary/10 via-card to-teal-50 px-6 py-8 text-center shadow-sm">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">{slide.icon}</div>
                 <h1 className="mt-3 text-2xl font-bold text-foreground md:text-3xl">{slide.title}</h1>
-                <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">{slide.description}</p>
+                <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">{slide.desc}</p>
               </div>
             ))}
           </div>

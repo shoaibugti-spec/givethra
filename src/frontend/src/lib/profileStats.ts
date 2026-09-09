@@ -33,6 +33,7 @@ export interface HeroStats {
   directHelps: number;
   contributions: number;
   totalAmountHelped: number;
+  amountByCurrency: Record<string, number>;
   activeUnlocked: number;
 }
 
@@ -43,6 +44,7 @@ export interface RequesterStats {
   totalCompleted: number;
   totalExpired: number;
   totalHelpReceived: number;
+  helpByCurrency: Record<string, number>;
 }
 
 // Unlock rows can have payment_type "full", "partial", or "media"
@@ -74,9 +76,13 @@ export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): 
   let directHelps = 0;
   let contributions = 0;
   let totalAmountHelped = 0;
+  const amountByCurrency: Record<string, number> = {};
 
   for (const resolution of completedResolutions) {
-    totalAmountHelped += Number(resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? 0) || 0;
+    const amount = Number(resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? 0) || 0;
+    const currency = String(resolution.currency || resolution.case_currency || "USD").toUpperCase();
+    totalAmountHelped += amount;
+    amountByCurrency[currency] = (amountByCurrency[currency] || 0) + amount;
     if (isContributionResolution(resolution)) contributions += 1;
     else directHelps += 1;
   }
@@ -86,6 +92,7 @@ export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): 
     directHelps,
     contributions,
     totalAmountHelped,
+    amountByCurrency,
     activeUnlocked: helpUnlocks.filter((unlock) => !resolvedCaseIds.has(String(unlock.case_id))).length,
   };
 }
@@ -95,6 +102,7 @@ export function computeRequesterStats(cases: any[] = []): RequesterStats {
   const norm = (item: any) => String(item?.status || "pending").trim().toLowerCase();
   const completedCases = safeCases.filter((item) => norm(item) === "completed");
 
+  const helpByCurrency: Record<string, number> = {};
   const totalHelpReceived = completedCases.reduce((sum, item) => {
     const collected = Number(item?.amount_collected ?? 0) || 0;
     const needed = Number(item?.amount_needed ?? 0) || 0;
@@ -103,6 +111,8 @@ export function computeRequesterStats(cases: any[] = []): RequesterStats {
     // amount_needed so direct-payment cases (which may not update
     // amount_collected) still count correctly.
     const receivedForCase = collected > 0 ? collected : needed;
+    const currency = String(item?.currency || "PKR").toUpperCase();
+    helpByCurrency[currency] = (helpByCurrency[currency] || 0) + receivedForCase;
     return sum + receivedForCase;
   }, 0);
 
@@ -113,5 +123,6 @@ export function computeRequesterStats(cases: any[] = []): RequesterStats {
     totalCompleted: completedCases.length,
     totalExpired: safeCases.filter((item) => norm(item) === "expired").length,
     totalHelpReceived,
+    helpByCurrency,
   };
 }
