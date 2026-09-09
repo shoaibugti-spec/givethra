@@ -4,6 +4,13 @@ import { sendNotification } from "@/lib/notify";
 import { calculateDebtAmount } from "../constants";
 
 export async function submitCase(formData: any, userId: string, isFree: boolean) {
+  const requirePermanentUrl = (value: unknown, label: string): string => {
+    const url = String(value || "").trim();
+    if (!/^https:\/\//i.test(url) || /^blob:/i.test(url) || /^data:/i.test(url)) {
+      throw new Error(`${label} upload is incomplete. Please upload it again before submitting.`);
+    }
+    return url;
+  };
   let finalAmount = 0;
   const category = formData.category;
 
@@ -84,8 +91,8 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
       was_early_request: isEarlyRequest,
     },
     photo_urls: photoUrls,
-    selfie_url: formData.selfieUrl,
-    video_url: formData.videoUrl,
+    selfie_url: requirePermanentUrl(formData.selfieUrl, "Selfie"),
+    video_url: requirePermanentUrl(formData.videoUrl, "Appeal video"),
     status: "pending",
     submitted_at: new Date().toISOString(),
     was_free: isFree,

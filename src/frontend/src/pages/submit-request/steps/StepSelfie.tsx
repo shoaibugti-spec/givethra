@@ -119,7 +119,7 @@ export default function StepSelfie({
 
       setUploading(true);
       const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
-      const path = `cases/\( {user.id}/ \){Date.now()}_selfie.jpg`;
+      const path = `cases/${user.id}/${Date.now()}_selfie.jpg`;
       const url = await uploadFileToStorage(file, path);
       setFormData((prev: any) => ({ ...prev, selfieUrl: url }));
       toast.success("Selfie uploaded");

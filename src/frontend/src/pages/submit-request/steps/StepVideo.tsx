@@ -275,7 +275,7 @@ export default function StepVideo({
     setError("");
     try {
       const file = new File([blob], "appeal.webm", { type: "video/webm" });
-      const path = `cases/\( {user.id}/ \){Date.now()}_appeal.webm`;
+      const path = `cases/${user.id}/${Date.now()}_appeal.webm`;
       const url = await uploadFileToStorage(file, path);
       setFormData((prev: any) => ({ ...prev, videoUrl: url }));
       toast.success("Video uploaded successfully (" + sizeMB.toFixed(1) + " MB)");
