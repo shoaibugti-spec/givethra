@@ -1415,9 +1415,13 @@ async function handleRequest(request, env, ctx) {
     return json({ valid: true, user }, 200, origin);
   }
 
-  // Public static assets
-  if (url.pathname.startsWith("/uploads/")) {
-    const key = url.pathname.slice(9);
+  // Public uploaded files. Older cases use /uploads?key=... while newer
+  // submissions use /uploads/<key>; serve both formats from the same R2 bucket.
+  if (url.pathname === "/uploads" || url.pathname.startsWith("/uploads/")) {
+    const key = url.pathname === "/uploads"
+      ? url.searchParams.get("key") || ""
+      : url.pathname.slice(9);
+    if (!key) return new Response("File not found", { status: 404 });
     try {
       const object = await env.UPLOADS.get(key);
       if (!object) return new Response("File not found", { status: 404 });

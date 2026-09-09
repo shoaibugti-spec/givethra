@@ -1341,6 +1341,20 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
       const name = file.original_name || file.filename || file.file_name || file.name;
       if (!label && typeof name === "string") label = name;
     }
+    // Older records may contain signed/query-style URLs such as
+    // /uploads?key=users/... . The Worker serves the same R2 object through
+    // the stable /uploads/<key> route, so normalize before rendering links.
+    try {
+      const parsed = new URL(url);
+      if (parsed.pathname === "/uploads" && parsed.searchParams.get("key")) {
+        const objectKey = parsed.searchParams.get("key") || "";
+        parsed.pathname = `/uploads/${objectKey}`;
+        parsed.search = "";
+        url = parsed.toString();
+      }
+    } catch {
+      // Invalid URLs are filtered below and never rendered as links.
+    }
     if (!url.startsWith("http")) return;
     if (fileEntries.some((f) => f.url === url)) return;
     fileEntries.push({ key, label: getFileLabel(key, url, label), url });
