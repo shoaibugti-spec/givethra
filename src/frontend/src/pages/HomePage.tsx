@@ -26,6 +26,7 @@ import { orderCasesForViewer } from "@/lib/caseOrdering";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   BadgeCheck,
+  Briefcase,
   Building2,
   MailCheck,
   Phone,
@@ -260,6 +261,37 @@ const TRUST_BADGES = [
     color: "text-orange-600",
   },
 ];
+
+function RoleHomeDashboard({ role }: { role: string | null }) {
+  const isHero = role === "hero";
+  return (
+    <Layout>
+      <div className="min-h-[70vh] bg-background px-4 py-10 pb-24">
+        <div className="mx-auto max-w-4xl space-y-8">
+          <section className="rounded-3xl bg-gradient-to-br from-primary/10 via-card to-teal-50 p-8 text-center shadow-sm">
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-primary">Givethra</p>
+            <h1 className="mt-3 text-3xl font-bold text-foreground md:text-5xl">{isHero ? "Welcome, Hero" : "Welcome, Requester"}</h1>
+            <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+              {isHero ? "Your kindness can create real impact. Manage your help and profile from here." : "Your verified journey starts here. Manage your cases and profile from one place."}
+            </p>
+          </section>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Link to={isHero ? "/my-help" : "/my-cases"} className="rounded-2xl border bg-card p-6 shadow-sm transition hover:border-primary hover:shadow-md">
+              <Briefcase className="h-7 w-7 text-primary" />
+              <h2 className="mt-4 text-lg font-bold">{isHero ? "My Help" : "My Cases"}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">View your {isHero ? "help activity and completed support" : "submitted cases and their approval status"}.</p>
+            </Link>
+            <Link to="/profile/$id" params={{ id: "me" }} className="rounded-2xl border bg-card p-6 shadow-sm transition hover:border-primary hover:shadow-md">
+              <BadgeCheck className="h-7 w-7 text-primary" />
+              <h2 className="mt-4 text-lg font-bold">My Accountability Profile</h2>
+              <p className="mt-1 text-sm text-muted-foreground">See role-specific totals, completed help, approvals, and history.</p>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -944,6 +976,9 @@ export default function HomePage() {
     );
   }
 
+  return <RoleHomeDashboard role={role} />;
+
+  /* Legacy browse dashboard retained below for reference; browsing now lives on /cases. */
   return (
     <Layout>
       <div className="bg-background pb-20 md:pb-0">
@@ -1161,7 +1196,7 @@ export default function HomePage() {
               <button
                 onClick={() => {
                   setFilterCountry(
-                    detectedCountry
+                    detectedCountry || "all"
                   );
 
                   if (detectedCity) {

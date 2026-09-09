@@ -41,7 +41,7 @@ import {
   Stethoscope,
   ShoppingCart,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getApprovedCases } from "@/lib/api";
 
 const COMMUNITY_SLIDES = [
@@ -85,6 +85,13 @@ const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
+
+const ROLE_HUB_SLIDES = [
+  { icon: <ShieldCheck className="h-8 w-8" />, title: "Verified Help", description: "Real people and genuine needs, carefully reviewed." },
+  { icon: <HeartHandshake className="h-8 w-8" />, title: "Real Impact", description: "Small acts of kindness become meaningful change." },
+  { icon: <Globe className="h-8 w-8" />, title: "Global Community", description: "Connect with people who care across borders." },
+  { icon: <Lock className="h-8 w-8" />, title: "Safe & Private", description: "Identity and personal documents stay protected." },
+];
 
 function SignInLandingPage({ onSignIn }: { onSignIn: () => void }) {
   return (
@@ -168,6 +175,8 @@ export default function RoleSelectionPage() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [heroIndex, setHeroIndex] = useState(0);
   const [requesterIndex, setRequesterIndex] = useState(0);
+  const roleHubSliderRef = useRef<HTMLDivElement>(null);
+  const [roleHubSlideIndex, setRoleHubSlideIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => setCommunityIndex(p => (p + 1) % COMMUNITY_SLIDES.length), 4000);
@@ -187,6 +196,16 @@ export default function RoleSelectionPage() {
 
   useEffect(() => {
     const interval = setInterval(() => setRequesterIndex(p => (p + 1) % REQUESTER_SLIDES.length), 4600);
+    return () => clearInterval(interval);
+  }, []);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRoleHubSlideIndex((previous) => {
+        const next = (previous + 1) % ROLE_HUB_SLIDES.length;
+        roleHubSliderRef.current?.children[next]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        return next;
+      });
+    }, 4500);
     return () => clearInterval(interval);
   }, []);
 
@@ -220,29 +239,17 @@ export default function RoleSelectionPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <div className="max-w-4xl w-full space-y-12">
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-3xl font-bold text-foreground">Givethra</span>
+        <div className="space-y-4">
+          <div ref={roleHubSliderRef} data-slide-index={roleHubSlideIndex} className="flex snap-x snap-mandatory overflow-x-auto rounded-3xl scrollbar-hide" aria-label="Givethra highlights">
+            {ROLE_HUB_SLIDES.map((slide) => (
+              <div key={slide.title} className="min-w-full snap-center rounded-3xl bg-gradient-to-br from-primary/10 via-card to-teal-50 px-6 py-8 text-center shadow-sm">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">{slide.icon}</div>
+                <h1 className="mt-3 text-2xl font-bold text-foreground md:text-3xl">{slide.title}</h1>
+                <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">{slide.description}</p>
+              </div>
+            ))}
           </div>
-          <div className="space-y-2">
-            <h1 className="text-4xl md:text-5xl font-bold text-foreground">
-              Verified Help.
-              <br className="sm:hidden" />
-              <span className="text-primary"> Real Impact.</span>
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              A trusted platform where real people with genuine needs get support
-              from kind-hearted Heroes.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate({ to: "/sign-in" })}
-              className="mx-auto inline-flex items-center justify-center rounded-full bg-primary px-7 py-3 text-sm font-bold text-primary-foreground shadow-md transition hover:bg-primary/90 active:scale-[.98]"
-            >
-              Sign in with Google
-            </button>
-          </div>
-          <p className="text-sm text-muted-foreground">How are you today?</p>
+          <p className="text-center text-sm text-muted-foreground">How are you today?</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:gap-5">
