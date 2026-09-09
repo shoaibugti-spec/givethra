@@ -1,5 +1,5 @@
 // src/frontend/src/pages/submit-request/steps/StepTerms.tsx
-// Full Terms & Conditions matching SubmitRequestPage
+// ✅ FIXED: Robust checkbox handling to ensure submission works perfectly
 
 import { StepNavigation } from "../shared/StepNavigation";
 import { StepGuide } from "../shared/StepGuide";
@@ -13,7 +13,13 @@ export default function StepTerms({
   isLast,
   submitting,
 }: any) {
+  // یقینی بنائیں کہ value ہمیشہ boolean کے طور پر پڑھی جائے
   const confirmed = !!value;
+
+  // چیک باکس کے لیے الگ اور واضح فنکشن
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.checked);
+  };
 
   return (
     <div className="space-y-6">
@@ -88,16 +94,20 @@ export default function StepTerms({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* ✅ چیک باکس کو زیادہ واضح اور قابلِ کلک بنایا گیا ہے */}
+        <div className="flex items-start gap-3 p-4 rounded-xl border border-primary/20 bg-primary/5">
           <input
             type="checkbox"
             id="termsCheckWizard"
             checked={confirmed}
-            onChange={(e) => onChange(e.target.checked)}
-            className="h-4 w-4"
+            onChange={handleCheckboxChange}
+            className="h-5 w-5 mt-0.5 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary/50 cursor-pointer"
           />
-          <label htmlFor="termsCheckWizard" className="text-sm">
-            I have read all the Terms & Conditions and I agree to them.
+          <label 
+            htmlFor="termsCheckWizard" 
+            className="text-sm font-medium cursor-pointer select-none leading-snug"
+          >
+            I have read all the Terms & Conditions and I <strong>fully agree</strong> to them.
           </label>
         </div>
       </div>
