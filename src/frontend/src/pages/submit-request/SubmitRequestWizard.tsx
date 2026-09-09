@@ -5,7 +5,9 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { MessageCircle } from "lucide-react";
+
+// ✅ نیا امپورٹ: آپ کا اپنا بنایا ہوا TopBar کمپوننٹ
+import SubmitTopBar from "./shared/TopBar";
 
 import StepCategory from "./steps/StepCategory";
 import StepTitle from "./steps/StepTitle";
@@ -24,8 +26,7 @@ import StepJobStatus from "./steps/StepJobStatus";
 import StepJobDocuments from "./steps/StepJobDocuments";
 import StepNoJobDocument from "./steps/StepNoJobDocument";
 import StepCategoryDetails from "./steps/StepCategoryDetails";
-// FIX 1: املا کی درستگی (اگر آپ کی فائل کا نام بھی غلط ہے، تو اسے Rename کر کے Property کر لیں)
-import StepPropertyOwnership from "./steps/StepPropertyOwnership"; 
+import StepPropertyOwnership from "./steps/StepPropertyOwnership";
 import StepRentedDocuments from "./steps/StepRentedDocuments";
 import StepOwnedDocuments from "./steps/StepOwnedDocuments";
 import StepPaymentReceiver from "./steps/StepPaymentReceiver";
@@ -47,9 +48,6 @@ import { formatRemaining } from "@/lib/completionCooldown";
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
 
-const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
-const SUPPORT_WHATSAPP_URL = "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
-
 const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   category: StepCategory,
   title: StepTitle,
@@ -68,7 +66,7 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   jobDocuments: StepJobDocuments,
   noJobDocument: StepNoJobDocument,
   categoryDetails: StepCategoryDetails,
-  propertyOwnership: StepPropertyOwnership, // FIX 1 Applied Here
+  propertyOwnership: StepPropertyOwnership,
   rentedDocuments: StepRentedDocuments,
   ownedDocuments: StepOwnedDocuments,
   paymentReceiver: StepPaymentReceiver,
@@ -108,27 +106,6 @@ const INITIAL_FORM = {
   deadline: "", selfieUrl: "", videoUrl: "", confirmed: false, isEarlyRequest: false,
 };
 
-function WizardTopBar({ isFree, balance }: { isFree: boolean; balance: number }) {
-  return (
-    <div className="mb-4 rounded-xl border-2 border-green-500 bg-green-50 dark:bg-green-950/30 p-4 space-y-3">
-      <div className="flex justify-center">
-        <span className={isFree ? "text-green-700 font-bold text-base" : "text-primary font-bold text-base"}>
-          {isFree ? "FREE Case" : `Credits: ${balance}`}
-        </span>
-      </div>
-      <div className="flex items-center justify-center gap-3 flex-wrap text-sm">
-        <a href={WHATSAPP_CHANNEL_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-green-700 hover:underline">
-          <MessageCircle className="h-4 w-4 shrink-0" /> WhatsApp Channel
-        </a>
-        <span className="text-muted-foreground">|</span>
-        <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline">
-          <MessageCircle className="h-4 w-4 shrink-0" /> 24/7 Support
-        </a>
-      </div>
-    </div>
-  );
-}
-
 export default function SubmitRequestWizard() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -154,7 +131,6 @@ export default function SubmitRequestWizard() {
   const willBeFree = canUseFree;
   const balance = stats.balance ?? 0;
 
-  // Refs for stable access inside callbacks/timeouts
   const currentStepIdRef = useRef(currentStepId);
   currentStepIdRef.current = currentStepId;
   const formDataRef = useRef(formData);
@@ -304,7 +280,6 @@ export default function SubmitRequestWizard() {
     setForceNewCase(true);
   }, [clearDraft]);
 
-  // FIX 2: Prevent undefined value crashes by providing a fallback empty string
   const currentValue =
     currentStepId === "whyHelp"
       ? formData.description
@@ -342,15 +317,15 @@ export default function SubmitRequestWizard() {
     }
 
     return { ...common, ...extra };
-    // FIX 3: Cleaned up dependency array for stability
   }, [currentStepId, currentValue, stableOnChange, handleNext, handleBack, handleSubmit, isFirst, isLast, submitting, willBeFree, stats.isFreeDisabled, stats.freeCasesUsed, formData, stableSetFormData, needsFormData]);
 
   const CurrentStepComponent = STEP_COMPONENTS[currentStepId];
 
+  // ✅ یہاں اب صرف آپ کا نیا SubmitTopBar استعمال ہوگا
   const shell = (body: React.ReactNode) => (
     <Layout>
       <div className="max-w-2xl mx-auto px-4 py-6">
-        <WizardTopBar isFree={willBeFree} balance={balance} />
+        <SubmitTopBar isFree={willBeFree} balance={balance} />
         {body}
       </div>
     </Layout>
