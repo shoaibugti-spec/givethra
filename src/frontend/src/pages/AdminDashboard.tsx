@@ -67,6 +67,8 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 const DOC_LABELS: Record<string, string> = {
   salary_slip: "Salary Slip (6 Months)",
   statement: "Bank Statement (6 Months)",
+  statement_url: "Bank Statement (6 Months)",
+  salary_slip_url: "Salary Slip (6 Months)",
   nikah_nama: "Nikah Nama",
   frc: "Family Registration Certificate (FRC)",
   b_form: "B-Form (Child ID)",
@@ -166,6 +168,31 @@ const DOC_LABELS: Record<string, string> = {
   shop_agreement_url: "Shop Agreement",
   business_proof_url: "Business Proof",
   disability_certificate_url: "Disability Certificate",
+  selfie: "Case Selfie",
+  video: "Case Appeal Video",
+  salarySlipUrl: "Salary Slip (6 Months)",
+  statementUrl: "Bank Statement (6 Months)",
+  rentalAgreementUrl: "Rental Agreement",
+  landlordCnicUrl: "Landlord's CNIC",
+  ownerCnicUrl: "Owner's CNIC",
+  death_cert: "Death Certificate",
+  death_certificate: "Death Certificate",
+  medical_bill: "Medical Bill",
+  medicine_estimate: "Medicine Estimate",
+  groceries_estimate: "Grocery Estimate",
+  repair_estimate: "Repair Estimate",
+  business_quotation: "Business Quotation",
+  business_proof: "Business Proof",
+  livestock_quotation: "Livestock Quotation",
+  livestock_proof: "Livestock Proof",
+  marriage_quotation: "Marriage Quotation",
+  debt_proof: "Debt Proof",
+  emergency_proof: "Emergency Proof",
+  child_b_form: "Child B-Form",
+  parents_proof: "Parents' Proof",
+  cnic: "CNIC",
+  cat_doc_urls: "Category Documents",
+  gender_doc_urls: "Identity Documents",
 };
 
 function getDocLabel(key: string): string {
@@ -1183,6 +1210,8 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     const excludeKeys = new Set([
       "_documents", "edu_documents", "edu_sub_fields", "property_ownership",
       "rental_agreement_url", "landlord_cnic_url", "job_status", "gender",
+      "statement_url", "salary_slip_url", "owner_cnic_url", "property_rental_agreement_url",
+      "property_landlord_cnic_url", "property_owner_cnic_url", "owner_relation",
       "marital_status", "is_orphan", "orphan_parent", "seeker_name",
       "seeker_contact", "receiver_name", "receiver_contact", "receiver_bank",
       "receiver_account", "disability_mode", "disability_type", "disability_reason",
@@ -1195,7 +1224,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     ]);
     for (const [key, val] of Object.entries(catDetails)) {
       if (excludeKeys.has(key)) continue;
-      if (key.startsWith("_")) continue;
+      if (key.startsWith("_") || key.endsWith("_url") || /url$/i.test(key)) continue;
       if (typeof val === "string" && val.trim()) {
         allFields.push({ label: getDocLabel(key), value: val });
       } else if (typeof val === "number" || typeof val === "boolean") {
@@ -1245,6 +1274,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
 
   const propertyDetails = [
     { label: "Property Ownership", value: catDetails?.property_ownership === "rented" ? "Rented" : catDetails?.property_ownership === "owned" ? "Owned" : "" },
+    { label: "Owner Relation", value: catDetails?.owner_relation || "" },
   ].filter((d) => d.value);
 
   const fileEntries: { key: string; label: string; url: string }[] = [];
@@ -1319,6 +1349,23 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   pushFile("selfie_url", c.selfie_url);
   pushFile("video_url", c.video_url);
   pushFile("paid_receipt_url", c.paid_receipt_url);
+  // Explicit aliases run before the generic walker so old and Wizard payloads
+  // receive the human label instead of "Statement Url" or a storage filename.
+  pushFile("salary_slip", c.salary_slip_url || catDetails?.salary_slip_url, "Salary Slip (6 Months)");
+  pushFile("statement", c.statement_url || catDetails?.statement_url, "Bank Statement (6 Months)");
+  pushFile("rental_agreement", catDetails?.rental_agreement_url || catDetails?.property_rental_agreement_url || catDetails?.rentalAgreementUrl, "Rental Agreement");
+  pushFile("landlord_cnic", catDetails?.landlord_cnic_url || catDetails?.property_landlord_cnic_url || catDetails?.landlordCnicUrl, "Landlord's CNIC");
+  pushFile("owner_cnic", catDetails?.owner_cnic_url || catDetails?.property_owner_cnic_url || catDetails?.ownerCnicUrl, "Owner's CNIC");
+
+  const explicitDocuments = [
+    ["gender_doc_urls", catDetails?.gender_doc_urls],
+    ["cat_doc_urls", catDetails?.cat_doc_urls],
+  ] as const;
+  for (const [, value] of explicitDocuments) {
+    if (value && typeof value === "object") {
+      for (const [key, url] of Object.entries(value)) pushFile(key, url, getDocLabel(key));
+    }
+  }
 
   const photoPayload = Array.isArray(c.photo_urls) ? c.photo_urls : parseObject(c.photo_urls);
   if (Array.isArray(photoPayload)) {
@@ -1473,7 +1520,11 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
           <p className="text-xs font-semibold text-primary flex items-center gap-1"><Building2 className="h-3 w-3" /> Property Details</p>
           {propertyDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
           {catDetails?.rental_agreement_url && <Img url={catDetails.rental_agreement_url} label="Rental Agreement" />}
+          {catDetails?.property_rental_agreement_url && <Img url={catDetails.property_rental_agreement_url} label="Rental Agreement" />}
           {catDetails?.landlord_cnic_url && <Img url={catDetails.landlord_cnic_url} label="Landlord's CNIC" />}
+          {catDetails?.property_landlord_cnic_url && <Img url={catDetails.property_landlord_cnic_url} label="Landlord's CNIC" />}
+          {catDetails?.owner_cnic_url && <Img url={catDetails.owner_cnic_url} label="Owner's CNIC" />}
+          {catDetails?.property_owner_cnic_url && <Img url={catDetails.property_owner_cnic_url} label="Owner's CNIC" />}
         </div>
       )}
 
