@@ -315,6 +315,14 @@ export async function searchUsers(query: string) {
   return readArrayResponse(res);
 }
 
+export async function checkUsernameAvailability(username: string) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/username-availability?username=${encodeURIComponent(username.trim())}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  return readApiResponse<{ available: boolean; suggestions: string[] }>(res);
+}
+
 export async function updateProfile(userId: string, data: any, profileRole?: "hero" | "requester" | null) {
   const query = profileRole ? `?profile_role=${encodeURIComponent(profileRole)}` : "";
   const res = await fetchWithAuth(`${WORKER_URL}/api/profiles/${userId}${query}`, {

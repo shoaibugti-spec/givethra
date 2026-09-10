@@ -38,6 +38,7 @@ import {
 import { toast } from "sonner";
 
 import {
+  checkUsernameAvailability,
   getProfile,
   updateProfile,
   getKycStatus,
@@ -101,6 +102,7 @@ export default function EditProfilePage() {
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
   const [idNumber, setIdNumber] = useState("");
+  const [usernameAvailability, setUsernameAvailability] = useState<{ available: boolean; suggestions: string[] } | null>(null);
   const [countryCode, setCountryCode] = useState("");
   const [city, setCity] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -119,6 +121,19 @@ export default function EditProfilePage() {
 
   const [countryOpen, setCountryOpen] = useState(false);
   const [countryQuery, setCountryQuery] = useState("");
+
+  async function validateUsername() {
+    const value = username.trim().toLowerCase();
+    if (!value || !/^[a-zA-Z0-9_]{3,24}$/.test(value)) {
+      setUsernameAvailability(null);
+      return;
+    }
+    try {
+      setUsernameAvailability(await checkUsernameAvailability(value));
+    } catch {
+      setUsernameAvailability(null);
+    }
+  }
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) {
@@ -653,8 +668,9 @@ export default function EditProfilePage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="username">Username</Label>
-                      <Input id="username" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))} placeholder="e.g. shoaib_hope" maxLength={24} />
+                      <Input id="username" value={username} onChange={(e) => { setUsername(e.target.value.replace(/\s/g, "")); setUsernameAvailability(null); }} onBlur={validateUsername} placeholder="e.g. shoaib_hope" maxLength={24} />
                       <p className="text-xs text-muted-foreground">People can find you by this username.</p>
+                      {usernameAvailability && (usernameAvailability.available ? <p className="text-xs font-medium text-emerald-600">Username is available.</p> : <div className="text-xs text-destructive"><p className="font-medium">Username is already taken.</p>{usernameAvailability.suggestions.length > 0 && <p>Try: {usernameAvailability.suggestions.map((suggestion) => <button key={suggestion} type="button" className="mr-1 underline" onClick={() => { setUsername(suggestion); setUsernameAvailability(null); }}>{suggestion}</button>)}</p>}</div>)}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="age">Age</Label>
