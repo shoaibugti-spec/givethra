@@ -26,8 +26,12 @@ export default function NeedHelpPage() {
     try {
       const kyc = await getKycStatus(user!.id);
       const status = String(kyc?.status || "none").trim().toLowerCase();
-      navigate({ to: status === "approved" ? "/submit-request" : "/kyc" });
+      if (status !== "approved") {
+        try { sessionStorage.setItem("givethra_kyc_return_to", "/need-help"); } catch { /* ignore */ }
+      }
+      navigate({ to: status === "approved" ? "/onboarding-submit" : "/kyc" });
     } catch {
+      try { sessionStorage.setItem("givethra_kyc_return_to", "/need-help"); } catch { /* ignore */ }
       navigate({ to: "/kyc" });
     }
   }

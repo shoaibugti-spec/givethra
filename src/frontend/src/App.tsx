@@ -1,7 +1,7 @@
 // src/frontend/src/App.tsx
 // Givethra - Full App with Role Selection, KYC, and Routing
-// FIX: /submit-request and /onboarding-submit both use SubmitRequestWizard
-// (Credits center + WhatsApp bar — no legacy form on submit route)
+// Profile submission and Requester Visit submission intentionally use separate
+// experiences while sharing the same case-submission backend.
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -58,7 +58,7 @@ const AffidavitPage = lazy(() =>
   }))
 );
 
-// Guided wizard — used for BOTH submit routes
+// Guided wizard — used by the Requester Visit route.
 const SubmitRequestWizard = lazy(() =>
   import("@/pages/submit-request/SubmitRequestWizard")
     .then((module) => ({ default: module.default }))

@@ -146,7 +146,7 @@ export default function SubmitRequestWizard() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate({ to: "/sign-in", search: { redirect: "/submit-request" } });
+      navigate({ to: "/sign-in", search: { redirect: "/onboarding-submit" } });
       return;
     }
     let cancelled = false;
@@ -155,7 +155,7 @@ export default function SubmitRequestWizard() {
         const kyc = user?.id ? await getKycStatus(user.id) : null;
         const approved = String(kyc?.status || "none").trim().toLowerCase() === "approved";
         if (!approved) {
-          try { sessionStorage.setItem("givethra_kyc_return_to", "/submit-request"); } catch { /* ignore */ }
+          try { sessionStorage.setItem("givethra_kyc_return_to", "/onboarding-submit"); } catch { /* ignore */ }
           navigate({ to: "/kyc" });
           return;
         }
@@ -165,7 +165,7 @@ export default function SubmitRequestWizard() {
           if (saved._stepId) setCurrentStepId(saved._stepId);
         }
       } catch {
-        try { sessionStorage.setItem("givethra_kyc_return_to", "/submit-request"); } catch { /* ignore */ }
+        try { sessionStorage.setItem("givethra_kyc_return_to", "/onboarding-submit"); } catch { /* ignore */ }
         navigate({ to: "/kyc" });
       } finally {
         if (!cancelled) {
