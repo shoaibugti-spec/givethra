@@ -84,6 +84,7 @@ export default function EditProfilePage() {
   const { isAuthenticated, user, refreshUser } = useAuth();
   const { role } = useRole();
   const navigate = useNavigate();
+  const setupMode = new URLSearchParams(window.location.search).get("setup") === "1";
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -416,10 +417,14 @@ export default function EditProfilePage() {
 
       toast.success("Profile updated successfully!");
 
-      navigate({
-        to: "/profile/$id",
-        params: { id: "me" },
-      });
+      if (setupMode) {
+        navigate({ to: "/" });
+      } else {
+        navigate({
+          to: "/profile/$id",
+          params: { id: "me" },
+        });
+      }
     } catch (err) {
       console.error("Profile save failed:", err);
 
@@ -472,7 +477,7 @@ export default function EditProfilePage() {
             </button>
 
             <h1 className="font-semibold text-foreground text-lg">
-              Edit Profile
+              {setupMode ? "Create Your Profile" : "Edit Profile"}
             </h1>
           </div>
         </header>

@@ -84,9 +84,15 @@ export async function getCasesByUser(userId: string) {
 
 export async function getCaseById(id: string) {
   const res = await fetchWithAuth(`${WORKER_URL}/api/cases/${id}`, { headers: headers() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error || "Failed to load case details");
-  return data;
+  const data = await res.json().catch(() => null);
+  if (res.ok) return data;
+  // Public case links can still resolve through the approved index when the
+  // detail route rejects an anonymous request or an older Worker is deployed.
+  const approved = await fetchWithAuth(`${WORKER_URL}/api/cases/approved`, { headers: headers() });
+  const rows = await readArrayResponse(approved);
+  const match = rows.find((row) => String(row?.id) === String(id));
+  if (match) return match;
+  throw new Error(data?.error || "Failed to load case details");
 }
 
 export async function getCasesByIds(ids: string[]) {

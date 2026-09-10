@@ -40,6 +40,7 @@ import {
   GraduationCap,
   Stethoscope,
   ShoppingCart,
+  Loader2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getApprovedCases } from "@/lib/api";
@@ -87,7 +88,7 @@ const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
 
 
-function SignInLandingPage({ onSignIn }: { onSignIn: () => void }) {
+function SignInLandingPage({ onSignIn, isLoggingIn, loginError }: { onSignIn: () => void; isLoggingIn: boolean; loginError: string | null }) {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-4xl space-y-10">
@@ -104,10 +105,17 @@ function SignInLandingPage({ onSignIn }: { onSignIn: () => void }) {
           <button
             type="button"
             onClick={onSignIn}
-            className="mt-8 inline-flex h-12 items-center justify-center rounded-full bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90 active:scale-[.98]"
+            disabled={isLoggingIn}
+            className="mt-8 inline-flex h-12 min-w-56 items-center justify-center gap-2 rounded-full bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90 active:scale-[.98] disabled:cursor-wait disabled:opacity-70"
           >
-            Sign in with Google
+            {isLoggingIn && <Loader2 className="h-5 w-5 animate-spin" />}
+            {isLoggingIn ? "Connecting securely…" : "Sign in with Google"}
           </button>
+          {loginError && (
+            <p role="alert" className="mx-auto mt-4 max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {loginError}
+            </p>
+          )}
         </section>
         <section className="grid gap-4 sm:grid-cols-4" aria-label="Givethra trust principles">
           {[
@@ -133,7 +141,7 @@ function SignInLandingPage({ onSignIn }: { onSignIn: () => void }) {
 }
 
 export default function RoleSelectionPage() {
-  const { isAuthenticated, loginWithGoogle, setRole: setAuthRole } = useAuth();
+  const { isAuthenticated, loginWithGoogle, isLoggingIn, loginError, setRole: setAuthRole } = useAuth();
   const { setRole } = useRole();
   const navigate = useNavigate();
 
@@ -216,7 +224,7 @@ export default function RoleSelectionPage() {
   };
 
   if (!isAuthenticated) {
-    return <SignInLandingPage onSignIn={loginWithGoogle} />;
+    return <SignInLandingPage onSignIn={loginWithGoogle} isLoggingIn={isLoggingIn} loginError={loginError} />;
   }
 
   const SlideContent = ({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) => (

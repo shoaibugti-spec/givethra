@@ -826,6 +826,22 @@ async function handleCases(request, env, user, url, parts, origin) {
     if (!isAdmin(user)) {
       const suspension = await getActiveSuspension(env, user.user_id);
       if (suspension) return suspendedActionResponse(origin, suspension);
+      const kyc = await env.DB.prepare(
+        "SELECT status, rejection_reason FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC LIMIT 1"
+      ).bind(user.user_id).first();
+      const kycStatus = String(kyc?.status || "none").trim().toLowerCase();
+      if (kycStatus !== "approved") {
+        return json({
+          error: kycStatus === "rejected"
+            ? "Your KYC was rejected. Please submit KYC again before submitting a case."
+            : kycStatus === "pending"
+              ? "Your KYC is under review. You can submit a case after admin approval."
+              : "KYC approval is required before submitting a case.",
+          code: "KYC_REQUIRED",
+          kyc_status: kycStatus,
+          rejection_reason: kyc?.rejection_reason || null,
+        }, 403, origin);
+      }
     }
     const body = await readJson(request);
     const record = pick(body, ["category", "title", "short_description", "country", "city", "urgency", "description", "amount_needed", "currency", "why_help", "deadline", "institute_name", "institute_contact", "institute_address", "payment_method", "account_title", "account_number", "account_iban", "photo_urls", "selfie_url", "video_url", "category_details", "was_free"]);

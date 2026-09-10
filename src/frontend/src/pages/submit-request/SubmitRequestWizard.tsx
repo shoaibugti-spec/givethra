@@ -251,7 +251,13 @@ export default function SubmitRequestWizard() {
       refetch();
       navigate({ to: "/my-cases" });
     } catch (err: any) {
-      toast.error(err.message || "Submission failed");
+      const message = err?.message || "Submission failed";
+      if (String(message).toLowerCase().includes("kyc")) {
+        toast.error(message);
+        navigate({ to: "/kyc" });
+      } else {
+        toast.error(message);
+      }
     } finally {
       setSubmitting(false);
     }

@@ -19,7 +19,7 @@ import {
 import { ThemeProvider } from "next-themes";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
-import { getKycStatus } from "@/lib/api";
+import { getProfile } from "@/lib/api";
 
 // Lazy imports
 const HomePage = lazy(() =>
@@ -228,75 +228,33 @@ function RootLayout() {
   const { role, setRole } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
-  const [checking, setChecking] = useState(true);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     if (authRole === "hero" && role !== "hero") setRole("hero");
     if (authRole === "help_seeker" && role !== "requester") setRole("requester");
-  }, [authRole, isAuthenticated, role, setRole]);
+  }, [authRole, role, setRole]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user) {
-      setChecking(false);
-      return;
-    }
-
+    if (!isAuthenticated || !user || isAdmin || location.pathname !== "/") return;
     let cancelled = false;
-    const checkKyc = async () => {
-      try {
-        const kyc = await getKycStatus(user.id);
-        const status = String(kyc?.status || "none").trim().toLowerCase();
-
-        const publicPaths = [
-          "/",
-          "/sign-in",
-          "/sign-up",
-          "/about",
-          "/account-privacy",
-          "/privacy",
-          "/terms",
-          "/community-guidelines",
-          "/faq",
-          "/contact",
-          "/community",
-          "/heroes-wall",
-          "/kindness-wall",
-          "/need-help",
-        ];
-        const isPublic = publicPaths.includes(location.pathname);
-        const isRequester = role === "requester";
-
-        // Every authenticated visitor completes KYC before entering the role hub.
-        // The KYC page itself remains the only exception while approval is pending.
-        if (!isAdmin && location.pathname === "/" && status !== "approved") {
-          if (!cancelled) navigate({ to: "/kyc" });
-          return;
+    setChecking(true);
+    getProfile(user.id, role)
+      .then((profile) => {
+        if (!cancelled && !String(profile?.full_name || "").trim()) {
+          navigate({ to: "/edit-profile", search: { setup: "1" } });
         }
-
-        if (
-          !isAdmin &&
-          isRequester &&
-          status !== "approved" &&
-          !isPublic &&
-          location.pathname !== "/kyc"
-        ) {
-          if (!cancelled) navigate({ to: "/kyc" });
-          return;
-        }
-
+      })
+      .catch(() => {
+        // The setup page can still load and create a missing profile after a transient read failure.
+      })
+      .finally(() => {
         if (!cancelled) setChecking(false);
-      } catch (err) {
-        console.error("KYC check error:", err);
-        setChecking(false);
-      }
-    };
-
-    checkKyc();
+      });
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, isAuthenticated, user, role, location.pathname, navigate]);
+  }, [isAdmin, isAuthenticated, location.pathname, navigate, role, user]);
 
   useEffect(() => {
     if (!role && !isAdmin && !checking && isAuthenticated) {
