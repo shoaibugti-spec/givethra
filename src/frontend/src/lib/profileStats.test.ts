@@ -1,40 +1,37 @@
 import { describe, expect, it } from "vitest";
 import { computeHeroStats, computeRequesterStats } from "./profileStats";
 
-describe("profile statistics", () => {
-  it("counts only truly completed Hero help and leaves unresolved unlocks active", () => {
-    const stats = computeHeroStats(
-      [{ case_id: "open" }, { case_id: "direct" }, { case_id: "contribution" }],
-      [
-        { case_id: "direct", case_status: "completed", payment_type: "direct", seeker_confirmed_amount: 1250 },
-        { case_id: "contribution", case_status: "completed", payment_type: "partial", amount_paid: 750 },
-        { case_id: "pending", case_status: "approved", payment_type: "direct", amount_paid: 500 },
-      ],
-    );
-
-    expect(stats).toEqual({
-      totalUnlocks: 3,
-      directHelps: 1,
-      contributions: 1,
-      totalAmountHelped: 2000,
-      activeUnlocked: 1,
-    });
+describe("profile stats", () => {
+  it("counts only truly completed hero help and separates contributions", () => {
+    expect(
+      computeHeroStats(
+        [{ id: "unlock-1" }, { id: "unlock-2" }],
+        [
+          { case_status: "completed", status: "completed", paid_to: "institute", amount_paid: 120 },
+          { case_status: "completed", status: "completed", paid_to: "givethra", amount_paid: 30 },
+          { case_status: "approved", status: "pending", paid_to: "institute", amount_paid: 500 },
+        ]
+      )
+    ).toEqual({ totalUnlocks: 2, directHelps: 1, contributions: 1, totalAmountHelped: 150 });
   });
 
-  it("counts Requester approval and help received only from completed cases", () => {
-    const stats = computeRequesterStats([
-      { status: "rejected", amount_collected: 5000 },
-      { status: "approved", amount_collected: 1000 },
-      { status: "completed", amount_collected: 2750 },
-    ]);
-
-    expect(stats).toEqual({
-      totalSubmitted: 3,
+  it("counts requester outcomes and falls back to case amount fields", () => {
+    expect(
+      computeRequesterStats([
+        { status: "pending" },
+        { status: "approved" },
+        { status: "rejected" },
+        { status: "expired" },
+        { status: "completed", amount_needed: 450 },
+        { status: "completed", amount_collected: 125 },
+      ])
+    ).toEqual({
+      totalSubmitted: 6,
       totalApproved: 1,
       totalRejected: 1,
-      totalCompleted: 1,
-      totalExpired: 0,
-      totalHelpReceived: 2750,
+      totalCompleted: 2,
+      totalExpired: 1,
+      totalHelpReceived: 575,
     });
   });
 });

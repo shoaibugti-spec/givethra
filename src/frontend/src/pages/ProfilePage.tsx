@@ -184,15 +184,12 @@ export default function ProfilePage() {
     totalCompleted: 0,
     totalExpired: 0,
     totalHelpReceived: 0,
-    helpByCurrency: {},
   });
   const [heroStats, setHeroStats] = useState<HeroStats>({
     totalUnlocks: 0,
     directHelps: 0,
     contributions: 0,
     totalAmountHelped: 0,
-    amountByCurrency: {},
-    activeUnlocked: 0,
   });
   const [helpedCases, setHelpedCases] = useState<any[]>([]);
   const [trustLevel, setTrustLevel] = useState(100);
@@ -208,7 +205,7 @@ export default function ProfilePage() {
       return;
     }
     loadData();
-  }, [isAuthenticated, location.pathname, role, profileUserId]);
+  }, [isAuthenticated, location.pathname, profileUserId]);
 
   // 🔥 FIX #6: Use Promise.allSettled to prevent single failure from blocking everything
   async function loadData() {
@@ -638,19 +635,9 @@ export default function ProfilePage() {
         {role === "hero" ? (
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-              <div className="text-2xl font-bold text-foreground">
-                {Object.entries(heroStats.amountByCurrency).length > 0
-                  ? Object.values(heroStats.amountByCurrency).map((amount) => amount.toFixed(2)).join(" · ")
-                  : "0.00"}
-              </div>
+              <div className="text-2xl font-bold text-foreground">{heroStats.totalUnlocks}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                <HandCoins className="h-3 w-3" /> Total Amount Helped
-              </div>
-            </div>
-            <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
-              <div className="text-2xl font-bold text-foreground">{heroStats.directHelps + heroStats.contributions}</div>
-              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                <HeartHandshake className="h-3 w-3" /> Helped
+                <Unlock className="h-3 w-3" /> Total Unlocks
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
@@ -666,9 +653,9 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
-              <div className="text-2xl font-bold text-foreground">{heroStats.totalUnlocks}</div>
+              <div className="text-2xl font-bold text-foreground">{heroStats.totalAmountHelped}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
-                <Unlock className="h-3 w-3" /> Total Unlocks
+                <HandCoins className="h-3 w-3" /> Total Amount Helped
               </div>
             </div>
           </div>
@@ -705,11 +692,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
-              <div className="text-2xl font-bold text-green-600">
-                {Object.entries(requesterStats.helpByCurrency).length > 0
-                  ? Object.values(requesterStats.helpByCurrency).map((amount) => amount.toFixed(2)).join(" · ")
-                  : "0.00"}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{requesterStats.totalHelpReceived}</div>
               <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
                 <HeartHandshake className="h-3 w-3" /> Total Help Received
               </div>
