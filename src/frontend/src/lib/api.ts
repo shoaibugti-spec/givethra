@@ -291,6 +291,14 @@ export async function getProfile(userId: string, profileRole?: "hero" | "request
   return readApiResponse(res);
 }
 
+export async function getProfileStats(userId: string) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/profile-stats/${encodeURIComponent(userId)}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  return readApiResponse(res);
+}
+
 export async function updateProfile(userId: string, data: any, profileRole?: "hero" | "requester" | null) {
   const query = profileRole ? `?profile_role=${encodeURIComponent(profileRole)}` : "";
   const res = await fetchWithAuth(`${WORKER_URL}/api/profiles/${userId}${query}`, {

@@ -17,6 +17,14 @@ export interface RequesterStats {
   totalHelpReceived: number;
 }
 
+function firstPositiveAmount(...values: unknown[]): number {
+  for (const value of values) {
+    const amount = Number(value);
+    if (Number.isFinite(amount) && amount > 0) return amount;
+  }
+  return 0;
+}
+
 export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): HeroStats {
   const safeUnlocks = Array.isArray(unlocks) ? unlocks : [];
   const safeResolutions = Array.isArray(resolutions) ? resolutions : [];
@@ -27,6 +35,7 @@ export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): 
     (sum, resolution) =>
       sum + Number(
         resolution?.seeker_confirmed_amount ??
+        resolution?.verified_amount ??
         resolution?.amount_paid ??
         resolution?.amount ??
         0
@@ -39,7 +48,7 @@ export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): 
 
 export function computeRequesterStats(cases: any[] = []): RequesterStats {
   const safeCases = Array.isArray(cases) ? cases : [];
-  const norm = (item: any) => String(item?.status || "pending").trim().toLowerCase();
+  const norm = (item: any) => String(item?.effective_status || item?.status || "pending").trim().toLowerCase();
   const completedCases = safeCases.filter((item) => norm(item) === "completed");
 
   return {
@@ -50,12 +59,7 @@ export function computeRequesterStats(cases: any[] = []): RequesterStats {
     totalExpired: safeCases.filter((item) => norm(item) === "expired").length,
     totalHelpReceived: completedCases.reduce(
       (sum, item) =>
-        sum + Number(
-          item?.amount_collected ??
-          item?.verified_amount ??
-          item?.amount_needed ??
-          0
-        ),
+        sum + firstPositiveAmount(item?.amount_collected, item?.verified_amount, item?.amount_needed),
       0
     ),
   };

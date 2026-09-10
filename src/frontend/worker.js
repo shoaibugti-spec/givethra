@@ -573,6 +573,63 @@ async function handleProfile(request, env, user, parts, origin) {
 }
 
 // ============================================================
+//  PROFILE STATS HANDLER
+// ============================================================
+// Keep both profile roles on one server-side data contract. This avoids the
+// browser having to join three endpoints and makes legacy amount/status fields
+// behave consistently for old and new records.
+async function handleProfileStats(request, env, user, url, parts, origin) {
+  if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
+  const userId = String(parts[2] || "").trim();
+  if (!user || !userId) return json({ error: "Authentication required" }, 401, origin);
+
+  const casesRows = await env.DB.prepare(
+    "SELECT c.*, CASE WHEN lower(COALESCE(c.status, '')) = 'completed' OR EXISTS (SELECT 1 FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed') THEN 'completed' ELSE c.status END AS effective_status FROM case_submissions c WHERE c.user_id = ? ORDER BY c.submitted_at DESC"
+  ).bind(userId).all();
+  const resolutionsRows = await env.DB.prepare(
+    "SELECT r.*, c.status AS case_status, c.title AS case_title FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id WHERE r.hero_id = ? ORDER BY r.submitted_at DESC"
+  ).bind(userId).all();
+  const unlocksRows = await env.DB.prepare(
+    "SELECT * FROM case_unlocks WHERE hero_id = ? ORDER BY unlocked_at DESC"
+  ).bind(userId).all();
+
+  const cases = (casesRows.results || []).map((row) => ({ ...row, status: row.effective_status || row.status }));
+  const resolutions = resolutionsRows.results || [];
+  const unlocks = unlocksRows.results || [];
+  const normalized = (value) => String(value || "").trim().toLowerCase();
+  const completed = (row) => {
+    if (normalized(row.case_status) === "completed" || normalized(row.status) === "completed") return true;
+    const confirmed = [1, "1", true, "true", "yes"].includes(row.admin_confirmed);
+    return confirmed && ["approved", "verified", "confirmed", "seeker_confirmed"].includes(normalized(row.status));
+  };
+  const completedResolutions = resolutions.filter(completed);
+  const contribution = (row) => [row.paid_to, row.paidTo, row.payment_type, row.paymentType].some((value) => ["givethra", "contribution", "fundraising", "partial"].includes(normalized(value)));
+  const amount = (row) => Number(row.seeker_confirmed_amount ?? row.verified_amount ?? row.amount_paid ?? row.amount ?? row.amount_collected ?? 0) || 0;
+  const caseAmount = (row) => [row.amount_collected, row.verified_amount, row.amount_needed].map(Number).find((value) => Number.isFinite(value) && value > 0) || 0;
+  const requesterCompleted = cases.filter((row) => normalized(row.status) === "completed");
+
+  return json({
+    cases,
+    resolutions,
+    unlocks,
+    requester: {
+      totalSubmitted: cases.length,
+      totalApproved: cases.filter((row) => normalized(row.status) === "approved").length,
+      totalRejected: cases.filter((row) => normalized(row.status) === "rejected").length,
+      totalCompleted: requesterCompleted.length,
+      totalExpired: cases.filter((row) => normalized(row.status) === "expired").length,
+      totalHelpReceived: requesterCompleted.reduce((sum, row) => sum + caseAmount(row), 0),
+    },
+    hero: {
+      totalUnlocks: unlocks.length,
+      directHelps: completedResolutions.filter((row) => !contribution(row)).length,
+      contributions: completedResolutions.filter(contribution).length,
+      totalAmountHelped: completedResolutions.reduce((sum, row) => sum + amount(row), 0),
+    },
+  }, 200, origin);
+}
+
+// ============================================================
 //  KYC HANDLER
 // ============================================================
 async function handleKyc(request, env, user, url, parts, origin) {
@@ -1552,6 +1609,10 @@ async function handleRequest(request, env, ctx) {
     // ✅ PROFILES
     if (parts[1] === "profiles") {
       return handleProfile(request, env, user, parts, origin);
+    }
+
+    if (parts[1] === "profile-stats") {
+      return handleProfileStats(request, env, user, url, parts, origin);
     }
 
     if (parts[1] === "kyc-submissions") {
