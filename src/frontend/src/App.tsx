@@ -71,6 +71,12 @@ const SubmitRequestWizard = lazy(() =>
     }))
 );
 
+const SubmitRequestPage = lazy(() =>
+  import("@/pages/SubmitRequestPage").catch(() => ({
+    default: () => <div>Failed to load page</div>,
+  }))
+);
+
 const ProfilePage = lazy(() =>
   import("@/pages/ProfilePage").catch(() => ({
     default: () => <div>Failed to load page</div>,
@@ -366,13 +372,13 @@ const affidavitRoute = createRoute({
   ),
 });
 
-// ✅ BOTH routes use the wizard (Credits center + WhatsApp, no legacy form)
+// Profile/BottomNav submission uses the established guided SubmitRequestPage.
 const submitRequestRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/submit-request",
   component: () => (
     <Suspense fallback={<PageLoader />}>
-      <SubmitRequestWizard />
+      <SubmitRequestPage />
     </Suspense>
   ),
 });

@@ -2628,7 +2628,7 @@ export default function SubmitRequestPage() {
             <h1 className="text-2xl font-bold">KYC Verification Required</h1>
             <p className="text-muted-foreground">Complete identity verification before submitting a request.</p>
             <Button asChild>
-              <Link to="/kyc">Complete KYC</Link>
+              <Link to="/kyc" onClick={() => { try { sessionStorage.setItem("givethra_kyc_return_to", "/submit-request"); } catch { /* ignore */ } }}>Complete KYC</Link>
             </Button>
           </div>
         </div>
