@@ -39,6 +39,10 @@ export function clearSessionCookie(
   res: Response
 ): void {
   const options = getSessionCookieOptions(req);
+  res.clearCookie("app_session_id", {
+    ...options,
+    maxAge: 0,
+  });
   res.clearCookie("auth_token", {
     ...options,
     maxAge: 0,
@@ -60,6 +64,7 @@ export function clearAllCookies(
 ): void {
   const options = getSessionCookieOptions(req);
   const cookiesToClear = [
+    "app_session_id",
     "auth_token",
     "user_email", 
     "givethra_role",

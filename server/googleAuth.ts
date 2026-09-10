@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { COOKIE_NAME } from "../shared/const";
-import { upsertUser, getUserByOpenId } from "./db";
+import { upsertUser, getUserByOpenId, getUserByEmail } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 
@@ -18,7 +18,7 @@ type GoogleClaims = {
 };
 
 function isVerifiedEmail(value: GoogleClaims["email_verified"]) {
-  return value === true || value === "true" || value === undefined;
+  return value === true || value === "true";
 }
 
 async function verifyGoogleCredential(credential: string) {
@@ -76,16 +76,22 @@ export function registerGoogleAuthRoutes(app: Express) {
       const identity = await verifyGoogleCredential(credential);
       const ownerEmail = (process.env.GIVETHRA_ADMIN_EMAIL || "").trim().toLowerCase();
       const role = ownerEmail && identity.email === ownerEmail ? "admin" : "user";
-      const openId = `google:${identity.sub}`;
+      const existing = await getUserByEmail(identity.email);
+      const openId = existing?.openId || `google:${identity.sub}`;
 
-      await upsertUser({
-        openId,
-        name: identity.name,
-        email: identity.email,
-        loginMethod: "google",
-        role,
-        lastSignedIn: new Date(),
-      });
+      // Existing email matches reuse the original account identity. Only new
+      // Google emails create a record; this avoids duplicate-key races and
+      // preserves all legacy references to the existing user.
+      if (!existing) {
+        await upsertUser({
+          openId,
+          name: identity.name,
+          email: identity.email,
+          loginMethod: "google",
+          role,
+          lastSignedIn: new Date(),
+        });
+      }
 
       const token = await sdk.createSessionToken(openId, { name: identity.name });
       res.cookie(COOKIE_NAME, token, getSessionCookieOptions(req));
@@ -96,7 +102,7 @@ export function registerGoogleAuthRoutes(app: Express) {
           id: openId,
           email: identity.email,
           name: identity.name,
-          role,
+          role: existing?.role || role,
           picture: identity.picture,
         },
       });

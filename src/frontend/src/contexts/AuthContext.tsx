@@ -112,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = getTokenFromLocation();
     if (token) {
       fetchWithTimeout(`${WORKER_URL}/verify`, {
+        credentials: "include",
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
@@ -148,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       const res = await fetchWithTimeout(`${WORKER_URL}/verify`, {
+        credentials: "include",
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -177,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetchWithTimeout(`${WORKER_URL}/auth/google`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential }),
       }, 15000);

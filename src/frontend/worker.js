@@ -33,9 +33,23 @@ function corsHeaders(origin) {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Guest-ID",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
+}
+
+function sessionCookie(token, maxAge = 60 * 60 * 24 * 30) {
+  return `app_session_id=${encodeURIComponent(token)}; Max-Age=${maxAge}; Path=/; Secure; HttpOnly; SameSite=None`;
+}
+
+function cookieValue(request, name) {
+  const header = request.headers.get("Cookie") || "";
+  for (const part of header.split(";")) {
+    const [key, ...value] = part.trim().split("=");
+    if (key === name) return decodeURIComponent(value.join("="));
+  }
+  return "";
 }
 
 function json(data, status = 200, origin = "") {
@@ -158,7 +172,7 @@ function isAdmin(user) {
 
 function bearer(request) {
   const value = request.headers.get("Authorization") || "";
-  return value.replace(/^Bearer\s+/i, "").trim();
+  return value.replace(/^Bearer\s+/i, "").trim() || cookieValue(request, "app_session_id");
 }
 
 async function verifyGoogleCredential(credential, clientId) {
@@ -654,7 +668,7 @@ function normalizeUploadedUrl(value) {
   try {
     const parsed = new URL(value);
     const key = parsed.pathname === "/uploads" ? parsed.searchParams.get("key") : null;
-    if (key) return `${PUBLIC_ORIGIN}/uploads/${key}`;
+    if (key && /^[A-Za-z0-9._/-]+$/.test(key)) return `${PUBLIC_ORIGIN}/uploads/${key}`;
   } catch {
     // Keep non-URL legacy values unchanged; the frontend will not render them.
   }
@@ -1426,7 +1440,9 @@ async function handleRequest(request, env, ctx) {
       const account = await findOrCreateUser(env, identity);
       const token = await signSession(account, env.JWT_SECRET);
       if (!token) return json({ error: "Authentication is not configured", code: "AUTH_NOT_CONFIGURED" }, 500, origin);
-      return json({ token, user: account }, 200, origin);
+      const response = json({ token, user: account }, 200, origin);
+      response.headers.set("Set-Cookie", sessionCookie(token));
+      return response;
     } catch (error) {
       console.error("Google authentication reconciliation failed", error);
       return json({ error: "Authentication or database request failed", code: "AUTH_RECONCILIATION_FAILED" }, 500, origin);
