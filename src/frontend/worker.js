@@ -1429,7 +1429,10 @@ async function handleRequest(request, env, ctx) {
       // پہلے ASSETS سے چیک کریں
       const assetResponse = await env.ASSETS.fetch(request);
       
-      if (assetResponse.status === 200) {
+      const assetContentType = assetResponse.headers.get('Content-Type') || '';
+      // With SPA fallback enabled, ASSETS returns index.html with HTTP 200 for
+      // a missing file. Never relabel that HTML response as an APK.
+      if (assetResponse.status === 200 && !assetContentType.toLowerCase().includes('text/html')) {
         const headers = new Headers(assetResponse.headers);
         headers.set('Content-Type', 'application/vnd.android.package-archive');
         headers.set('Content-Disposition', 'attachment; filename="Givethra.apk"');

@@ -20,6 +20,13 @@ describe("public Worker routing", () => {
     expect(workerSource).toContain("env.UPLOADS");
   });
 
+  it("does not relabel SPA fallback HTML as an APK and ships the APK in frontend assets", () => {
+    expect(workerSource).toContain("!assetContentType.toLowerCase().includes('text/html')");
+    const apkPath = path.join(process.cwd(), "public", "Givethra.apk");
+    expect(fs.existsSync(apkPath)).toBe(true);
+    expect(fs.statSync(apkPath).size).toBeGreaterThan(1000000);
+  });
+
   it("serves approved case detail and by-id data to guest visitors", () => {
     expect(workerSource).toContain('// Public approved case links are intentionally readable without a session.');
     expect(workerSource).toContain('const publicStatus = String(publicRow?.status || "").toLowerCase();');
