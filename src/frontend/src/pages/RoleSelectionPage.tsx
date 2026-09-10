@@ -143,7 +143,7 @@ function SignInLandingPage({ onSignIn, isLoggingIn, loginError }: { onSignIn: ()
 
 export default function RoleSelectionPage() {
   const { isAuthenticated, loginWithGoogle, isLoggingIn, loginError, role: authRole, setRole: setAuthRole } = useAuth();
-  const { setRole } = useRole();
+  const { role, setRole } = useRole();
   const navigate = useNavigate();
 
   const [activeCases, setActiveCases] = useState<any[]>([]);
