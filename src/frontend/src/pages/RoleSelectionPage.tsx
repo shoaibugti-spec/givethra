@@ -85,6 +85,7 @@ const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61590715263595";
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
+const SUPPORT_WHATSAPP_URL = "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 const CONTACT_EMAIL = "info@givethra.org";
 
 
@@ -259,7 +260,7 @@ export default function RoleSelectionPage() {
         <div className="space-y-4">
           <div ref={roleHubSliderRef} data-slide-index={roleHubSlideIndex} className="flex snap-x snap-mandatory overflow-x-auto rounded-3xl scrollbar-hide" aria-label="Givethra highlights">
             {roleHubSlides.map((slide, index) => (
-              <div key={`${slide.title}-${index}`} className="min-w-full snap-center rounded-3xl bg-gradient-to-br from-primary/10 via-card to-teal-50 px-6 py-8 text-center shadow-sm">
+              <div key={`${slide.title}-${index}`} role={slide.title === "Welcome Givethra Home" ? "button" : undefined} tabIndex={slide.title === "Welcome Givethra Home" ? 0 : undefined} onClick={slide.title === "Welcome Givethra Home" ? handleCommunityClick : undefined} onKeyDown={slide.title === "Welcome Givethra Home" ? (event) => { if (event.key === "Enter" || event.key === " ") handleCommunityClick(); } : undefined} className={`min-w-full snap-center rounded-3xl bg-gradient-to-br from-primary/10 via-card to-teal-50 px-6 py-8 text-center shadow-sm ${slide.title === "Welcome Givethra Home" ? "cursor-pointer hover:ring-2 hover:ring-primary/30" : ""}`}>
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">{slide.icon}</div>
                 <h1 className="mt-3 text-2xl font-bold text-foreground md:text-3xl">{slide.title}</h1>
                 <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">{slide.desc}</p>
@@ -380,10 +381,10 @@ export default function RoleSelectionPage() {
               <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><Facebook className="h-5 w-5" /></a>
               <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><Instagram className="h-5 w-5" /></a>
               <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><Linkedin className="h-5 w-5" /></a>
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Channel" className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><MessageCircle className="h-5 w-5" /></a>
+              <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Support" className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><MessageCircle className="h-5 w-5" /></a>
               <a href={`mailto:${CONTACT_EMAIL}`} aria-label="Email" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"><Mail className="h-5 w-5" /></a>
             </div>
-            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline"><MessageCircle className="h-4 w-4" /> Follow our WhatsApp Channel</a>
+            <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline"><MessageCircle className="h-4 w-4" /> Get WhatsApp Support 24/7</a>
             <div>
               <a href={`mailto:${CONTACT_EMAIL}`} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"><Mail className="h-4 w-4" /> {CONTACT_EMAIL}</a>
             </div>
