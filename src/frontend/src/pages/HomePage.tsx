@@ -63,6 +63,7 @@ import {
   getUnlockCount,
   getUnreadNotificationsCount,
   getProfile,
+  searchUsers,
   getCommunityPosts,
   createCommunityPost,
   getUserSupports,
@@ -280,6 +281,10 @@ function HomeSocialDashboard() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [busyPost, setBusyPost] = useState<string | null>(null);
+  const [userQuery, setUserQuery] = useState("");
+  const [submittedUserQuery, setSubmittedUserQuery] = useState("");
+  const [userResults, setUserResults] = useState<any[]>([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
 
   const loadHomeData = async () => {
     if (!user?.id) return;
@@ -296,6 +301,31 @@ function HomeSocialDashboard() {
   };
 
   useEffect(() => { loadHomeData(); }, [user?.id, feedTab]);
+
+  useEffect(() => {
+    const query = submittedUserQuery.trim();
+    if (query.length < 2) {
+      setUserResults([]);
+      setSearchingUsers(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setSearchingUsers(true);
+      try {
+        const results = await searchUsers(query);
+        if (!cancelled) setUserResults(Array.isArray(results) ? results : []);
+      } catch {
+        if (!cancelled) setUserResults([]);
+      } finally {
+        if (!cancelled) setSearchingUsers(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [submittedUserQuery]);
 
   const submitPost = async () => {
     const text = message.trim();
@@ -368,6 +398,32 @@ function HomeSocialDashboard() {
                 <p className="text-[10px] text-muted-foreground">100 Supports = 1 Credit</p>
               </div>
             </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <Search className="h-4 w-4 text-primary" />
+              <div>
+                <h2 className="text-sm font-bold text-foreground">Find people in Givethra</h2>
+                <p className="text-xs text-muted-foreground">Search by name or username, then open their profile.</p>
+              </div>
+            </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input value={userQuery} onChange={(event) => setUserQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") setSubmittedUserQuery(userQuery); }} placeholder="Search name or @username" className="h-11 w-full rounded-xl border border-border bg-muted/20 pl-10 pr-24 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+              <button type="button" onClick={() => setSubmittedUserQuery(userQuery)} disabled={userQuery.trim().length < 2} className="absolute right-1 top-1 h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">Search</button>
+            </div>
+            {submittedUserQuery.trim().length >= 2 && (
+              <div className="mt-3 space-y-2">
+                {searchingUsers ? <p className="py-3 text-center text-xs text-muted-foreground">Searching…</p> : userResults.length === 0 ? <p className="py-3 text-center text-xs text-muted-foreground">No users found.</p> : userResults.map((result) => (
+                  <Link key={result.user_id} to="/profile/$id" params={{ id: String(result.user_id) }} className="flex items-center gap-3 rounded-xl border border-border/70 p-3 transition hover:border-primary/40 hover:bg-primary/5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-bold text-primary">{result.avatar_url ? <img src={result.avatar_url} alt="" className="h-full w-full object-cover" /> : String(result.full_name || "U").slice(0, 1).toUpperCase()}</div>
+                    <div className="min-w-0"><p className="truncate text-sm font-semibold">{result.full_name || "Givethra member"}</p><p className="truncate text-xs text-muted-foreground">{result.username ? `@${result.username}` : "Givethra member"}{result.city ? ` · ${result.city}` : ""}</p></div>
+                    <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
+                  </Link>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">

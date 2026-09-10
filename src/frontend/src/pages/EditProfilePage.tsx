@@ -95,6 +95,12 @@ export default function EditProfilePage() {
   const [kycStatus, setKycStatus] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("");
+  const [idNumber, setIdNumber] = useState("");
   const [countryCode, setCountryCode] = useState("");
   const [city, setCity] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -135,6 +141,12 @@ export default function EditProfilePage() {
 
       if (prof) {
         setFullName(prof.full_name ?? user.fullName ?? "");
+        setFirstName(prof.first_name ?? "");
+        setLastName(prof.last_name ?? "");
+        setUsername(prof.username ?? "");
+        setAge(prof.age != null ? String(prof.age) : "");
+        setGender(prof.gender ?? "");
+        setIdNumber(prof.id_number ?? "");
 
         setCity(prof.city ?? "");
 
@@ -159,6 +171,9 @@ export default function EditProfilePage() {
         setCoverUrl(prof.cover_url ?? null);
       } else {
         setFullName(user.fullName ?? "");
+        const nameParts = String(user.fullName || "").trim().split(/\s+/);
+        setFirstName(nameParts[0] || "");
+        setLastName(nameParts.slice(1).join(" "));
       }
 
       try {
@@ -328,6 +343,15 @@ export default function EditProfilePage() {
       return;
     }
 
+    if (setupMode && !username.trim()) {
+      toast.error("Username is required to create your profile");
+      return;
+    }
+    if (username && !/^[a-zA-Z0-9_]{3,24}$/.test(username.trim())) {
+      toast.error("Username must be 3–24 characters using letters, numbers, or underscore");
+      return;
+    }
+
     const validationError = getBioError(bio);
 
     if (validationError) {
@@ -343,6 +367,12 @@ export default function EditProfilePage() {
         user.id,
         {
           full_name: fullName.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          username: username.trim().toLowerCase(),
+          age: age ? Number(age) : null,
+          gender: gender || null,
+          id_number: idNumber.trim() || null,
           city: city.trim(),
 
           country_code: countryCode,
@@ -607,6 +637,45 @@ export default function EditProfilePage() {
                       }
                       placeholder="Your full legal name"
                     />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Username</Label>
+                      <Input id="username" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))} placeholder="e.g. shoaib_hope" maxLength={24} />
+                      <p className="text-xs text-muted-foreground">People can find you by this username.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="age">Age</Label>
+                      <Input id="age" type="number" min={13} max={120} value={age} onChange={(e) => setAge(e.target.value)} placeholder="Your age" />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="gender">Gender</Label>
+                      <select id="gender" value={gender} onChange={(e) => setGender(e.target.value)} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                        <option value="">Prefer not to say</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="idNumber">National ID / ID number</Label>
+                      <Input id="idNumber" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Optional" />
+                    </div>
                   </div>
 
                   {/* Country */}

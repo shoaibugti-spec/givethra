@@ -501,7 +501,7 @@ async function handleProfile(request, env, user, parts, origin) {
   if (!userId || (request.method !== "GET" && !canAccessUser(user, userId))) return json({ error: "Forbidden" }, 403, origin);
   const queryRole = String(new URL(request.url).searchParams.get("profile_role") || "").toLowerCase();
   const profileRole = queryRole === "hero" || queryRole === "requester" ? queryRole : (user?.role === "hero" ? "hero" : "requester");
-  const allowedFields = ["full_name", "phone_number", "country", "city", "bio", "preferred_language", "avatar_url", "cover_url"];
+  const allowedFields = ["full_name", "first_name", "last_name", "username", "age", "gender", "id_number", "phone_number", "country", "country_code", "city", "bio", "preferred_language", "avatar_url", "cover_url"];
 
   if (request.method === "GET") {
     try {
@@ -539,15 +539,19 @@ async function handleProfile(request, env, user, parts, origin) {
     const merged = { ...(current || {}), ...values };
     await env.DB.prepare(
       `INSERT INTO profile_variants
-        (id, user_id, profile_role, full_name, phone_number, country, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, user_id, profile_role, full_name, first_name, last_name, username, age, gender, id_number, phone_number, country, country_code, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(user_id, profile_role) DO UPDATE SET
-        full_name = excluded.full_name, phone_number = excluded.phone_number, country = excluded.country,
+        full_name = excluded.full_name, first_name = excluded.first_name, last_name = excluded.last_name,
+        username = excluded.username, age = excluded.age, gender = excluded.gender, id_number = excluded.id_number,
+        phone_number = excluded.phone_number, country = excluded.country, country_code = excluded.country_code,
         city = excluded.city, bio = excluded.bio, preferred_language = excluded.preferred_language,
         avatar_url = excluded.avatar_url, cover_url = excluded.cover_url, updated_at = excluded.updated_at`
-    ).bind(current?.id || id(), userId, profileRole, merged.full_name || null, merged.phone_number || null,
-      merged.country || null, merged.city || null, merged.bio || null, merged.preferred_language || "en",
-      merged.avatar_url || null, merged.cover_url || null, current?.created_at || timestamp, timestamp).run();
+    ).bind(current?.id || id(), userId, profileRole, merged.full_name || null, merged.first_name || null,
+      merged.last_name || null, merged.username || null, merged.age ? Number(merged.age) : null, merged.gender || null,
+      merged.id_number || null, merged.phone_number || null, merged.country || null, merged.country_code || null,
+      merged.city || null, merged.bio || null, merged.preferred_language || "en", merged.avatar_url || null,
+      merged.cover_url || null, current?.created_at || timestamp, timestamp).run();
     const saved = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
     if (saved) {
       await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?")
@@ -559,17 +563,51 @@ async function handleProfile(request, env, user, parts, origin) {
   const current = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
   const merged = { ...(current || {}), ...values, user_id: userId, created_at: current?.created_at || timestamp, updated_at: timestamp };
   await env.DB.prepare(
-    `INSERT INTO profiles (user_id, full_name, phone_number, country, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET full_name = excluded.full_name, phone_number = excluded.phone_number,
-      country = excluded.country, city = excluded.city, bio = excluded.bio, preferred_language = excluded.preferred_language,
+    `INSERT INTO profiles (user_id, full_name, first_name, last_name, username, age, gender, id_number, phone_number, country, country_code, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET full_name = excluded.full_name, first_name = excluded.first_name,
+      last_name = excluded.last_name, username = excluded.username, age = excluded.age, gender = excluded.gender,
+      id_number = excluded.id_number, phone_number = excluded.phone_number, country = excluded.country,
+      country_code = excluded.country_code, city = excluded.city, bio = excluded.bio, preferred_language = excluded.preferred_language,
       avatar_url = excluded.avatar_url, cover_url = excluded.cover_url, updated_at = excluded.updated_at`
-  ).bind(userId, merged.full_name || null, merged.phone_number || null, merged.country || null, merged.city || null,
-    merged.bio || null, merged.preferred_language || "en", merged.avatar_url || null, merged.cover_url || null,
-    merged.created_at, merged.updated_at).run();
+  ).bind(userId, merged.full_name || null, merged.first_name || null, merged.last_name || null, merged.username || null,
+    merged.age ? Number(merged.age) : null, merged.gender || null, merged.id_number || null, merged.phone_number || null,
+    merged.country || null, merged.country_code || null, merged.city || null, merged.bio || null,
+    merged.preferred_language || "en", merged.avatar_url || null, merged.cover_url || null, merged.created_at, merged.updated_at).run();
   await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?")
     .bind(merged.full_name || user.full_name || null, merged.avatar_url || user.avatar_url || null, timestamp, userId).run();
   return json({ ...merged, profile_role: profileRole }, 200, origin);
+}
+
+async function handleUserSearch(request, env, user, url, origin) {
+  if (!user) return json({ error: "Authentication required" }, 401, origin);
+  if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
+  const query = String(url.searchParams.get("q") || "").trim().replace(/[%_]/g, "").slice(0, 60);
+  if (query.length < 2) return json([], 200, origin);
+  const pattern = `%${query}%`;
+  const rows = await env.DB.prepare(
+    `SELECT u.user_id,
+      COALESCE(v.full_name, p.full_name, u.full_name, 'Givethra member') AS full_name,
+      COALESCE(v.username, p.username) AS username,
+      COALESCE(v.avatar_url, p.avatar_url, u.avatar_url) AS avatar_url,
+      COALESCE(v.country, p.country) AS country,
+      COALESCE(v.city, p.city) AS city
+     FROM users u
+     LEFT JOIN profiles p ON p.user_id = u.user_id
+     LEFT JOIN profile_variants v ON v.user_id = u.user_id AND v.profile_role = 'hero'
+     WHERE lower(COALESCE(v.full_name, p.full_name, u.full_name, '')) LIKE lower(?)
+        OR lower(COALESCE(v.username, p.username, '')) LIKE lower(?)
+     ORDER BY lower(COALESCE(v.full_name, p.full_name, u.full_name, '')) ASC
+     LIMIT 20`
+  ).bind(pattern, pattern).all();
+  return json((rows.results || []).map((row) => ({
+    user_id: row.user_id,
+    full_name: row.full_name,
+    username: row.username || null,
+    avatar_url: row.avatar_url || null,
+    country: row.country || null,
+    city: row.city || null,
+  })), 200, origin);
 }
 
 // ============================================================
@@ -1625,6 +1663,10 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
+    if (parts[1] === "user-search") {
+      return handleUserSearch(request, env, user, url, origin);
+    }
+
     // ✅ PROFILES
     if (parts[1] === "profiles") {
       return handleProfile(request, env, user, parts, origin);

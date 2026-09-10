@@ -305,6 +305,16 @@ export async function getProfileStats(userId: string) {
   return readApiResponse(res);
 }
 
+export async function searchUsers(query: string) {
+  const value = query.trim();
+  if (value.length < 2) return [];
+  const res = await fetchWithAuth(`${WORKER_URL}/api/user-search?q=${encodeURIComponent(value)}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  return readArrayResponse(res);
+}
+
 export async function updateProfile(userId: string, data: any, profileRole?: "hero" | "requester" | null) {
   const query = profileRole ? `?profile_role=${encodeURIComponent(profileRole)}` : "";
   const res = await fetchWithAuth(`${WORKER_URL}/api/profiles/${userId}${query}`, {
