@@ -10,6 +10,7 @@ import { sendNotification } from "@/lib/notify";
 import { Shield, CheckCircle2, Clock, AlertTriangle, Camera, Eye, RefreshCw, ArrowRight, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { useNavigate } from "@tanstack/react-router";
 import Tesseract from "tesseract.js";
 import {
   getKycSubmission,
@@ -20,6 +21,10 @@ import {
 
 export default function KycPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const returnTo = (() => {
+    try { return sessionStorage.getItem("givethra_kyc_return_to") || "/home"; } catch { return "/home"; }
+  })();
   const [submission, setSubmission] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -536,6 +541,9 @@ export default function KycPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8">
+        <Button variant="ghost" size="sm" className="mb-4 -ml-2" onClick={() => { try { sessionStorage.removeItem("givethra_kyc_return_to"); } catch { /* ignore */ } navigate({ to: returnTo as any }); }}>
+          ← Back
+        </Button>
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 rounded-xl bg-primary/10"><Shield className="h-5 w-5 text-primary" /></div>
           <div>

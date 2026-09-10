@@ -47,6 +47,7 @@ import { useCompletionCooldown } from "@/hooks/useCompletionCooldown";
 import { formatRemaining } from "@/lib/completionCooldown";
 import { validateStep } from "./utils/validation";
 import { submitCase } from "./utils/SubmitCase";
+import { getKycStatus } from "@/lib/api";
 
 const STEP_COMPONENTS: Record<string, React.ComponentType<any>> = {
   category: StepCategory,
@@ -114,6 +115,7 @@ export default function SubmitRequestWizard() {
   const [currentStepId, setCurrentStepId] = useState<string>("category");
   const [submitting, setSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [checkingKyc, setCheckingKyc] = useState(true);
   const [forceNewCase, setForceNewCase] = useState(false);
   const [allowEarlyFlow, setAllowEarlyFlow] = useState(false);
 
@@ -147,13 +149,33 @@ export default function SubmitRequestWizard() {
       navigate({ to: "/sign-in", search: { redirect: "/submit-request" } });
       return;
     }
-    const saved = loadDraft();
-    if (saved) {
-      setFormData((prev) => ({ ...prev, ...saved }));
-      if (saved._stepId) setCurrentStepId(saved._stepId);
-    }
-    setIsLoading(false);
-  }, [isAuthenticated, navigate, loadDraft]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const kyc = user?.id ? await getKycStatus(user.id) : null;
+        const approved = String(kyc?.status || "none").trim().toLowerCase() === "approved";
+        if (!approved) {
+          try { sessionStorage.setItem("givethra_kyc_return_to", "/submit-request"); } catch { /* ignore */ }
+          navigate({ to: "/kyc" });
+          return;
+        }
+        const saved = loadDraft();
+        if (!cancelled && saved) {
+          setFormData((prev) => ({ ...prev, ...saved }));
+          if (saved._stepId) setCurrentStepId(saved._stepId);
+        }
+      } catch {
+        try { sessionStorage.setItem("givethra_kyc_return_to", "/submit-request"); } catch { /* ignore */ }
+        navigate({ to: "/kyc" });
+      } finally {
+        if (!cancelled) {
+          setCheckingKyc(false);
+          setIsLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, navigate, loadDraft, user?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -343,7 +365,7 @@ export default function SubmitRequestWizard() {
     </Layout>
   );
 
-  if (isLoading || statsLoading || cooldownLoading) {
+  if (isLoading || checkingKyc || statsLoading || cooldownLoading) {
     return shell(<div className="py-16 text-center">Loading Submit Request Wizard...</div>);
   }
 

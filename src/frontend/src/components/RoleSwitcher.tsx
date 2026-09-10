@@ -5,7 +5,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { Users, HeartHandshake } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { getKycStatus } from "@/lib/api";
 
 export default function RoleSwitcher() {
   const { role, setRole } = useRole();
@@ -20,21 +19,6 @@ export default function RoleSwitcher() {
     try {
       // Convert role to AuthContext format
       const authRole = newRole === "requester" ? "help_seeker" : "hero";
-      
-      // If switching to Requester, check KYC
-      if (newRole === "requester" && user?.id) {
-        const kyc = await getKycStatus(user.id);
-        const status = String(kyc?.status || "none").toLowerCase();
-        
-        if (status !== "approved") {
-          // Set role to requester before redirect so after KYC they become requester
-          setRole("requester");
-          setAuthRole("help_seeker");
-          navigate({ to: "/kyc" });
-          toast.info("Please complete KYC verification to become a Requester.");
-          return;
-        }
-      }
       
       // Switch role in both contexts
       setRole(newRole);
