@@ -205,7 +205,11 @@ export default function RoleSelectionPage() {
     const interval = setInterval(() => {
       setRoleHubSlideIndex((previous) => {
         const next = (previous + 1) % roleHubSlides.length;
-        roleHubSliderRef.current?.children[next]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        const slider = roleHubSliderRef.current;
+        const slide = slider?.children[next] as HTMLElement | undefined;
+        // Move only the horizontal carousel. scrollIntoView() also changes the
+        // document's vertical scroll position when the user is reading a wall.
+        if (slider && slide) slider.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
         return next;
       });
     }, 4500);
@@ -216,11 +220,25 @@ export default function RoleSelectionPage() {
   const handleRequesterClick = () => {
     setRole("requester");
     setAuthRole("help_seeker");
+    window.scrollTo({ top: 0, behavior: "auto" });
     navigate({ to: "/need-help" });
   };
 
   const handleCommunityClick = () => {
+    if (!role) {
+      const nextRole = authRole === "hero" ? "hero" : "requester";
+      setRole(nextRole);
+      setAuthRole(nextRole === "hero" ? "hero" : "help_seeker");
+    }
+    window.scrollTo({ top: 0, behavior: "auto" });
     navigate({ to: "/home" });
+  };
+
+  const handleHeroClick = () => {
+    setRole("hero");
+    setAuthRole("hero");
+    window.scrollTo({ top: 0, behavior: "auto" });
+    navigate({ to: "/become-hero" });
   };
 
   if (!isAuthenticated) {
@@ -280,7 +298,7 @@ export default function RoleSelectionPage() {
           {/* Hero button 2 – hero slides */}
           <button
             type="button"
-            onClick={() => navigate({ to: "/become-hero" })}
+            onClick={handleHeroClick}
             className="group flex items-center justify-center rounded-3xl bg-amber-500 p-4 shadow-md transition-all hover:scale-[1.02] hover:shadow-xl dark:bg-amber-600 aspect-square"
           >
             <SlideContent
