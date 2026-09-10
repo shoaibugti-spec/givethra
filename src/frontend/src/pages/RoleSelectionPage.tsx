@@ -226,13 +226,11 @@ export default function RoleSelectionPage() {
   };
 
   const handleCommunityClick = () => {
-    if (!role) {
-      const nextRole = authRole === "hero" ? "hero" : "requester";
-      setRole(nextRole);
-      setAuthRole(nextRole === "hero" ? "hero" : "help_seeker");
-    }
+    const nextRole = role || (authRole === "hero" ? "hero" : "requester");
+    setRole(nextRole);
+    setAuthRole(nextRole === "hero" ? "hero" : "help_seeker");
     window.scrollTo({ top: 0, behavior: "auto" });
-    navigate({ to: "/home" });
+    void navigate({ to: "/home" });
   };
 
   const handleHeroClick = () => {

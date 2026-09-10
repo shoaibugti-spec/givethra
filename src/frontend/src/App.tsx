@@ -313,15 +313,11 @@ const indexRoute = createRoute({
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/home",
-  component: () => {
-    const { role } = useRole();
-    if (!role) return <PageLoader />;
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <HomePage />
-      </Suspense>
-    );
-  },
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <HomePage />
+    </Suspense>
+  ),
 });
 
 const signUpRoute = createRoute({
