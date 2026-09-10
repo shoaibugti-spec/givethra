@@ -224,7 +224,7 @@ function BottomNavFallback() {
 import BottomNav from "@/components/BottomNav";
 
 function RootLayout() {
-  const { isAuthenticated, user, role: authRole, isAdmin } = useAuth();
+  const { isAuthenticated, isInitializing, user, role: authRole, isAdmin } = useAuth();
   const { role, setRole } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
@@ -282,7 +282,7 @@ function RootLayout() {
     }
   }, [role, isAdmin, isAuthenticated, location.pathname, navigate, checking]);
 
-  if (isAuthenticated && checking) {
+  if (isInitializing) {
     return <AppLoadingScreen />;
   }
 
