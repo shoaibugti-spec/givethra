@@ -1190,11 +1190,16 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     let filter = "";
     const binds = [actorId, actorId, actorId];
     if (tab === "my-heroes" && user) { filter = "WHERE cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)"; binds.push(user.user_id); }
-    if (tab === "my-posts" && user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
+    if (tab === "my-posts") {
+      if (user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
+      else filter = "WHERE 1 = 0";
+    }
     const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3 + COALESCE(sc.support_count,0) * 3)";
     const heroBoost = "(CASE WHEN cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 100 ELSE 0 END)";
     const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.signed_up_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
     const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
+    const rankSeed = Number.isFinite(Number(url.searchParams.get("seed"))) ? Math.trunc(Number(url.searchParams.get("seed"))) : 0;
+    const stableVariation = `(((unicode(substr(cp.id, 1, 1)) * 31 + ${rankSeed}) % 17) / 100.0)`;
     // Keep the four feed contracts intentionally distinct:
     // Latest is purely chronological; Most Supported is purely support-ranked;
     // For You is the mixed/personalized ranking.
@@ -1204,7 +1209,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
         ? "COALESCE(sc.support_count, 0) DESC, cp.created_at DESC, cp.id DESC"
         : tab === "my-posts"
           ? "cp.created_at DESC, cp.id DESC"
-          : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC, cp.id DESC`;
+          : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} + ${stableVariation} DESC, cp.created_at DESC, cp.id DESC`;
     if (tab !== "my-posts") binds.push(user?.user_id || actorId);
     const posts = await env.DB.prepare(
       `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),

@@ -391,8 +391,10 @@ export async function getHeroesWall(limit = 24) {
   return data;
 }
 
-export async function getCommunityPosts(tab: "for-you" | "latest" | "most-supported" | "my-heroes" | "my-posts" = "for-you") {
-  const res = await fetchWithAuth(`${WORKER_URL}/api/community/posts?tab=${encodeURIComponent(tab)}`, {
+export async function getCommunityPosts(tab: "for-you" | "latest" | "most-supported" | "my-posts" = "for-you", rankSeed?: number) {
+  const query = new URLSearchParams({ tab });
+  if (tab === "for-you" && typeof rankSeed === "number" && Number.isFinite(rankSeed)) query.set("seed", String(Math.trunc(rankSeed)));
+  const res = await fetchWithAuth(`${WORKER_URL}/api/community/posts?${query.toString()}`, {
     headers: { ...headers(), "X-Guest-ID": getGuestId() },
     cache: "no-store",
   });

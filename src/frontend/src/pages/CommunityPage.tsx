@@ -30,7 +30,6 @@ import {
   Loader2,
   CheckCircle2,
   Share2,
-  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -195,7 +194,7 @@ export default function CommunityPage() {
   >({});
 
   const [feedTab, setFeedTab] = useState<
-    "for-you" | "my-heroes" | "my-posts"
+    "for-you" | "latest" | "most-supported" | "my-posts"
   >("for-you");
 
   const [supportingPostId, setSupportingPostId] = useState<string | null>(null);
@@ -223,7 +222,8 @@ export default function CommunityPage() {
     }
 
     try {
-      const data = await getCommunityPosts(feedTab);
+      const rankSeed = feedTab === "for-you" ? Date.now() % 1000000000 : undefined;
+      const data = await getCommunityPosts(feedTab, rankSeed);
 
       const nextPosts = Array.isArray(data)
         ? data.map(normalizeCachedPost)
@@ -690,7 +690,7 @@ export default function CommunityPage() {
 
         {/* Feed Tabs */}
         <div
-          className="grid grid-cols-3 rounded-xl border border-border bg-muted/30 p-1"
+          className="grid grid-cols-4 rounded-xl border border-border bg-muted/30 p-1"
           role="tablist"
           aria-label="Community post feeds"
         >
@@ -711,16 +711,29 @@ export default function CommunityPage() {
           <button
             type="button"
             role="tab"
-            aria-selected={feedTab === "my-heroes"}
-            onClick={() => setFeedTab("my-heroes")}
+            aria-selected={feedTab === "latest"}
+            onClick={() => setFeedTab("latest")}
             className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
-              feedTab === "my-heroes"
+              feedTab === "latest"
                 ? "bg-card text-primary shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Users className="inline h-4 w-4 mr-1" />
-            My Heroes
+            Latest
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={feedTab === "most-supported"}
+            onClick={() => setFeedTab("most-supported")}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+              feedTab === "most-supported"
+                ? "bg-card text-primary shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Most Supported
           </button>
 
           <button
@@ -804,8 +817,6 @@ export default function CommunityPage() {
             <p className="text-muted-foreground">
               {feedTab === "my-posts"
                 ? "You have not shared a post yet."
-                : feedTab === "my-heroes"
-                ? "Follow Heroes to see their posts here."
                 : "No posts yet. Be the first to share!"}
             </p>
           </div>
