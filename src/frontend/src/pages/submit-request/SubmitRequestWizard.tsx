@@ -293,6 +293,8 @@ export default function SubmitRequestWizard() {
         handleFieldChange("description", val);
       } else if (stepId === "terms") {
         handleFieldChange("confirmed", val === true || val === "true");
+      } else if (stepId === "orphan") {
+        handleFieldChange("isOrphan", val);
       } else {
         handleFieldChange(stepId, val);
       }
@@ -323,6 +325,8 @@ export default function SubmitRequestWizard() {
       ? formData.description
       : currentStepId === "terms"
       ? formData.confirmed
+      : currentStepId === "orphan"
+      ? formData.isOrphan
       : (formData[currentStepId as keyof typeof formData] ?? "");
 
   const needsFormData = STEPS_NEEDING_FORMDATA.has(currentStepId);

@@ -8,6 +8,7 @@ const validation = readFileSync(new URL("./utils/validation.ts", import.meta.url
 const constantsSource = readFileSync(new URL("./constants.ts", import.meta.url), "utf8");
 const amountStep = readFileSync(new URL("./steps/StepAmount.tsx", import.meta.url), "utf8");
 const submitCase = readFileSync(new URL("./utils/SubmitCase.ts", import.meta.url), "utf8");
+const wizard = readFileSync(new URL("./SubmitRequestWizard.tsx", import.meta.url), "utf8");
 const worker = readFileSync(new URL("../../../worker.js", import.meta.url), "utf8");
 
 describe("Requester Visit submission audit", () => {
@@ -37,6 +38,13 @@ describe("Requester Visit submission audit", () => {
     expect(validation).toContain('"Medical & Treatment"');
     expect(validation).toContain('"Child Support"');
     expect(validation).toContain('"Emergency Help"');
+  });
+
+  it("maps the orphan Yes/No control to the isOrphan validation field", () => {
+    expect(wizard).toContain('stepId === "orphan"');
+    expect(wizard).toContain('handleFieldChange("isOrphan", val)');
+    expect(wizard).toContain('currentStepId === "orphan"');
+    expect(wizard).toContain("formData.isOrphan");
   });
 
   it("uses fixed Rs 3,000 Emergency and Rs 8,000 Livestock/Farming amounts everywhere", () => {
