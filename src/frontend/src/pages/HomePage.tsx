@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   getApprovedCases,
   getCategoryCounts,
@@ -270,13 +271,28 @@ const TRUST_BADGES = [
   },
 ];
 
+function relativePostTime(value: unknown) {
+  const timestamp = new Date(String(value || "")).getTime();
+  if (!Number.isFinite(timestamp)) return "Recently";
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 function HomeSocialDashboard() {
   const { user } = useAuth();
   const { role } = useRole();
   const [walletBalance, setWalletBalance] = useState(0);
   const [supports, setSupports] = useState(0);
+  const [supportsGiven, setSupportsGiven] = useState(0);
+  const [supportEarningsUsd, setSupportEarningsUsd] = useState(0);
   const [posts, setPosts] = useState<any[]>([]);
-  const [feedTab, setFeedTab] = useState<"for-you" | "my-heroes" | "my-posts">("for-you");
+  const [feedTab, setFeedTab] = useState<"for-you" | "latest" | "most-supported" | "my-posts">("for-you");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
@@ -296,6 +312,10 @@ function HomeSocialDashboard() {
     ]);
     if (walletResult.status === "fulfilled") setWalletBalance(Number(walletResult.value?.balance || 0));
     if (supportResult.status === "fulfilled") setSupports(Number(supportResult.value?.supports || 0));
+    if (supportResult.status === "fulfilled") {
+      setSupportsGiven(Number(supportResult.value?.supportsGiven || 0));
+      setSupportEarningsUsd(Number(supportResult.value?.supportEarningsUsd || 0));
+    }
     if (postsResult.status === "fulfilled") setPosts(Array.isArray(postsResult.value) ? postsResult.value : []);
     setLoading(false);
   };
@@ -335,6 +355,9 @@ function HomeSocialDashboard() {
       const created = await createCommunityPost({ message: text, user_id: user.id, display_name: user.fullName || "User", is_guest: false });
       setPosts((current) => [{ ...created, display_name: created?.display_name || user.fullName || "User", message: text, likes_count: 0, support_count: 0 }, ...current]);
       setMessage("");
+      toast.success("Your post is live. You can publish again after 24 hours.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Post could not be published");
     } finally {
       setPosting(false);
     }
@@ -347,15 +370,19 @@ function HomeSocialDashboard() {
     else await navigator.clipboard?.writeText(`${text}\n${url}`);
   };
   const reactToPost = async (post: any) => {
-    if (!post?.id) return;
+    if (!post?.id || post.supported_by_me || post.user_id === user?.id) return;
     setBusyPost(`support:${post.id}`);
     try {
-      await supportPost(String(post.id));
+      const result = await supportPost(String(post.id));
       setPosts((current) => current.map((item) => item.id === post.id ? {
         ...item,
-        support_count: Number(item.support_count || 0) + 1,
+        support_count: Number(result?.support_count ?? Number(item.support_count || 0) + 1),
+        supported_by_me: true,
       } : item));
       setSupports((value) => value + 1);
+      if (result?.supportEarningsUsd != null) setSupportEarningsUsd(Number(result.supportEarningsUsd));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Support could not be added");
     } finally {
       setBusyPost(null);
     }
@@ -387,16 +414,21 @@ function HomeSocialDashboard() {
                 {(user?.fullName || "U").slice(0, 1).toUpperCase()}
               </div>
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-primary/5 border border-primary/15 p-3">
-                <p className="text-xs text-muted-foreground">Wallet / Credits</p>
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              <div className="rounded-xl border border-primary/15 bg-primary/5 p-3">
+                <p className="text-[11px] text-muted-foreground">Wallet credits</p>
                 <p className="mt-1 text-xl font-bold text-primary">{walletBalance.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground">Used for platform actions</p>
               </div>
-              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 dark:bg-amber-950/20">
-                <p className="text-xs text-muted-foreground">Support Balance</p>
-                <p className="mt-1 text-xl font-bold text-amber-600">{supports.toLocaleString()} <span className="text-xs font-medium">Supports</span></p>
-                <p className="text-[10px] text-muted-foreground">100 Supports = 1 Credit</p>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:bg-amber-950/20">
+                <p className="text-[11px] text-muted-foreground">Support earnings</p>
+                <p className="mt-1 text-xl font-bold text-amber-600">${supportEarningsUsd.toFixed(2)}</p>
+                <p className="text-[10px] text-muted-foreground">{supports.toLocaleString()} received · 10,000 = $1</p>
               </div>
+            </div>
+            <div className="mt-2 flex items-center justify-between rounded-xl border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+              <span>{supportsGiven.toLocaleString()} Supports given to others</span>
+              <span className="font-semibold text-amber-700">Withdrawal coming soon</span>
             </div>
           </section>
 
@@ -432,22 +464,22 @@ function HomeSocialDashboard() {
               <div className="min-w-0 flex-1">
                 <p className="mb-2 text-sm font-semibold">{user?.fullName || "Your profile"}</p>
                 <textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="What’s on your mind to share?" rows={3} className="w-full resize-none rounded-xl border border-border bg-muted/20 p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
-                <div className="mt-3 flex justify-end"><Button onClick={submitPost} disabled={posting || !message.trim()}>{posting ? "Posting..." : "Post"}</Button></div>
+                <div className="mt-3 flex items-center justify-between gap-3"><span className="text-[11px] text-muted-foreground">One post per 24 hours · Support others to grow the community</span><Button onClick={submitPost} disabled={posting || !message.trim()}>{posting ? "Posting..." : "Post"}</Button></div>
               </div>
             </div>
           </section>
 
-          <div className="flex gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
-            {[ ["for-you", "For You"], ["my-heroes", "My Heroes"], ["my-posts", "My Support"] ].map(([value, label]) => (
+          <div className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm">
+            {[ ["for-you", "For You"], ["latest", "Latest"], ["most-supported", "Most Supported"], ["my-posts", "My Posts"] ].map(([value, label]) => (
               <button key={value} type="button" onClick={() => setFeedTab(value as typeof feedTab)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${feedTab === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>{label}</button>
             ))}
           </div>
 
           {loading ? <div className="py-12 text-center text-sm text-muted-foreground">Loading your feed...</div> : posts.length === 0 ? <div className="rounded-2xl border border-dashed bg-card py-12 text-center text-sm text-muted-foreground">No posts yet. Be the first to share something.</div> : posts.map((post) => (
             <article key={post.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-3"><Link to="/profile/$id" params={{ id: String(post.user_id || "me") }} className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-bold text-primary">{post.avatar_url ? <img src={post.avatar_url} alt="" className="h-full w-full object-cover" /> : String(post.display_name || "U").slice(0, 1).toUpperCase()}</Link><div className="min-w-0"><div className="flex items-center gap-2"><Link to="/profile/$id" params={{ id: String(post.user_id || "me") }} className="truncate text-sm font-semibold hover:text-primary">{post.display_name || "User"}</Link>{post.user_id && post.user_id !== user?.id && <button type="button" disabled={busyPost === `hero:${post.id}`} onClick={() => togglePostHero(post)} className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">{post.is_following ? "Hero ✓" : "Hero"}</button>}</div><p className="text-xs text-muted-foreground">Verified community member</p></div></div>
+              <div className="flex items-center gap-3"><Link to="/profile/$id" params={{ id: String(post.user_id || "me") }} className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-bold text-primary">{post.avatar_url ? <img src={post.avatar_url} alt="" className="h-full w-full object-cover" /> : String(post.display_name || "U").slice(0, 1).toUpperCase()}</Link><div className="min-w-0"><div className="flex items-center gap-2"><Link to="/profile/$id" params={{ id: String(post.user_id || "me") }} className="truncate text-sm font-semibold hover:text-primary">{post.display_name || "User"}</Link>{post.user_id && post.user_id !== user?.id && <button type="button" disabled={busyPost === `hero:${post.id}`} onClick={() => togglePostHero(post)} className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">{post.is_following ? "Hero ✓" : "Hero"}</button>}</div><p className="text-xs text-muted-foreground">{relativePostTime(post.created_at)} · {post.is_verified ? "Verified member" : "Givethra member"}</p></div></div>
               <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{post.message}</p>
-              <div className="mt-4 flex gap-2 border-t border-border pt-3"><button type="button" disabled={busyPost === `support:${post.id}`} onClick={() => reactToPost(post)} className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10">🫴🏻 Support · {Number(post.support_count || 0)}</button><button type="button" onClick={() => sharePost(post)} className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"><Share2 className="h-4 w-4" /> Share</button></div>
+              <div className="mt-4 flex gap-2 border-t border-border pt-3"><button type="button" disabled={busyPost === `support:${post.id}` || Boolean(post.supported_by_me) || post.user_id === user?.id} onClick={() => reactToPost(post)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${post.supported_by_me ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-primary/20 text-primary hover:bg-primary/10"}`}>{post.supported_by_me ? "Supported ✓" : "🫴🏻 Support"} · {Number(post.support_count || 0)}</button><button type="button" onClick={() => sharePost(post)} className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"><Share2 className="h-4 w-4" /> Share</button></div>
             </article>
           ))}
         </div>

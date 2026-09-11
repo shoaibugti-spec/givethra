@@ -23,7 +23,6 @@ import {
   CheckCircle2,
   ChevronRight,
   Circle,
-  Coins,
   Gift,
   KeyRound,
   Lock,
@@ -81,8 +80,7 @@ import { computeHeroStats, computeRequesterStats, type HeroStats, type Requester
 // Config
 // ---------------------------------------------------------------------------
 
-const SUPPORTS_PER_CREDIT = 100;
-const CREDITS_PER_REWARD = 5;
+const SUPPORTS_PER_DOLLAR = 10000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -167,10 +165,10 @@ export default function ProfilePage() {
   const [isMyHero, setIsMyHero] = useState(false);
   const [heroUpdating, setHeroUpdating] = useState(false);
   const [badgeInfoOpen, setBadgeInfoOpen] = useState(false);
-  const [creditsInfoOpen, setCreditsInfoOpen] = useState(false);
   const [heroesCount, setHeroesCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [supportsCount, setSupportsCount] = useState(0);
+  const [supportEarningsUsd, setSupportEarningsUsd] = useState(0);
   const [relationshipType, setRelationshipType] = useState<"heroes" | "requesters" | null>(null);
   const [relationshipUsers, setRelationshipUsers] = useState<any[]>([]);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
@@ -245,6 +243,7 @@ export default function ProfilePage() {
       setHeroesCount(Number(prof?.heroes_count || prof?.followers_count || 0));
       setFollowingCount(Number(prof?.following_count || 0));
       setSupportsCount(Number(prof?.supports_count || 0));
+      setSupportEarningsUsd(Number(prof?.support_earnings_usd || 0));
       setIsMyHero(Boolean(prof?.is_following));
 
       const list = Array.isArray(caseList) ? caseList : [];
@@ -328,12 +327,6 @@ export default function ProfilePage() {
   const displayName = profile?.full_name || user?.fullName || "My Profile";
   const avatarUrl = profile?.avatar_url || null;
   const coverUrl = profile?.cover_url || null;
-
-  const creditCount = Math.floor(supportsCount / SUPPORTS_PER_CREDIT);
-  const supportsIntoCurrentCredit = supportsCount % SUPPORTS_PER_CREDIT;
-  const creditProgressPct = Math.round((supportsIntoCurrentCredit / SUPPORTS_PER_CREDIT) * 100);
-  const rewardsUnlocked = Math.floor(creditCount / CREDITS_PER_REWARD);
-  const creditsIntoCurrentReward = creditCount % CREDITS_PER_REWARD;
 
   const verificationBadges = [
     { label: "Email Verified", icon: <Mail className="h-3 w-3" />, active: isOwnProfile ? !!user?.email : !!profile?.email_verified },
@@ -594,32 +587,22 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ============================= Credits (from Supports) ============================= */}
+        {/* ============================= Support earnings (separate from wallet credits) ============================= */}
         <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Coins className="h-4 w-4 text-amber-600" />
-              <span className="text-sm font-semibold">Credits</span>
+              <HandCoins className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-semibold">Support earnings</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-lg font-bold text-amber-600">{creditCount}</span>
-              <button
-                type="button"
-                onClick={() => setCreditsInfoOpen(true)}
-                className="text-muted-foreground hover:text-primary transition-colors"
-                aria-label="How credits work"
-              >
-                <Info className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div className="h-2 rounded-full bg-amber-500 transition-all" style={{ width: `${creditProgressPct}%` }} />
+            <span className="text-lg font-bold text-amber-600">${supportEarningsUsd.toFixed(2)}</span>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            {SUPPORTS_PER_CREDIT - supportsIntoCurrentCredit} more Supports to your next Credit · {creditsIntoCurrentReward}/{CREDITS_PER_REWARD} Credits toward your next reward
-            {rewardsUnlocked > 0 ? ` (${rewardsUnlocked} unlocked so far)` : ""}
+            {supportsCount.toLocaleString()} Supports received · {SUPPORTS_PER_DOLLAR.toLocaleString()} Supports = $1.00
           </p>
+          <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+            <span>Withdrawal eligibility will be announced soon.</span>
+            <span className="font-semibold whitespace-nowrap">Coming soon</span>
+          </div>
         </div>
 
         {/* ============================= Role-based Stats ============================= */}
@@ -877,32 +860,6 @@ export default function ProfilePage() {
           </div>
           <DialogFooter>
             <Button onClick={() => setBadgeInfoOpen(false)}>Got it</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Credits Info Dialog */}
-      <Dialog open={creditsInfoOpen} onOpenChange={setCreditsInfoOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Coins className="h-5 w-5 text-amber-600" /> How Credits Work
-            </DialogTitle>
-            <DialogDescription>Turn community Supports into real perks.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2 text-sm text-muted-foreground">
-            <p>
-              Every <span className="font-semibold text-foreground">{SUPPORTS_PER_CREDIT} Supports</span> your posts and
-              cases receive from the community earn you{" "}
-              <span className="font-semibold text-foreground">1 Credit</span>.
-            </p>
-            <p>
-              Collect <span className="font-semibold text-foreground">{CREDITS_PER_REWARD} Credits</span> to unlock a
-              reward — submit a new case, unlock a case, or clear an account suspension.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setCreditsInfoOpen(false)}>Got it</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -510,9 +510,9 @@ async function handleProfile(request, env, user, parts, origin) {
         const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
         const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
         const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-        const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
+        const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?").bind(userId).first();
         const profileData = user?.user_id === userId ? variant : withoutPrivateContact(variant);
-        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
+        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), support_earnings_usd:Number(supportData?.support_earnings_usd||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
       }
     } catch { /* migration is additive; use legacy profile until applied */ }
     const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
@@ -520,10 +520,10 @@ async function handleProfile(request, env, user, parts, origin) {
     const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
     const activeCase = profileRole === "requester" ? await env.DB.prepare("SELECT * FROM case_submissions WHERE user_id=? AND lower(COALESCE(status,'')) IN ('approved','open','in_progress') ORDER BY submitted_at DESC LIMIT 1").bind(userId).first() : null;
     const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-    const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
+    const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?").bind(userId).first();
     const profileData = user?.user_id === userId ? (profile || {}) : withoutPrivateContact(profile || {});
     const safeCase = user?.user_id === userId ? activeCase : withoutPrivateContact(activeCase);
-    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts:posts.results||[], active_case:safeCase||null }, 200, origin);
+    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), support_earnings_usd:Number(supportData?.support_earnings_usd||0), is_following:Boolean(following), posts:posts.results||[], active_case:safeCase||null }, 200, origin);
   }
   if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
   const body = await readJson(request);
@@ -1136,25 +1136,19 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
   if (!post) return { added: false, supports: 0, creditsEarned: 0, unavailable: true };
   const existing = await env.DB.prepare("SELECT id FROM user_supports WHERE source_user_id = ? AND post_id = ? LIMIT 1").bind(sourceUserId, postId).first();
   if (existing) {
-    const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count FROM users WHERE user_id = ?").bind(originalUserId).first();
-    return { added: false, supports: Number(current?.supports_count || 0), creditsEarned: 0, alreadySupported: true };
+    const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?").bind(originalUserId).first();
+    return { added: false, supports: Number(current?.supports_count || 0), supportEarningsUsd: Number(current?.support_earnings_usd || 0), alreadySupported: true };
   }
   const inserted = await env.DB.prepare(
     "INSERT OR IGNORE INTO user_supports (id, user_id, source_user_id, post_id, created_at) VALUES (?, ?, ?, ?, ?)"
   ).bind(id(), originalUserId, sourceUserId, postId, now()).run();
   if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, creditsEarned: 0, alreadySupported: true };
-  const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(originalUserId).first();
+  const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?").bind(originalUserId).first();
   const supports = Number(current?.supports_count || 0) + 1;
-  const previousCredits = Number(current?.credits_from_supports || 0);
-  const totalCredits = Math.floor(supports / 100);
-  const creditsEarned = Math.max(0, totalCredits - previousCredits);
-  await env.DB.prepare("UPDATE users SET supports_count = ?, credits_from_supports = ?, updated_at = ? WHERE user_id = ?").bind(supports, totalCredits, now(), originalUserId).run();
-  if (creditsEarned > 0) {
-    await addCredits(env, originalUserId, creditsEarned, "support_to_credit", `${creditsEarned * 100} supports converted to ${creditsEarned} credit${creditsEarned === 1 ? "" : "s"}`, postId);
-    await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "credit_earned", "Credit earned from Supports", `${creditsEarned} credit${creditsEarned === 1 ? "" : "s"} earned from ${creditsEarned * 100} Supports`);
-  }
+  const supportEarningsUsd = Number((supports / 10000).toFixed(4));
+  await env.DB.prepare("UPDATE users SET supports_count = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportEarningsUsd, now(), originalUserId).run();
   await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);
-  return { added: true, supports, creditsEarned };
+  return { added: true, supports, supportEarningsUsd };
 }
 
 async function handleCommunityPosts(request, env, user, url, parts, origin, ctx) {
@@ -1170,7 +1164,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     const heroBoost = "(CASE WHEN cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 100 ELSE 0 END)";
     const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.signed_up_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
     const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
-    const orderBy = tab === "my-posts" ? "cp.created_at DESC" : tab === "my-heroes" ? `${heroBoost} DESC, ${engagementScore} DESC, cp.created_at DESC` : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC`;
+    const orderBy = tab === "latest" ? "cp.created_at DESC" : tab === "most-supported" ? "COALESCE(sc.support_count,0) DESC, cp.created_at DESC" : tab === "my-posts" ? "cp.created_at DESC" : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC`;
     if (tab !== "my-posts") binds.push(user?.user_id || actorId);
     const posts = await env.DB.prepare(
       `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),
@@ -1198,12 +1192,17 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     if (!message && !repostId) return json({ error: "Message or repost ID required" }, 400, origin);
     const guest = user ? null : guestIdentity(request, body);
     if (!user && !guest) return json({ error: "Guest identity is required" }, 400, origin);
+    const authorId = user?.user_id || guest.id;
+    if (user) {
+      const recent = await env.DB.prepare("SELECT created_at FROM community_posts WHERE user_id = ? AND created_at >= datetime('now', '-24 hours') ORDER BY created_at DESC LIMIT 1").bind(authorId).first();
+      if (recent) return json({ error: "You can publish one post every 24 hours.", code: "POST_COOLDOWN", next_post_at: new Date(new Date(recent.created_at).getTime() + 24 * 60 * 60 * 1000).toISOString() }, 429, origin);
+    }
     const postId = id();
     const displayName = user ? publicDisplayName(user.full_name,"User") : guest.name;
     let finalMessage = message;
     if (repostId) { const original = await env.DB.prepare("SELECT display_name, message FROM community_posts WHERE id = ?").bind(repostId).first(); if (!original) return json({ error: "Original post not found" }, 404, origin); finalMessage = `${body?.repost_comment ? String(body.repost_comment).trim() + " — " : ""}Reposted from ${publicDisplayName(original.display_name,"User")}`; }
     await env.DB.prepare(`INSERT INTO community_posts (id,user_id,display_name,message,role,repost_id,repost_comment,created_at) VALUES (?,?,?,?,?,?,?,?)`).bind(postId,user?.user_id||guest.id,displayName,finalMessage,body?.role||null,repostId,body?.repost_comment||null,now()).run();
-    let supportResult = { added: false, supports: 0, creditsEarned: 0 };
+    let supportResult = { added: false, supports: 0, supportEarningsUsd: 0 };
     if (repostId) {
       const original = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(repostId).first();
       if (original?.user_id) supportResult = await recordCommunitySupport(env, ctx, original.user_id, user?.user_id || guest.id, repostId, displayName);
@@ -1746,8 +1745,9 @@ async function handleRequest(request, env, ctx) {
 
     if (parts[1] === "user-supports" && parts[2] && request.method === "GET") {
       const target = String(parts[2]);
-      const row = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports, COALESCE(credits_from_supports, 0) AS creditsFromSupports FROM users WHERE user_id = ?").bind(target).first();
-      return json({ user_id: target, supports: Number(row?.supports || 0), creditsFromSupports: Number(row?.creditsFromSupports || 0) }, 200, origin);
+      const row = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports, COALESCE(support_earnings_usd, 0) AS supportEarningsUsd FROM users WHERE user_id = ?").bind(target).first();
+      const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(target).first();
+      return json({ user_id: target, supports: Number(row?.supports || 0), supportsReceived: Number(row?.supports || 0), supportsGiven: Number(given?.count || 0), supportEarningsUsd: Number(row?.supportEarningsUsd || 0), supportsPerDollar: 10000 }, 200, origin);
     }
 
     if (parts[1] === "wallets" && parts[2]) {
