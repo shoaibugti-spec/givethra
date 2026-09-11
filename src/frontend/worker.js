@@ -1162,17 +1162,22 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
   if (!post) return { added: false, supports: 0, creditsEarned: 0, unavailable: true };
   const existing = await env.DB.prepare("SELECT id FROM user_supports WHERE source_user_id = ? AND post_id = ? LIMIT 1").bind(sourceUserId, postId).first();
   if (existing) {
-    const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?").bind(originalUserId).first();
+    const current = await getProfileSupportData(env, originalUserId);
     return { added: false, supports: Number(current?.supports_count || 0), supportEarningsUsd: Number(current?.support_earnings_usd || 0), alreadySupported: true };
   }
   const inserted = await env.DB.prepare(
     "INSERT OR IGNORE INTO user_supports (id, user_id, source_user_id, post_id, created_at) VALUES (?, ?, ?, ?, ?)"
   ).bind(id(), originalUserId, sourceUserId, postId, now()).run();
   if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, creditsEarned: 0, alreadySupported: true };
-  const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?").bind(originalUserId).first();
+  const current = await getProfileSupportData(env, originalUserId);
   const supports = Number(current?.supports_count || 0) + 1;
   const supportEarningsUsd = Number((supports / 10000).toFixed(4));
-  await env.DB.prepare("UPDATE users SET supports_count = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportEarningsUsd, now(), originalUserId).run();
+  try {
+    await env.DB.prepare("UPDATE users SET supports_count = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportEarningsUsd, now(), originalUserId).run();
+  } catch {
+    // Keep Support functional while an older production database is awaiting migration.
+    await env.DB.prepare("UPDATE users SET supports_count = ?, updated_at = ? WHERE user_id = ?").bind(supports, now(), originalUserId).run();
+  }
   await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);
   return { added: true, supports, supportEarningsUsd };
 }
@@ -1780,7 +1785,7 @@ async function handleRequest(request, env, ctx) {
 
     if (parts[1] === "user-supports" && parts[2] && request.method === "GET") {
       const target = String(parts[2]);
-      const row = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports, COALESCE(support_earnings_usd, 0) AS supportEarningsUsd FROM users WHERE user_id = ?").bind(target).first();
+      const row = await getProfileSupportData(env, target);
       const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(target).first();
       return json({ user_id: target, supports: Number(row?.supports || 0), supportsReceived: Number(row?.supports || 0), supportsGiven: Number(given?.count || 0), supportEarningsUsd: Number(row?.supportEarningsUsd || 0), supportsPerDollar: 10000 }, 200, origin);
     }

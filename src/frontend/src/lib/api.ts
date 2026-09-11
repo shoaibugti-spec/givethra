@@ -391,7 +391,7 @@ export async function getHeroesWall(limit = 24) {
   return data;
 }
 
-export async function getCommunityPosts(tab: "for-you" | "my-heroes" | "my-posts" = "for-you") {
+export async function getCommunityPosts(tab: "for-you" | "latest" | "most-supported" | "my-heroes" | "my-posts" = "for-you") {
   const res = await fetchWithAuth(`${WORKER_URL}/api/community/posts?tab=${encodeURIComponent(tab)}`, {
     headers: { ...headers(), "X-Guest-ID": getGuestId() },
     cache: "no-store",
@@ -453,7 +453,11 @@ export async function createCommunityPost(data: Record<string, unknown>) {
     body: JSON.stringify(payload),
   });
   const result = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(result?.error || `Community post request failed (${res.status})`);
+  if (!res.ok) {
+    const error = new Error(result?.error || `Community post request failed (${res.status})`);
+    Object.assign(error, { code: result?.code, nextPostAt: result?.next_post_at });
+    throw error;
+  }
   return result;
 }
 

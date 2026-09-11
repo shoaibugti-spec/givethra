@@ -33,4 +33,17 @@ describe("community support and feed contract", () => {
     expect(worker).toContain('tab === "most-supported"');
     expect(worker).toContain("COALESCE(sc.support_count, 0) DESC, cp.created_at DESC, cp.id DESC");
   });
+
+  it("keeps Support usable before the additive earnings migration is applied", () => {
+    expect(worker).toContain("const current = await getProfileSupportData(env, originalUserId);");
+    expect(worker).toContain("UPDATE users SET supports_count = ?, updated_at = ? WHERE user_id = ?");
+    expect(worker).toContain("const row = await getProfileSupportData(env, target);");
+  });
+
+  it("shows a live one-post-per-24-hours countdown in the composer", () => {
+    expect(home).toContain('getCommunityPosts("my-posts")');
+    expect(home).toContain("Post locked");
+    expect(home).toContain("cooldownHours");
+    expect(home).toContain("postLocked");
+  });
 });

@@ -297,6 +297,8 @@ function HomeSocialDashboard() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [busyPost, setBusyPost] = useState<string | null>(null);
+  const [postCooldownUntil, setPostCooldownUntil] = useState<number | null>(null);
+  const [clockMs, setClockMs] = useState(() => Date.now());
   const [userQuery, setUserQuery] = useState("");
   const [submittedUserQuery, setSubmittedUserQuery] = useState("");
   const [userResults, setUserResults] = useState<any[]>([]);
@@ -305,10 +307,11 @@ function HomeSocialDashboard() {
   const loadHomeData = async () => {
     if (!user?.id) return;
     setLoading(true);
-    const [walletResult, supportResult, postsResult] = await Promise.allSettled([
+    const [walletResult, supportResult, postsResult, ownPostsResult] = await Promise.allSettled([
       getWallet(user.id),
       getUserSupports(user.id),
       getCommunityPosts(feedTab),
+      getCommunityPosts("my-posts"),
     ]);
     if (walletResult.status === "fulfilled") setWalletBalance(Number(walletResult.value?.balance || 0));
     if (supportResult.status === "fulfilled") setSupports(Number(supportResult.value?.supports || 0));
@@ -317,10 +320,21 @@ function HomeSocialDashboard() {
       setSupportEarningsUsd(Number(supportResult.value?.supportEarningsUsd || 0));
     }
     if (postsResult.status === "fulfilled") setPosts(Array.isArray(postsResult.value) ? postsResult.value : []);
+    if (ownPostsResult.status === "fulfilled") {
+      const latest = ownPostsResult.value
+        .filter((post: any) => post.user_id === user.id && post.created_at)
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+      const next = latest ? new Date(latest.created_at).getTime() + 24 * 60 * 60 * 1000 : 0;
+      setPostCooldownUntil(next > Date.now() ? next : null);
+    }
     setLoading(false);
   };
 
   useEffect(() => { loadHomeData(); }, [user?.id, feedTab]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const query = submittedUserQuery.trim();
@@ -349,19 +363,27 @@ function HomeSocialDashboard() {
 
   const submitPost = async () => {
     const text = message.trim();
-    if (!text || !user?.id) return;
+    if (!text || !user?.id || (postCooldownUntil != null && postCooldownUntil > Date.now())) return;
     setPosting(true);
     try {
       const created = await createCommunityPost({ message: text, user_id: user.id, display_name: user.fullName || "User", is_guest: false });
       setPosts((current) => [{ ...created, display_name: created?.display_name || user.fullName || "User", message: text, likes_count: 0, support_count: 0 }, ...current]);
       setMessage("");
+      setPostCooldownUntil(Date.now() + 24 * 60 * 60 * 1000);
       toast.success("Your post is live. You can publish again after 24 hours.");
     } catch (error) {
+      const nextPostAt = Number((error as any)?.nextPostAt ? new Date((error as any).nextPostAt).getTime() : 0);
+      if (nextPostAt > Date.now()) setPostCooldownUntil(nextPostAt);
       toast.error(error instanceof Error ? error.message : "Post could not be published");
     } finally {
       setPosting(false);
     }
   };
+  const cooldownRemainingMs = Math.max(0, (postCooldownUntil || 0) - clockMs);
+  const cooldownHours = Math.floor(cooldownRemainingMs / (1000 * 60 * 60));
+  const cooldownMinutes = Math.floor((cooldownRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
+  const cooldownSeconds = Math.floor((cooldownRemainingMs % (1000 * 60)) / 1000);
+  const postLocked = cooldownRemainingMs > 0;
 
   const sharePost = async (post: any) => {
     const text = `${post.display_name || "Givethra member"}: ${post.message || ""}`;
@@ -464,7 +486,7 @@ function HomeSocialDashboard() {
               <div className="min-w-0 flex-1">
                 <p className="mb-2 text-sm font-semibold">{user?.fullName || "Your profile"}</p>
                 <textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="What’s on your mind to share?" rows={3} className="w-full resize-none rounded-xl border border-border bg-muted/20 p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
-                <div className="mt-3 flex items-center justify-between gap-3"><span className="text-[11px] text-muted-foreground">One post per 24 hours · Support others to grow the community</span><Button onClick={submitPost} disabled={posting || !message.trim()}>{posting ? "Posting..." : "Post"}</Button></div>
+                <div className="mt-3 flex items-center justify-between gap-3"><span className="text-[11px] text-muted-foreground">{postLocked ? `Post locked · ${cooldownHours}h ${cooldownMinutes}m ${cooldownSeconds}s left` : "One post per 24 hours · Support others to grow the community"}</span><Button onClick={submitPost} disabled={posting || !message.trim() || postLocked}>{posting ? "Posting..." : postLocked ? "Post Locked" : "Post"}</Button></div>
               </div>
             </div>
           </section>
