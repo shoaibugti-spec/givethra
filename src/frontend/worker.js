@@ -1164,7 +1164,16 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     const heroBoost = "(CASE WHEN cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 100 ELSE 0 END)";
     const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.signed_up_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
     const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
-    const orderBy = tab === "latest" ? "cp.created_at DESC" : tab === "most-supported" ? "COALESCE(sc.support_count,0) DESC, cp.created_at DESC" : tab === "my-posts" ? "cp.created_at DESC" : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC`;
+    // Keep the four feed contracts intentionally distinct:
+    // Latest is purely chronological; Most Supported is purely support-ranked;
+    // For You is the mixed/personalized ranking.
+    const orderBy = tab === "latest"
+      ? "cp.created_at DESC, cp.id DESC"
+      : tab === "most-supported"
+        ? "COALESCE(sc.support_count, 0) DESC, cp.created_at DESC, cp.id DESC"
+        : tab === "my-posts"
+          ? "cp.created_at DESC, cp.id DESC"
+          : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC, cp.id DESC`;
     if (tab !== "my-posts") binds.push(user?.user_id || actorId);
     const posts = await env.DB.prepare(
       `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),

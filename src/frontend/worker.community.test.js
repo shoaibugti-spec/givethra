@@ -26,4 +26,11 @@ describe("community support and feed contract", () => {
     expect(home).toContain('"Most Supported"');
     expect(home).toContain('"My Posts"');
   });
+
+  it("keeps Latest chronological and Most Supported ranked by support count", () => {
+    expect(worker).toContain('tab === "latest"');
+    expect(worker).toContain("cp.created_at DESC, cp.id DESC");
+    expect(worker).toContain('tab === "most-supported"');
+    expect(worker).toContain("COALESCE(sc.support_count, 0) DESC, cp.created_at DESC, cp.id DESC");
+  });
 });
