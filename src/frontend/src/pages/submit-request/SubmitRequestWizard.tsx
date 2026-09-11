@@ -200,6 +200,7 @@ export default function SubmitRequestWizard() {
   }, [visibleStepIds, currentStepId]);
 
   const handleFieldChange = useCallback((field: string, value: any) => {
+    formDataRef.current = { ...formDataRef.current, [field]: value };
     setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
 
@@ -301,8 +302,11 @@ export default function SubmitRequestWizard() {
 
   const stableSetFormData = useCallback((updater: any) => {
     if (typeof updater === "function") {
-      setFormData((prev) => updater(prev));
+      const next = updater(formDataRef.current);
+      formDataRef.current = next;
+      setFormData(next);
     } else {
+      formDataRef.current = updater;
       setFormData(updater);
     }
   }, []);
