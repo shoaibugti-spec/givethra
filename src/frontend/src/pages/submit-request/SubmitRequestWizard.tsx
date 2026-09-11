@@ -232,7 +232,7 @@ export default function SubmitRequestWizard() {
   const handleSubmit = useCallback(async () => {
     // Read the latest controlled state and normalize legacy/string draft values.
     // This prevents a checked Terms box from racing the final validation pass.
-    const latest = formDataRef.current;
+    const latest: any = { ...formDataRef.current };
     if (latest.confirmed === "true" || latest.confirmed === 1) {
       latest.confirmed = true;
     }

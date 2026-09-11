@@ -1588,7 +1588,8 @@ export default function SubmitRequestPage() {
     }
 
     if (easy) {
-      if (!isOtherInstitute && !instituteName) return "Please select your institute/company from the list.";
+      const selectedInstitute = (instituteName || catFields.institute_name || "").trim();
+      if (!isOtherInstitute && !selectedInstitute) return "Please select your institute/company from the list.";
       if (isOtherInstitute) {
         if (!otherName.trim()) return "Please enter the institute name.";
         if (!otherContact.trim()) return "Please enter the institute contact number.";
@@ -1794,7 +1795,7 @@ export default function SubmitRequestPage() {
       const finalInstitute = easy
         ? isOtherInstitute
           ? otherName
-          : instituteName
+          : (instituteName || catFields.institute_name || "")
         : catFields.institute_name ||
           catFields.hospital_name ||
           catFields.provider ||
@@ -2288,7 +2289,9 @@ export default function SubmitRequestPage() {
                       key={n}
                       type="button"
                       onClick={() => {
+                        setIsOtherInstitute(false);
                         setInstituteName(n);
+                        setCatFields((p) => ({ ...p, institute_name: n }));
                         setInstituteSearch("");
                       }}
                       className="w-full text-left px-3 py-2.5 text-sm hover:bg-primary/5"
@@ -2303,7 +2306,15 @@ export default function SubmitRequestPage() {
               )}
               <button
                 type="button"
-                onClick={() => setIsOtherInstitute(true)}
+                onClick={() => {
+                  setIsOtherInstitute(true);
+                  setInstituteName("");
+                  setCatFields((p) => {
+                    const next = { ...p };
+                    delete next.institute_name;
+                    return next;
+                  });
+                }}
                 className="text-xs text-primary font-medium underline"
               >
                 My institute is not in the list — add manually
@@ -2318,7 +2329,14 @@ export default function SubmitRequestPage() {
               </p>
               <button
                 type="button"
-                onClick={() => setInstituteName("")}
+                onClick={() => {
+                  setInstituteName("");
+                  setCatFields((p) => {
+                    const next = { ...p };
+                    delete next.institute_name;
+                    return next;
+                  });
+                }}
                 className="text-xs text-primary underline shrink-0"
               >
                 Change
@@ -2822,6 +2840,10 @@ export default function SubmitRequestPage() {
                     setCategory(v);
                     setInstituteName("");
                     setIsOtherInstitute(false);
+                    setInstituteSearch("");
+                    setEduSubType("");
+                    setEduAdmissionLevel("");
+                    setEduSubFields({});
                     setRefNumber("");
                     setOtherName("");
                     setOtherContact("");
@@ -3151,6 +3173,7 @@ export default function SubmitRequestPage() {
                         type="button"
                         onClick={() => {
                           setInstituteName(c.name);
+                          setCatFields((p) => ({ ...p, institute_name: c.name }));
                           setIsOtherInstitute(false);
                         }}
                         className={`px-3 py-2.5 rounded-lg border text-xs font-medium text-left ${

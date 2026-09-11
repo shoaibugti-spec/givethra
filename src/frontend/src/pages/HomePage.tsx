@@ -316,8 +316,12 @@ function HomeSocialDashboard() {
     if (walletResult.status === "fulfilled") setWalletBalance(Number(walletResult.value?.balance || 0));
     if (supportResult.status === "fulfilled") setSupports(Number(supportResult.value?.supports || 0));
     if (supportResult.status === "fulfilled") {
-      setSupportsGiven(Number(supportResult.value?.supportsGiven || 0));
-      setSupportEarningsUsd(Number(supportResult.value?.supportEarningsUsd || 0));
+      const supportData = supportResult.value as typeof supportResult.value & {
+        supportsGiven?: number;
+        supportEarningsUsd?: number;
+      };
+      setSupportsGiven(Number(supportData?.supportsGiven || 0));
+      setSupportEarningsUsd(Number(supportData?.supportEarningsUsd || 0));
     }
     if (postsResult.status === "fulfilled") setPosts(Array.isArray(postsResult.value) ? postsResult.value : []);
     if (ownPostsResult.status === "fulfilled") {

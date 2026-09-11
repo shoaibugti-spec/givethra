@@ -90,13 +90,13 @@ export default function StepVideo({
       stopStream();
       // Medium 480p capture keeps the case video practical for admins on slower connections.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
+        video: ({
           facingMode: "user",
           width: { ideal: VIDEO_WIDTH, max: VIDEO_WIDTH },
           height: { ideal: VIDEO_HEIGHT, max: VIDEO_HEIGHT },
           frameRate: { ideal: 24, max: 24 },
           resizeMode: "crop-and-scale",
-        },
+        } as any),
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
