@@ -1188,7 +1188,9 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     const actorId = user?.user_id || guest?.id || "";
     const tab = url.searchParams.get("tab") || "for-you";
     let filter = "";
-    const binds = [actorId, actorId, actorId];
+    // Placeholder order is: like actor, support actor, optional WHERE actor,
+    // following actor, then the optional For You hero-boost actor.
+    const binds = [actorId, actorId];
     if (tab === "my-heroes" && user) { filter = "WHERE cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)"; binds.push(user.user_id); }
     if (tab === "my-posts") {
       if (user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
@@ -1217,7 +1219,8 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
         : tab === "my-posts"
           ? "cp.created_at DESC, cp.id DESC"
           : `${forYouScore} + ${stableVariation} DESC, cp.created_at DESC, cp.id DESC`;
-    if (tab !== "my-posts") binds.push(user?.user_id || actorId);
+    binds.push(user?.user_id || actorId);
+    if (tab === "for-you") binds.push(user?.user_id || actorId);
     const posts = await env.DB.prepare(
       `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),
        support_counts AS (SELECT post_id, COUNT(*) AS support_count FROM user_supports GROUP BY post_id),
