@@ -139,6 +139,7 @@ const StepCategory = memo(function StepCategory({
   const handleSelect = useCallback(
     (id: string) => {
       if (id === valueRef.current) return;
+      valueRef.current = id;
       onChange(id);
     },
     [onChange]
