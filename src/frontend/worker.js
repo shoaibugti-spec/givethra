@@ -1195,11 +1195,18 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
       else filter = "WHERE 1 = 0";
     }
     const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3 + COALESCE(sc.support_count,0) * 3)";
+    const supportScore = "COALESCE(sc.support_count,0)";
     const heroBoost = "(CASE WHEN cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 100 ELSE 0 END)";
     const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.signed_up_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
     const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
     const rankSeed = Number.isFinite(Number(url.searchParams.get("seed"))) ? Math.trunc(Number(url.searchParams.get("seed"))) : 0;
     const stableVariation = `(((unicode(substr(cp.id, 1, 1)) * 31 + ${rankSeed}) % 17) / 100.0)`;
+    const profile = Math.abs(rankSeed) % 3;
+    const forYouScore = profile === 0
+      ? `${engagementScore} * 1.0 + ${supportScore} * 5.0 + ${freshnessBoost} * 2.0 + ${heroBoost} * 1.5 + ${newCreatorBoost}`
+      : profile === 1
+        ? `${engagementScore} * 1.5 + ${supportScore} * 2.0 + ${freshnessBoost} * 6.0 + ${heroBoost} * 2.0 + ${newCreatorBoost} * 4.0`
+        : `${engagementScore} * 2.0 + ${supportScore} * 3.0 + ${freshnessBoost} * 3.0 + ${heroBoost} * 5.0 + ${newCreatorBoost} * 2.0`;
     // Keep the four feed contracts intentionally distinct:
     // Latest is purely chronological; Most Supported is purely support-ranked;
     // For You is the mixed/personalized ranking.
@@ -1209,7 +1216,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
         ? "COALESCE(sc.support_count, 0) DESC, cp.created_at DESC, cp.id DESC"
         : tab === "my-posts"
           ? "cp.created_at DESC, cp.id DESC"
-          : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} + ${stableVariation} DESC, cp.created_at DESC, cp.id DESC`;
+          : `${forYouScore} + ${stableVariation} DESC, cp.created_at DESC, cp.id DESC`;
     if (tab !== "my-posts") binds.push(user?.user_id || actorId);
     const posts = await env.DB.prepare(
       `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),

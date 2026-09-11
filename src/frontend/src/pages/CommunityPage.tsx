@@ -174,11 +174,11 @@ export default function CommunityPage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
 
-  const [posts, setPosts] = useState<Post[]>(readCachedCommunityPosts);
+  // Feed tabs must always render the server's current ordering. Cached posts
+  // are still written for resilience, but never shown as the initial ranking.
+  const [posts, setPosts] = useState<Post[]>([]);
 
-  const [loading, setLoading] = useState(
-    () => readCachedCommunityPosts().length === 0
-  );
+  const [loading, setLoading] = useState(true);
 
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [showComments, setShowComments] = useState<
@@ -222,7 +222,9 @@ export default function CommunityPage() {
     }
 
     try {
-      const rankSeed = feedTab === "for-you" ? Date.now() % 1000000000 : undefined;
+      const rankSeed = feedTab === "for-you"
+        ? (Date.now() ^ Math.floor(Math.random() * 2147483647)) % 2147483647
+        : undefined;
       const data = await getCommunityPosts(feedTab, rankSeed);
 
       const nextPosts = Array.isArray(data)
@@ -570,6 +572,8 @@ export default function CommunityPage() {
   // ------------------------------------------------------------
 
   useEffect(() => {
+    setPosts([]);
+    setLoading(true);
     void fetchPosts(true);
 
     const interval = setInterval(() => {
