@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Givethra — Verified Help. Real Impact.</title>
+    <meta name="description" content="Givethra connects people who need help with people who want to help — through verified cases, direct support, and real accountability." />
+    <meta property="og:title" content="Givethra — Verified Help. Real Impact." />
+    <meta property="og:description" content="Givethra connects people who need help with people who want to help — through verified cases, direct support, and real accountability." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#03707B" />
+    <link rel="apple-touch-icon" href="/1780969153797.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Givethra" />
+
+    <!-- ⚠️ React + Google Translate DOM ٹکراؤ کا محفوظ حل — سب سے پہلے لوڈ ہو -->
+    <script>
+  (function () {
+    if (typeof Node !== "function" || !Node.prototype) return;
+
+    const originalRemoveChild = Node.prototype.removeChild;
+    Node.prototype.removeChild = function (child) {
+      if (child && child.parentNode !== this) {
+        return child; // خاموشی سے نظر انداز کریں
+      }
+      return originalRemoveChild.apply(this, arguments);
+    };
+
+    const originalInsertBefore = Node.prototype.insertBefore;
+    Node.prototype.insertBefore = function (newNode, referenceNode) {
+      if (referenceNode && referenceNode.parentNode !== this) {
+        return newNode; // ⚠️ appendChild نہیں — بس واپس کر دیں، کہیں منتقل نہ کریں
+      }
+      return originalInsertBefore.apply(this, arguments);
+    };
+
+    const originalReplaceChild = Node.prototype.replaceChild;
+    Node.prototype.replaceChild = function (newChild, oldChild) {
+      if (oldChild && oldChild.parentNode !== this) {
+        return newChild; // ⚠️ یہاں بھی appendChild نہیں
+      }
+      return originalReplaceChild.apply(this, arguments);
+    };
+  })();
+</script>
+
+    <style>
+      body { top: 0 !important; position: static !important; }
+
+      .skiptranslate, .goog-te-banner-frame, #goog-gt-tt,
+      .goog-te-balloon-frame, .goog-te-menu-frame,
+      .goog-te-spinner-pos {
+        display: none !important;
+      }
+      .goog-text-highlight {
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+      html.translated-ltr, html.translated-rtl { top: 0 !important; }
+    </style>
+
+    <div id="google_translate_element" style="display:none"></div>
+
+    <script>
+      function googleTranslateElementInit() {
+        new google.translate.TranslateElement(
+          {
+            pageLanguage: "en",
+            includedLanguages: "en,ur",
+            autoDisplay: false,
+          },
+          "google_translate_element"
+        );
+      }
+    </script>
+    <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script type="module" crossorigin src="/assets/main-Cdc0HMQw.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/main-BV--E0oI.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch((err) =>
+            console.log("SW registration failed:", err)
+          );
+        });
+      }
+    </script>
+  </body>
+</html>
