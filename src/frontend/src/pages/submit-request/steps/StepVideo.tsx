@@ -13,6 +13,12 @@ import { toast } from "sonner";
 
 const MIN_SECONDS = 60;
 const MAX_SECONDS = 120;
+// Medium mobile-friendly capture: clear enough for admin review without 720p/1080p-sized uploads.
+const VIDEO_WIDTH = 854;
+const VIDEO_HEIGHT = 480;
+const VIDEO_BITRATE = 900_000;
+const AUDIO_BITRATE = 64_000;
+const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 
 function pad2(n: number) {
   return n < 10 ? `0${n}` : String(n);
@@ -82,13 +88,14 @@ export default function StepVideo({
     setError("");
     try {
       stopStream();
-      // Match SubmitRequestPage constraints — avoids 2x zoom
+      // Medium 480p capture keeps the case video practical for admins on slower connections.
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 },
+          width: { ideal: VIDEO_WIDTH, max: VIDEO_WIDTH },
+          height: { ideal: VIDEO_HEIGHT, max: VIDEO_HEIGHT },
+          frameRate: { ideal: 24, max: 24 },
+          resizeMode: "crop-and-scale",
         },
         audio: {
           echoCancellation: true,
@@ -162,10 +169,10 @@ export default function StepVideo({
     const mimeType = pickMimeType();
     let recorder: MediaRecorder;
     try {
-      recorder = new MediaRecorder(streamRef.current, {
-        mimeType,
-        videoBitsPerSecond: 2200000,
-        audioBitsPerSecond: 128000,
+        recorder = new MediaRecorder(streamRef.current, {
+          mimeType,
+          videoBitsPerSecond: VIDEO_BITRATE,
+          audioBitsPerSecond: AUDIO_BITRATE,
       });
     } catch {
       try {
@@ -252,8 +259,8 @@ export default function StepVideo({
       await startCamera();
       return;
     }
-    if (sizeMB > 48) {
-      setError("Video is too large (max 50MB). Record a shorter video.");
+    if (blob.size > MAX_VIDEO_BYTES) {
+      setError("Video is too large (max 20MB). Please record again in a well-lit place.");
       stoppingRef.current = false;
       await startCamera();
       return;
@@ -332,8 +339,8 @@ export default function StepVideo({
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">Live video appeal</h2>
         <p className="text-sm text-muted-foreground">
-          Record a live video about your case for Heroes. Minimum more than 1 minute (60s).
-          Maximum 120 seconds. File upload is not allowed.
+          Record a live video about your case for Heroes. Medium 480p quality keeps upload and review fast.
+          Minimum 1 minute (60s), maximum 120 seconds. File upload is not allowed.
         </p>
       </div>
 
@@ -450,7 +457,8 @@ export default function StepVideo({
           "Explain who you are, what happened, your current condition, and how help will help.",
           "Speak clearly in a quiet place.",
           "After recording, press play and listen once to confirm sound is clear.",
-          "Minimum more than 1 minute. Maximum 120 seconds. Pause is allowed. Stop unlocks after 60 seconds.",
+          "Medium 480p video with clear audio is used to keep uploads manageable for admin review.",
+          "Minimum 1 minute. Maximum 120 seconds. Pause is allowed. Stop unlocks after 60 seconds.",
         ]}
       />
 
