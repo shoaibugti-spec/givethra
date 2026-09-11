@@ -22,6 +22,8 @@ export const CATEGORY_LIMITS: Record<
   "Widow & Elderly Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
   "Child Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
   "Disability Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
+  "Emergency Help": { type: "fixed", amount: 3000, label: "Fixed Emergency Help" },
+  "Livestock / Farming": { type: "fixed", amount: 8000, label: "Fixed Farming Help" },
   "Electricity Bill": { type: "verified", label: "1 Month Verified Bill" },
   "Gas Bill": { type: "verified", label: "1 Month Verified Bill" },
   "Water Bill": { type: "verified", label: "1 Month Verified Bill" },
@@ -36,8 +38,6 @@ export const CATEGORY_LIMITS: Record<
   "Business / Work Help": { type: "max", maxAmount: 20000, label: "Rs 8,000–20,000" },
   "Marriage Support": { type: "verified", label: "Verified Need" },
   "Funeral Expenses": { type: "verified", label: "Verified Need" },
-  "Livestock / Farming": { type: "verified", label: "Verified Need" },
-  "Emergency Help": { type: "verified", label: "Verified Need" },
 };
 
 export const CATEGORIES = [

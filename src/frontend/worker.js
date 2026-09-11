@@ -846,6 +846,13 @@ function decodeCaseRow(row) {
   return result;
 }
 
+function fixedCaseAmount(category) {
+  if (category === "Emergency Help") return 3000;
+  if (category === "Livestock / Farming") return 8000;
+  if (["Child Support", "Widow & Elderly Support", "Disability Support"].includes(category)) return 6000;
+  return null;
+}
+
 // ============================================================
 //  CASES HANDLER
 // ============================================================
@@ -936,6 +943,8 @@ async function handleCases(request, env, user, url, parts, origin) {
     }
     const body = await readJson(request);
     const record = pick(body, ["category", "title", "short_description", "country", "city", "urgency", "description", "amount_needed", "currency", "why_help", "deadline", "institute_name", "institute_contact", "institute_address", "payment_method", "account_title", "account_number", "account_iban", "photo_urls", "selfie_url", "video_url", "category_details", "was_free"]);
+    const fixedAmount = fixedCaseAmount(record.category);
+    if (fixedAmount !== null) record.amount_needed = fixedAmount;
     const caseId = body?.id || id();
     const photoUrls = Array.isArray(record.photo_urls) || (record.photo_urls && typeof record.photo_urls === "object") ? JSON.stringify(record.photo_urls) : (record.photo_urls || null);
     const categoryDetails = Array.isArray(record.category_details) || (record.category_details && typeof record.category_details === "object") ? JSON.stringify(record.category_details) : (record.category_details || null);

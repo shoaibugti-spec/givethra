@@ -1,7 +1,7 @@
 // src/frontend/src/pages/submit-request/utils/SubmitCase.ts
 import { insertCaseSubmission } from "@/lib/api";
 import { sendNotification } from "@/lib/notify";
-import { calculateDebtAmount } from "../constants";
+import { calculateDebtAmount, getFixedAmount } from "../constants";
 
 export async function submitCase(formData: any, userId: string, isFree: boolean) {
   const requirePermanentUrl = (value: unknown, label: string): string => {
@@ -14,9 +14,9 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
   let finalAmount = 0;
   const category = formData.category;
 
-  const fixedCats = ["Child Support", "Widow & Elderly Support", "Disability Support"];
-  if (fixedCats.includes(category)) {
-    finalAmount = 6000;
+  const fixedAmount = getFixedAmount(category);
+  if (fixedAmount != null) {
+    finalAmount = fixedAmount;
   } else if (category === "Debt Relief") {
     const debt = parseFloat(formData.debtTotalAmount) || 0;
     finalAmount = calculateDebtAmount(debt);
