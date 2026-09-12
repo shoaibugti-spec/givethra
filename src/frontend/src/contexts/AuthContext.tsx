@@ -278,6 +278,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         auto_select: false,
         cancel_on_tap_outside: true,
+        context: "signin",
+        use_fedcm_for_prompt: true,
+        itp_support: true,
       });
       googleInitializedRef.current = true;
     }
@@ -290,8 +293,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           googlePromptTimerRef.current = window.setTimeout(openGooglePrompt, 650);
           return;
         }
+        // Do not expose browser-cookie wording to users. Leave the normal
+        // Google button available so the official account chooser can be
+        // opened again without suggesting that the app can bypass Google's
+        // security controls.
         setIsLoggingIn(false);
-        setLoginError("Select a Google account to continue. If the account selector is hidden, enable third-party cookies for Google and the selector will reopen automatically.");
+        setLoginError(null);
       });
     };
     openGooglePrompt();
