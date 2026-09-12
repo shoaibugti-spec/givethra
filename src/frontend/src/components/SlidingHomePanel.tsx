@@ -85,13 +85,13 @@ export default function SlidingHomePanel({ children, onTabChange }: SlidingHomeP
 
   const shellClass = expanded
     ? "fixed inset-x-0 bottom-0 z-40 h-[90dvh] max-h-[900px] min-h-[260px] overflow-hidden rounded-t-[2rem] border border-b-0 border-primary/15 bg-background/95 shadow-[0_-18px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl"
-    : "relative min-h-[100dvh] bg-muted/20";
+    : "relative min-h-0 bg-transparent";
   const headerClass = expanded
     ? "shrink-0 border-b border-border/80 bg-card/95 px-3 pb-3 pt-2"
     : "fixed inset-x-0 bottom-0 z-50 border-t border-primary/15 bg-card/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_35px_rgba(15,23,42,0.16)] backdrop-blur-xl";
   const bodyClass = expanded
     ? "min-h-0 flex-1 overflow-y-auto overscroll-contain"
-    : "min-h-[100dvh] pb-28";
+    : "hidden";
 
   return (
     <div className={shellClass} style={{ transform: expanded && dragOffset ? `translateY(${dragOffset}px)` : undefined, transition: isDragging ? "none" : "transform 260ms cubic-bezier(0.23, 1, 0.32, 1)" }} data-testid="home-bottom-sheet" aria-label="Givethra home content panel">

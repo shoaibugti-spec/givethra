@@ -1199,9 +1199,7 @@ export default function HomePage() {
       </button>
     );
   }
-  return <HomeSocialDashboard />;
-
-  /* Retained below as legacy reference while the social Home is active. */
+  /* Legacy Home Page remains the white-page experience; the current social dashboard is rendered in its own panel below. */
   return (
     <Layout>
       <div className="bg-background pb-20 md:pb-0">
@@ -2364,6 +2362,9 @@ export default function HomePage() {
             </p>
           </div>
         </section>
+
+        {/* Current Community / Wallet dashboard stays isolated in the sliding panel. */}
+        <HomeSocialDashboard />
       </div>
     </Layout>
   );
