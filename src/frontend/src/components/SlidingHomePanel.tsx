@@ -22,11 +22,12 @@ const TAB_TARGETS: Record<PanelTab, string> = {
 };
 
 /**
- * Functional Home Page shell.
+ * Home shell for the existing functional HomeSocialDashboard.
  *
- * The existing HomeSocialDashboard is rendered unchanged inside `children`.
- * The header is the only drag handle, so inputs, buttons, feeds and scrolling
- * inside the existing home content keep their normal behavior.
+ * Collapsed: the existing Home Page remains a normal, fully visible page and
+ * the compact header floats above its bottom edge.
+ * Expanded: the same React content moves into a 90dvh scrollable sheet. It is
+ * not duplicated, so posting, support, feed tabs and wallet state stay intact.
  */
 export default function SlidingHomePanel({ children, onTabChange }: SlidingHomePanelProps) {
   const [expanded, setExpanded] = useState(false);
@@ -34,7 +35,7 @@ export default function SlidingHomePanel({ children, onTabChange }: SlidingHomeP
   const dragStartY = useRef<number | null>(null);
   const dragStartExpanded = useRef(false);
   const [dragOffset, setDragOffset] = useState(0);
-  const isDragging = dragStartY.current !== null;
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -50,31 +51,28 @@ export default function SlidingHomePanel({ children, onTabChange }: SlidingHomeP
     dragStartY.current = event.clientY;
     dragStartExpanded.current = expanded;
     setDragOffset(0);
+    setIsDragging(true);
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
 
   const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (dragStartY.current === null) return;
     const delta = event.clientY - dragStartY.current;
-    const nextOffset = dragStartExpanded.current ? Math.min(0, delta) : Math.max(0, delta);
-    setDragOffset(nextOffset);
+    setDragOffset(dragStartExpanded.current ? Math.min(0, delta) : Math.max(0, delta));
   };
 
   const endDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (dragStartY.current === null) return;
     const delta = event.clientY - dragStartY.current;
     const threshold = Math.min(110, window.innerHeight * 0.14);
-    if (Math.abs(delta) >= threshold) {
-      setExpanded(delta < 0);
-    }
+    if (Math.abs(delta) >= threshold) setExpanded(delta < 0);
     dragStartY.current = null;
     setDragOffset(0);
+    setIsDragging(false);
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   };
 
-  const togglePanel = () => {
-    if (dragStartY.current === null) setExpanded((value) => !value);
-  };
+  const togglePanel = () => setExpanded((value) => !value);
 
   const chooseTab = (tab: PanelTab) => {
     setActiveTab(tab);
@@ -85,68 +83,36 @@ export default function SlidingHomePanel({ children, onTabChange }: SlidingHomeP
     });
   };
 
-  const dragTransform = dragOffset === 0
-    ? undefined
-    : `translateY(${dragOffset}px)`;
+  const shellClass = expanded
+    ? "fixed inset-x-0 bottom-0 z-40 h-[90dvh] max-h-[900px] min-h-[260px] overflow-hidden rounded-t-[2rem] border border-b-0 border-primary/15 bg-background/95 shadow-[0_-18px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl"
+    : "relative min-h-[100dvh] bg-muted/20";
+  const headerClass = expanded
+    ? "shrink-0 border-b border-border/80 bg-card/95 px-3 pb-3 pt-2"
+    : "fixed inset-x-0 bottom-0 z-50 border-t border-primary/15 bg-card/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_35px_rgba(15,23,42,0.16)] backdrop-blur-xl";
+  const bodyClass = expanded
+    ? "min-h-0 flex-1 overflow-y-auto overscroll-contain"
+    : "min-h-[100dvh] pb-28";
 
   return (
-    <div className="relative min-h-[100dvh] bg-muted/20">
-      <div
-        className="fixed inset-x-0 bottom-0 z-40 h-[90dvh] max-h-[900px] min-h-[240px] overflow-hidden rounded-t-[2rem] border border-b-0 border-primary/15 bg-background/95 shadow-[0_-18px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl"
-        style={{
-          transform: dragTransform || (expanded ? "translateY(0)" : "translateY(calc(100% - 26dvh))"),
-          transition: isDragging ? "none" : "transform 260ms cubic-bezier(0.23, 1, 0.32, 1)",
-        }}
-        data-testid="home-bottom-sheet"
-        aria-label="Givethra home content panel"
-      >
-        <div
-          className="touch-none select-none border-b border-border/80 bg-card/95 px-3 pb-3 pt-2"
-          onPointerDown={beginDrag}
-          onPointerMove={moveDrag}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-          onDoubleClick={togglePanel}
-        >
-          <button
-            type="button"
-            onClick={togglePanel}
-            className="mx-auto flex w-full flex-col items-center gap-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            aria-expanded={expanded}
-            aria-controls="givethra-home-panel-content"
-          >
-            <span className="flex h-7 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <ChevronUp className={`h-5 w-5 animate-bounce transition-transform ${expanded ? "rotate-180" : ""}`} />
-            </span>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {expanded ? "Swipe down to close" : "Swipe up to explore"}
-            </span>
-          </button>
-
-          <div className="mx-auto mt-2 grid max-w-xl grid-cols-3 gap-2" role="tablist" aria-label="Home summary tabs">
-            {TABS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === id}
-                onClick={() => chooseTab(id)}
-                className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-bold transition active:scale-[0.97] ${activeTab === id ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
+    <div className={shellClass} style={{ transform: expanded && dragOffset ? `translateY(${dragOffset}px)` : undefined, transition: isDragging ? "none" : "transform 260ms cubic-bezier(0.23, 1, 0.32, 1)" }} data-testid="home-bottom-sheet" aria-label="Givethra home content panel">
+      <div className={headerClass} onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
+        <button type="button" onClick={togglePanel} className="mx-auto flex w-full flex-col items-center gap-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-expanded={expanded} aria-controls="givethra-home-panel-content">
+          <span className="flex h-7 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <ChevronUp className={`h-5 w-5 animate-bounce transition-transform ${expanded ? "rotate-180" : ""}`} />
+          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{expanded ? "Swipe down to close" : "Swipe up to explore"}</span>
+        </button>
+        <div className="mx-auto mt-2 grid max-w-xl grid-cols-3 gap-2" role="tablist" aria-label="Home summary tabs">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" role="tab" aria-selected={activeTab === id} onClick={() => chooseTab(id)} className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-bold transition active:scale-[0.97] ${activeTab === id ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}>
+              <Icon className="h-4 w-4" />
+              <span>{label}</span>
+            </button>
+          ))}
         </div>
-
-        <div
-          id="givethra-home-panel-content"
-          className="h-[calc(100%-118px)] overflow-y-auto overscroll-contain"
-          style={{ WebkitOverflowScrolling: "touch" }}
-        >
-          {children}
-        </div>
+      </div>
+      <div id="givethra-home-panel-content" className={bodyClass} style={{ WebkitOverflowScrolling: "touch" }}>
+        {children}
       </div>
     </div>
   );
