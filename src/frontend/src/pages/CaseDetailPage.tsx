@@ -229,6 +229,7 @@ export default function CaseDetailPage() {
   const { user, isAuthenticated } = useAuth(); // isAssistant removed
   const [caseData, setCaseData] = useState<any>(null);
   const [seekerKyc, setSeekerKyc] = useState<any>(null);
+  const [seekerProfile, setSeekerProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [unlocked, setUnlocked] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
@@ -328,8 +329,9 @@ export default function CaseDetailPage() {
           getCaseResolutions(id, user.id),
           getKycSubmission(data.user_id),
           getProfile(user.id),
+          getProfile(data.user_id),
         ]);
-        const [fullUnlock, contributionUnlock, mediaUnlock, count, res, kyc, prof] =
+        const [fullUnlock, contributionUnlock, mediaUnlock, count, res, kyc, prof, seekerProf] =
           results.map((r) => (r.status === "fulfilled" ? r.value : null));
 
         const activeUnlock = fullUnlock || contributionUnlock || null;
@@ -343,6 +345,7 @@ export default function CaseDetailPage() {
         setMyResolutions(loadedResolutions);
         setShowResolution(Boolean(activeUnlock && loadedResolutions.length === 0));
         setSeekerKyc(kyc);
+        setSeekerProfile(seekerProf);
         const nm = (prof?.full_name || "").split(" ")[0];
         if (nm) setHeroName(nm);
         setWalletLoading(true);
@@ -481,6 +484,31 @@ export default function CaseDetailPage() {
     { label: "Institute Contact", value: caseData?.institute_contact || categoryDetails.institute_contact, mono: true },
     { label: "Institute Address", value: caseData?.institute_address || categoryDetails.institute_address },
   ].filter((row) => Boolean(row.value));
+  const educationRows = [
+    { label: "Fee Type", value: categoryDetails.edu_sub_type || categoryDetails.fee_type },
+    { label: "Student Name", value: categoryDetails.student_name },
+    { label: "Father's Name", value: categoryDetails.father_name },
+    { label: "Roll / Registration No.", value: categoryDetails.roll_no, mono: true },
+    { label: "Institute", value: caseData?.institute_name || categoryDetails.institute_name || categoryDetails.provider },
+    { label: "Institute Contact", value: caseData?.institute_contact || categoryDetails.institute_contact, mono: true },
+    { label: "Institute Address", value: caseData?.institute_address || categoryDetails.institute_address },
+  ].filter((row) => Boolean(row.value));
+  const medicalRows = [
+    { label: "Patient Name", value: categoryDetails.patient_name },
+    { label: "Illness / Treatment", value: categoryDetails.illness },
+    { label: "Hospital / Clinic", value: categoryDetails.hospital_name },
+    { label: "Bill / MR Reference", value: categoryDetails.refNumber || categoryDetails.reference_no, mono: true },
+  ].filter((row) => Boolean(row.value));
+  const unlockedProofDocuments = [
+    { label: "Fee Challan / Voucher", value: categoryDetails.fee_challan },
+    { label: "Student ID Proof", value: categoryDetails.student_id_proof },
+    { label: "Hospital Bill / Medical Receipt", value: categoryDetails.medical_bill },
+    { label: "Doctor's Report", value: categoryDetails.doctor_report },
+  ].filter((doc) => typeof doc.value === "string" && doc.value.trim());
+  const seekerName = seekerProfile?.full_name || seekerKyc?.full_name || caseData?.full_name || "Verified Help Seeker";
+  const seekerContact = seekerProfile?.phone_number || seekerProfile?.phone || caseData?.seeker_phone || caseData?.phone_number;
+  const isEducationCase = /school|college|university|education|fee/i.test(String(caseData?.category || "")) || Boolean(categoryDetails.fee_challan);
+  const isMedicalCase = /medical|hospital|treatment/i.test(String(caseData?.category || "")) || Boolean(categoryDetails.medical_bill);
   const unlockMode = myUnlock?.payment_type || payMode;
   const canHelpAgain = (unlocked || contributionOpen) && !isOwner && !isCompleted && !isRejected && !isExpired;
   const activeUnlock = myUnlock;
@@ -1048,6 +1076,27 @@ export default function CaseDetailPage() {
                     <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h2 className="font-semibold">Direct Payment Receiver Details</h2></div>
                     <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} to the verified receiver below. For bills, use the listed provider and consumer/reference number.</div>
                     {directPaymentRows.length > 0 ? directPaymentRows.map((row) => <CopyRow key={row.label} label={row.label} value={String(row.value)} mono={row.mono} />) : <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-700">Receiver payment details are not available yet. Please contact Givethra before sending money.</p>}
+                    <div className="rounded-xl border border-teal-200 bg-teal-50/60 dark:bg-teal-950/20 p-3 space-y-2">
+                      <p className="text-xs font-bold text-teal-700">Help Seeker Contact (Unlocked)</p>
+                      <CopyRow label="Name" value={seekerName} />
+                      {seekerContact ? <CopyRow label="Mobile Number" value={String(seekerContact)} mono /> : <p className="text-xs text-muted-foreground">Mobile number is not available in the submitted profile.</p>}
+                    </div>
+                    {(isEducationCase || isMedicalCase) && (
+                      <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 dark:bg-indigo-950/20 p-3 space-y-2">
+                        <p className="text-xs font-bold text-indigo-700">Verified Case Details</p>
+                        {isEducationCase && educationRows.map((row) => <CopyRow key={row.label} label={row.label} value={String(row.value)} mono={row.mono} />)}
+                        {isMedicalCase && medicalRows.map((row) => <CopyRow key={row.label} label={row.label} value={String(row.value)} mono={row.mono} />)}
+                        {unlockedProofDocuments.length > 0 ? (
+                          <div className="pt-1 space-y-1.5">
+                            {unlockedProofDocuments.map((doc) => (
+                              <a key={doc.label} href={String(doc.value)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs font-semibold text-indigo-700 hover:underline">
+                                <FileText className="h-3.5 w-3.5" /> View {doc.label}
+                              </a>
+                            ))}
+                          </div>
+                        ) : <p className="text-xs text-amber-700">No fee challan, voucher, or medical bill was attached to this approved case.</p>}
+                      </div>
+                    )}
                     <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-700 dark:text-amber-400 mt-2">Pay only to the receiver details shown above. Keep the payment receipt and transaction/reference number, then submit both below for Givethra review.</div>
                   </div>
                 )}
