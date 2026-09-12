@@ -34,6 +34,8 @@ import {
   adminUpdateResolution,
   adminUpdateDeposit,
   adminUpsertWallet,
+  adminGetWithdrawals,
+  adminUpdateWithdrawal,
   adminGetWalletsByUser,
   adminCloseCase,
   adminGetUserSuspension,
@@ -303,6 +305,7 @@ export default function AdminPage() {
   const [deposits, setDeposits] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [wallets, setWallets] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [unlocks, setUnlocks] = useState<any[]>([]);
   const [supportMsgs, setSupportMsgs] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
@@ -342,6 +345,7 @@ export default function AdminPage() {
         adminGetAllFeedbacks(),
         adminGetAllOffers(),
         adminGetAllSuspensions(),
+        adminGetWithdrawals(),
       ]);
       const rowsAt = (index: number) => {
         const result = results[index];
@@ -358,6 +362,7 @@ export default function AdminPage() {
       const fbs = rowsAt(8);
       const offs = rowsAt(9);
       const susp = rowsAt(10);
+      const wds = rowsAt(11);
       setKycList(kyc);
       setCaseList(cases);
       setResolutions(res);
@@ -369,6 +374,7 @@ export default function AdminPage() {
       setFeedbacks(fbs);
       setOffers(offs);
       setSuspensions(susp);
+      setWithdrawals(wds);
       setUnreadSupport(sup.filter((m: any) => m.sender === "user" && !m.is_read).length);
     } catch (err) {
       console.error("Admin data load error:", err);
@@ -756,6 +762,11 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
             </div>
           ))}
         </div>
+
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/40 p-5 dark:bg-amber-950/10">
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-amber-950 dark:text-amber-100">Earnings Withdrawals</h2><p className="text-xs text-muted-foreground">Review requests, send the manual bank payment, then attach its receipt.</p></div><span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-900">{withdrawals.filter(w => w.status === "pending").length} pending</span></div>
+          <div className="mt-4 grid gap-3">{withdrawals.length ? withdrawals.map((w: any) => <div key={w.id} className="rounded-xl border bg-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{w.full_name || w.email || w.user_id}</p><p className="text-xs text-muted-foreground">{w.amount_pkr} PKR · {w.bank_name} · {w.account_title} · {w.account_number}</p><p className="mt-1 text-[11px] text-muted-foreground">Requested {w.requested_at ? new Date(w.requested_at).toLocaleString() : "—"}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-bold capitalize">{w.status}</span></div>{w.payment_proof_url ? <a className="mt-2 inline-block text-xs font-semibold text-primary underline" href={w.payment_proof_url} target="_blank" rel="noreferrer">View payment proof</a> : null}{w.status === "pending" ? <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" onClick={() => void adminUpdateWithdrawal(w.id, { status: "approved" }).then(loadData)}>Mark Approved</Button><Button size="sm" variant="outline" onClick={() => void adminUpdateWithdrawal(w.id, { status: "rejected" }).then(loadData)}>Reject</Button><input placeholder="Payment receipt URL" className="h-9 min-w-56 flex-1 rounded-md border bg-background px-3 text-xs" id={`proof-${w.id}`} /><Button size="sm" onClick={() => { const proof = (document.getElementById(`proof-${w.id}`) as HTMLInputElement)?.value.trim(); if (proof) void adminUpdateWithdrawal(w.id, { status: "completed", payment_proof_url: proof }).then(loadData); }}>Complete + Proof</Button></div> : null}</div>) : <p className="text-sm text-muted-foreground">No withdrawal requests yet.</p>}</div>
+        </section>
 
         {activeSuspensions > 0 && (
           <div className="rounded-xl border border-red-300 bg-red-50 dark:bg-red-950/20 p-4 text-sm text-red-700 flex items-start gap-2">

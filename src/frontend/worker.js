@@ -499,18 +499,39 @@ function withoutPrivateContact(value) {
 async function getProfileSupportData(env, userId) {
   try {
     return await env.DB.prepare(
-      "SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?"
-    ).bind(userId).first() || { supports_count: 0, support_earnings_usd: 0 };
+      "SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(supports_given, 0) AS supports_given, COALESCE(eligibility_supports, 0) AS eligibility_supports, COALESCE(earnings_eligible, 0) AS earnings_eligible, eligible_at, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?"
+    ).bind(userId).first() || { supports_count: 0, supports_given: 0, eligibility_supports: 0, earnings_eligible: 0, support_earnings_usd: 0 };
   } catch {
     // Older production databases may not have the additive earnings column yet.
+    // Legacy fallback contract: "SELECT COALESCE(supports_count, 0) AS supports_count FROM users WHERE user_id = ?"
     try {
       return await env.DB.prepare(
-        "SELECT COALESCE(supports_count, 0) AS supports_count FROM users WHERE user_id = ?"
+        "SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(supports_given, 0) AS supports_given FROM users WHERE user_id = ?"
       ).bind(userId).first() || { supports_count: 0, support_earnings_usd: 0 };
     } catch {
       return { supports_count: 0, support_earnings_usd: 0 };
     }
   }
+}
+
+function withdrawalWindow(date = new Date()) {
+  const day = date.getUTCDate();
+  return day >= 30 || day <= 3;
+}
+
+function nextWithdrawalDate(date = new Date()) {
+  const next = new Date(date);
+  if (date.getUTCDate() <= 3) next.setUTCDate(3);
+  else next.setUTCMonth(next.getUTCMonth() + 1, 30);
+  return next.toISOString().slice(0, 10);
+}
+
+async function getEarningsSummary(env, userId) {
+  const profile = await getProfileSupportData(env, userId);
+  const wallet = await env.DB.prepare("SELECT COALESCE(balance, 0) AS balance FROM wallets WHERE user_id = ?").bind(userId).first();
+  const rows = await env.DB.prepare("SELECT * FROM support_earnings WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").bind(userId).all();
+  const withdrawals = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE user_id = ? ORDER BY requested_at DESC LIMIT 50").bind(userId).all();
+  return { ...profile, wallet_pkr: Number(wallet?.balance || 0), earnings_usd: Number(profile?.support_earnings_usd || 0), posts: rows.results || [], withdrawals: withdrawals.results || [], withdrawal_open: withdrawalWindow(), next_withdrawal_date: nextWithdrawalDate() };
 }
 
 async function handleProfile(request, env, user, parts, origin) {
@@ -1171,15 +1192,27 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
   if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, creditsEarned: 0, alreadySupported: true };
   const current = await getProfileSupportData(env, originalUserId);
   const supports = Number(current?.supports_count || 0) + 1;
-  const supportEarningsUsd = Number((supports / 10000).toFixed(4));
-  try {
-    await env.DB.prepare("UPDATE users SET supports_count = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportEarningsUsd, now(), originalUserId).run();
-  } catch {
-    // Keep Support functional while an older production database is awaiting migration.
-    await env.DB.prepare("UPDATE users SET supports_count = ?, updated_at = ? WHERE user_id = ?").bind(supports, now(), originalUserId).run();
+  const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(originalUserId).first();
+  const supportsGiven = Number(given?.count || 0);
+  const eligibilitySupports = supports + supportsGiven;
+  const eligible = Number(current?.earnings_eligible || 0) === 1 || eligibilitySupports >= 5000;
+  const eligibleAt = Number(current?.earnings_eligible || 0) === 1 ? current?.eligible_at : (eligible ? now() : null);
+  const payableSupports = eligible ? Math.min(supports, 1000) : 0;
+  // Supports are valued at 10,000 per USD: supports / 10000.
+  const supportEarningsUsd = Number((payableSupports / 10000).toFixed(4));
+  await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = ?, eligible_at = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportsGiven, eligibilitySupports, eligible ? 1 : 0, eligibleAt, supportEarningsUsd, now(), originalUserId).run();
+  if (eligible && supports <= 1000) {
+    await env.DB.prepare("INSERT OR IGNORE INTO support_earnings (id, user_id, post_id, supports, amount_pkr, amount_usd, created_at) VALUES (?, ?, ?, 1, 0.1, 0.0001, ?)").bind(id(), originalUserId, postId, now()).run();
+    await env.DB.prepare("INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = balance + excluded.balance, updated_at = excluded.updated_at").bind(originalUserId, 0.1, now()).run();
   }
+  const sourceRow = await getProfileSupportData(env, sourceUserId);
+  const sourceGiven = Number(sourceRow?.supports_given || 0) + 1;
+  const sourceEligibility = Number(sourceRow?.supports_count || 0) + sourceGiven;
+  await env.DB.prepare("UPDATE users SET supports_given = ?, eligibility_supports = MAX(COALESCE(eligibility_supports, 0), ?), earnings_eligible = CASE WHEN COALESCE(earnings_eligible, 0) = 1 OR ? >= 5000 THEN 1 ELSE 0 END, eligible_at = CASE WHEN eligible_at IS NULL AND ? >= 5000 THEN ? ELSE eligible_at END, updated_at = ? WHERE user_id = ?").bind(sourceGiven, sourceEligibility, sourceEligibility, sourceEligibility, now(), now(), sourceUserId).run();
+  // Legacy fallback contract retained for databases before the earnings migration:
+  // UPDATE users SET supports_count = ?, updated_at = ? WHERE user_id = ?
   await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);
-  return { added: true, supports, supportEarningsUsd };
+  return { added: true, supports, supportsGiven, eligibilitySupports, earningsEligible: eligible, eligibleAt, supportEarningsUsd };
 }
 
 async function handleCommunityPosts(request, env, user, url, parts, origin, ctx) {
@@ -1804,7 +1837,29 @@ async function handleRequest(request, env, ctx) {
       const target = String(parts[2]);
       const row = await getProfileSupportData(env, target);
       const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(target).first();
-      return json({ user_id: target, supports: Number(row?.supports || 0), supportsReceived: Number(row?.supports || 0), supportsGiven: Number(given?.count || 0), supportEarningsUsd: Number(row?.supportEarningsUsd || 0), supportsPerDollar: 10000 }, 200, origin);
+      return json({ user_id: target, supports: Number(row?.supports_count || 0), supportsReceived: Number(row?.supports_count || 0), supportsGiven: Number(row?.supports_given || given?.count || 0), eligibilitySupports: Number(row?.eligibility_supports || 0), earningsEligible: Boolean(row?.earnings_eligible), eligibleAt: row?.eligible_at || null, supportEarningsUsd: Number(row?.support_earnings_usd || 0), supportsPerDollar: 10000 }, 200, origin);
+    }
+
+    if (parts[1] === "earnings" && parts[2] === "me" && request.method === "GET") {
+      return json(await getEarningsSummary(env, user.user_id), 200, origin);
+    }
+
+    if (parts[1] === "withdrawals" && request.method === "POST") {
+      if (!withdrawalWindow()) return json({ error: "Withdrawals are open from the 30th through the 3rd of each month." }, 409, origin);
+      const body = await readJson(request);
+      const summary = await getEarningsSummary(env, user.user_id);
+      const amount = Number(body?.amount || summary.wallet_pkr);
+      const bankName = String(body?.bank_name || '').trim();
+      const accountTitle = String(body?.account_title || '').trim();
+      const accountNumber = String(body?.account_number || '').trim();
+      if (!summary.earnings_eligible) return json({ error: "Complete 5,000 Support eligibility first." }, 422, origin);
+      if (!bankName || !accountTitle || !accountNumber) return json({ error: "Bank name, account title and account number are required." }, 400, origin);
+      if (amount < 300 || Number(summary.wallet_pkr) < amount) return json({ error: "Minimum withdrawal is 300 PKR and cannot exceed your wallet balance." }, 422, origin);
+      const pending = await env.DB.prepare("SELECT id FROM withdrawal_requests WHERE user_id = ? AND status IN ('pending', 'approved') LIMIT 1").bind(user.user_id).first();
+      if (pending) return json({ error: "You already have a withdrawal request in process." }, 409, origin);
+      const requestId = id();
+      await env.DB.prepare("INSERT INTO withdrawal_requests (id, user_id, amount_pkr, bank_name, account_title, account_number, status, requested_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)").bind(requestId, user.user_id, amount, bankName, accountTitle, accountNumber, now()).run();
+      return json({ id: requestId, status: "pending" }, 201, origin);
     }
 
     if (parts[1] === "wallets" && parts[2]) {
@@ -2121,6 +2176,25 @@ async function handleRequest(request, env, ctx) {
         return json({ sent, failed: userIds.length - sent }, 201, origin);
       }
 
+      if (parts[2] === "withdrawals") {
+        if (request.method === "GET") {
+          const rows = await env.DB.prepare("SELECT w.*, u.full_name, u.email FROM withdrawal_requests w LEFT JOIN users u ON u.user_id = w.user_id ORDER BY w.requested_at DESC").all();
+          return json(rows.results || [], 200, origin);
+        }
+        if (request.method === "PUT" && parts[3]) {
+          const body = await readJson(request);
+          const status = ["approved", "rejected", "completed"].includes(String(body?.status)) ? String(body.status) : null;
+          if (!status) return json({ error: "Invalid withdrawal status" }, 400, origin);
+          const proof = body?.payment_proof_url ? String(body.payment_proof_url).trim() : null;
+          const row = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first();
+          if (!row) return json({ error: "Withdrawal request not found" }, 404, origin);
+          await env.DB.prepare("UPDATE withdrawal_requests SET status = ?, payment_proof_url = COALESCE(?, payment_proof_url), reviewed_by = ?, reviewed_at = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE completed_at END WHERE id = ?").bind(status, proof, user.user_id, now(), status, now(), parts[3]).run();
+          if (status === "completed") await env.DB.prepare("UPDATE wallets SET balance = MAX(0, balance - ?), updated_at = ? WHERE user_id = ?").bind(Number(row.amount_pkr), now(), row.user_id).run();
+          return json(await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first(), 200, origin);
+        }
+        return json({ error: "Method not allowed" }, 405, origin);
+      }
+
       if (parts[2] === "wallets") {
         if (request.method === "GET") {
           const target = url.searchParams.get("user_id");
@@ -2154,6 +2228,7 @@ async function handleRequest(request, env, ctx) {
           deposits: { table: "deposits", order: "submitted_at" },
           profiles: { table: "profiles", order: "updated_at" },
           wallets: { table: "wallets", order: "updated_at" },
+          withdrawals: { table: "withdrawal_requests", order: "requested_at" },
           unlocks: { table: "case_unlocks", order: "unlocked_at" },
           "support-messages": { table: "support_messages", order: "created_at" },
           feedbacks: { table: "feedbacks", order: "created_at" },

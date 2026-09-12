@@ -68,6 +68,8 @@ import {
   getCommunityPosts,
   createCommunityPost,
   getUserSupports,
+  getEarningsSummary,
+  requestWithdrawal,
   supportPost,
   followUser,
   unfollowUser,
@@ -292,6 +294,9 @@ function HomeSocialDashboard() {
   const [supports, setSupports] = useState(0);
   const [supportsGiven, setSupportsGiven] = useState(0);
   const [supportEarningsUsd, setSupportEarningsUsd] = useState(0);
+  const [earningsSummary, setEarningsSummary] = useState<any>(null);
+  const [activeMoneyTab, setActiveMoneyTab] = useState<"support" | "earnings" | "wallet">("support");
+  const [withdrawalForm, setWithdrawalForm] = useState({ amount: "", bank_name: "", account_title: "", account_number: "" });
   const [posts, setPosts] = useState<any[]>([]);
   const [feedTab, setFeedTab] = useState<"for-you" | "latest" | "most-supported" | "my-posts">("for-you");
   const [message, setMessage] = useState("");
@@ -308,9 +313,10 @@ function HomeSocialDashboard() {
   const loadHomeData = async () => {
     if (!user?.id) return;
     setLoading(true);
-    const [walletResult, supportResult, postsResult, ownPostsResult] = await Promise.allSettled([
+    const [walletResult, supportResult, earningsResult, postsResult, ownPostsResult] = await Promise.allSettled([
       getWallet(user.id),
       getUserSupports(user.id),
+      getEarningsSummary(),
       getCommunityPosts(feedTab),
       getCommunityPosts("my-posts"),
     ]);
@@ -324,6 +330,7 @@ function HomeSocialDashboard() {
       setSupportsGiven(Number(supportData?.supportsGiven || 0));
       setSupportEarningsUsd(Number(supportData?.supportEarningsUsd || 0));
     }
+    if (earningsResult.status === "fulfilled") setEarningsSummary(earningsResult.value);
     if (postsResult.status === "fulfilled") setPosts(Array.isArray(postsResult.value) ? postsResult.value : []);
     if (ownPostsResult.status === "fulfilled") {
       const latest = ownPostsResult.value
@@ -455,7 +462,15 @@ function HomeSocialDashboard() {
             </div>
             <div className="mt-2 flex items-center justify-between rounded-xl border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
               <span>{supportsGiven.toLocaleString()} Supports given to others</span>
-              <span className="font-semibold text-amber-700">Withdrawal coming soon</span>
+              <span className="font-semibold text-amber-700">Eligibility: {Number(earningsSummary?.eligibility_supports || 0).toLocaleString()} / 5,000</span>
+            </div>
+            <div className="mt-4 flex gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
+              {[ ["support", "Support"], ["earnings", "Earnings"], ["wallet", "Wallet"] ].map(([value, label]) => <button key={value} type="button" onClick={() => setActiveMoneyTab(value as typeof activeMoneyTab)} className={`min-w-24 flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${activeMoneyTab === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-card"}`}>{label}</button>)}
+            </div>
+            <div className="mt-3 rounded-xl border border-border bg-card p-4 text-sm">
+              {activeMoneyTab === "support" ? <><p className="font-semibold">Community Support</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Given and received Supports both count toward eligibility. After 5,000, only Supports received on your own posts earn money.</p></> : null}
+              {activeMoneyTab === "earnings" ? <><div className="flex items-center justify-between"><p className="font-semibold">Earnings history</p><span className={earningsSummary?.earnings_eligible ? "text-emerald-600" : "text-amber-600"}>{earningsSummary?.earnings_eligible ? "Eligible" : "Building eligibility"}</span></div><p className="mt-1 text-xs text-muted-foreground">${Number(earningsSummary?.earnings_usd || supportEarningsUsd).toFixed(4)} earned · {Number(earningsSummary?.wallet_pkr || 0).toFixed(2)} PKR</p><div className="mt-3 space-y-2">{(earningsSummary?.posts || []).slice(0, 5).map((entry: any) => <div key={entry.id} className="flex justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs"><span>Post {String(entry.post_id).slice(0, 8)} · {entry.supports} Support</span><strong>{Number(entry.amount_pkr).toFixed(2)} PKR</strong></div>)}</div></> : null}
+              {activeMoneyTab === "wallet" ? <><div className="flex items-center justify-between"><p className="font-semibold">PKR Wallet</p><strong className="text-primary">{Number(earningsSummary?.wallet_pkr || 0).toFixed(2)} PKR</strong></div><p className="mt-1 text-xs text-muted-foreground">Withdrawals open from the 30th through the 3rd. Minimum 300 PKR.</p><div className="mt-3 grid gap-2"><input value={withdrawalForm.bank_name} onChange={e => setWithdrawalForm({ ...withdrawalForm, bank_name: e.target.value })} placeholder="Bank name" className="h-9 rounded-lg border border-border bg-muted/20 px-3 text-xs" /><input value={withdrawalForm.account_title} onChange={e => setWithdrawalForm({ ...withdrawalForm, account_title: e.target.value })} placeholder="Account title" className="h-9 rounded-lg border border-border bg-muted/20 px-3 text-xs" /><input value={withdrawalForm.account_number} onChange={e => setWithdrawalForm({ ...withdrawalForm, account_number: e.target.value })} placeholder="Account number / IBAN" className="h-9 rounded-lg border border-border bg-muted/20 px-3 text-xs" /><div className="flex gap-2"><input value={withdrawalForm.amount} onChange={e => setWithdrawalForm({ ...withdrawalForm, amount: e.target.value })} placeholder="Amount PKR" inputMode="decimal" className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-muted/20 px-3 text-xs" /><Button size="sm" disabled={!earningsSummary?.withdrawal_open || Number(earningsSummary?.wallet_pkr || 0) < 300} onClick={async () => { try { await requestWithdrawal({ ...withdrawalForm, amount: Number(withdrawalForm.amount || earningsSummary?.wallet_pkr || 0) }); toast.success("Withdrawal request sent to Admin."); setEarningsSummary(await getEarningsSummary()); } catch (error) { toast.error(error instanceof Error ? error.message : "Withdrawal failed"); } }}>Request withdrawal</Button></div></div></> : null}
             </div>
           </section>
 

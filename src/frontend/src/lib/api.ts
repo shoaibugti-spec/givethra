@@ -335,16 +335,26 @@ export async function updateProfile(userId: string, data: any, profileRole?: "he
 }
 
 // ---------- WALLET ----------
-export async function getUserSupports(userId: string): Promise<{ user_id: string; supports: number; creditsFromSupports: number }> {
+export async function getUserSupports(userId: string): Promise<{ user_id: string; supports: number; creditsFromSupports: number; supportsGiven?: number; eligibilitySupports?: number; earningsEligible?: boolean; eligibleAt?: string | null; supportEarningsUsd?: number }> {
   const res = await fetchWithAuth(`${WORKER_URL}/api/user-supports/${encodeURIComponent(userId)}`, { headers: headers(), cache: "no-store" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || `Support balance request failed (${res.status})`);
-  return { user_id: String(data?.user_id || userId), supports: Number(data?.supports || 0), creditsFromSupports: Number(data?.creditsFromSupports || 0) };
+  return { user_id: String(data?.user_id || userId), supports: Number(data?.supports || 0), creditsFromSupports: Number(data?.creditsFromSupports || 0), supportsGiven: Number(data?.supportsGiven || 0), eligibilitySupports: Number(data?.eligibilitySupports || 0), earningsEligible: Boolean(data?.earningsEligible), eligibleAt: data?.eligibleAt || null, supportEarningsUsd: Number(data?.supportEarningsUsd || 0) };
 }
 
 export async function getWallet(userId: string) {
   const res = await fetchWithAuth(`${WORKER_URL}/api/wallets/${userId}`, { headers: headers() });
   return res.json();
+}
+
+export async function getEarningsSummary() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/earnings/me`, { headers: headers(), cache: "no-store" });
+  return readApiResponse(res);
+}
+
+export async function requestWithdrawal(data: { amount: number; bank_name: string; account_title: string; account_number: string }) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/withdrawals`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+  return readApiResponse(res);
 }
 
 export async function updateWalletBalance(userId: string, newBalance: number) {
@@ -870,6 +880,16 @@ export async function adminUpsertWallet(userId: string, balance: number) {
     body: JSON.stringify({ user_id: userId, balance }),
   });
   return res.json();
+}
+
+export async function adminGetWithdrawals() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/withdrawals`, { headers: headers(), cache: "no-store" });
+  return readApiResponse(res);
+}
+
+export async function adminUpdateWithdrawal(id: string, data: { status: string; payment_proof_url?: string }) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/withdrawals/${encodeURIComponent(id)}`, { method: "PUT", headers: headers(), body: JSON.stringify(data) });
+  return readApiResponse(res);
 }
 
 export async function adminGetCategoryOffer(category: string) {
