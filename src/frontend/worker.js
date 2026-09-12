@@ -528,7 +528,7 @@ function nextWithdrawalDate(date = new Date()) {
 
 async function getEarningsSummary(env, userId) {
   const profile = await getProfileSupportData(env, userId);
-  const wallet = await env.DB.prepare("SELECT COALESCE(balance, 0) AS balance FROM wallets WHERE user_id = ?").bind(userId).first();
+  const wallet = await env.DB.prepare("SELECT COALESCE(balance_pkr, 0) AS balance FROM earnings_wallets WHERE user_id = ?").bind(userId).first();
   const rows = await env.DB.prepare("SELECT * FROM support_earnings WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").bind(userId).all();
   const withdrawals = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE user_id = ? ORDER BY requested_at DESC LIMIT 50").bind(userId).all();
   return { ...profile, wallet_pkr: Number(wallet?.balance || 0), earnings_usd: Number(profile?.support_earnings_usd || 0), posts: rows.results || [], withdrawals: withdrawals.results || [], withdrawal_open: withdrawalWindow(), next_withdrawal_date: nextWithdrawalDate() };
@@ -1197,13 +1197,15 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
   const eligibilitySupports = supports + supportsGiven;
   const eligible = Number(current?.earnings_eligible || 0) === 1 || eligibilitySupports >= 5000;
   const eligibleAt = Number(current?.earnings_eligible || 0) === 1 ? current?.eligible_at : (eligible ? now() : null);
-  const payableSupports = eligible ? Math.min(supports, 1000) : 0;
+  const postSupportRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE post_id = ? AND user_id = ?").bind(postId, originalUserId).first();
+  const postSupports = Number(postSupportRow?.count || 0);
+  const payableSupports = eligible ? Math.min(postSupports, 1000) : 0;
   // Supports are valued at 10,000 per USD: supports / 10000.
   const supportEarningsUsd = Number((payableSupports / 10000).toFixed(4));
   await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = ?, eligible_at = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportsGiven, eligibilitySupports, eligible ? 1 : 0, eligibleAt, supportEarningsUsd, now(), originalUserId).run();
-  if (eligible && supports <= 1000) {
+  if (eligible && postSupports <= 1000) {
     await env.DB.prepare("INSERT OR IGNORE INTO support_earnings (id, user_id, post_id, supports, amount_pkr, amount_usd, created_at) VALUES (?, ?, ?, 1, 0.1, 0.0001, ?)").bind(id(), originalUserId, postId, now()).run();
-    await env.DB.prepare("INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = balance + excluded.balance, updated_at = excluded.updated_at").bind(originalUserId, 0.1, now()).run();
+    await env.DB.prepare("INSERT INTO earnings_wallets (user_id, balance_pkr, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance_pkr = balance_pkr + excluded.balance_pkr, updated_at = excluded.updated_at").bind(originalUserId, 0.1, now()).run();
   }
   const sourceRow = await getProfileSupportData(env, sourceUserId);
   const sourceGiven = Number(sourceRow?.supports_given || 0) + 1;
@@ -2189,7 +2191,7 @@ async function handleRequest(request, env, ctx) {
           const row = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first();
           if (!row) return json({ error: "Withdrawal request not found" }, 404, origin);
           await env.DB.prepare("UPDATE withdrawal_requests SET status = ?, payment_proof_url = COALESCE(?, payment_proof_url), reviewed_by = ?, reviewed_at = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE completed_at END WHERE id = ?").bind(status, proof, user.user_id, now(), status, now(), parts[3]).run();
-          if (status === "completed") await env.DB.prepare("UPDATE wallets SET balance = MAX(0, balance - ?), updated_at = ? WHERE user_id = ?").bind(Number(row.amount_pkr), now(), row.user_id).run();
+          if (status === "completed") await env.DB.prepare("UPDATE earnings_wallets SET balance_pkr = MAX(0, balance_pkr - ?), updated_at = ? WHERE user_id = ?").bind(Number(row.amount_pkr), now(), row.user_id).run();
           return json(await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first(), 200, origin);
         }
         return json({ error: "Method not allowed" }, 405, origin);

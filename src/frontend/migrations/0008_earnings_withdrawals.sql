@@ -7,3 +7,4 @@ CREATE TABLE IF NOT EXISTS support_earnings (id TEXT PRIMARY KEY, user_id TEXT N
 CREATE INDEX IF NOT EXISTS support_earnings_user_created ON support_earnings(user_id, created_at);
 CREATE TABLE IF NOT EXISTS withdrawal_requests (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, amount_pkr REAL NOT NULL, bank_name TEXT NOT NULL, account_title TEXT NOT NULL, account_number TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', payment_proof_url TEXT, reviewed_by TEXT, requested_at TEXT NOT NULL, reviewed_at TEXT, completed_at TEXT);
 CREATE INDEX IF NOT EXISTS withdrawal_status_requested ON withdrawal_requests(status, requested_at);
+CREATE TABLE IF NOT EXISTS earnings_wallets (user_id TEXT PRIMARY KEY, balance_pkr REAL NOT NULL DEFAULT 0, updated_at TEXT NOT NULL);
