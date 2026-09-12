@@ -72,6 +72,7 @@ import {
   followUser,
   unfollowUser,
 } from "@/lib/api";
+import SlidingHomePanel from "@/components/SlidingHomePanel";
 
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
@@ -427,7 +428,8 @@ function HomeSocialDashboard() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-muted/20 pb-24">
+      <SlidingHomePanel>
+      <div className="min-h-full bg-muted/20 pb-24">
         <div className="mx-auto max-w-3xl space-y-4 px-3 py-4 md:px-5 md:py-7">
           <section className="rounded-2xl bg-card px-5 py-5 shadow-sm border border-border">
             <div className="flex items-center justify-between gap-4">
@@ -441,12 +443,12 @@ function HomeSocialDashboard() {
               </div>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-2.5">
-              <div className="rounded-xl border border-primary/15 bg-primary/5 p-3">
+              <div id="home-wallet-summary" className="scroll-mt-4 rounded-xl border border-primary/15 bg-primary/5 p-3">
                 <p className="text-[11px] text-muted-foreground">Wallet credits</p>
                 <p className="mt-1 text-xl font-bold text-primary">{walletBalance.toLocaleString()}</p>
                 <p className="text-[10px] text-muted-foreground">Used for platform actions</p>
               </div>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:bg-amber-950/20">
+              <div id="home-support-summary" className="scroll-mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:bg-amber-950/20">
                 <p className="text-[11px] text-muted-foreground">Support earnings</p>
                 <p className="mt-1 text-xl font-bold text-amber-600">${supportEarningsUsd.toFixed(2)}</p>
                 <p className="text-[10px] text-muted-foreground">{supports.toLocaleString()} received · 10,000 = $1</p>
@@ -510,6 +512,7 @@ function HomeSocialDashboard() {
           ))}
         </div>
       </div>
+      </SlidingHomePanel>
     </Layout>
   );
 }
