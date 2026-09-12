@@ -94,6 +94,7 @@ function SignInLandingPage({ onSignIn, isLoggingIn, loginError }: { onSignIn: ()
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-4xl space-y-10">
         <section className="rounded-[2rem] border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-teal-50 p-8 text-center shadow-sm md:p-14">
+          <div className="mx-auto h-24 w-24 overflow-hidden rounded-3xl border-4 border-white shadow-xl ring-4 ring-primary/15"><img src="/assets/givethra-google-logo.png" alt="Givethra G+ logo" className="h-full w-full object-cover" /></div>
           <p className="text-sm font-bold uppercase tracking-[0.24em] text-primary">Givethra</p>
           <h1 className="mt-5 text-4xl font-bold leading-tight text-foreground md:text-6xl">
             Verified Help.<br />

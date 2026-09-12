@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Heart, Loader2 } from "lucide-react";
+import { Download, Loader2, Mail, MessageCircle } from "lucide-react";
 import { useEffect } from "react";
 
 export default function SignInPage() {
@@ -33,8 +33,8 @@ export default function SignInPage() {
       <Card className="w-full max-w-md border-border shadow-xl">
         <CardHeader className="text-center space-y-2">
           <div className="flex justify-center">
-            <div className="h-14 w-14 rounded-2xl bg-primary flex items-center justify-center">
-              <Heart className="h-7 w-7 text-primary-foreground" />
+            <div className="relative h-24 w-24 overflow-hidden rounded-3xl border-4 border-white shadow-xl ring-4 ring-primary/15">
+              <img src="/assets/givethra-google-logo.png" alt="Givethra G+ logo" className="h-full w-full object-cover" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">Welcome to Givethra</CardTitle>
@@ -72,7 +72,7 @@ export default function SignInPage() {
             Don't have an account?{" "}
             <Link to="/sign-up" className="text-primary font-medium hover:underline">Sign up</Link>
           </p>
-          <div className="space-y-2 border-t border-border pt-4 text-center text-xs text-muted-foreground"><p className="font-semibold text-foreground">📱 Get the Givethra Android App</p><p>Verified cases, anytime — right on your phone.</p><Button variant="outline" size="sm">Download App</Button><p>Verified &amp; Secure · 100% Transparency · Compassion · Global Community · Safe &amp; Private</p><p>Get WhatsApp Support 24/7 · info@givethra.org</p><p>About · FAQ · Privacy Policy · Terms · Community Guidelines · Contact Us</p><p>© {new Date().getFullYear()} Givethra. All rights reserved.</p><p className="italic">“Be the reason someone believes in kindness.”</p><p>givethra.org</p></div>
+          <div className="space-y-4 border-t border-border pt-5 text-center text-xs text-muted-foreground"><div className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-teal-50 p-4"><p className="text-2xl">📱</p><p className="mt-1 font-bold text-foreground">Get the Givethra Android App</p><p className="mt-1">Verified cases, anytime — right on your phone.</p><Button variant="outline" size="sm" className="mt-3 gap-2"><Download className="h-4 w-4" />Download App</Button></div><div className="grid grid-cols-2 gap-2 text-[11px]"><span className="rounded-lg bg-emerald-50 p-2 text-emerald-700">Verified &amp; Secure</span><span className="rounded-lg bg-sky-50 p-2 text-sky-700">100% Transparency</span><span className="rounded-lg bg-rose-50 p-2 text-rose-700">Compassion Driven by Humanity</span><span className="rounded-lg bg-amber-50 p-2 text-amber-700">Global Community</span><span className="rounded-lg bg-violet-50 p-2 text-violet-700">Help Beyond Borders</span><span className="rounded-lg bg-teal-50 p-2 text-teal-700">Safe &amp; Private</span></div><div className="space-y-2"><p className="font-semibold text-foreground">Connect with Givethra</p><p>Follow us and reach out — we're here to help.</p><div className="flex justify-center gap-4"><a href="https://wa.me/message/42CJXLUYEI2KM1?src=qr" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-green-600"><MessageCircle className="h-4 w-4" />Get WhatsApp Support 24/7</a><a href="mailto:info@givethra.org" className="inline-flex items-center gap-1 text-primary"><Mail className="h-4 w-4" />info@givethra.org</a></div></div><nav className="flex flex-wrap justify-center gap-x-3 gap-y-1"><Link to="/about">About</Link><Link to="/faq">FAQ</Link><Link to="/privacy">Privacy Policy</Link><Link to="/terms">Terms</Link><Link to="/community-guidelines">Community Guidelines</Link><Link to="/contact">Contact Us</Link></nav><p>© {new Date().getFullYear()} Givethra. All rights reserved.</p><p className="italic">“Be the reason someone believes in kindness.”</p><p className="font-semibold text-foreground">givethra.org</p></div>
         </CardContent>
       </Card>
     </div>
