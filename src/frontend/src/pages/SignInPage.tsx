@@ -61,6 +61,7 @@ export default function SignInPage() {
               </>
             )}
           </Button>
+          <div id="google-account-chooser-fallback" className="hidden min-h-11 w-full justify-center" aria-live="polite" />
           <div className="grid grid-cols-2 gap-2 text-center text-xs"><div className="rounded-xl border border-border bg-muted/30 p-3"><strong className="block text-foreground">Support</strong><span className="text-muted-foreground">Help verified people</span></div><div className="rounded-xl border border-border bg-muted/30 p-3"><strong className="block text-foreground">Earnings</strong><span className="text-muted-foreground">Earn from your posts</span></div></div>
           <p className="text-center text-sm font-medium text-primary">Support others, become eligible, earn through your own posts, and use your separate Earnings Wallet.</p>
           {loginError && (

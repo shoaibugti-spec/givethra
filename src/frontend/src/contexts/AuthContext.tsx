@@ -293,10 +293,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           googlePromptTimerRef.current = window.setTimeout(openGooglePrompt, 650);
           return;
         }
-        // Do not expose browser-cookie wording to users. Leave the normal
-        // Google button available so the official account chooser can be
-        // opened again without suggesting that the app can bypass Google's
-        // security controls.
+        const fallback = document.getElementById("google-account-chooser-fallback");
+        if (fallback && !fallback.dataset.rendered) {
+          fallback.dataset.rendered = "1";
+          fallback.classList.remove("hidden");
+          googleIdentity.accounts.id.renderButton(fallback, {
+            type: "standard",
+            theme: "outline",
+            size: "large",
+            text: "signin_with",
+            shape: "rectangular",
+            width: Math.min(360, Math.max(240, fallback.clientWidth || 320)),
+          });
+        }
         setIsLoggingIn(false);
         setLoginError(null);
       });

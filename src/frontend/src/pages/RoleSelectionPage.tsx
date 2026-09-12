@@ -113,6 +113,7 @@ function SignInLandingPage({ onSignIn, isLoggingIn, loginError }: { onSignIn: ()
             {isLoggingIn && <Loader2 className="h-5 w-5 animate-spin" />}
             {isLoggingIn ? "Connecting securely…" : "Sign in with Google"}
           </button>
+          <div id="google-account-chooser-fallback" className="mx-auto hidden min-h-11 max-w-sm justify-center" aria-live="polite" />
           {loginError && (
             <p role="alert" className="mx-auto mt-4 max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {loginError}
