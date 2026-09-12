@@ -427,7 +427,6 @@ function HomeSocialDashboard() {
   };
 
   return (
-    <Layout>
       <SlidingHomePanel>
       <div className="min-h-full bg-muted/20 pb-24">
         <div className="mx-auto max-w-3xl space-y-4 px-3 py-4 md:px-5 md:py-7">
@@ -513,7 +512,6 @@ function HomeSocialDashboard() {
         </div>
       </div>
       </SlidingHomePanel>
-    </Layout>
   );
 }
 

@@ -58,7 +58,7 @@ export default function SlidingHomePanel({ children, onTabChange }: SlidingHomeP
   const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (dragStartY.current === null) return;
     const delta = event.clientY - dragStartY.current;
-    setDragOffset(dragStartExpanded.current ? Math.min(0, delta) : Math.max(0, delta));
+    setDragOffset(dragStartExpanded.current ? delta : Math.max(0, delta));
   };
 
   const endDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -95,7 +95,7 @@ export default function SlidingHomePanel({ children, onTabChange }: SlidingHomeP
 
   return (
     <div className={shellClass} style={{ transform: expanded && dragOffset ? `translateY(${dragOffset}px)` : undefined, transition: isDragging ? "none" : "transform 260ms cubic-bezier(0.23, 1, 0.32, 1)" }} data-testid="home-bottom-sheet" aria-label="Givethra home content panel">
-      <div className={headerClass} onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
+      <div className={`${headerClass} touch-none select-none`} onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
         <button type="button" onClick={togglePanel} className="mx-auto flex w-full flex-col items-center gap-1 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-expanded={expanded} aria-controls="givethra-home-panel-content">
           <span className="flex h-7 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <ChevronUp className={`h-5 w-5 animate-bounce transition-transform ${expanded ? "rotate-180" : ""}`} />
