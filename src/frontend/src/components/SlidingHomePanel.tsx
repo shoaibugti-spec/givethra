@@ -15,12 +15,6 @@ const TABS: Array<{ id: PanelTab; label: string; icon: typeof DollarSign }> = [
   { id: "wallet", label: "Wallet", icon: WalletCards },
 ];
 
-const TAB_TARGETS: Record<PanelTab, string> = {
-  earning: "home-support-summary",
-  support: "home-support-summary",
-  wallet: "home-wallet-summary",
-};
-
 /**
  * Home shell for the existing functional HomeSocialDashboard.
  *
@@ -78,9 +72,6 @@ export default function SlidingHomePanel({ children, onTabChange }: SlidingHomeP
     setActiveTab(tab);
     setExpanded(true);
     onTabChange?.(tab);
-    window.requestAnimationFrame(() => {
-      document.getElementById(TAB_TARGETS[tab])?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   };
 
   const shellClass = expanded

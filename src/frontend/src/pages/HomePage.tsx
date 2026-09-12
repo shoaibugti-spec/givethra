@@ -288,6 +288,7 @@ function relativePostTime(value: unknown) {
 }
 
 function HomeSocialDashboard() {
+  // Earnings conversion reference: 10,000 = $1 (shown only in Earnings, never in Support).
   const { user } = useAuth();
   const { role } = useRole();
   const [walletBalance, setWalletBalance] = useState(0);
@@ -295,7 +296,7 @@ function HomeSocialDashboard() {
   const [supportsGiven, setSupportsGiven] = useState(0);
   const [supportEarningsUsd, setSupportEarningsUsd] = useState(0);
   const [earningsSummary, setEarningsSummary] = useState<any>(null);
-  const [activeMoneyTab, setActiveMoneyTab] = useState<"support" | "earnings" | "wallet">("support");
+  const [activeMoneyTab, setActiveMoneyTab] = useState<"earning" | "support" | "wallet">("support");
   const [withdrawalForm, setWithdrawalForm] = useState({ amount: "", bank_name: "", account_title: "", account_number: "" });
   const [posts, setPosts] = useState<any[]>([]);
   const [feedTab, setFeedTab] = useState<"for-you" | "latest" | "most-supported" | "my-posts">("for-you");
@@ -434,7 +435,7 @@ function HomeSocialDashboard() {
   };
 
   return (
-      <SlidingHomePanel>
+      <SlidingHomePanel onTabChange={setActiveMoneyTab}>
       <div className="min-h-full bg-muted/20 pb-24">
         <div className="mx-auto max-w-3xl space-y-4 px-3 py-4 md:px-5 md:py-7">
           <section className="rounded-2xl bg-card px-5 py-5 shadow-sm border border-border">
@@ -448,32 +449,12 @@ function HomeSocialDashboard() {
                 {(user?.fullName || "U").slice(0, 1).toUpperCase()}
               </div>
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-2.5">
-              <div id="home-wallet-summary" className="scroll-mt-4 rounded-xl border border-primary/15 bg-primary/5 p-3">
-                <p className="text-[11px] text-muted-foreground">Wallet credits</p>
-                <p className="mt-1 text-xl font-bold text-primary">{walletBalance.toLocaleString()}</p>
-                <p className="text-[10px] text-muted-foreground">Used for platform actions</p>
-              </div>
-              <div id="home-support-summary" className="scroll-mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:bg-amber-950/20">
-                <p className="text-[11px] text-muted-foreground">Support earnings</p>
-                <p className="mt-1 text-xl font-bold text-amber-600">${supportEarningsUsd.toFixed(2)}</p>
-                <p className="text-[10px] text-muted-foreground">{supports.toLocaleString()} received · 10,000 = $1</p>
-              </div>
-            </div>
-            <div className="mt-2 flex items-center justify-between rounded-xl border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-              <span>{supportsGiven.toLocaleString()} Supports given to others</span>
-              <span className="font-semibold text-amber-700">Eligibility: {Number(earningsSummary?.eligibility_supports || 0).toLocaleString()} / 5,000</span>
-            </div>
-            <div className="mt-4 flex gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
-              {[ ["support", "Support"], ["earnings", "Earnings"], ["wallet", "Wallet"] ].map(([value, label]) => <button key={value} type="button" onClick={() => setActiveMoneyTab(value as typeof activeMoneyTab)} className={`min-w-24 flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${activeMoneyTab === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-card"}`}>{label}</button>)}
-            </div>
-            <div className="mt-3 rounded-xl border border-border bg-card p-4 text-sm">
-              {activeMoneyTab === "support" ? <><p className="font-semibold">Community Support</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Given and received Supports both count toward eligibility. After 5,000, only Supports received on your own posts earn money.</p></> : null}
-              {activeMoneyTab === "earnings" ? <><div className="flex items-center justify-between"><p className="font-semibold">Earnings history</p><span className={earningsSummary?.earnings_eligible ? "text-emerald-600" : "text-amber-600"}>{earningsSummary?.earnings_eligible ? "Eligible" : "Building eligibility"}</span></div><p className="mt-1 text-xs text-muted-foreground">${Number(earningsSummary?.earnings_usd || supportEarningsUsd).toFixed(4)} earned · {Number(earningsSummary?.wallet_pkr || 0).toFixed(2)} PKR</p><div className="mt-3 space-y-2">{(earningsSummary?.posts || []).slice(0, 5).map((entry: any) => <div key={entry.id} className="flex justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs"><span>Post {String(entry.post_id).slice(0, 8)} · {entry.supports} Support</span><strong>{Number(entry.amount_pkr).toFixed(2)} PKR</strong></div>)}</div></> : null}
-              {activeMoneyTab === "wallet" ? <><div className="flex items-center justify-between"><p className="font-semibold">PKR Wallet</p><strong className="text-primary">{Number(earningsSummary?.wallet_pkr || 0).toFixed(2)} PKR</strong></div><p className="mt-1 text-xs text-muted-foreground">Withdrawals open from the 30th through the 3rd. Minimum 300 PKR.</p><div className="mt-3 grid gap-2"><input value={withdrawalForm.bank_name} onChange={e => setWithdrawalForm({ ...withdrawalForm, bank_name: e.target.value })} placeholder="Bank name" className="h-9 rounded-lg border border-border bg-muted/20 px-3 text-xs" /><input value={withdrawalForm.account_title} onChange={e => setWithdrawalForm({ ...withdrawalForm, account_title: e.target.value })} placeholder="Account title" className="h-9 rounded-lg border border-border bg-muted/20 px-3 text-xs" /><input value={withdrawalForm.account_number} onChange={e => setWithdrawalForm({ ...withdrawalForm, account_number: e.target.value })} placeholder="Account number / IBAN" className="h-9 rounded-lg border border-border bg-muted/20 px-3 text-xs" /><div className="flex gap-2"><input value={withdrawalForm.amount} onChange={e => setWithdrawalForm({ ...withdrawalForm, amount: e.target.value })} placeholder="Amount PKR" inputMode="decimal" className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-muted/20 px-3 text-xs" /><Button size="sm" disabled={!earningsSummary?.withdrawal_open || Number(earningsSummary?.wallet_pkr || 0) < 300} onClick={async () => { try { await requestWithdrawal({ ...withdrawalForm, amount: Number(withdrawalForm.amount || earningsSummary?.wallet_pkr || 0) }); toast.success("Withdrawal request sent to Admin."); setEarningsSummary(await getEarningsSummary()); } catch (error) { toast.error(error instanceof Error ? error.message : "Withdrawal failed"); } }}>Request withdrawal</Button></div></div></> : null}
-            </div>
+            {activeMoneyTab === "support" ? <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4"><p className="font-semibold">Support Center</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Support others and receive support on your own posts. Both given and received Supports count toward your 5,000 eligibility target.</p><p className="mt-3 text-xs font-semibold text-primary">Eligibility: {Number(earningsSummary?.eligibility_supports || 0).toLocaleString()} / 5,000 Supports</p></div> : null}
+            {activeMoneyTab === "earning" ? <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:bg-amber-950/20"><div className="flex items-center justify-between"><p className="font-semibold">Earnings</p><span className={earningsSummary?.earnings_eligible ? "text-emerald-600" : "text-amber-700"}>{earningsSummary?.earnings_eligible ? "Eligible" : "Not eligible yet"}</span></div><p className="mt-1 text-xs text-muted-foreground">Your posts earn only after eligibility. Current earnings: ${Number(earningsSummary?.earnings_usd || supportEarningsUsd).toFixed(4)}</p><div className="mt-3 space-y-2">{(earningsSummary?.posts || []).map((entry: any) => <div key={entry.id} className="flex justify-between rounded-lg bg-white/70 px-3 py-2 text-xs"><span>Post {String(entry.post_id).slice(0, 8)} · {entry.supports} Support</span><strong>{Number(entry.amount_pkr).toFixed(2)} PKR</strong></div>)}</div></div> : null}
+            {activeMoneyTab === "wallet" ? <div className="mt-5 rounded-xl border border-primary/15 bg-primary/5 p-4"><div className="flex items-center justify-between"><p className="font-semibold">Wallet</p><strong className="text-primary">{Number(earningsSummary?.wallet_pkr || walletBalance).toFixed(2)} PKR</strong></div><p className="mt-1 text-xs text-muted-foreground">Withdrawal opens from the 30th through the 3rd. Minimum 300 PKR.</p><div className="mt-3 grid gap-2"><input value={withdrawalForm.bank_name} onChange={e => setWithdrawalForm({ ...withdrawalForm, bank_name: e.target.value })} placeholder="Bank name" className="h-9 rounded-lg border border-border bg-background px-3 text-xs" /><input value={withdrawalForm.account_title} onChange={e => setWithdrawalForm({ ...withdrawalForm, account_title: e.target.value })} placeholder="Account title" className="h-9 rounded-lg border border-border bg-background px-3 text-xs" /><input value={withdrawalForm.account_number} onChange={e => setWithdrawalForm({ ...withdrawalForm, account_number: e.target.value })} placeholder="Account number / IBAN" className="h-9 rounded-lg border border-border bg-background px-3 text-xs" /><div className="flex gap-2"><input value={withdrawalForm.amount} onChange={e => setWithdrawalForm({ ...withdrawalForm, amount: e.target.value })} placeholder="Amount PKR" inputMode="decimal" className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-xs" /><Button size="sm" disabled={!earningsSummary?.withdrawal_open || Number(earningsSummary?.wallet_pkr || walletBalance) < 300} onClick={async () => { try { await requestWithdrawal({ ...withdrawalForm, amount: Number(withdrawalForm.amount || earningsSummary?.wallet_pkr || walletBalance) }); toast.success("Withdrawal request sent to Admin."); setEarningsSummary(await getEarningsSummary()); } catch (error) { toast.error(error instanceof Error ? error.message : "Withdrawal failed"); } }}>Request withdrawal</Button></div></div></div> : null}
           </section>
 
+          {activeMoneyTab === "support" ? <>
           <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <Search className="h-4 w-4 text-primary" />
@@ -524,6 +505,7 @@ function HomeSocialDashboard() {
               <div className="mt-4 flex gap-2 border-t border-border pt-3"><button type="button" disabled={busyPost === `support:${post.id}` || Boolean(post.supported_by_me) || post.user_id === user?.id} onClick={() => reactToPost(post)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${post.supported_by_me ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-primary/20 text-primary hover:bg-primary/10"}`}>{post.supported_by_me ? "Supported ✓" : "🫴🏻 Support"} · {Number(post.support_count || 0)}</button><button type="button" onClick={() => sharePost(post)} className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"><Share2 className="h-4 w-4" /> Share</button></div>
             </article>
           ))}
+          </> : null}
         </div>
       </div>
       </SlidingHomePanel>
