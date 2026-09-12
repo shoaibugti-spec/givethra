@@ -1177,6 +1177,17 @@ async function insertCommunityNotification(env, ctx, recipientId, actorId, actor
   ).bind(id(), recipientId, type, title, `${publicDisplayName(actorName, "A Givethra member")}: ${message}`, "/community", now()).run());
 }
 
+async function refreshSupportEligibility(env, userId) {
+  const received = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE user_id = ?").bind(userId).first();
+  const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(userId).first();
+  const supportsReceived = Number(received?.count || 0);
+  const supportsGiven = Number(given?.count || 0);
+  const eligibilitySupports = supportsReceived + supportsGiven;
+  const eligible = eligibilitySupports >= 5000;
+  await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = CASE WHEN COALESCE(earnings_eligible, 0) = 1 OR ? >= 5000 THEN 1 ELSE 0 END, eligible_at = CASE WHEN eligible_at IS NULL AND ? >= 5000 THEN ? ELSE eligible_at END, updated_at = ? WHERE user_id = ?").bind(supportsReceived, supportsGiven, eligibilitySupports, eligibilitySupports, eligibilitySupports, now(), now(), userId).run();
+  return { supportsReceived, supportsGiven, eligibilitySupports, eligible };
+}
+
 async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, postId, actorName) {
   if (!originalUserId || !sourceUserId || originalUserId === sourceUserId) return { added: false, supports: 0, creditsEarned: 0 };
   const post = await env.DB.prepare("SELECT created_at FROM community_posts WHERE id = ? AND user_id = ?").bind(postId, originalUserId).first();
@@ -1191,11 +1202,11 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
   ).bind(id(), originalUserId, sourceUserId, postId, now()).run();
   if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, creditsEarned: 0, alreadySupported: true };
   const current = await getProfileSupportData(env, originalUserId);
-  const supports = Number(current?.supports_count || 0) + 1;
-  const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(originalUserId).first();
-  const supportsGiven = Number(given?.count || 0);
-  const eligibilitySupports = supports + supportsGiven;
-  const eligible = Number(current?.earnings_eligible || 0) === 1 || eligibilitySupports >= 5000;
+  const targetEligibility = await refreshSupportEligibility(env, originalUserId);
+  const supports = targetEligibility.supportsReceived;
+  const supportsGiven = targetEligibility.supportsGiven;
+  const eligibilitySupports = targetEligibility.eligibilitySupports;
+  const eligible = Number(current?.earnings_eligible || 0) === 1 || targetEligibility.eligible;
   const eligibleAt = Number(current?.earnings_eligible || 0) === 1 ? current?.eligible_at : (eligible ? now() : null);
   const postSupportRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE post_id = ? AND user_id = ?").bind(postId, originalUserId).first();
   const postSupports = Number(postSupportRow?.count || 0);
@@ -1207,10 +1218,7 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
     await env.DB.prepare("INSERT OR IGNORE INTO support_earnings (id, user_id, post_id, supports, amount_pkr, amount_usd, created_at) VALUES (?, ?, ?, 1, 0.1, 0.0001, ?)").bind(id(), originalUserId, postId, now()).run();
     await env.DB.prepare("INSERT INTO earnings_wallets (user_id, balance_pkr, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance_pkr = balance_pkr + excluded.balance_pkr, updated_at = excluded.updated_at").bind(originalUserId, 0.1, now()).run();
   }
-  const sourceRow = await getProfileSupportData(env, sourceUserId);
-  const sourceGiven = Number(sourceRow?.supports_given || 0) + 1;
-  const sourceEligibility = Number(sourceRow?.supports_count || 0) + sourceGiven;
-  await env.DB.prepare("UPDATE users SET supports_given = ?, eligibility_supports = MAX(COALESCE(eligibility_supports, 0), ?), earnings_eligible = CASE WHEN COALESCE(earnings_eligible, 0) = 1 OR ? >= 5000 THEN 1 ELSE 0 END, eligible_at = CASE WHEN eligible_at IS NULL AND ? >= 5000 THEN ? ELSE eligible_at END, updated_at = ? WHERE user_id = ?").bind(sourceGiven, sourceEligibility, sourceEligibility, sourceEligibility, now(), now(), sourceUserId).run();
+  await refreshSupportEligibility(env, sourceUserId);
   // Legacy fallback contract retained for databases before the earnings migration:
   // UPDATE users SET supports_count = ?, updated_at = ? WHERE user_id = ?
   await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);

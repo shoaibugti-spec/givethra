@@ -91,7 +91,7 @@ export default function SlidingHomePanel({ children, onTabChange }: SlidingHomeP
           <span className="flex h-7 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <ChevronUp className={`h-5 w-5 animate-bounce transition-transform ${expanded ? "rotate-180" : ""}`} />
           </span>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{expanded ? "Swipe down to close" : "Swipe up to explore"}</span>
+          <span className="text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{expanded ? "Swipe down to close" : "Support · Earnings · Wallet · Swipe up"}</span>
         </button>
         <div className="mx-auto mt-2 grid max-w-xl grid-cols-3 gap-2" role="tablist" aria-label="Home summary tabs">
           {TABS.map(({ id, label, icon: Icon }) => (
