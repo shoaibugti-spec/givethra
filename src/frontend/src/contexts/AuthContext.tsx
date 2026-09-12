@@ -106,6 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const googleInitializedRef = useRef(false);
+  const googlePromptRetryRef = useRef(0);
+  const googlePromptTimerRef = useRef<number | null>(null);
+  const googleLoginTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     clearLegacyBrowserState();
@@ -138,6 +141,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setIsInitializing(false);
     }
+  }, []);
+
+  useEffect(() => () => {
+    if (googlePromptTimerRef.current) window.clearTimeout(googlePromptTimerRef.current);
+    if (googleLoginTimerRef.current) window.clearTimeout(googleLoginTimerRef.current);
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -175,14 +183,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const finishGoogleLogin = useCallback(async (credential: string) => {
+    if (googleLoginTimerRef.current) window.clearTimeout(googleLoginTimerRef.current);
+    if (googlePromptTimerRef.current) window.clearTimeout(googlePromptTimerRef.current);
+    googlePromptRetryRef.current = 0;
     setLoginError(null);
     try {
-      const response = await fetchWithTimeout(`${WORKER_URL}/auth/google`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
-      }, 15000);
+      let response: Response | null = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await fetchWithTimeout(`${WORKER_URL}/auth/google`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ credential }),
+          }, 15000);
+          break;
+        } catch (error) {
+          if (attempt === 1) throw error;
+          await new Promise((resolve) => window.setTimeout(resolve, 700));
+        }
+      }
+      if (!response) throw new Error("Google sign-in verification did not return a response.");
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token || !data.user) {
         throw new Error(data.error || `Google sign-in could not be verified (HTTP ${response.status}).`);
@@ -228,6 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearLegacyBrowserState();
     setLoginError(null);
     setIsLoggingIn(true);
+    googlePromptRetryRef.current = 0;
+    if (googlePromptTimerRef.current) window.clearTimeout(googlePromptTimerRef.current);
+    if (googleLoginTimerRef.current) window.clearTimeout(googleLoginTimerRef.current);
     const deadline = Date.now() + 5000;
     while (!(window as any).google?.accounts?.id && Date.now() < deadline) {
       await new Promise((resolve) => window.setTimeout(resolve, 50));
@@ -257,18 +281,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       googleInitializedRef.current = true;
     }
-    googleIdentity.accounts.id.prompt((notification: any) => {
-      if (notification?.isNotDisplayed?.()) {
+    const openGooglePrompt = () => {
+      googleIdentity.accounts.id.prompt((notification: any) => {
+        const unavailable = notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.();
+        if (!unavailable) return;
+        if (googlePromptRetryRef.current < 3) {
+          googlePromptRetryRef.current += 1;
+          googlePromptTimerRef.current = window.setTimeout(openGooglePrompt, 650);
+          return;
+        }
         setIsLoggingIn(false);
-        setLoginError("Google sign-in could not open. Please allow Google prompts/pop-ups and try again.");
-      }
-    });
-    window.setTimeout(() => {
+        setLoginError("Select a Google account to continue. If the account selector is hidden, enable third-party cookies for Google and the selector will reopen automatically.");
+      });
+    };
+    openGooglePrompt();
+    googleLoginTimerRef.current = window.setTimeout(() => {
       setIsLoggingIn((active) => {
-        if (active) setLoginError("Google sign-in timed out. Please try again.");
+        if (active) setLoginError("Google account selection is taking longer than expected. Please select your account when the Google prompt appears.");
         return false;
       });
-    }, 30000);
+    }, 60000);
   }, [finishGoogleLogin, isLoggingIn]);
 
   const handleLogout = useCallback(async () => {
