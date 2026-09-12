@@ -246,6 +246,10 @@ export default function RoleSelectionPage() {
     navigate({ to: "/become-hero" });
   };
 
+  // Never flash the former role hub after authentication; the authenticated
+  // destination is the Home page only.
+  if (isAuthenticated) return <div className="min-h-screen bg-background" aria-label="Opening Givethra Home" />;
+
   if (!isAuthenticated) {
     return <SignInLandingPage onSignIn={loginWithGoogle} isLoggingIn={isLoggingIn} loginError={loginError} />;
   }
