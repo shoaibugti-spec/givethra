@@ -117,6 +117,7 @@ function SignInLandingPage({ onSignIn, isLoggingIn, loginError }: { onSignIn: ()
               {loginError}
             </p>
           )}
+          <p className="mx-auto mt-4 max-w-xl text-sm font-medium text-primary">Support verified people, earn through your own posts after eligibility, and manage your separate Earnings Wallet.</p>
         </section>
         <section className="grid gap-4 sm:grid-cols-4" aria-label="Givethra trust principles">
           {[
@@ -147,6 +148,10 @@ export default function RoleSelectionPage() {
   const navigate = useNavigate();
 
   const [activeCases, setActiveCases] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isAuthenticated) void navigate({ to: "/home" });
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     getApprovedCases()

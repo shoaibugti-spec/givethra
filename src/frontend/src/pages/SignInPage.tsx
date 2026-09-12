@@ -24,7 +24,7 @@ export default function SignInPage() {
     if (isAuthenticated) {
       if (redirect === "/need-help") navigate({ to: "/need-help" });
       else if (redirect === "/community") navigate({ to: "/community" });
-      else navigate({ to: "/" });
+      else navigate({ to: "/home" });
     }
   }, [isAuthenticated, navigate, redirect]);
 
@@ -61,6 +61,8 @@ export default function SignInPage() {
               </>
             )}
           </Button>
+          <div className="grid grid-cols-2 gap-2 text-center text-xs"><div className="rounded-xl border border-border bg-muted/30 p-3"><strong className="block text-foreground">Support</strong><span className="text-muted-foreground">Help verified people</span></div><div className="rounded-xl border border-border bg-muted/30 p-3"><strong className="block text-foreground">Earnings</strong><span className="text-muted-foreground">Earn from your posts</span></div></div>
+          <p className="text-center text-sm font-medium text-primary">Support others, become eligible, earn through your own posts, and use your separate Earnings Wallet.</p>
           {loginError && (
             <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
               {loginError}
@@ -70,6 +72,7 @@ export default function SignInPage() {
             Don't have an account?{" "}
             <Link to="/sign-up" className="text-primary font-medium hover:underline">Sign up</Link>
           </p>
+          <div className="space-y-2 border-t border-border pt-4 text-center text-xs text-muted-foreground"><p className="font-semibold text-foreground">📱 Get the Givethra Android App</p><p>Verified cases, anytime — right on your phone.</p><Button variant="outline" size="sm">Download App</Button><p>Verified &amp; Secure · 100% Transparency · Compassion · Global Community · Safe &amp; Private</p><p>Get WhatsApp Support 24/7 · info@givethra.org</p><p>About · FAQ · Privacy Policy · Terms · Community Guidelines · Contact Us</p><p>© {new Date().getFullYear()} Givethra. All rights reserved.</p><p className="italic">“Be the reason someone believes in kindness.”</p><p>givethra.org</p></div>
         </CardContent>
       </Card>
     </div>
