@@ -984,7 +984,7 @@ export default function HomePage() {
         <img
           src={currentSlide.image}
           alt="Givethra"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover object-top"
         />
       );
     }
@@ -1034,7 +1034,7 @@ export default function HomePage() {
       currentSlide.type ===
       "category"
     ) {
-      return <img src={currentSlide.image} alt="" loading="eager" draggable={false} className="pointer-events-none h-full w-full select-none object-cover" />;
+      return <img src={currentSlide.image} alt="" loading="eager" draggable={false} className="pointer-events-none h-full w-full select-none object-cover object-top" />;
     }
 
     if (
@@ -1220,7 +1220,8 @@ export default function HomePage() {
               >
                 {renderSlideContent()}
               </div>
-              <div className="relative z-10 min-h-[520px] rounded-3xl bg-gradient-to-b from-transparent via-slate-950/10 to-slate-950/35 px-2 pb-4 pt-[205px] sm:min-h-[570px] sm:px-5 sm:pt-[250px]">
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] rounded-3xl bg-[linear-gradient(to_bottom,rgba(163,218,240,0)_18%,rgba(163,218,240,0.18)_42%,rgba(163,218,240,0.72)_78%,rgba(163,218,240,1)_100%)]" />
+              <div className="relative z-10 min-h-[520px] rounded-3xl px-2 pb-4 pt-[205px] sm:min-h-[570px] sm:px-5 sm:pt-[250px]">
                 <div className="mb-2 text-center text-white drop-shadow-md">
                   <p className="text-sm font-bold">Select a Category &amp; Submit Your Help Request</p>
                   <p className="text-[10px] text-white/85">Tap a shortcut to start the first step of your case submission.</p>
