@@ -742,113 +742,6 @@ export default function HomePage() {
 
   guideSlides.push(HAND_SLIDE);
 
-  if (!isAuthenticated) {
-    guideSlides.push({
-      key: "free_helps",
-      type: "action",
-      icon: Gift,
-      title:
-        "🎉 First 3 helps are FREE!",
-      desc:
-        "Become a Hero and unlock your first 3 cases for free. After that, 1 credit per help. Start today.",
-      cta:
-        "Become a Hero — Free",
-      to: "/sign-in",
-      color: "text-green-600",
-      bg: "bg-green-500/10",
-    });
-
-    guideSlides.push({
-      key: "free_case",
-      type: "action",
-      icon: FileText,
-      title:
-        "📝 Submit your FIRST case FREE!",
-      desc:
-        "Complete KYC and submit your first case with no fee. Heroes will verify and help you.",
-      cta:
-        "Submit Free Case",
-      to: "/sign-in",
-      color: "text-primary",
-      bg: "bg-primary/10",
-    });
-  } else {
-    if (kycStatus !== "approved") {
-      guideSlides.push({
-        key: "announce",
-        type: "announce",
-        to: "/kyc",
-      });
-
-      guideSlides.push({
-        key: "kyc",
-        type: "guide",
-        icon: ShieldCheck,
-        image: "/assets/generated/help-kyc.jpg",
-        title:
-          "Step 1: Verify your identity",
-        desc:
-          "You've signed up — now complete your KYC. Add your CNIC photos (front, back, selfie) as shown on the KYC page. Tap here to start.",
-        to: "/kyc",
-        color:
-          "text-violet-600",
-        bg:
-          "bg-violet-500/10",
-      });
-    }
-
-    if (kycStatus === "approved") {
-      guideSlides.push({
-        key: "submit",
-        type: "guide",
-        icon: FileText,
-        title:
-          "Submit your FIRST case — FREE! 🎉",
-        desc:
-          "Your identity is verified! Your first case is completely free to submit. Tap here to start your request.",
-        to: "/submit-request",
-        color:
-          "text-primary",
-        bg:
-          "bg-primary/10",
-      });
-
-      if (unlockCount < 3) {
-        guideSlides.push({
-          key: "free_helps_auth",
-          type: "guide",
-          icon: Gift,
-          title:
-            "🎉 Your first 3 helps are FREE!",
-          desc: `As a Hero, your first ${
-            3 - unlockCount
-          } unlocks are completely free. After that, 1 credit per help. Start helping now!`,
-          to: "/cases",
-          color:
-            "text-green-600",
-          bg:
-            "bg-green-500/10",
-        });
-      }
-
-      guideSlides.push({
-        key: "help",
-        type: "guide",
-        icon: Heart,
-        title:
-          "Help someone — become a Hero",
-        desc:
-          "Browse verified cases and help a real person by paying their institute directly. You'll get an affidavit as proof. Tap here to help.",
-        to: "/cases",
-        cta: "Help Now",
-        color:
-          "text-rose-600",
-        bg:
-          "bg-rose-500/10",
-      });
-    }
-  }
-
   guideSlides.push(
     ...HELP_NOW_CATEGORY_SLIDES.map(
       (slide) => ({
@@ -1141,19 +1034,7 @@ export default function HomePage() {
       currentSlide.type ===
       "category"
     ) {
-      return (
-        <div className="relative h-full w-full overflow-hidden bg-slate-950">
-          <img src={currentSlide.image} alt="" loading="eager" className="absolute inset-0 h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-transparent" />
-          <div className="relative z-10 flex h-full max-w-[72%] flex-col justify-center gap-2 px-5 text-white md:max-w-[58%] md:px-8">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${currentSlide.bg || "bg-white/15"} shadow-lg ring-1 ring-white/20`}><currentSlide.icon className={`h-5 w-5 ${currentSlide.color || "text-white"}`} /></div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">Givethra Help</p>
-            <h3 className="font-display text-lg font-bold leading-tight md:text-2xl">{currentSlide.title}</h3>
-            <p className="text-xs leading-relaxed text-white/85 md:text-sm">{currentSlide.desc}</p>
-            <p className="mt-1 inline-flex w-fit items-center rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white/90 ring-1 ring-white/20">Select a category below to start</p>
-          </div>
-        </div>
-      );
+      return <img src={currentSlide.image} alt="" loading="eager" draggable={false} className="pointer-events-none h-full w-full select-none object-cover" />;
     }
 
     if (
