@@ -1266,7 +1266,7 @@ export default function HomePage() {
             <div className="absolute bottom-0 -left-16 h-48 w-48 rounded-full bg-primary/8 blur-2xl" />
           </div>
 
-          <div className="relative max-w-7xl mx-auto px-4 pt-8 pb-6 md:py-12 flex flex-col md:flex-row items-center gap-6 md:gap-12">
+          <div className="relative mx-auto max-w-7xl px-4 pt-8 pb-6 md:py-10 flex flex-col items-center gap-6">
             <motion.div
               initial={{
                 opacity: 0,
@@ -1325,11 +1325,11 @@ export default function HomePage() {
                 duration: 0.65,
                 delay: 0.15,
               }}
-              className="flex-1 w-full space-y-4"
+              className="relative w-full max-w-6xl"
             >
               <div
                 id="givethra-help-slider"
-                className="relative h-52 w-full rounded-2xl overflow-hidden shadow-xl touch-pan-y"
+                className="absolute inset-0 z-0 h-full w-full overflow-hidden rounded-3xl shadow-xl touch-pan-y"
                 onTouchStart={
                   handleSliderTouchStart
                 }
@@ -1339,15 +1339,17 @@ export default function HomePage() {
               >
                 {renderSlideContent()}
               </div>
-              <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
-                <p className="mb-1 text-center text-xs font-bold text-foreground">Select a Category &amp; Submit Your Help Request</p>
-                <p className="mb-3 text-center text-[10px] text-muted-foreground">Tap any category to start the first step of your case submission.</p>
+              <div className="relative z-10 min-h-[520px] rounded-3xl bg-gradient-to-b from-transparent via-slate-950/10 to-slate-950/35 px-2 pb-4 pt-[205px] sm:min-h-[570px] sm:px-5 sm:pt-[250px]">
+                <div className="mb-2 text-center text-white drop-shadow-md">
+                  <p className="text-sm font-bold">Select a Category &amp; Submit Your Help Request</p>
+                  <p className="text-[10px] text-white/85">Tap a shortcut to start the first step of your case submission.</p>
+                </div>
                 <div className="relative" onTouchStart={handleCategoryTouchStart} onTouchEnd={handleCategoryTouchEnd}>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-4 gap-2 sm:gap-3">
                   {visibleCategories.map((category) => {
                     const Icon = CATEGORY_ICON[category] || MoreHorizontal;
                     const active = currentSlide.category === category;
-                    return <button key={category} type="button" aria-label={`Start ${category} help request`} onClick={() => { try { localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category); } catch {} navigate({ to: "/submit-request" }); }} className={`group relative min-h-[94px] overflow-hidden rounded-2xl border text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-[.98] ${active ? "border-primary ring-2 ring-primary/30" : "border-border"}`}><img src={CATEGORY_SLIDE_MEDIA[category]} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" /><span className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-slate-950/10" /><span className="relative z-10 flex h-full min-h-[94px] flex-col justify-between p-2.5 text-white"><span className={`flex h-8 w-8 items-center justify-center rounded-xl ${active ? "bg-primary" : "bg-white/20"} backdrop-blur-sm`}><Icon className="h-4 w-4" /></span><span className="text-[11px] font-bold leading-tight">{category}</span></span></button>;
+                    return <button key={category} type="button" aria-label={`Start ${category} help request`} onClick={() => { try { localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category); } catch {} navigate({ to: "/submit-request" }); }} className={`group relative flex min-h-[104px] flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl active:scale-[.98] sm:min-h-[118px] ${active ? "border-primary ring-2 ring-primary/50" : "border-white/80"}`}><span className="px-1.5 pt-1.5 text-center text-[9px] font-bold leading-tight text-slate-800 sm:px-2 sm:pt-2 sm:text-[11px]">{category}</span><span className="relative mt-1 flex-1 overflow-hidden rounded-xl mx-1 mb-1 sm:mx-1.5 sm:mb-1.5"><img src={CATEGORY_SLIDE_MEDIA[category]} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" /><span className={`absolute bottom-1 left-1 flex h-6 w-6 items-center justify-center rounded-lg ${active ? "bg-primary text-white" : "bg-white/90 text-primary"} shadow-sm`}><Icon className="h-3.5 w-3.5" /></span></span></button>;
                   })}
                 </div>
                 </div>
