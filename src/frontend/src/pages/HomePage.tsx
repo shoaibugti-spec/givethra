@@ -564,6 +564,7 @@ export default function HomePage() {
   const [balance, setBalance] = useState(0);
   const [unlockCount, setUnlockCount] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
+  const [categoryPage, setCategoryPage] = useState(0);
 
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] =
@@ -874,6 +875,13 @@ export default function HomePage() {
 
   const sliderTouchStart =
     useRef<number | null>(null);
+  const categoryTouchStart = useRef<number | null>(null);
+  const CATEGORY_PAGE_SIZE = 8;
+  const categoryPages = Math.ceil(FILTER_CATEGORIES.length / CATEGORY_PAGE_SIZE);
+  const visibleCategories = FILTER_CATEGORIES.slice(
+    categoryPage * CATEGORY_PAGE_SIZE,
+    categoryPage * CATEGORY_PAGE_SIZE + CATEGORY_PAGE_SIZE,
+  );
 
   function handleSliderTouchStart(
     event: React.TouchEvent<HTMLDivElement>
@@ -914,6 +922,18 @@ export default function HomePage() {
             : guideSlides.length - 1)) %
         guideSlides.length
     );
+  }
+
+  function handleCategoryTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    categoryTouchStart.current = event.changedTouches[0]?.clientX ?? null;
+  }
+
+  function handleCategoryTouchEnd(event: React.TouchEvent<HTMLDivElement>) {
+    const start = categoryTouchStart.current;
+    const end = event.changedTouches[0]?.clientX;
+    categoryTouchStart.current = null;
+    if (start == null || end == null || Math.abs(end - start) < 35) return;
+    setCategoryPage((page) => (page + (end < start ? 1 : categoryPages - 1)) % categoryPages);
   }
 
   useEffect(() => {
@@ -1322,12 +1342,14 @@ export default function HomePage() {
               <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
                 <p className="mb-1 text-center text-xs font-bold text-foreground">Select a Category &amp; Submit Your Help Request</p>
                 <p className="mb-3 text-center text-[10px] text-muted-foreground">Tap any category to start the first step of your case submission.</p>
+                <div className="relative" onTouchStart={handleCategoryTouchStart} onTouchEnd={handleCategoryTouchEnd}>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {FILTER_CATEGORIES.map((category) => {
+                  {visibleCategories.map((category) => {
                     const Icon = CATEGORY_ICON[category] || MoreHorizontal;
                     const active = currentSlide.category === category;
                     return <button key={category} type="button" aria-label={`Start ${category} help request`} onClick={() => { try { localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category); } catch {} navigate({ to: "/submit-request" }); }} className={`group relative min-h-[94px] overflow-hidden rounded-2xl border text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-[.98] ${active ? "border-primary ring-2 ring-primary/30" : "border-border"}`}><img src={CATEGORY_SLIDE_MEDIA[category]} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" /><span className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-slate-950/10" /><span className="relative z-10 flex h-full min-h-[94px] flex-col justify-between p-2.5 text-white"><span className={`flex h-8 w-8 items-center justify-center rounded-xl ${active ? "bg-primary" : "bg-white/20"} backdrop-blur-sm`}><Icon className="h-4 w-4" /></span><span className="text-[11px] font-bold leading-tight">{category}</span></span></button>;
                   })}
+                </div>
                 </div>
               </div>
             </motion.div>
