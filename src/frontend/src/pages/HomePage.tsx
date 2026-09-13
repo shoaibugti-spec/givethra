@@ -565,6 +565,7 @@ export default function HomePage() {
   const [unlockCount, setUnlockCount] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
   const [categoryPage, setCategoryPage] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] =
@@ -838,7 +839,7 @@ export default function HomePage() {
           (prev + 1) %
           guideSlides.length
       );
-    }, 6000);
+    }, 5000);
 
     return () => clearInterval(t);
   }, [guideSlides.length]);
@@ -1230,8 +1231,8 @@ export default function HomePage() {
                 <div className="grid grid-cols-4 gap-2 sm:gap-3">
                   {visibleCategories.map((category) => {
                     const Icon = CATEGORY_ICON[category] || MoreHorizontal;
-                    const active = currentSlide.category === category;
-                    return <button key={category} type="button" aria-label={`Start ${category} help request`} onClick={() => { try { localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category); } catch {} navigate({ to: "/submit-request" }); }} className="group border-0 bg-transparent p-0 shadow-none transition hover:-translate-y-0.5 active:scale-[.98]"><span className={`flex min-h-[104px] flex-col items-center justify-between rounded-2xl border bg-white/90 px-1.5 py-2 text-center shadow-md backdrop-blur-[2px] transition group-hover:bg-white sm:min-h-[118px] sm:px-2 ${active ? "border-primary ring-2 ring-primary/50" : "border-teal-100"}`}><span className="text-[9px] font-bold leading-tight text-slate-800 sm:text-[11px]">{category}</span><span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? "bg-primary text-white" : "bg-primary/10 text-primary"}`}><Icon className="h-5 w-5" /></span></span></button>;
+                    const active = selectedCategory === category;
+                    return <button key={category} type="button" aria-label={`Start ${category} help request`} onClick={() => { setSelectedCategory(category); try { localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category); } catch {} navigate({ to: "/submit-request" }); }} className="group border-0 bg-transparent p-0 shadow-none transition hover:-translate-y-0.5 active:scale-[.98]"><span className={`flex min-h-[104px] flex-col items-center justify-between rounded-2xl border bg-white/90 px-1.5 py-2 text-center shadow-md backdrop-blur-[2px] transition group-hover:bg-white sm:min-h-[118px] sm:px-2 ${active ? "border-primary ring-2 ring-primary/50" : "border-teal-100"}`}><span className="text-[9px] font-bold leading-tight text-slate-800 sm:text-[11px]">{category}</span><span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? "bg-primary text-white" : "bg-primary/10 text-primary"}`}><Icon className="h-5 w-5" /></span></span></button>;
                   })}
                 </div>
                 </div>
