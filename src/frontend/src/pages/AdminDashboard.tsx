@@ -694,7 +694,9 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
   
   const usersList = profiles.map((p) => {
     const uid = p.user_id;
-    const kyc = kycList.find((k) => k.user_id === uid);
+    const kyc = kycList
+      .filter((k) => k.user_id === uid)
+      .sort((a, b) => Number(Boolean(b.is_current)) - Number(Boolean(a.is_current)) || new Date(b.submitted_at ?? 0).getTime() - new Date(a.submitted_at ?? 0).getTime())[0];
     const userCases = caseList.filter((c) => c.user_id === uid);
     const userUnlocks = unlocks.filter((u) => u.hero_id === uid);
     const userDeposits = deposits.filter((d) => d.user_id === uid);
@@ -706,7 +708,15 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
     return {
       user_id: uid,
       name: p.full_name || kyc?.full_name || "—",
+      username: p.username || p.full_name || (p.email ? String(p.email).split("@")[0] : "—"),
       email: p.email || "—",
+      phone: p.phone_number || "",
+      country: p.country || "",
+      city: p.city || "",
+      bio: p.bio || "",
+      avatar_url: p.avatar_url || "",
+      kycId: kyc?.id || "",
+      kycDetails: kyc || null,
       created_at: p.created_at,
       kycStatus: kyc?.status ?? "none",
       casesSubmitted: userCases.length,
@@ -1952,7 +1962,8 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
               {u.isSuspended && <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">SUSPENDED</span>}
               {u.suspensionCount > 0 && !u.isSuspended && <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">#{u.suspensionCount}</span>}
             </p>
-            <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+            <p className="text-xs text-muted-foreground truncate">@{u.username} · {u.email}</p>
+            <p className="text-[10px] text-muted-foreground truncate font-mono">User ID: {u.user_id} · KYC: {u.kycId || "—"}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1970,19 +1981,49 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
             <Stat icon={<Heart className="h-4 w-4" />} label="Cases Helped" value={u.casesUnlocked} />
             <Stat icon={<Coins className="h-4 w-4" />} label="Total Deposited" value={`${u.totalDeposited} credits`} />
           </div>
+          <div className="rounded-lg bg-card border border-border p-3 space-y-2">
+            <p className="text-xs font-semibold text-primary flex items-center gap-1"><User className="h-3 w-3" /> Complete User Identity</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+              <DetailRow label="Username" value={u.username} />
+              <DetailRow label="Full Name" value={u.name} />
+              <DetailRow label="Email Address" value={u.email} />
+              <DetailRow label="User ID" value={u.user_id} mono />
+              <DetailRow label="KYC ID" value={u.kycId || "Not submitted"} mono />
+              <DetailRow label="Phone Number" value={u.phone || "—"} />
+              <DetailRow label="Country" value={u.country || "—"} />
+              <DetailRow label="City" value={u.city || "—"} />
+              <DetailRow label="Joined" value={u.created_at ? new Date(u.created_at).toLocaleString() : "—"} />
+            </div>
+            {u.bio && <p className="text-xs text-muted-foreground border-t border-border pt-2"><strong>Bio:</strong> {u.bio}</p>}
+          </div>
+          {u.kycDetails && (
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 p-3 space-y-2">
+              <p className="text-xs font-semibold text-blue-700 flex items-center gap-1"><ShieldIcon className="h-3 w-3" /> Complete KYC Details</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                <DetailRow label="KYC Status" value={u.kycDetails.status || "—"} />
+                <DetailRow label="Document Type" value={u.kycDetails.document_type || "—"} />
+                <DetailRow label="KYC Full Name" value={u.kycDetails.full_name || "—"} />
+                <DetailRow label="Date of Birth" value={u.kycDetails.date_of_birth || "—"} />
+                <DetailRow label="CNIC / Passport Number" value={u.kycDetails.cnic_number || "—"} mono />
+                <DetailRow label="Submitted At" value={u.kycDetails.submitted_at ? new Date(u.kycDetails.submitted_at).toLocaleString() : "—"} />
+                <DetailRow label="Reviewed At" value={u.kycDetails.reviewed_at ? new Date(u.kycDetails.reviewed_at).toLocaleString() : "—"} />
+                <DetailRow label="Reviewed By" value={u.kycDetails.reviewed_by || "—"} />
+              </div>
+              <div className="border-t border-blue-200 pt-2 text-xs">
+                <p><strong>Address:</strong> {u.kycDetails.address || "—"}</p>
+                {u.kycDetails.rejection_reason && <p className="text-red-600 mt-1"><strong>Rejection Reason:</strong> {u.kycDetails.rejection_reason}</p>}
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {[["CNIC Front", u.kycDetails.cnic_front_url], ["CNIC Back", u.kycDetails.cnic_back_url], ["Selfie", u.kycDetails.selfie_url], ["Passport", u.kycDetails.passport_url], ["Face Video", u.kycDetails.face_video_url]].map(([label, url]) => url ? <a key={String(label)} href={String(url)} target="_blank" rel="noopener noreferrer" className="text-primary underline">{label} ↗</a> : null)}
+              </div>
+            </div>
+          )}
           {u.suspensionCount > 0 && (
             <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 p-2 text-xs">
               <p className="text-red-700 font-semibold">🚫 Suspension History</p>
               <p className="text-red-600">Suspended {u.suspensionCount} time(s) · {u.isSuspended ? "Currently suspended" : "Currently active"}</p>
             </div>
           )}
-          <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t border-border">
-            <p className="flex items-center gap-1"><Mail className="h-3 w-3" /> {u.email}</p>
-            {u.cnic && <p className="font-mono">CNIC: {u.cnic}</p>}
-            <p className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Joined: {u.created_at ? new Date(u.created_at).toLocaleString() : "—"}</p>
-            <p className="font-mono text-[10px]">ID: {u.user_id}</p>
-          </div>
-
           <div className="flex gap-2">
             {u.isSuspended && (
               <Button size="sm" variant="outline" className="text-teal-600 border-teal-300 flex-1" onClick={() => onManualUnlock(u.user_id)}>
