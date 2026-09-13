@@ -562,7 +562,13 @@ export default function SubmitRequestPage() {
   const [tried1, setTried1] = useState(false);
   const [tried2, setTried2] = useState(false);
 
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(() => {
+    try {
+      const value = localStorage.getItem("givethra_prefill_category") || "";
+      localStorage.removeItem("givethra_prefill_category");
+      return value;
+    } catch { return ""; }
+  });
   const [title, setTitle] = useState("");
   const [shortDesc, setShortDesc] = useState("");
   const [country, setCountry] = useState("");

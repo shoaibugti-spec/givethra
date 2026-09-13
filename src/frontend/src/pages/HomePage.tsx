@@ -52,6 +52,18 @@ import {
   Stethoscope,
   ShoppingCart,
   Share2,
+  Home,
+  BookOpen,
+  Pill,
+  Apple,
+  Baby,
+  Accessibility,
+  Gem,
+  Wrench,
+  Tractor,
+  CreditCard,
+  Siren,
+  MoreHorizontal,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -191,6 +203,29 @@ const FILTER_CATEGORIES = [
   "Emergency Help",
   "Other",
 ];
+
+const CATEGORY_SLIDE_MEDIA: Record<string, string> = {
+  "Electricity Bill": "/assets/generated/help-bills.jpg", "Gas Bill": "/assets/generated/help-bills.jpg", "Water Bill": "/assets/generated/help-bills.jpg",
+  "House Rent": "/assets/generated/help-livelihood.jpg", "School Fees": "/assets/generated/help-education.jpg", "Education & Books": "/assets/generated/help-education.jpg",
+  "Medical & Treatment": "/assets/generated/help-medical.jpg", Medicines: "/assets/generated/help-medical.jpg", "Food & Groceries": "/assets/generated/help-livelihood.jpg",
+  "Child Support": "/assets/generated/help-education.jpg", "Widow & Elderly Support": "/assets/generated/help-medical.jpg", "Disability Support": "/assets/generated/help-medical.jpg",
+  "Marriage Support": "/assets/generated/help-livelihood.jpg", "Business / Work Help": "/assets/generated/help-livelihood.jpg", "Home Repair": "/assets/generated/help-livelihood.jpg",
+  "Funeral Expenses": "/assets/generated/help-medical.jpg", "Livestock / Farming": "/assets/generated/help-livelihood.jpg", "Debt Relief": "/assets/generated/help-bills.jpg",
+  "Emergency Help": "/assets/generated/help-medical.jpg", Other: "/assets/generated/help-livelihood.jpg",
+};
+
+const CATEGORY_ICON: Record<string, typeof Battery> = {
+  "Electricity Bill": Battery, "Gas Bill": Flame, "Water Bill": Droplets, "House Rent": Home,
+  "School Fees": GraduationCap, "Education & Books": BookOpen, "Medical & Treatment": Stethoscope, Medicines: Pill,
+  "Food & Groceries": Apple, "Child Support": Baby, "Widow & Elderly Support": Heart, "Disability Support": Accessibility,
+  "Marriage Support": Gem, "Business / Work Help": ShoppingCart, "Home Repair": Wrench, "Funeral Expenses": Heart,
+  "Livestock / Farming": Tractor, "Debt Relief": CreditCard, "Emergency Help": Siren, Other: MoreHorizontal,
+};
+
+const CATEGORY_FORM_NAME: Record<string, string> = {
+  "School Fees": "School, College & University Fees",
+  "Education & Books": "Education, Books & Admission",
+};
 
 const HELP_NOW_CATEGORY_SLIDES = FILTER_CATEGORIES.map((category) => ({
   key: `category_${category}`,
@@ -748,6 +783,7 @@ export default function HomePage() {
         key: "kyc",
         type: "guide",
         icon: ShieldCheck,
+        image: "/assets/generated/help-kyc.jpg",
         title:
           "Step 1: Verify your identity",
         desc:
@@ -818,7 +854,8 @@ export default function HomePage() {
         key: slide.key,
         type: "category" as const,
         category: slide.category,
-        icon: slide.style.icon,
+        icon: CATEGORY_ICON[slide.category] || slide.style.icon,
+        image: CATEGORY_SLIDE_MEDIA[slide.category],
         title: slide.category,
         desc:
           CATEGORY_APPEAL[
@@ -1085,42 +1122,17 @@ export default function HomePage() {
       "category"
     ) {
       return (
-        <button
-          type="button"
-          onClick={() =>
-            navigate({
-              to: currentSlide.to,
-            })
-          }
-          className="w-full h-52 md:h-72 bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
-        >
-          <div
-            className={`h-16 w-16 rounded-2xl ${
-              currentSlide.bg ||
-              "bg-primary/10"
-            } flex items-center justify-center`}
-          >
-            <currentSlide.icon
-              className={`h-8 w-8 ${
-                currentSlide.color ||
-                "text-primary"
-              }`}
-            />
+        <div className="relative h-full w-full overflow-hidden bg-slate-950">
+          <img src={currentSlide.image} alt="" loading="eager" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-transparent" />
+          <div className="relative z-10 flex h-full max-w-[72%] flex-col justify-center gap-2 px-5 text-white md:max-w-[58%] md:px-8">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${currentSlide.bg || "bg-white/15"} shadow-lg ring-1 ring-white/20`}><currentSlide.icon className={`h-5 w-5 ${currentSlide.color || "text-white"}`} /></div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">Givethra Help</p>
+            <h3 className="font-display text-lg font-bold leading-tight md:text-2xl">{currentSlide.title}</h3>
+            <p className="text-xs leading-relaxed text-white/85 md:text-sm">{currentSlide.desc}</p>
+            <button type="button" onClick={() => { try { localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[currentSlide.category] || currentSlide.category); } catch {} navigate({ to: currentSlide.to }); }} className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-lg transition hover:bg-white/90 active:scale-95">Submit Your Case <ChevronRight className="h-3.5 w-3.5" /></button>
           </div>
-
-          <h3 className="font-display text-xl font-bold text-foreground">
-            {currentSlide.title}
-          </h3>
-
-          <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-            {currentSlide.desc}
-          </p>
-
-          <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">
-            {currentSlide.cta}
-            <ChevronRight className="h-4 w-4" />
-          </span>
-        </button>
+        </div>
       );
     }
 
@@ -1159,6 +1171,10 @@ export default function HomePage() {
           </span>
         </button>
       );
+    }
+
+    if (currentSlide.type === "guide" && currentSlide.image) {
+      return <div className="relative h-full w-full overflow-hidden bg-slate-950"><img src={currentSlide.image} alt="Identity verification" loading="eager" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-transparent" /><div className="relative z-10 flex h-full max-w-[72%] flex-col justify-center gap-2 px-5 text-white md:max-w-[58%] md:px-8"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/30 ring-1 ring-white/20"><ShieldCheck className="h-5 w-5 text-violet-200" /></div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">Secure verification</p><h3 className="font-display text-lg font-bold leading-tight md:text-2xl">Complete Your KYC to Submit Your Case</h3><p className="text-xs leading-relaxed text-white/85 md:text-sm">Verify your identity with CNIC photos, selfie and a short video.</p><button type="button" onClick={() => navigate({ to: currentSlide.to })} className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-lg active:scale-95">Start verification <ChevronRight className="h-3.5 w-3.5" /></button></div></div>;
     }
 
     return (
@@ -1302,6 +1318,16 @@ export default function HomePage() {
                 }
               >
                 {renderSlideContent()}
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
+                <p className="mb-2 text-center text-xs font-bold text-foreground">Select a Category &amp; Submit Your Case Directly</p>
+                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                  {FILTER_CATEGORIES.map((category) => {
+                    const Icon = CATEGORY_ICON[category] || MoreHorizontal;
+                    const active = currentSlide.category === category;
+                    return <button key={category} type="button" aria-label={`Select ${category}`} onClick={() => { const index = guideSlides.findIndex((slide) => slide.category === category); if (index >= 0) setSlideIndex(index); }} className={`flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-xl px-2 py-2 text-center transition ${active ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}><span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? "bg-white/20" : "bg-primary/10"}`}><Icon className="h-4 w-4" /></span><span className="max-w-[70px] truncate text-[10px] font-semibold">{category.replace(" Support", "").replace(" Bill", "")}</span></button>;
+                  })}
+                </div>
               </div>
             </motion.div>
           </div>
