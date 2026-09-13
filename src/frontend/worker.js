@@ -1724,9 +1724,13 @@ async function handleRequest(request, env, ctx) {
   // Public uploaded files. Older cases use /uploads?key=... while newer
   // submissions use /uploads/<key>; serve both formats from the same R2 bucket.
   if (url.pathname === "/uploads" || url.pathname.startsWith("/uploads/")) {
-    const key = url.pathname === "/uploads"
+    const rawKey = url.pathname === "/uploads"
       ? url.searchParams.get("key") || ""
       : url.pathname.slice(9);
+    // URL pathnames percent-encode spaces, parentheses and non-ASCII names.
+    // R2 stores the original object key, so decode exactly once before lookup.
+    let key = rawKey;
+    try { key = decodeURIComponent(rawKey); } catch { /* keep the raw key */ }
     if (!key) return new Response("File not found", { status: 404 });
     try {
       const object = await env.UPLOADS.get(key);
@@ -2248,7 +2252,10 @@ async function handleRequest(request, env, ctx) {
         const entry = tableMap[parts[2]];
         if (entry) {
           const rows = await env.DB.prepare(`SELECT * FROM ${entry.table} ORDER BY ${entry.order} DESC`).all();
-          return json(rows.results || [], 200, origin);
+          const results = entry.table === "case_submissions"
+            ? (rows.results || []).map(decodeCaseRow)
+            : (rows.results || []);
+          return json(results, 200, origin);
         }
       }
 
