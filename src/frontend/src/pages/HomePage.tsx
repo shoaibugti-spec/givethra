@@ -1130,7 +1130,7 @@ export default function HomePage() {
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">Givethra Help</p>
             <h3 className="font-display text-lg font-bold leading-tight md:text-2xl">{currentSlide.title}</h3>
             <p className="text-xs leading-relaxed text-white/85 md:text-sm">{currentSlide.desc}</p>
-            <button type="button" onClick={() => { try { localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[currentSlide.category] || currentSlide.category); } catch {} navigate({ to: currentSlide.to }); }} className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-lg transition hover:bg-white/90 active:scale-95">Submit Your Case <ChevronRight className="h-3.5 w-3.5" /></button>
+            <p className="mt-1 inline-flex w-fit items-center rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white/90 ring-1 ring-white/20">Select a category below to start</p>
           </div>
         </div>
       );
@@ -1320,12 +1320,13 @@ export default function HomePage() {
                 {renderSlideContent()}
               </div>
               <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
-                <p className="mb-2 text-center text-xs font-bold text-foreground">Select a Category &amp; Submit Your Case Directly</p>
-                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                <p className="mb-1 text-center text-xs font-bold text-foreground">Select a Category &amp; Submit Your Help Request</p>
+                <p className="mb-3 text-center text-[10px] text-muted-foreground">Tap any category to start the first step of your case submission.</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {FILTER_CATEGORIES.map((category) => {
                     const Icon = CATEGORY_ICON[category] || MoreHorizontal;
                     const active = currentSlide.category === category;
-                    return <button key={category} type="button" aria-label={`Select ${category}`} onClick={() => { const index = guideSlides.findIndex((slide) => slide.category === category); if (index >= 0) setSlideIndex(index); }} className={`flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-xl px-2 py-2 text-center transition ${active ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}><span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? "bg-white/20" : "bg-primary/10"}`}><Icon className="h-4 w-4" /></span><span className="max-w-[70px] truncate text-[10px] font-semibold">{category.replace(" Support", "").replace(" Bill", "")}</span></button>;
+                    return <button key={category} type="button" aria-label={`Start ${category} help request`} onClick={() => { try { localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category); } catch {} navigate({ to: "/submit-request" }); }} className={`group relative min-h-[94px] overflow-hidden rounded-2xl border text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-[.98] ${active ? "border-primary ring-2 ring-primary/30" : "border-border"}`}><img src={CATEGORY_SLIDE_MEDIA[category]} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" /><span className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-slate-950/10" /><span className="relative z-10 flex h-full min-h-[94px] flex-col justify-between p-2.5 text-white"><span className={`flex h-8 w-8 items-center justify-center rounded-xl ${active ? "bg-primary" : "bg-white/20"} backdrop-blur-sm`}><Icon className="h-4 w-4" /></span><span className="text-[11px] font-bold leading-tight">{category}</span></span></button>;
                   })}
                 </div>
               </div>
