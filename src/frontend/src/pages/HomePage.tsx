@@ -700,7 +700,7 @@ export default function HomePage() {
 
     const t = setInterval(() => {
       setSlideIndex((prev) => (prev + 1) % guideSlides.length);
-    }, 4000); // <--- Yahan 4 seconds kar diya hai
+    }, 4000); // 4 seconds per slide
 
     return () => clearInterval(t);
   }, [guideSlides.length]);
@@ -881,7 +881,25 @@ export default function HomePage() {
         <section className="relative overflow-hidden bg-card border-b border-border">
           <div className="relative mx-auto max-w-7xl px-4 pt-6 pb-6 md:py-8 flex flex-col items-center gap-6">
             
-            {/* 1. MAIN SLIDER (Full Image, No Dots as requested) */}
+            {/* SMART BUTTONS ABOVE SLIDER */}
+            <div className="flex w-full max-w-6xl flex-col sm:flex-row gap-3 mb-2">
+              <Button
+                size="lg"
+                onClick={() => navigate({ to: "/become-hero" })}
+                className="h-14 flex-1 rounded-2xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-base sm:text-lg shadow-sm shadow-amber-200 transition-all hover:scale-[1.01] active:scale-[0.99]"
+              >
+                <Heart className="h-5 w-5 sm:h-6 sm:w-6 mr-2" /> Become a Hero (Help Others)
+              </Button>
+              <Button
+                size="lg"
+                onClick={() => navigate({ to: "/need-help" })}
+                className="h-14 flex-1 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base sm:text-lg shadow-sm shadow-blue-200 transition-all hover:scale-[1.01] active:scale-[0.99]"
+              >
+                <FileText className="h-5 w-5 sm:h-6 sm:w-6 mr-2" /> Request Help (Requester)
+              </Button>
+            </div>
+
+            {/* 1. MAIN SLIDER (Full Image, No Dots) */}
             <motion.div
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -898,7 +916,7 @@ export default function HomePage() {
               </div>
             </motion.div>
 
-            {/* 2. CATEGORY CARDS (NoBroker Style: Image on top, Icon at bottom) */}
+            {/* 2. CATEGORY CARDS (NoBroker Style) */}
             <div className="w-full max-w-6xl mt-2">
               <div className="mb-4 text-center">
                 <h2 className="text-base md:text-lg font-bold text-foreground">
@@ -980,98 +998,17 @@ export default function HomePage() {
         </section>
         {/* --- END OF UPDATED HERO & CATEGORY SECTION --- */}
 
-        {/* WhatsApp Channel & Customer Support */}
-        <section className="py-4 px-4 bg-background border-b border-border">
-          <div className="max-w-7xl mx-auto flex items-center justify-center gap-6 flex-wrap">
-            <a
-              href={WHATSAPP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-green-600 transition-colors"
-            >
-              <MessageCircle className="h-6 w-6 text-green-600" />
-              <span>WhatsApp Channel</span>
-            </a>
-            <span className="text-muted-foreground text-lg select-none">|</span>
-            <a
-              href="https://wa.me/message/42CJXLUYEI2KM1?src=qr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
-            >
-              <MessageCircle className="h-6 w-6 text-primary" />
-              <span>24/7 Customer Support</span>
-            </a>
-          </div>
-        </section>
+        {/* NOTE: WhatsApp Section has been moved below KindnessWall as requested */}
 
-        {isAuthenticated && (
-          <section className="bg-background border-b border-border py-5 px-4">
-            <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                onClick={() => navigate({ to: "/become-hero" })}
-                className="text-left rounded-2xl border border-border bg-card hover:border-primary hover:shadow-md transition-all p-5 flex items-start gap-4 group"
-              >
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Heart className="h-6 w-6 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-bold text-foreground flex items-center gap-1">
-                    Become a Hero
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    Browse verified cases and help someone directly by paying their institute.
-                  </p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => navigate({ to: "/need-help" })}
-                className="text-left rounded-2xl border border-border bg-card hover:border-primary hover:shadow-md transition-all p-5 flex items-start gap-4 group"
-              >
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <FileText className="h-6 w-6 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-bold text-foreground flex items-center gap-1">
-                    Need Help?
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    Submit your first case FREE with documents and get verified, direct support.
-                  </p>
-                </div>
-              </button>
-            </div>
-          </section>
-        )}
-
-        {detectedCountry && (
-          <section className="bg-primary/5 border-b border-border py-2.5 px-4">
-            <div className="max-w-7xl mx-auto flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-muted-foreground">Your location:</span>
-              <span className="font-semibold text-foreground">
-                {detectedCity ? `${detectedCity}, ` : ""}
-                {detectedCountry}
-              </span>
-              <button
-                onClick={() => {
-                  setFilterCountry(detectedCountry || "all");
-                  if (detectedCity) setFilterCity(detectedCity);
-                  setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-                }}
-                className="ml-auto text-xs bg-primary text-white px-3 py-1 rounded-full font-medium shrink-0"
-              >
-                Show local cases
-              </button>
-            </div>
-          </section>
-        )}
-
+        {/* Active Cases Search & Filters Section */}
         <section className="bg-background border-b border-border py-4 px-4">
           <div className="max-w-7xl mx-auto space-y-3">
+            {/* Title added here as requested */}
+            <div className="mb-2">
+              <h2 className="font-display text-lg font-bold text-foreground">Active Cases – Become a Hero and Help People</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Search and filter through all verified cases that need support right now.</p>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
@@ -1194,10 +1131,11 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Category Counts Section */}
         <section className="bg-muted/30 border-b border-border py-4 px-4">
           <div className="max-w-7xl mx-auto">
             <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">
-              Tap a category to filter
+              Tap a category to filter cases
             </p>
 
             <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-1">
@@ -1352,6 +1290,32 @@ export default function HomePage() {
 
         <HeroesWall />
         <KindnessWall />
+
+        {/* --- WHATSAPP SECTION RELOCATED HERE (Below KindnessWall, Above App Download) --- */}
+        <section className="py-6 px-4 bg-background border-b border-border">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-6 flex-wrap">
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-green-600 transition-colors"
+            >
+              <MessageCircle className="h-6 w-6 text-green-600" />
+              <span>WhatsApp Channel</span>
+            </a>
+            <span className="text-muted-foreground text-lg select-none">|</span>
+            <a
+              href="https://wa.me/message/42CJXLUYEI2KM1?src=qr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
+            >
+              <MessageCircle className="h-6 w-6 text-primary" />
+              <span>24/7 Customer Support</span>
+            </a>
+          </div>
+        </section>
+
         <section className="py-8 px-4 bg-background border-y border-border">
           <div className="mx-auto max-w-3xl rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-teal-50 p-6 text-center shadow-sm">
             <p className="text-2xl">📱</p><h2 className="mt-2 font-display text-xl font-bold">Get the Givethra Android App</h2><p className="mt-1 text-sm text-muted-foreground">Verified cases, anytime — right on your phone.</p><Button className="mt-4">Download App</Button><div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4"><span>Verified &amp; Secure</span><span>100% Transparency</span><span>Compassion</span><span>Global Community</span><span>Safe &amp; Private</span><span>Your Data is Protected</span></div>
