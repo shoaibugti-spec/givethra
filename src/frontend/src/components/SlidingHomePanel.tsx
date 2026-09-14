@@ -4,7 +4,7 @@ type PanelTab = "earning" | "support" | "wallet";
 interface SlidingHomePanelProps { children: React.ReactNode; onTabChange?: (tab: PanelTab) => void; }
 const TABS: Array<{ id: PanelTab; label: string; icon: typeof DollarSign }> = [
   { id: "earning", label: "Earnings", icon: DollarSign },
-  { id: "support", label: "Help", icon: HandHelping },
+  { id: "support", label: "Support", icon: HandHelping },
   { id: "wallet", label: "Wallet", icon: WalletCards },
 ];
 

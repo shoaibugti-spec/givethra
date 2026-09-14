@@ -26,6 +26,7 @@ import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 import {
   getUnreadNotificationsCount,
+  getCommunityPosts,
 } from "@/lib/api";
 import RoleSwitcher from "@/components/RoleSwitcher";
 
@@ -73,6 +74,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouterState();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifCount, setNotifCount] = useState(0);
+  const [supportPostCount, setSupportPostCount] = useState(0);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
@@ -97,6 +99,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       );
     };
   }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSupportPostCount = async () => {
+      try {
+        const latest = await getCommunityPosts("latest");
+        const posts = Array.isArray(latest) ? latest : [];
+        const newest = posts.reduce((max: number, post: any) => Math.max(max, new Date(post?.created_at || 0).getTime()), 0);
+        const seen = Number(localStorage.getItem("givethra_my_help_posts_seen_at") || 0);
+        if (!cancelled) setSupportPostCount(seen ? posts.filter((post: any) => new Date(post?.created_at || 0).getTime() > seen).length : 0);
+        if (!seen && newest) localStorage.setItem("givethra_my_help_posts_seen_at", String(newest));
+      } catch {
+        if (!cancelled) setSupportPostCount(0);
+      }
+    };
+    loadSupportPostCount();
+    const timer = window.setInterval(loadSupportPostCount, 20000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
 
   const closeMenu = () => setMenuOpen(false);
   const handleLogout = () => {
@@ -150,7 +171,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           <div className="flex-1 flex items-center justify-center">
-            {isAuthenticated && <RoleSwitcher notificationCount={notifCount} />}
+            {isAuthenticated && <RoleSwitcher supportPostCount={supportPostCount} />}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
