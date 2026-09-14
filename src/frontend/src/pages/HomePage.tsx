@@ -350,6 +350,14 @@ function HomeSocialDashboard() {
 
   useEffect(() => { loadHomeData(); }, [user?.id, feedTab]);
   useEffect(() => {
+    const onPanelTab = (event: Event) => {
+      const tab = (event as CustomEvent<"support" | "earning" | "wallet">).detail;
+      if (tab === "support" || tab === "earning" || tab === "wallet") setActiveMoneyTab(tab);
+    };
+    window.addEventListener("givethra-home-panel-tab", onPanelTab);
+    return () => window.removeEventListener("givethra-home-panel-tab", onPanelTab);
+  }, []);
+  useEffect(() => {
     const timer = window.setInterval(() => setClockMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);

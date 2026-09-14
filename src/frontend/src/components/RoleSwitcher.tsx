@@ -1,84 +1,39 @@
 // src/frontend/src/components/RoleSwitcher.tsx
-import { useRole } from "@/contexts/RoleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "@tanstack/react-router";
-import { Users, HeartHandshake } from "lucide-react";
+import { DollarSign, HeartHandshake } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function RoleSwitcher() {
-  const { role, setRole } = useRole();
-  const { user, isAuthenticated, setRole: setAuthRole } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [switching, setSwitching] = useState(false);
 
-  const handleSwitch = async (newRole: "hero" | "requester") => {
-    if (newRole === role || switching) return;
-    
+  const handleSwitch = (tab: "support" | "earning") => {
+    if (switching) return;
     setSwitching(true);
     try {
-      // Convert role to AuthContext format
-      const authRole = newRole === "requester" ? "help_seeker" : "hero";
-      
-      // Switch role in both contexts
-      setRole(newRole);
-      setAuthRole(authRole);
-      
-      toast.success(`Switched to ${newRole === "hero" ? "Hero" : "Requester"} mode`);
-      
-      // 🔥 FIX: Navigate to home to refresh all components with new role
-      // This forces BottomNav and other components to re-render with the new role
+      localStorage.setItem("givethra_home_mode", tab);
+      window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: tab }));
       navigate({ to: "/home" });
-      
-    } catch (error) {
-      toast.error("Could not switch role. Please try again.");
+      toast.success(tab === "earning" ? "Earnings view opened" : "Help view opened");
     } finally {
-      setSwitching(false);
+      window.setTimeout(() => setSwitching(false), 250);
     }
   };
 
-  const isHero = role === "hero";
-  const isRequester = role === "requester";
-
-  // Only show if authenticated
   if (!isAuthenticated) return null;
 
   return (
-    <div className="flex items-center gap-1 bg-muted rounded-full p-1 shadow-sm border border-border/50">
-      {/* Hero Button */}
-      <button
-        onClick={() => handleSwitch("hero")}
-        disabled={switching}
-        className={`
-          flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
-          ${isHero 
-            ? "bg-primary text-primary-foreground shadow-md" 
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-          }
-          ${switching ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-        `}
-        aria-pressed={isHero}
-      >
+    <div className="flex items-center gap-1 rounded-full border border-border/50 bg-muted p-1 shadow-sm" aria-label="Home view switcher">
+      <button type="button" onClick={() => handleSwitch("support")} disabled={switching} className="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:bg-muted/50 hover:text-foreground">
         <HeartHandshake className="h-4 w-4" />
-        <span className="hidden sm:inline">Hero</span>
+        <span className="hidden sm:inline">Help</span>
       </button>
-
-      {/* Requester Button */}
-      <button
-        onClick={() => handleSwitch("requester")}
-        disabled={switching}
-        className={`
-          flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
-          ${isRequester 
-            ? "bg-primary text-primary-foreground shadow-md" 
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-          }
-          ${switching ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-        `}
-        aria-pressed={isRequester}
-      >
-        <Users className="h-4 w-4" />
-        <span className="hidden sm:inline">Requester</span>
+      <button type="button" onClick={() => handleSwitch("earning")} disabled={switching} className="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:bg-muted/50 hover:text-foreground">
+        <DollarSign className="h-4 w-4" />
+        <span className="hidden sm:inline">Earnings</span>
       </button>
     </div>
   );

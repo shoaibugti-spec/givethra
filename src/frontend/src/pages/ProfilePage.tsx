@@ -338,7 +338,8 @@ export default function ProfilePage() {
   const menuItems = [
     { icon: <Pencil className="h-5 w-5" />, label: "Edit Profile", to: "/edit-profile" },
     { icon: <MessageCircle className="h-5 w-5" />, label: "Community", to: "/community" },
-    { icon: <Briefcase className="h-5 w-5" />, label: role === "hero" ? "My Help Dashboard" : "My Cases Dashboard", to: role === "hero" ? "/my-help" : "/my-cases" },
+    { icon: <HeartHandshake className="h-5 w-5" />, label: "My Help Dashboard", to: "/my-help" },
+    { icon: <Briefcase className="h-5 w-5" />, label: "My Cases Dashboard", to: "/my-cases" },
     { icon: <Bell className="h-5 w-5" />, label: "Notifications", to: "/notifications" },
     { icon: <Wallet className="h-5 w-5" />, label: "Wallet", to: "/wallet" },
     { icon: <ShieldCheck className="h-5 w-5" />, label: "Security", to: "/security" },
@@ -545,6 +546,17 @@ export default function ProfilePage() {
                 <span className="text-[11px] text-muted-foreground">Supports</span>
               </div>
             </div>
+
+            {isOwnProfile && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => navigate({ to: "/my-help" })} className="flex items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-3 text-sm font-semibold text-primary transition hover:bg-primary/10">
+                  <HeartHandshake className="h-4 w-4" /> My Help
+                </button>
+                <button type="button" onClick={() => navigate({ to: "/my-cases" })} className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground transition hover:bg-muted">
+                  <Briefcase className="h-4 w-4" /> My Cases
+                </button>
+              </div>
+            )}
 
             {/* Verification Badges */}
             <div className="mt-3 flex flex-wrap gap-2">
