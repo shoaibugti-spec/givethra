@@ -201,13 +201,25 @@ const FILTER_CATEGORIES = [
 ];
 
 const CATEGORY_SLIDE_MEDIA: Record<string, string> = {
-  "Electricity Bill": "/assets/generated/help-bills.jpg", "Gas Bill": "/assets/generated/help-bills.jpg", "Water Bill": "/assets/generated/help-bills.jpg",
-  "House Rent": "/assets/generated/help-livelihood.jpg", "School Fees": "/assets/generated/help-education.jpg", "Education & Books": "/assets/generated/help-education.jpg",
-  "Medical & Treatment": "/assets/generated/help-medical.jpg", Medicines: "/assets/generated/help-medical.jpg", "Food & Groceries": "/assets/generated/help-livelihood.jpg",
-  "Child Support": "/assets/generated/help-education.jpg", "Widow & Elderly Support": "/assets/generated/help-medical.jpg", "Disability Support": "/assets/generated/help-medical.jpg",
-  "Marriage Support": "/assets/generated/help-livelihood.jpg", "Business / Work Help": "/assets/generated/help-livelihood.jpg", "Home Repair": "/assets/generated/help-livelihood.jpg",
-  "Funeral Expenses": "/assets/generated/help-medical.jpg", "Livestock / Farming": "/assets/generated/help-livelihood.jpg", "Debt Relief": "/assets/generated/help-bills.jpg",
-  "Emergency Help": "/assets/generated/help-medical.jpg",
+  "Electricity Bill": "/assets/generated/category-electricity-bill.jpg",
+  "Gas Bill": "/assets/generated/category-gas-bill.jpg",
+  "Water Bill": "/assets/generated/category-water-bill.jpg",
+  "House Rent": "/assets/generated/category-house-rent.jpg",
+  "School Fees": "/assets/generated/category-school-fees.jpg",
+  "Education & Books": "/assets/generated/category-education-books.jpg",
+  "Medical & Treatment": "/assets/generated/category-medical-treatment.jpg",
+  Medicines: "/assets/generated/category-medicines.jpg",
+  "Food & Groceries": "/assets/generated/category-food-groceries.jpg",
+  "Child Support": "/assets/generated/category-child-support.jpg",
+  "Widow & Elderly Support": "/assets/generated/category-widow-elderly.jpg",
+  "Disability Support": "/assets/generated/category-disability-support.jpg",
+  "Marriage Support": "/assets/generated/category-marriage-support.jpg",
+  "Business / Work Help": "/assets/generated/category-business-work.jpg",
+  "Home Repair": "/assets/generated/category-home-repair.jpg",
+  "Funeral Expenses": "/assets/generated/category-funeral-expenses.jpg",
+  "Livestock / Farming": "/assets/generated/category-livestock-farming.jpg",
+  "Debt Relief": "/assets/generated/category-debt-relief.jpg",
+  "Emergency Help": "/assets/generated/category-emergency-help.jpg",
 };
 
 const CATEGORY_ICON: Record<string, typeof Battery> = {
@@ -720,7 +732,7 @@ export default function HomePage() {
 
     const t = setInterval(() => {
       setSlideIndex((prev) => (prev + 1) % guideSlides.length);
-    }, 4000); // 4 seconds per slide
+    }, 3000); // 3 seconds per slide
 
     return () => clearInterval(t);
   }, [guideSlides.length]);
@@ -1003,11 +1015,12 @@ export default function HomePage() {
 
                 {/* Dots Indicator below the Category Slider */}
                 <div className="flex justify-center gap-1.5 mt-1">
-                  {[0, 1, 2, 3, 4].map((i) => (
+                  {guideSlides.map((slide, i) => (
                     <span
-                      key={i}
-                      className={`h-1.5 rounded-full ${
-                        i === 0 ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/30"
+                      key={slide.key}
+                      aria-label={`Slide ${i + 1} of ${guideSlides.length}`}
+                      className={`h-1.5 rounded-full transition-all ${
+                        i === slideIndex ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/30"
                       }`}
                     />
                   ))}
