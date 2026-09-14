@@ -116,7 +116,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
     loadSupportPostCount();
     const timer = window.setInterval(loadSupportPostCount, 20000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    const handleSupportPostsSeen = (event: Event) => {
+      const newest = Number((event as CustomEvent<{ newest?: number }>).detail?.newest || Date.now());
+      localStorage.setItem("givethra_my_help_posts_seen_at", String(newest));
+      setSupportPostCount(0);
+    };
+    window.addEventListener("givethra-support-posts-seen", handleSupportPostsSeen);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("givethra-support-posts-seen", handleSupportPostsSeen);
+    };
   }, []);
 
   const closeMenu = () => setMenuOpen(false);

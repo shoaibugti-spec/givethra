@@ -380,6 +380,14 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
   }, []);
 
   useEffect(() => {
+    if (activeMoneyTab !== "support" || posts.length === 0) return;
+    const newest = posts.reduce((max, post) => Math.max(max, new Date(post?.created_at || 0).getTime()), 0);
+    if (newest > 0) {
+      window.dispatchEvent(new CustomEvent("givethra-support-posts-seen", { detail: { newest } }));
+    }
+  }, [activeMoneyTab, posts]);
+
+  useEffect(() => {
     const query = submittedUserQuery.trim();
     if (query.length < 2) {
       setUserResults([]);

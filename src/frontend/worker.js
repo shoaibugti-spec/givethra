@@ -1296,7 +1296,7 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     if (!user && !guest) return json({ error: "Guest identity is required" }, 400, origin);
     const authorId = user?.user_id || guest.id;
     if (user) {
-      const recent = await env.DB.prepare("SELECT created_at FROM community_posts WHERE user_id = ? AND created_at >= datetime('now', '-24 hours') ORDER BY created_at DESC LIMIT 1").bind(authorId).first();
+      const recent = await env.DB.prepare("SELECT created_at FROM community_posts WHERE user_id = ? AND datetime(created_at) >= datetime('now', '-24 hours') ORDER BY datetime(created_at) DESC LIMIT 1").bind(authorId).first();
       if (recent) return json({ error: "You can publish one post every 24 hours.", code: "POST_COOLDOWN", next_post_at: new Date(new Date(recent.created_at).getTime() + 24 * 60 * 60 * 1000).toISOString() }, 429, origin);
     }
     const postId = id();
