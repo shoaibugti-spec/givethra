@@ -37,7 +37,7 @@ export default function RoleSwitcher({ supportPostCount = 0 }: { supportPostCoun
 
   return (
     <div className="flex items-center gap-1 rounded-full border border-border/50 bg-muted p-1 shadow-sm" aria-label="Home view switcher">
-      <button type="button" aria-label="Home" aria-pressed={false} onClick={() => { localStorage.setItem("givethra_home_mode", "support"); window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" })); navigate({ to: "/home" }); }} disabled={switching} className="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-all active:scale-[.97] hover:bg-background hover:text-foreground">
+      <button type="button" aria-label="Home" aria-pressed={activeTab === "support"} onClick={() => { setActiveTab("support"); localStorage.setItem("givethra_home_mode", "support"); window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" })); navigate({ to: "/home" }); }} disabled={switching} className={`flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-all active:scale-[.97] ${activeTab === "support" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}>
         <HeartHandshake className="h-4 w-4" />
         <span className="hidden sm:inline">Home</span>
       </button>
