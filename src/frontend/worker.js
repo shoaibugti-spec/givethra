@@ -1221,6 +1221,8 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
   await refreshSupportEligibility(env, sourceUserId);
   // Legacy fallback contract retained for databases before the earnings migration:
   // UPDATE users SET supports_count = ?, updated_at = ? WHERE user_id = ?
+  // Every new Support creates an unread notification for the post owner.
+  // Keep this queued so the support response stays fast while the counter is updated.
   await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);
   return { added: true, supports, supportsGiven, eligibilitySupports, earningsEligible: eligible, eligibleAt, supportEarningsUsd };
 }
