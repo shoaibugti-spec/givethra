@@ -161,6 +161,7 @@ export default function ProfilePage() {
   const [cases, setCases] = useState<any[]>([]);
   const [showLogout, setShowLogout] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [profileView, setProfileView] = useState<"overview" | "help" | "cases">("overview");
   const [profileLoading, setProfileLoading] = useState(true);
   const [isMyHero, setIsMyHero] = useState(false);
   const [heroUpdating, setHeroUpdating] = useState(false);
@@ -549,12 +550,35 @@ export default function ProfilePage() {
 
             {isOwnProfile && (
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => navigate({ to: "/my-help" })} className="flex items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-3 text-sm font-semibold text-primary transition hover:bg-primary/10">
+                <button type="button" onClick={() => setProfileView("help")} className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${profileView === "help" ? "border-primary bg-primary text-primary-foreground" : "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10"}`}>
                   <HeartHandshake className="h-4 w-4" /> My Help
                 </button>
-                <button type="button" onClick={() => navigate({ to: "/my-cases" })} className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground transition hover:bg-muted">
+                <button type="button" onClick={() => setProfileView("cases")} className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${profileView === "cases" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted"}`}>
                   <Briefcase className="h-4 w-4" /> My Cases
                 </button>
+              </div>
+            )}
+
+            {isOwnProfile && profileView !== "overview" && (
+              <div className="mt-3 rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                {profileView === "help" ? <>
+                  <div className="mb-3 flex items-center gap-2 font-semibold text-primary"><HeartHandshake className="h-4 w-4" /> My Help</div>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.totalUnlocks}</strong><span className="text-[10px] text-muted-foreground">Total Unlocks</span></div>
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.directHelps}</strong><span className="text-[10px] text-muted-foreground">Direct Helps</span></div>
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.contributions}</strong><span className="text-[10px] text-muted-foreground">Contributions</span></div>
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.totalAmountHelped}</strong><span className="text-[10px] text-muted-foreground">Total Amount Helped</span></div>
+                  </div>
+                </> : <>
+                  <div className="mb-3 flex items-center gap-2 font-semibold text-primary"><Briefcase className="h-4 w-4" /> My Cases</div>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalSubmitted}</strong><span className="text-[10px] text-muted-foreground">Submitted</span></div>
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalApproved}</strong><span className="text-[10px] text-muted-foreground">Approved</span></div>
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalRejected}</strong><span className="text-[10px] text-muted-foreground">Rejected</span></div>
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalCompleted}</strong><span className="text-[10px] text-muted-foreground">Completed</span></div>
+                    <div className="col-span-2 rounded-xl bg-card p-3"><strong className="block text-xl text-green-600">{requesterStats.totalHelpReceived}</strong><span className="text-[10px] text-muted-foreground">Total Help Received</span></div>
+                  </div>
+                </>}
               </div>
             )}
 
