@@ -303,7 +303,10 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
   const [supportsGiven, setSupportsGiven] = useState(0);
   const [supportEarningsUsd, setSupportEarningsUsd] = useState(0);
   const [earningsSummary, setEarningsSummary] = useState<any>(null);
-  const [activeMoneyTab, setActiveMoneyTab] = useState<"earning" | "support" | "wallet">("support");
+  const [activeMoneyTab, setActiveMoneyTab] = useState<"earning" | "support" | "wallet">(() => {
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("givethra_home_mode") : null;
+    return saved === "earning" || saved === "wallet" ? saved : "support";
+  });
   const [withdrawalForm, setWithdrawalForm] = useState({ amount: "", bank_name: "", account_title: "", account_number: "" });
   const [posts, setPosts] = useState<any[]>([]);
   const [feedTab, setFeedTab] = useState<"for-you" | "latest" | "most-supported" | "my-posts">("for-you");
@@ -543,7 +546,7 @@ export default function HomePage() {
   const [unlockCount, setUnlockCount] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [homeMode, setHomeMode] = useState<"support" | "earning">(() => (localStorage.getItem("givethra_home_mode") === "earning" ? "earning" : "support"));
+  const [homeMode, setHomeMode] = useState<"support" | "earning">(() => (localStorage.getItem("givethra_home_mode") === "earning" || localStorage.getItem("givethra_home_mode") === "wallet" ? "earning" : "support"));
 
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);

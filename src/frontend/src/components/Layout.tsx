@@ -132,7 +132,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
           <Link
-            to="/"
+            to={isAuthenticated ? "/home" : "/"}
+            onClick={() => {
+              if (!isAuthenticated) return;
+              localStorage.setItem("givethra_home_mode", "support");
+              window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" }));
+            }}
             aria-label="Givethra home"
             className="flex items-center gap-1.5 shrink-0"
           >
