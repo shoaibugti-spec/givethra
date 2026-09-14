@@ -145,7 +145,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           <div className="flex-1 flex items-center justify-center">
-            {isAuthenticated && <RoleSwitcher />}
+            {isAuthenticated && <RoleSwitcher notificationCount={notifCount} />}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">

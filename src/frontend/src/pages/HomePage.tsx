@@ -450,7 +450,7 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
   };
 
   return (
-      <SlidingHomePanel onTabChange={setActiveMoneyTab} notificationCount={notificationCount}>
+      <SlidingHomePanel onTabChange={setActiveMoneyTab}>
       <div className="min-h-full bg-muted/20 pb-24">
         <div className="mx-auto max-w-3xl space-y-4 px-3 py-4 md:px-5 md:py-7">
           <section className="rounded-2xl bg-card px-5 py-5 shadow-sm border border-border">
