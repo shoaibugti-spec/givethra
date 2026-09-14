@@ -24,10 +24,10 @@ export default function SlidingHomePanel({ children, onTabChange }: SlidingHomeP
     return () => window.removeEventListener("givethra-home-panel-tab", onModeChange);
   }, []);
   const chooseTab = (tab: PanelTab) => {
+    // These are sections inside the current Home view. They must not trigger
+    // the global Help/Earnings navigation switcher.
     setActiveTab(tab);
-    localStorage.setItem("givethra_home_mode", tab);
     onTabChange?.(tab);
-    window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: tab }));
   };
   return <div className="min-h-screen bg-background pb-20" data-testid="home-money-view">
     <div className="sticky top-0 z-30 border-b border-border bg-card/95 px-3 py-3 shadow-sm backdrop-blur-xl">
