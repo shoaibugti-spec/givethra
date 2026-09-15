@@ -234,7 +234,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </>
             )}
             {!isAuthenticated && (
-              <div className="hidden md:flex items-center gap-1">
+              <div className="flex items-center gap-1">
                 <Link to="/sign-in">
                   <Button variant="ghost" size="sm">
                     Sign in

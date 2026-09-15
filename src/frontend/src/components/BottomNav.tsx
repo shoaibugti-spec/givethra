@@ -16,7 +16,7 @@ export default function BottomNav() {
     window.addEventListener("givethra-home-panel-tab", onModeChange);
     return () => window.removeEventListener("givethra-home-panel-tab", onModeChange);
   }, []);
-  if (["/", "/sign-in", "/kyc", "/onboarding", "/onboarding-submit", "/become-hero", "/cases", "/need-help"].includes(currentPath) || (currentPath === "/home" && homeMode === "earning")) return null;
+  if (["/", "/home", "/sign-in", "/kyc", "/onboarding", "/onboarding-submit", "/become-hero", "/cases", "/need-help"].includes(currentPath)) return null;
 
   const navItems = [
     { to: "/home", label: "Home", icon: Home, ocid: "bottom_nav.home" },

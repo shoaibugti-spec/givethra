@@ -311,7 +311,7 @@ const indexRoute = createRoute({
   path: "/",
   component: () => (
     <Suspense fallback={<PageLoader />}>
-      <RoleSelectionPage />
+      <HomePage />
     </Suspense>
   ),
 });

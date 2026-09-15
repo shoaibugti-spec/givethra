@@ -822,6 +822,14 @@ export default function HomePage() {
 
   const currentSlide = guideSlides[slideIndex] ?? HAND_SLIDE;
 
+  function goToProtectedAction(to: string) {
+    if (!isAuthenticated) {
+      navigate({ to: "/sign-in" });
+      return;
+    }
+    navigate({ to: to as any });
+  }
+
   function renderSlideContent() {
     if (currentSlide.type === "image") {
       return (
@@ -837,7 +845,7 @@ export default function HomePage() {
       return (
         <button
           type="button"
-          onClick={() => navigate({ to: currentSlide.to })}
+          onClick={() => goToProtectedAction(currentSlide.to)}
           className="w-full h-full bg-gradient-to-br from-primary to-primary/80 text-white flex flex-col items-center justify-center text-center px-6 gap-2 cursor-pointer"
         >
           <span className="text-4xl">🎉</span>
@@ -861,7 +869,7 @@ export default function HomePage() {
       return (
         <button
           type="button"
-          onClick={() => navigate({ to: currentSlide.to })}
+          onClick={() => goToProtectedAction(currentSlide.to)}
           className="w-full h-full bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
         >
           <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}>
@@ -888,7 +896,7 @@ export default function HomePage() {
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">Secure verification</p>
             <h3 className="font-display text-lg font-bold leading-tight md:text-2xl">Complete Your KYC to Submit Your Case</h3>
             <p className="text-xs leading-relaxed text-white/85 md:text-sm">Verify your identity with CNIC photos, selfie and a short video.</p>
-            <button type="button" onClick={() => navigate({ to: currentSlide.to })} className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-lg active:scale-95">
+            <button type="button" onClick={() => goToProtectedAction(currentSlide.to)} className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-lg active:scale-95">
               Start verification <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -899,7 +907,7 @@ export default function HomePage() {
     return (
       <button
         type="button"
-        onClick={() => navigate({ to: currentSlide.to })}
+        onClick={() => goToProtectedAction(currentSlide.to)}
         className="w-full h-full bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer"
       >
         <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}>
@@ -997,6 +1005,10 @@ export default function HomePage() {
                         type="button"
                         aria-label={`Start ${category} help request`}
                         onClick={() => {
+                          if (!isAuthenticated) {
+                            navigate({ to: "/sign-in" });
+                            return;
+                          }
                           setSelectedCategory(category);
                           try {
                             localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category);
@@ -1490,7 +1502,7 @@ export default function HomePage() {
         </section>
         </>}
 
-        <HomeSocialDashboard notificationCount={notifCount} />
+        {isAuthenticated && <HomeSocialDashboard notificationCount={notifCount} />}
       </div>
     </Layout>
   );
