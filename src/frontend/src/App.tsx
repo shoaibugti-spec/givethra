@@ -281,8 +281,10 @@ function RootLayout() {
         "/heroes-wall",
         "/kindness-wall",
         "/need-help",
+        "/cases",
       ];
-      if (!publicPaths.includes(location.pathname)) {
+      const isPublicRoute = publicPaths.includes(location.pathname) || location.pathname.startsWith("/cases/");
+      if (!isPublicRoute) {
         navigate({ to: "/" });
       }
     }
