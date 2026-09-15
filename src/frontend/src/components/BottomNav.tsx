@@ -4,19 +4,24 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, LayoutList, User, Wallet, HeartHandshake } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getCommunityPosts } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 const LAST_SEEN_KEY = "givethra_my_help_posts_seen_at";
 
 export default function BottomNav() {
   const router = useRouterState();
   const currentPath = router.location.pathname;
+  const { isAuthenticated } = useAuth();
   const [homeMode, setHomeMode] = useState<"support" | "earning">(() => (localStorage.getItem("givethra_home_mode") === "earning" ? "earning" : "support"));
   useEffect(() => {
     const onModeChange = (event: Event) => setHomeMode((event as CustomEvent<"support" | "earning">).detail === "earning" ? "earning" : "support");
     window.addEventListener("givethra-home-panel-tab", onModeChange);
     return () => window.removeEventListener("givethra-home-panel-tab", onModeChange);
   }, []);
-  if (["/", "/home", "/sign-in", "/kyc", "/onboarding", "/onboarding-submit", "/become-hero", "/cases", "/need-help"].includes(currentPath)) return null;
+  // Guests can browse the public HomePage without account navigation. Once signed in,
+  // keep the bottom navigation available on Home and throughout the app.
+  if (!isAuthenticated) return null;
+  if (["/sign-in", "/kyc", "/onboarding", "/onboarding-submit", "/become-hero"].includes(currentPath)) return null;
 
   const navItems = [
     { to: "/home", label: "Home", icon: Home, ocid: "bottom_nav.home" },
