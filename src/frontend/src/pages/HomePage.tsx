@@ -1270,7 +1270,10 @@ export default function HomePage() {
                   const collected = Number(c.amount_collected ?? 0);
                   const percent = needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
                   const remaining = Math.max(needed - collected, 0);
-                  const appeal = CATEGORY_APPEAL[c.category] ?? "Be someone's hope today 🤲";
+                  const displayCategory = normalizePublishedCategory(c.category);
+                  const appeal = CATEGORY_APPEAL[displayCategory] ?? "Be someone's hope today 🤲";
+                  const selfieUrl = typeof c.selfie_url === "string" && c.selfie_url.trim() ? c.selfie_url : null;
+                  const requesterName = String(c.full_name || c.display_name || "Verified requester").trim();
                   const isDone = needed > 0 && collected >= needed;
 
                   return (
@@ -1284,11 +1287,30 @@ export default function HomePage() {
                         className="rounded-2xl border border-border bg-card overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all h-full flex flex-col"
                         onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}
                       >
+                        {selfieUrl && (
+                          <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-card to-teal-50 px-4 pt-4">
+                            <div className="flex items-center gap-3 rounded-2xl border border-primary/10 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
+                              <img
+                                src={selfieUrl}
+                                alt={`${requesterName} selfie`}
+                                loading="lazy"
+                                className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-md"
+                              />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+                                  <ShieldCheck className="h-3.5 w-3.5" /> Verified requester
+                                </div>
+                                <p className="mt-1 truncate text-sm font-bold text-foreground">{requesterName}</p>
+                                <p className="text-[11px] text-muted-foreground">Identity verified for this help request</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-4 border-b border-border">
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <span className="inline-flex items-center gap-1 text-xs font-semibold bg-card text-primary px-2.5 py-1 rounded-full border border-primary/20">
-                              <span>{CATEGORY_EMOJI[c.category] ?? "📌"}</span>
-                              {normalizePublishedCategory(c.category)}
+                              <span>{CATEGORY_EMOJI[displayCategory] ?? "📌"}</span>
+                              {displayCategory}
                             </span>
                             <span
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1306,6 +1328,12 @@ export default function HomePage() {
                           <div>
                             <h3 className="font-bold text-lg leading-snug line-clamp-2 text-foreground">{c.title}</h3>
                             <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{c.short_description}</p>
+                            {c.description && (
+                              <div className="mt-3 rounded-xl bg-primary/5 px-3 py-2.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-primary">Case story</p>
+                                <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-relaxed text-foreground/80">{c.description}</p>
+                              </div>
+                            )}
                           </div>
 
                           {needed > 0 && (
