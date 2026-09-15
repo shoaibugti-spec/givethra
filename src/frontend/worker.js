@@ -1766,35 +1766,52 @@ async function handleRequest(request, env, ctx) {
   // Social crawlers do not run the React app. For a public published case,
   // inject case-specific Open Graph metadata into the SPA shell so WhatsApp,
   // Facebook, and other platforms can display the requester's approved selfie.
-  const caseShareMatch = request.method === "GET" && parts.length === 2 && parts[0] === "cases" && parts[1];
+  const caseShareMatch = request.method === "GET" && (
+    (parts.length === 2 && parts[0] === "cases" && parts[1]) ||
+    (parts.length === 3 && parts[0] === "share" && parts[1] === "cases" && parts[2])
+  );
   if (caseShareMatch && env.DB && env.ASSETS) {
-    const sharedCaseId = decodeURIComponent(parts[1]);
+    const isDedicatedShareUrl = parts[0] === "share";
+    const sharedCaseId = decodeURIComponent(isDedicatedShareUrl ? parts[2] : parts[1]);
     const sharedCase = await env.DB.prepare(
-      "SELECT id, title, short_description, description, category, selfie_url, status FROM case_submissions WHERE id = ? AND lower(status) IN ('approved', 'published', 'active') LIMIT 1"
+      "SELECT id, title, short_description, description, category, amount_needed, currency, city, country, selfie_url, status FROM case_submissions WHERE id = ? AND lower(status) IN ('approved', 'published', 'active') LIMIT 1"
     ).bind(sharedCaseId).first();
     if (sharedCase) {
       const shell = await env.ASSETS.fetch(new Request(new URL("/", url), request));
       const sourceHtml = await shell.text();
       const title = escapeHtml(sharedCase.title || "Verified Givethra Help Case");
-      const description = escapeHtml(sharedCase.short_description || sharedCase.description || "Support a verified Givethra help request.");
+      const category = escapeHtml(sharedCase.category || "Verified Help Request");
+      const amount = Number(sharedCase.amount_needed || 0);
+      const currency = escapeHtml(String(sharedCase.currency || "USD").toUpperCase());
+      const location = escapeHtml([sharedCase.city, sharedCase.country].filter(Boolean).join(", "));
+      const baseDescription = String(sharedCase.short_description || sharedCase.description || "Support a verified Givethra help request.").trim();
+      const description = escapeHtml(`${category}${amount > 0 ? ` · Goal: ${currency} ${amount.toLocaleString()}` : ""}${location ? ` · ${location}` : ""}. ${baseDescription} Tap to view the verified case and help now.`);
       const canonical = escapeHtml(`${PUBLIC_ORIGIN}/cases/${encodeURIComponent(String(sharedCase.id))}`);
       const image = escapeHtml(normalizeUploadedUrl(sharedCase.selfie_url) || `${PUBLIC_ORIGIN}/assets/generated/hero-givethra.dim_1200x500.jpg`);
+      const redirect = escapeHtml(`/cases/${encodeURIComponent(String(sharedCase.id))}`);
       const metadata = `
-        <title>${title} · Givethra</title>
+        <title>${title} · ${category} · Givethra</title>
         <meta name="description" content="${description}">
         <link rel="canonical" href="${canonical}">
-        <meta property="og:type" content="website">
+        <meta property="og:type" content="article">
         <meta property="og:site_name" content="Givethra">
-        <meta property="og:title" content="${title} · Givethra">
+        <meta property="og:title" content="${title} · ${category}">
         <meta property="og:description" content="${description}">
         <meta property="og:url" content="${canonical}">
         <meta property="og:image" content="${image}">
+        <meta property="og:image:secure_url" content="${image}">
         <meta property="og:image:alt" content="Verified requester selfie for ${title}">
+        <meta property="og:image:type" content="image/jpeg">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="1200">
         <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="${title} · Givethra">
+        <meta name="twitter:title" content="${title} · ${category}">
         <meta name="twitter:description" content="${description}">
         <meta name="twitter:image" content="${image}">`;
-      const html = sourceHtml.replace(/<head([^>]*)>/i, `<head$1>${metadata}`);
+      const redirectMarkup = isDedicatedShareUrl
+        ? `<meta http-equiv="refresh" content="0;url=${redirect}"><script>if (!/bot|crawler|spider|preview|facebookexternalhit|whatsapp/i.test(navigator.userAgent)) location.replace(${JSON.stringify(`/cases/${String(sharedCase.id)}`)});</script>`
+        : "";
+      const html = sourceHtml.replace(/<head([^>]*)>/i, `<head$1>${metadata}${redirectMarkup}`);
       const headers = new Headers(shell.headers);
       headers.set("Content-Type", "text/html; charset=utf-8");
       headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
