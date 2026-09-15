@@ -1376,14 +1376,25 @@ export default function HomePage() {
                             );
                           })()}
 
-                          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border mt-auto">
-                            <span className="flex items-center gap-1">
+                          <div className="mt-auto space-y-3 border-t border-border pt-3">
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
                               <MapPin className="h-3 w-3" />
                               {c.city}, {c.country}
                             </span>
-                            <span className="inline-flex items-center gap-1 text-primary font-semibold">
-                              Help now <ChevronRight className="h-3.5 w-3.5" />
-                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Help now with ${c.title || "this case"}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                navigate({ to: "/cases/$id", params: { id: c.id } });
+                              }}
+                              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-extrabold text-primary-foreground shadow-md transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                            >
+                              <Heart className="h-4 w-4" fill="currentColor" />
+                              Help Now
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                            <p className="text-center text-[11px] text-muted-foreground">View full case details and choose how to help</p>
                           </div>
                         </div>
                       </div>
