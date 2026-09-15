@@ -178,6 +178,13 @@ function sym(cur?: string) {
   return CURRENCY_SYMBOLS[cur || "USD"] ?? (cur || "$");
 }
 
+function normalizePublishedCategory(value: unknown): string {
+  const category = String(value ?? "").trim();
+  if (category === "School, College & University Fees") return "School Fees";
+  if (category === "Education, Books & Admission") return "Education & Books";
+  return category;
+}
+
 const FILTER_CATEGORIES = [
   "Electricity Bill",
   "Gas Bill",
@@ -681,9 +688,14 @@ export default function HomePage() {
   async function loadCategoryCounts() {
     try {
       const counts = await getCategoryCounts();
-      setCategoryCounts(counts ?? {});
+      const normalized = Object.entries(counts ?? {}).reduce<Record<string, number>>((result, [category, count]) => {
+        const label = normalizePublishedCategory(category);
+        result[label] = (result[label] || 0) + Number(count || 0);
+        return result;
+      }, {});
+      setCategoryCounts(normalized);
     } catch {
-      // ignore
+      // The published cases remain visible even if the count endpoint is unavailable.
     }
   }
 
@@ -764,10 +776,13 @@ export default function HomePage() {
     )
   ).sort();
 
+  // Sort by published count while preserving the original sequence for ties and zeros.
+  const orderedCategories = [...FILTER_CATEGORIES].sort((a, b) => Number(categoryCounts[b] || 0) - Number(categoryCounts[a] || 0));
+
   let filtered = cases.filter((c) => {
     if (filterCountry !== "all" && c.country !== filterCountry) return false;
     if (filterCity !== "all" && c.city !== filterCity) return false;
-    if (filterCat !== "all" && c.category !== filterCat) return false;
+    if (filterCat !== "all" && normalizePublishedCategory(c.category) !== filterCat) return false;
     if (filterUrgency !== "all" && c.urgency !== filterUrgency) return false;
 
     if (search.trim()) {
@@ -1181,19 +1196,29 @@ export default function HomePage() {
             </p>
 
             <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-1">
-              {FILTER_CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => selectCategory(cat)}
-                  className={`flex flex-col items-center shrink-0 min-w-[68px] p-2 rounded-xl transition-colors ${
-                    filterCat === cat ? "bg-primary/10 ring-1 ring-primary" : "hover:bg-muted"
-                  }`}
-                >
-                  <span className="text-xl">{CATEGORY_EMOJI[cat] ?? "📌"}</span>
-                  <span className="text-sm font-bold text-foreground">{categoryCounts[cat] ?? 0}</span>
-                  <span className="text-[10px] text-muted-foreground text-center leading-tight">{cat}</span>
-                </button>
-              ))}
+              {orderedCategories.map((cat) => {
+                const count = Number(categoryCounts[cat] || 0);
+                const active = filterCat === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => selectCategory(cat)}
+                    className={`group relative flex flex-col items-center shrink-0 min-w-[76px] rounded-2xl border p-2.5 transition-all ${
+                      active
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-sm"
+                        : count > 0
+                          ? "border-primary/20 bg-card shadow-sm hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
+                          : "border-transparent hover:bg-muted"
+                    }`}
+                  >
+                    <span className={`mb-1 flex h-10 w-10 items-center justify-center rounded-full text-xl ${active || count > 0 ? "bg-primary/10" : "bg-muted/60"}`}>
+                      {CATEGORY_EMOJI[cat] ?? "📌"}
+                    </span>
+                    <span className={`text-sm font-extrabold ${count > 0 ? "text-primary" : "text-foreground"}`}>{count}</span>
+                    <span className="mt-0.5 text-[10px] font-semibold text-muted-foreground text-center leading-tight">{cat}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -1251,7 +1276,7 @@ export default function HomePage() {
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <span className="inline-flex items-center gap-1 text-xs font-semibold bg-card text-primary px-2.5 py-1 rounded-full border border-primary/20">
                               <span>{CATEGORY_EMOJI[c.category] ?? "📌"}</span>
-                              {c.category}
+                              {normalizePublishedCategory(c.category)}
                             </span>
                             <span
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
