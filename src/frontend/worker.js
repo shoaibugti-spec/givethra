@@ -3,12 +3,10 @@
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
 // Assistant REMOVED - shoaibugti@gmail.com is no longer assistant.
 //
-// 🔥 FIXED (this pass — root cause of ProfilePage stats "not showing correctly"):
-// canAccessUser(user, userId) used to do `user.user_id === userId` as its last check.
-// If the request's auth session failed to verify (expired/rotated JWT_SECRET, missing
-// header, etc.) `user` is `null`, and reading `.user_id` off `null` THROWS. That
-// exception is caught by the top-level try/catch in `fetch()` and turned into an
-// HTTP 500 — but the frontend's `readArrayResponse()` helper (used by getCasesByUser,
+// 🔥 FIXED: canAccessUser(user, userId) used to do `user.user_id === userId` as its last check.
+// If the request's auth session failed to verify, `user` is `null`, and reading `.user_id` off
+// `null` THROWS. That exception is caught by the top-level try/catch in `fetch()` and turned into
+// an HTTP 500 — but the frontend's `readArrayResponse()` helper (used by getCasesByUser,
 // getCaseResolutionsByHero, getCaseUnlocksByHero) has no `res.ok` check: it just tries
 // to parse JSON and falls back to `[]` on anything that isn't an array. The net
 // result was a *silent* failure — no error, no toast, just every stat quietly
@@ -21,7 +19,6 @@ const PUBLIC_ORIGIN = "https://givethra.org";
 const ADMIN_EMAILS = new Set([
   "shoaibahmedbugti5@gmail.com",
 ]);
-// ASSISTANT_EMAILS REMOVED
 
 function googleClientId(env) {
   return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || "").trim();
@@ -70,7 +67,6 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
 
 function now() {
   return new Date().toISOString();
@@ -177,8 +173,6 @@ async function verifySession(token, secret) {
 function isAdmin(user) {
   return Boolean(user && ADMIN_EMAILS.has(String(user.email).toLowerCase()));
 }
-
-// isAssistant() REMOVED
 
 function bearer(request) {
   const value = request.headers.get("Authorization") || "";
@@ -371,12 +365,6 @@ function requestedUserId(url) {
   return url.searchParams.get("user_id") || "";
 }
 
-// 🔥 FIXED: was `user.user_id === userId` — if `user` is null (session invalid or
-// missing), that line threw a TypeError instead of returning `false`. The thrown
-// error was caught far away in fetch()'s top-level try/catch and turned into an
-// opaque HTTP 500, which the frontend's array-reading helpers then silently turned
-// into `[]`. Now a null user is simply treated as "not this user" — no exception,
-// and a clean 403 is returned instead of a mysterious, silently-swallowed 500.
 function canAccessUser(user, userId) {
   return isAdmin(user) || !userId || Boolean(user && user.user_id === userId);
 }
@@ -449,9 +437,6 @@ function pick(body, fields) {
   return Object.fromEntries(fields.filter((field) => body && body[field] !== undefined).map((field) => [field, body[field]]));
 }
 
-// ============================================================
-//  CREDIT TRANSACTIONS HELPERS
-// ============================================================
 async function getWalletBalance(env, userId) {
   const row = await env.DB.prepare(
     "SELECT balance FROM wallets WHERE user_id = ?"
@@ -488,9 +473,6 @@ async function addCredits(env, userId, amount, type, description, referenceId = 
   await addTransaction(env, userId, amount, type, description, referenceId);
 }
 
-// ============================================================
-//  PROFILE HANDLER
-// ============================================================
 function hasBioContactInfo(value) {
   return /\d|@|https?:\/\/|www\.|whats?app|e[- ]?mail|email|phone|contact|telegram|signal|wechat|imo/i.test(String(value || ""));
 }
@@ -512,8 +494,6 @@ async function getProfileSupportData(env, userId) {
       "SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(supports_given, 0) AS supports_given, COALESCE(eligibility_supports, 0) AS eligibility_supports, COALESCE(earnings_eligible, 0) AS earnings_eligible, eligible_at, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?"
     ).bind(userId).first() || { supports_count: 0, supports_given: 0, eligibility_supports: 0, earnings_eligible: 0, support_earnings_usd: 0 };
   } catch {
-    // Older production databases may not have the additive earnings column yet.
-    // Legacy fallback contract: "SELECT COALESCE(supports_count, 0) AS supports_count FROM users WHERE user_id = ?"
     try {
       return await env.DB.prepare(
         "SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(supports_given, 0) AS supports_given FROM users WHERE user_id = ?"
@@ -711,12 +691,6 @@ async function handleUsernameAvailability(request, env, user, url, origin) {
   return json({ available: !isTaken, suggestions }, 200, origin);
 }
 
-// ============================================================
-//  PROFILE STATS HANDLER
-// ============================================================
-// Keep both profile roles on one server-side data contract. This avoids the
-// browser having to join three endpoints and makes legacy amount/status fields
-// behave consistently for old and new records.
 async function handleProfileStats(request, env, user, url, parts, origin) {
   if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
   const userId = String(parts[2] || "").trim();
@@ -768,14 +742,9 @@ async function handleProfileStats(request, env, user, url, parts, origin) {
   }, 200, origin);
 }
 
-// ============================================================
-//  KYC HANDLER
-// ============================================================
 async function handleKyc(request, env, user, url, parts, origin) {
   const queryUser = requestedUserId(url);
   const target = queryUser || user?.user_id || "";
-  // 🔥 FIX: Allow public access to GET (only status) so other users' profiles can load
-  // We'll still check ownership for PUT/POST
   if (request.method === "GET") {
     const isOwnOrAdmin = canAccessUser(user, target);
     const rows = await env.DB.prepare(
@@ -784,19 +753,16 @@ async function handleKyc(request, env, user, url, parts, origin) {
     if (isOwnOrAdmin) {
       return json(rows.results || [], 200, origin);
     } else {
-      // Return only non-sensitive fields for other users
       const limited = (rows.results || []).map((r) => ({
         id: r.id,
         user_id: r.user_id,
         status: r.status,
         submitted_at: r.submitted_at,
-        // Do not include CNIC, addresses, etc.
       }));
       return json(limited, 200, origin);
     }
   }
   if (request.method === "POST") {
-    // POST requires authentication and ownership of the user_id (or admin)
     if (!user) return json({ error: "Authentication required" }, 401, origin);
     if (!canAccessUser(user, user.user_id)) return json({ error: "Forbidden" }, 403, origin);
     const body = await readJson(request);
@@ -901,9 +867,6 @@ function fixedCaseAmount(category) {
   return null;
 }
 
-// ============================================================
-//  CASES HANDLER
-// ============================================================
 async function handleCases(request, env, user, url, parts, origin) {
   if (request.method === "GET") {
     if (parts[2] === "approved") {
@@ -997,22 +960,13 @@ async function handleCases(request, env, user, url, parts, origin) {
     const photoUrls = Array.isArray(record.photo_urls) || (record.photo_urls && typeof record.photo_urls === "object") ? JSON.stringify(record.photo_urls) : (record.photo_urls || null);
     const categoryDetails = Array.isArray(record.category_details) || (record.category_details && typeof record.category_details === "object") ? JSON.stringify(record.category_details) : (record.category_details || null);
 
-    // =====================================================
-    // 🔥 FIX #1: Free Case logic corrected
-    // =====================================================
-    // Get free case history for this user
     const freeAttempts = await env.DB.prepare(
       "SELECT was_free, status FROM case_submissions WHERE user_id = ? AND COALESCE(was_free, 0) = 1 ORDER BY submitted_at ASC"
     ).bind(user.user_id).all();
     const freeHistory = freeAttempts.results || [];
 
-    // Determine if this case should be free:
-    // - If no free case yet -> free (first)
-    // - If exactly one free case AND it was rejected -> free (second chance)
-    // - Otherwise -> not free
     const firstFreeRejected = freeHistory.some((c) => String(c.status || "").toLowerCase() === "rejected");
     const isFree = freeHistory.length === 0 || (freeHistory.length === 1 && firstFreeRejected);
-    // =====================================================
 
     if (!isFree) {
       const balance = await getWalletBalance(env, user.user_id);
@@ -1021,9 +975,6 @@ async function handleCases(request, env, user, url, parts, origin) {
       }
     }
 
-    // A paid submission consumes its one credit at the moment it is submitted.
-    // The charge is never refunded for approval or rejection. Roll it back only
-    // if the case row itself cannot be written, so a failed request is atomic.
     if (!isFree) {
       await deductCredits(env, user.user_id, 1, 'case_submission', `Case "${record.title || caseId}" submission fee`, caseId);
     }
@@ -1046,9 +997,6 @@ async function handleCases(request, env, user, url, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
-// ============================================================
-//  HEROES WALL HANDLER
-// ============================================================
 async function handleHeroesWall(request, env, origin) {
   if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
   const url = new URL(request.url);
@@ -1127,9 +1075,6 @@ async function handleHeroesWall(request, env, origin) {
   return json({ cases: wallCases, metrics: { solved_cases: completedCases.length, total_amount: totalAmount, currency: completedCases[0]?.currency || "PKR" } }, 200, origin);
 }
 
-// ============================================================
-//  COMMUNITY POSTS HANDLER
-// ============================================================
 async function signSessionPayload(payload, secret) {
   if (!secret) return null;
   const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
@@ -1232,7 +1177,6 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
   const postSupportRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE post_id = ? AND user_id = ?").bind(postId, originalUserId).first();
   const postSupports = Number(postSupportRow?.count || 0);
   const payableSupports = eligible ? Math.min(postSupports, 1000) : 0;
-  // Supports are valued at 10,000 per USD: supports / 10000.
   const supportEarningsUsd = Number((payableSupports / 10000).toFixed(4));
   await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = ?, eligible_at = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportsGiven, eligibilitySupports, eligible ? 1 : 0, eligibleAt, supportEarningsUsd, now(), originalUserId).run();
   if (eligible && postSupports <= 1000) {
@@ -1240,10 +1184,6 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
     await env.DB.prepare("INSERT INTO earnings_wallets (user_id, balance_pkr, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance_pkr = balance_pkr + excluded.balance_pkr, updated_at = excluded.updated_at").bind(originalUserId, 0.1, now()).run();
   }
   await refreshSupportEligibility(env, sourceUserId);
-  // Legacy fallback contract retained for databases before the earnings migration:
-  // UPDATE users SET supports_count = ?, updated_at = ? WHERE user_id = ?
-  // Every new Support creates an unread notification for the post owner.
-  // Keep this queued so the support response stays fast while the counter is updated.
   await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);
   return { added: true, supports, supportsGiven, eligibilitySupports, earningsEligible: eligible, eligibleAt, supportEarningsUsd };
 }
@@ -1254,8 +1194,6 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     const actorId = user?.user_id || guest?.id || "";
     const tab = url.searchParams.get("tab") || "for-you";
     let filter = "";
-    // Placeholder order follows the SQL text: like actor, support actor,
-    // following actor in SELECT, optional WHERE actor, then For You boost actor.
     const binds = [actorId, actorId];
     binds.push(user?.user_id || actorId);
     if (tab === "my-heroes" && user) { filter = "WHERE cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)"; binds.push(user.user_id); }
@@ -1269,8 +1207,6 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.signed_up_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
     const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
     const rankSeed = Number.isFinite(Number(url.searchParams.get("seed"))) ? Math.trunc(Number(url.searchParams.get("seed"))) : 0;
-    // Controlled exploration: enough to rotate similarly scored posts between
-    // sessions, while support/engagement/freshness remain the primary score.
     const stableVariation = `((abs(length(cp.id) * 31 + ${rankSeed}) % 100) / 100.0 * 8)`;
     const profile = Math.abs(rankSeed) % 3;
     const forYouScore = profile === 0
@@ -1278,9 +1214,6 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
       : profile === 1
         ? `${engagementScore} * 1.5 + ${supportScore} * 2.0 + ${freshnessBoost} * 6.0 + ${heroBoost} * 2.0 + ${newCreatorBoost} * 4.0`
         : `${engagementScore} * 2.0 + ${supportScore} * 3.0 + ${freshnessBoost} * 3.0 + ${heroBoost} * 5.0 + ${newCreatorBoost} * 2.0`;
-    // Keep the four feed contracts intentionally distinct:
-    // Latest is purely chronological; Most Supported is purely support-ranked;
-    // For You is the mixed/personalized ranking.
     const orderBy = tab === "latest"
       ? "cp.created_at DESC, cp.id DESC"
       : tab === "most-supported"
@@ -1347,9 +1280,6 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
-// ============================================================
-//  COMMUNITY LIKES HANDLER
-// ============================================================
 async function handleCommunityLikes(request, env, user, url, parts, origin, ctx) {
   const postId = parts[3];
   if (!postId) return json({ error: "Post ID required" }, 400, origin);
@@ -1398,9 +1328,6 @@ async function handleCommunityLikes(request, env, user, url, parts, origin, ctx)
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
-// ============================================================
-//  COMMUNITY COMMENTS HANDLER
-// ============================================================
 async function handleCommunityComments(request, env, user, url, parts, origin, ctx) {
   const postId = parts[3];
   if (!postId) return json({ error: "Post ID required" }, 400, origin);
@@ -1462,7 +1389,6 @@ async function handleCommunityComments(request, env, user, url, parts, origin, c
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
-
 async function handleCommunitySupport(request, env, user, origin, ctx) {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
   const body = await readJson(request).catch(() => ({}));
@@ -1518,9 +1444,6 @@ async function handleFollow(request, env, user, url, parts, origin, ctx) {
   return json({ error: "Method not allowed" },405,origin);
 }
 
-// ============================================================
-//  NOTIFICATIONS HANDLER
-// ============================================================
 async function handleNotifications(request, env, user, url, parts, origin) {
   const requested = url.searchParams.get("user_id") || user?.user_id;
   if (!requested || !canAccessUser(user, requested)) {
@@ -1573,21 +1496,16 @@ async function handleNotifications(request, env, user, url, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
-// ============================================================
-//  SYNC COMPLETED CASE (FIXED - correct contribution/direct logic)
-// ============================================================
 async function synchronizeCompletedCase(env, resolutionId) {
-  // Get the resolution and verify it's truly completed
   const resolution = await env.DB.prepare(
     "SELECT case_id, paid_to, status, admin_confirmed, resolution_type FROM case_resolutions WHERE id = ?"
   ).bind(resolutionId).first();
   if (!resolution?.case_id) return null;
-  
-  const isApproved = String(resolution.status || "").toLowerCase() === "completed" && 
+
+  const isApproved = String(resolution.status || "").toLowerCase() === "completed" &&
                       [1, "1", true, "true"].includes(resolution.admin_confirmed);
   if (!isApproved) return null;
 
-  // 🔥 FIX: Instead of using just the current resolution, we compute totals per case
   const totals = await env.DB.prepare(
     `SELECT c.user_id, c.amount_needed, c.amount_collected,
             COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0)) 
@@ -1611,11 +1529,8 @@ async function synchronizeCompletedCase(env, resolutionId) {
   const verifiedTotal = Math.max(contributionTotal + directTotal, Number(totals.amount_collected || 0));
   const goalReached = Number(totals.amount_needed || 0) <= 0 || verifiedTotal >= Number(totals.amount_needed || 0);
 
-  // 🔥 CRITICAL FIX: Only mark as completed if there is no contribution amount remaining.
-  // If any contribution exists, case stays as 'approved' (or 'open') until Admin pays it via Pay & Close.
   const nextStatus = (contributionTotal === 0 && goalReached) ? "completed" : undefined;
 
-  // Update case: amount_collected always, status only if completed
   if (nextStatus) {
     await env.DB.prepare(
       "UPDATE case_submissions SET amount_collected = ?, status = ? WHERE id = ?"
@@ -1630,9 +1545,6 @@ async function synchronizeCompletedCase(env, resolutionId) {
   return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "approved" };
 }
 
-// ============================================================
-//  MAIN HANDLER
-// ============================================================
 async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const origin = url.origin;
@@ -1649,32 +1561,24 @@ async function handleRequest(request, env, ctx) {
     return json({ status: "ok", timestamp: now() }, 200, origin);
   }
 
-  // ============================================================
-  //  APK FILE HANDLING - FIXED MIME TYPE (مکمل طور پر درست)
-  //  یہ کوڈ ASSETS سے پہلے چلے گا
-  // ============================================================
   if (url.pathname === '/Givethra.apk' || url.pathname.endsWith('.apk')) {
     try {
-      // پہلے ASSETS سے چیک کریں
       const assetResponse = await env.ASSETS.fetch(request);
-      
+
       const assetContentType = assetResponse.headers.get('Content-Type') || '';
-      // With SPA fallback enabled, ASSETS returns index.html with HTTP 200 for
-      // a missing file. Never relabel that HTML response as an APK.
       if (assetResponse.status === 200 && !assetContentType.toLowerCase().includes('text/html')) {
         const headers = new Headers(assetResponse.headers);
         headers.set('Content-Type', 'application/vnd.android.package-archive');
         headers.set('Content-Disposition', 'attachment; filename="Givethra.apk"');
         headers.set('Cache-Control', 'public, max-age=31536000, immutable');
         headers.set('Accept-Ranges', 'bytes');
-        
+
         return new Response(assetResponse.body, {
           status: 200,
           headers: headers
         });
       }
-      
-      // اگر ASSETS میں نہ ملے تو UPLOADS (R2) سے چیک کریں
+
       const uploadObject = await env.UPLOADS.get('Givethra.apk');
       if (uploadObject) {
         const headers = new Headers();
@@ -1684,14 +1588,13 @@ async function handleRequest(request, env, ctx) {
         headers.set('Content-Length', String(uploadObject.size));
         headers.set('Accept-Ranges', 'bytes');
         headers.set('Access-Control-Allow-Origin', '*');
-        
+
         return new Response(uploadObject.body, {
           status: 200,
           headers: headers
         });
       }
-      
-      // اگر فائل نہ ملے تو تفصیلی 404
+
       return new Response(JSON.stringify({
         error: 'APK file not found',
         message: 'Please contact support or try again later.',
@@ -1703,7 +1606,7 @@ async function handleRequest(request, env, ctx) {
           'Cache-Control': 'no-cache'
         }
       });
-      
+
     } catch (error) {
       console.error('APK fetch error:', error);
       return new Response(JSON.stringify({
@@ -1744,14 +1647,10 @@ async function handleRequest(request, env, ctx) {
     return json({ valid: true, user }, 200, origin);
   }
 
-  // Public uploaded files. Older cases use /uploads?key=... while newer
-  // submissions use /uploads/<key>; serve both formats from the same R2 bucket.
   if (url.pathname === "/uploads" || url.pathname.startsWith("/uploads/")) {
     const rawKey = url.pathname === "/uploads"
       ? url.searchParams.get("key") || ""
       : url.pathname.slice(9);
-    // URL pathnames percent-encode spaces, parentheses and non-ASCII names.
-    // R2 stores the original object key, so decode exactly once before lookup.
     let key = rawKey;
     try { key = decodeURIComponent(rawKey); } catch { /* keep the raw key */ }
     if (!key) return new Response("File not found", { status: 404 });
@@ -1774,9 +1673,7 @@ async function handleRequest(request, env, ctx) {
       return new Response("File not found", { status: 404 });
     }
   }
-  // Social crawlers do not run the React app. For a public published case,
-  // inject case-specific Open Graph metadata into the SPA shell so WhatsApp,
-  // Facebook, and other platforms can display the requester's approved selfie.
+
   const caseShareMatch = request.method === "GET" && (
     (parts.length === 2 && parts[0] === "cases" && parts[1]) ||
     (parts.length === 3 && parts[0] === "share" && parts[1] === "cases" && parts[2])
@@ -1834,9 +1731,6 @@ async function handleRequest(request, env, ctx) {
     return env.ASSETS.fetch(request);
   }
 
-  // ============================================================
-  //  PUBLIC: Community Posts (no auth required for reading)
-  // ============================================================
   if (parts[0] === "api" && parts[1] === "heroes-wall") {
     return handleHeroesWall(request, env, origin);
   }
@@ -1874,7 +1768,7 @@ async function handleRequest(request, env, ctx) {
       ).bind(now(), now(), user.user_id).run();
       return json({ updated: true, user_id: user.user_id }, 200, origin);
     }
-    
+
     if (parts[2] === "posts" && parts.length === 3 && request.method === "GET") {
       return handleCommunityPosts(request, env, user, url, parts, origin, ctx);
     }
@@ -1889,9 +1783,6 @@ async function handleRequest(request, env, ctx) {
     }
   }
 
-  // ============================================================
-  //  AUTH REQUIRED: All other APIs
-  // ============================================================
   const user = await authenticate(request, env, googleClientId(env));
   if (!user && parts[0] !== "api") {
     return json({ error: "Authentication required" }, 401, origin);
@@ -1905,7 +1796,6 @@ async function handleRequest(request, env, ctx) {
       return handleUserSearch(request, env, user, url, origin);
     }
 
-    // ✅ PROFILES
     if (parts[1] === "profiles") {
       return handleProfile(request, env, user, parts, origin);
     }
@@ -2329,7 +2219,6 @@ async function handleRequest(request, env, ctx) {
           "support-messages": { table: "support_messages", order: "created_at" },
           feedbacks: { table: "feedbacks", order: "created_at" },
           offers: { table: "category_offers", order: "updated_at" },
-          feedbacks: { table: "feedbacks", order: "created_at" },
           suspensions: { table: "user_suspensions", order: "suspended_at" },
         };
         const entry = tableMap[parts[2]];
@@ -2434,25 +2323,28 @@ async function handleRequest(request, env, ctx) {
             ).bind(current.user_id).first();
             await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?")
               .bind(String(effectiveKyc?.status || values.status).toLowerCase(), now(), current.user_id).run();
+
+            // 🔥 FIXED: Cleaner indentation for KYC notifications
             if (String(current.status || "").trim().toLowerCase() !== values.status) {
-              // worker.js — KYC approve کرتے وقت
-if (values.status === "approved") {
-  await sendNotification(
-    env,
-    current.user_id,
-    "kyc_approved",
-    "KYC Approved ✅",
-    "Your identity has been verified. Please complete your request to get help.",
-    "/submit-request"  // 🔥 یہاں /home کی بجائے /submit-request
-  );
-} else if (values.status === "rejected") {
+              if (values.status === "approved") {
+                await sendNotification(
+                  env,
+                  current.user_id,
+                  "kyc_approved",
+                  "KYC Approved ✅",
+                  "Your identity has been verified. Please complete your request to get help.",
+                  "/submit-request"
+                );
+              } else if (values.status === "rejected") {
                 const reason = String(values.rejection_reason || "").trim();
                 await sendNotification(
                   env,
                   current.user_id,
                   "kyc_rejected",
                   "KYC Needs Attention",
-                  reason ? `Your KYC submission was rejected. Reason: ${reason}. Please update and resubmit your KYC.` : "Your KYC submission was rejected. Please update and resubmit your KYC.",
+                  reason
+                    ? `Your KYC submission was rejected. Reason: ${reason}. Please update and resubmit your KYC.`
+                    : "Your KYC submission was rejected. Please update and resubmit your KYC.",
                   "/kyc"
                 );
               }
@@ -2534,9 +2426,6 @@ if (values.status === "approved") {
       }
     }
 
-    // ============================================================
-    //  CREDIT TRANSACTIONS
-    // ============================================================
     if (parts[1] === "transactions" && parts[2]) {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
       const target = parts[2];
@@ -2547,9 +2436,6 @@ if (values.status === "approved") {
       return json(rows.results || [], 200, origin);
     }
 
-    // ============================================================
-    //  ONBOARDING STATUS
-    // ============================================================
     if (parts[1] === "onboarding-status" && parts[2]) {
       const target = parts[2];
       if (!canAccessUser(user, target)) {
@@ -2575,9 +2461,6 @@ if (values.status === "approved") {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
-    // ============================================================
-    //  CASE UNLOCKS
-    // ============================================================
     if (parts[1] === "case-unlocks") {
       if (parts[2] === "count" && request.method === "GET") {
         const heroId = String(url.searchParams.get("hero_id") || "").trim();
@@ -2623,7 +2506,6 @@ if (values.status === "approved") {
         }
         const unlockId = body?.id || id();
         try {
-          // 🔥 FIX #2: Added status and source columns for assistant compatibility
           await env.DB.prepare(
             `INSERT INTO case_unlocks (id, case_id, hero_id, pledged_amount, credits_charged, payment_type, status, source, unlocked_at)
              VALUES (?, ?, ?, ?, ?, ?, 'approved', 'user', ?)`
@@ -2643,9 +2525,6 @@ if (values.status === "approved") {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
-    // ============================================================
-    //  CASE RESOLUTIONS
-    // ============================================================
     if (parts[1] === "case-resolutions") {
       if (request.method === "GET") {
         const caseId = String(url.searchParams.get("case_id") || "").trim();
@@ -2727,9 +2606,6 @@ if (values.status === "approved") {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
-    // ============================================================
-    //  OFFERS
-    // ============================================================
     if (parts[1] === "offers") {
       if (request.method === "GET") {
         const category = url.searchParams.get("category");
@@ -2738,7 +2614,7 @@ if (values.status === "approved") {
         const rows = await env.DB.prepare(sql).bind(...bind).all();
         return json(rows.results || [], 200, origin);
       }
-      if (parts[1] === "offers" && parts[2] === "usage" && request.method === "PUT") {
+      if (parts[2] === "usage" && request.method === "PUT") {
         const body = await readJson(request);
         await env.DB.prepare(
           "UPDATE category_offers SET used_count = ? WHERE category = ?"
@@ -2749,9 +2625,6 @@ if (values.status === "approved") {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
-    // ============================================================
-    //  OFFER CLAIMS
-    // ============================================================
     if (parts[1] === "offer-claims") {
       if (request.method === "GET" && parts[2] === "count") {
         const userId = url.searchParams.get("user_id");
@@ -2771,9 +2644,6 @@ if (values.status === "approved") {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
-    // ============================================================
-    //  USER SUSPENSION
-    // ============================================================
     if (parts[1] === "user-suspension" && parts[2]) {
       if (request.method === "GET") {
         const row = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(parts[2]).first();
@@ -2824,12 +2694,6 @@ if (values.status === "approved") {
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }
-
-    // ============================================================
-    //  ASSISTANT APIs — REMOVED (was here)
-    // ============================================================
-    // NOTE: Assistant functionality has been completely removed.
-    // No /api/assistant endpoints exist anymore.
 
     return json({ error: "API route not found" }, 404, origin);
   }
