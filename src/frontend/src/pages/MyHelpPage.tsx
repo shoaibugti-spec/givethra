@@ -40,7 +40,7 @@ function maskCnic(cnic?: string): string {
   if (digits.length < 6) return cnic;
   const shown = digits.slice(0, 4);
   const masked = "*".repeat(Math.max(digits.length - 4, 4));
-  return `\( {shown} \){masked}`;
+  return `${shown}${masked}`; // ✅ FIXED: Removed backslashes from template literal
 }
 
 function generateAffidavitFromRecord(caseData: any, record: any, seekerName: string, heroName: string) {
@@ -50,7 +50,7 @@ function generateAffidavitFromRecord(caseData: any, record: any, seekerName: str
   const seekerCnic = maskCnic(record.seeker_cnic);
   const heroCnic = maskCnic(record.hero_cnic);
   const completedDate = record.completedAt ? new Date(record.completedAt).toLocaleDateString() : today;
-  const verifyCode = `GVT-\( {caseId}- \){Date.now().toString(36).toUpperCase()}`;
+  const verifyCode = `GVT-${caseId}-${Date.now().toString(36).toUpperCase()}`; // ✅ FIXED: Removed backslashes from template literal
   const cur = caseData.currency || "USD";
   const s = sym(cur);
   const paidAmount = record.amount;
