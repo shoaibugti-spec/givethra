@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCaseById, getCaseResolutions } from "@/lib/api";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Download, ExternalLink, FileCheck2, Copy, Check } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, FileCheck2, Copy, Check, Image as ImageIcon, FileText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,11 +17,15 @@ export default function PaymentProofPage() {
   const [caseTitle, setCaseTitle] = useState("Payment proof");
   const [loading, setLoading] = useState(true);
 
-  // 🔥 SAME AS OLD WORKING CODE - regex to extract caseId
+  // 🔥 Same as old working code
   const caseId = useMemo(() => {
     const match = location.pathname.match(/^\/payment-proof\/([^/]+)/);
     return match ? decodeURIComponent(match[1]) : "";
   }, [location.pathname]);
+
+  // 🔥 Detect if the proof is an image or PDF
+  const isImage = /\.(jpg|jpeg|png|webp|gif|heic|heif|bmp|svg)(\?.*)?$/i.test(proofUrl);
+  const isPdf = /\.pdf(\?.*)?$/i.test(proofUrl);
 
   useEffect(() => {
     let active = true;
@@ -30,12 +34,10 @@ export default function PaymentProofPage() {
       return () => { active = false; };
     }
 
-    // 🔥 SAME AS OLD WORKING CODE - Promise.all
     Promise.all([getCaseById(caseId), getCaseResolutions(caseId)])
       .then(([caseData, resolutions]) => {
         if (!active) return;
 
-        // 🔥 SAME AS OLD WORKING CODE - extract receipt url
         const completed = (Array.isArray(resolutions) ? resolutions : [])
           .filter((r: any) => r.receipt_url || r.paid_receipt_url);
 
@@ -45,7 +47,6 @@ export default function PaymentProofPage() {
           caseData?.paid_receipt_url ||
           "";
 
-        // 🔥 NEW: Also extract TXN number
         const txnId =
           completed[0]?.transaction_id ||
           caseData?.transaction_id ||
@@ -57,7 +58,6 @@ export default function PaymentProofPage() {
         setCaseTitle(caseData?.title || "Payment proof");
         setProofUrl(url);
         setTransactionId(txnId);
-        if (!url) toast.error("Payment proof is not available yet.");
       })
       .catch(() => { if (active) toast.error("Unable to load payment proof."); })
       .finally(() => { if (active) setLoading(false); });
@@ -102,7 +102,7 @@ export default function PaymentProofPage() {
             </div>
           </div>
 
-          {/* 🔥 TXN Number Display Block */}
+          {/* TXN Number */}
           {!loading && proofUrl && transactionId && (
             <div className="mb-4 flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4">
               <div className="min-w-0 flex-1">
@@ -118,42 +118,65 @@ export default function PaymentProofPage() {
             </div>
           )}
 
-          {/* 🔥 SAME AS OLD WORKING CODE - iframe (works for images + PDFs) */}
           {loading ? (
             <div className="py-20 text-center text-sm text-muted-foreground">Loading payment proof...</div>
           ) : proofUrl ? (
-            <iframe
-              title="Verified payment proof"
-              src={proofUrl}
-              className="min-h-[70vh] w-full rounded-xl border bg-white"
-            />
-          ) : (
-            <div className="py-20 text-center text-sm text-muted-foreground">
-              No payment proof is available for this record.
+            <div className="space-y-3">
+              {/* 🔥 Smart display: <img> for images, <iframe> for PDFs */}
+              {isImage ? (
+                <div className="flex min-h-[55vh] items-center justify-center rounded-xl border bg-white p-3">
+                  <img
+                    src={proofUrl}
+                    alt="Verified payment proof"
+                    className="max-h-[70vh] w-auto max-w-full rounded object-contain"
+                    onError={(e) => {
+                      console.error("Image failed to load:", proofUrl);
+                      toast.error("Image could not be displayed. Try opening the original.");
+                    }}
+                  />
+                </div>
+              ) : isPdf ? (
+                <iframe
+                  title="Verified payment proof"
+                  src={proofUrl}
+                  className="min-h-[70vh] w-full rounded-xl border bg-white"
+                />
+              ) : (
+                // Fallback: try iframe (some file types need iframe)
+                <iframe
+                  title="Verified payment proof"
+                  src={proofUrl}
+                  className="min-h-[70vh] w-full rounded-xl border bg-white"
+                />
+              )}
+
+              <a
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                href={proofUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open original proof <ExternalLink className="h-3 w-3" />
+              </a>
             </div>
-          )}
-
-          {proofUrl && (
-            <a
-              className="mt-3 inline-flex items-center gap-1 text-xs text-primary hover:underline"
-              href={proofUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open original proof <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
-
-          {/* 🔥 TXN fallback (even without proof image) */}
-          {!loading && !proofUrl && transactionId && (
-            <div className="mt-2 mx-auto w-full max-w-sm rounded-lg border border-primary/20 bg-primary/5 p-3 text-left">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Transaction ID</p>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="font-mono text-sm font-bold text-foreground break-all">{transactionId}</p>
-                <Button size="sm" variant="ghost" onClick={copyTxn}>
-                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
+          ) : (
+            <div className="py-20 text-center text-sm text-muted-foreground flex flex-col items-center gap-3">
+              <ImageIcon className="h-10 w-10 opacity-30" />
+              <p className="font-medium">No payment proof is available for this record.</p>
+              <p className="text-xs max-w-md">
+                This usually means the receipt hasn't been uploaded yet, or the payment is still under verification.
+              </p>
+              {transactionId && (
+                <div className="mt-2 w-full max-w-sm rounded-lg border border-primary/20 bg-primary/5 p-3 text-left">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Transaction ID</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="font-mono text-sm font-bold text-foreground break-all">{transactionId}</p>
+                    <Button size="sm" variant="ghost" onClick={copyTxn}>
+                      {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>
