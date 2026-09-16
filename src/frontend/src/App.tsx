@@ -2,6 +2,9 @@
 // Givethra - Full App with Role Selection, KYC, and Routing
 // Profile submission and Requester Visit submission intentionally use separate
 // experiences while sharing the same case-submission backend.
+//
+// 🔥 FIXED: publicPaths now uses startsWith() for /payment-proof/ and /affidavit/
+// routes so users aren't redirected to "/" when role hasn't loaded yet.
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -289,7 +292,13 @@ function RootLayout() {
         "/cases",
         "/payment-proof",
       ];
-      const isPublicRoute = publicPaths.includes(location.pathname) || location.pathname.startsWith("/cases/");
+      // 🔥 FIX: Now uses startsWith() for parameterized routes so users aren't
+      // redirected away when role hasn't loaded yet.
+      const isPublicRoute =
+        publicPaths.includes(location.pathname) ||
+        location.pathname.startsWith("/cases/") ||
+        location.pathname.startsWith("/payment-proof/") ||
+        location.pathname.startsWith("/affidavit/");
       if (!isPublicRoute) {
         navigate({ to: "/" });
       }
