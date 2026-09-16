@@ -3,16 +3,10 @@
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
 // Assistant REMOVED - shoaibugti@gmail.com is no longer assistant.
 //
-// 🔥 FIXED: canAccessUser(user, userId) used to do `user.user_id === userId` as its last check.
-// If the request's auth session failed to verify, `user` is `null`, and reading `.user_id` off
-// `null` THROWS. That exception is caught by the top-level try/catch in `fetch()` and turned into
-// an HTTP 500 — but the frontend's `readArrayResponse()` helper (used by getCasesByUser,
-// getCaseResolutionsByHero, getCaseUnlocksByHero) has no `res.ok` check: it just tries
-// to parse JSON and falls back to `[]` on anything that isn't an array. The net
-// result was a *silent* failure — no error, no toast, just every stat quietly
-// reading 0 — every single time the session token wasn't valid, on every endpoint
-// that gates access with canAccessUser(user, someUserId). Fixed by short-circuiting
-// on a null user before touching `.user_id`.
+// 🔥 FIXED (this pass): 
+//   1. /uploads/ handler now auto-detects Content-Type by extension if R2 metadata is missing
+//   2. /uploads/ handler sets Content-Disposition: inline (so images/PDFs render in iframe/img)
+//   3. Removed X-Content-Type-Options: nosniff so browsers can display files inline
 
 const PUBLIC_ORIGIN = "https://givethra.org";
 
@@ -1647,6 +1641,9 @@ async function handleRequest(request, env, ctx) {
     return json({ valid: true, user }, 200, origin);
   }
 
+  // ============================================================
+  //  🔥 FIXED: /uploads/ handler - Content-Type auto-detect + inline
+  // ============================================================
   if (url.pathname === "/uploads" || url.pathname.startsWith("/uploads/")) {
     const rawKey = url.pathname === "/uploads"
       ? url.searchParams.get("key") || ""
@@ -1657,17 +1654,43 @@ async function handleRequest(request, env, ctx) {
     try {
       const object = await env.UPLOADS.get(key);
       if (!object) return new Response("File not found", { status: 404 });
+
+      // 🔥 Auto-detect content type by extension if R2 metadata is missing
+      let contentType = object.httpMetadata?.contentType || "";
+      if (!contentType || contentType === "application/octet-stream") {
+        const lower = key.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) contentType = "image/jpeg";
+        else if (lower.endsWith(".png")) contentType = "image/png";
+        else if (lower.endsWith(".webp")) contentType = "image/webp";
+        else if (lower.endsWith(".gif")) contentType = "image/gif";
+        else if (lower.endsWith(".heic")) contentType = "image/heic";
+        else if (lower.endsWith(".heif")) contentType = "image/heif";
+        else if (lower.endsWith(".bmp")) contentType = "image/bmp";
+        else if (lower.endsWith(".svg")) contentType = "image/svg+xml";
+        else if (lower.endsWith(".pdf")) contentType = "application/pdf";
+        else if (lower.endsWith(".mp4")) contentType = "video/mp4";
+        else if (lower.endsWith(".webm")) contentType = "video/webm";
+        else if (lower.endsWith(".mov")) contentType = "video/quicktime";
+        else contentType = "application/octet-stream";
+      }
+
       const headers = new Headers({
-        "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+        "Content-Type": contentType,
         "Cache-Control": "public, max-age=31536000",
-        "X-Content-Type-Options": "nosniff",
+        // 🔥 FIX: Removed X-Content-Type-Options: nosniff so browsers can render inline
+        // 🔥 FIX: Explicitly set inline so browsers display instead of forcing download
+        "Content-Disposition": "inline",
+        "Access-Control-Allow-Origin": PUBLIC_ORIGIN,
       });
+
+      // Override to attachment only if download explicitly requested
       if (url.searchParams.get("download") === "1") {
         const fileName = decodeURIComponent(key.split("/").pop() || "download")
-          .replace(/[\\r\\n\\\"]+/g, "_")
+          .replace(/[\r\n"]+/g, "_")
           .slice(0, 180) || "download";
         headers.set("Content-Disposition", `attachment; filename="${fileName}"`);
       }
+
       return new Response(object.body, { headers });
     } catch {
       return new Response("File not found", { status: 404 });
@@ -2324,7 +2347,6 @@ async function handleRequest(request, env, ctx) {
             await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?")
               .bind(String(effectiveKyc?.status || values.status).toLowerCase(), now(), current.user_id).run();
 
-            // 🔥 FIXED: Cleaner indentation for KYC notifications
             if (String(current.status || "").trim().toLowerCase() !== values.status) {
               if (values.status === "approved") {
                 await sendNotification(
