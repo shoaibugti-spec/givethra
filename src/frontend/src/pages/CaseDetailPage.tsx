@@ -263,7 +263,10 @@ export default function CaseDetailPage() {
   const [paused, setPaused] = useState(false);
   const [recTimer, setRecTimer] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0); // 🔥 FIX #3: store video duration
-  const recordingStartedAtRef = useRef<number | null>(null);
+  
+  // 🔥 FIX: useRef to accurately track elapsed time, solving the 0s state closure bug
+  const recTimerRef = useRef(0); 
+  
   const [stream, setStream] = useState<MediaStream | null>(null);
   const liveVideoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -372,6 +375,9 @@ export default function CaseDetailPage() {
     return await uploadFileToStorage(file, path);
   }
 
+  // ============================================================
+  //  VIDEO RECORDING - FULLY FIXED (0s BUG RESOLVED)
+  // ============================================================
   async function startRecording() {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
@@ -393,7 +399,8 @@ export default function CaseDetailPage() {
       setRecording(true);
       setPaused(false);
       setRecTimer(0);
-      setVideoDuration(0); // reset duration
+      recTimerRef.current = 0; // 🔥 Reset ref timer
+      setVideoDuration(0);
       setFbVideoBlob(null);
       setFbVideoFile(null);
       setFbVideoName("");
@@ -411,11 +418,12 @@ export default function CaseDetailPage() {
       mediaRecorderRef.current = recorder;
       videoChunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) videoChunksRef.current.push(e.data); };
+      
       recorder.onstop = () => {
-        // Store actual elapsed recording time rather than a possibly stale React timer value.
-        const elapsedSeconds = recordingStartedAtRef.current ? Math.min(90, Math.floor((Date.now() - recordingStartedAtRef.current) / 1000)) : recTimer;
+        // 🔥 FIX: Use recTimerRef.current to get the exact final duration
+        const elapsedSeconds = recTimerRef.current;
         setVideoDuration(elapsedSeconds);
-        recordingStartedAtRef.current = null;
+        
         const recordedType = recorder.mimeType || mimeType;
         const blob = new Blob(videoChunksRef.current, { type: recordedType });
         setFbVideoFile(new File([blob], "feedback.webm", { type: recordedType }));
@@ -427,35 +435,68 @@ export default function CaseDetailPage() {
         setPaused(false);
         if (timerRef.current) clearInterval(timerRef.current);
       };
-      // Set this immediately when MediaRecorder starts. Without it, mobile browsers
-      // fall back to the stale 0-second React timer in onstop.
+      
       recorder.start();
-      recordingStartedAtRef.current = Date.now();
+      
+      // Timer logic with useRef to prevent stale state
       timerRef.current = setInterval(() => {
-        setRecTimer(prev => { if (prev + 1 >= 90) { stopRecording(); return 90; } return prev + 1; });
+        setRecTimer(prev => {
+          const next = prev + 1;
+          recTimerRef.current = next; // 🔥 Update ref every second
+          if (next >= 90) { 
+            stopRecording(); 
+            return 90; 
+          }
+          return next;
+        });
       }, 1000);
-    } catch { toast.error("Camera/microphone access denied."); }
+      
+    } catch { 
+      toast.error("Camera/microphone access denied."); 
+    }
   }
 
   function pauseRecording() {
     const r = mediaRecorderRef.current;
-    if (r && r.state === "recording") { r.pause(); setPaused(true); if (timerRef.current) clearInterval(timerRef.current); }
+    if (r && r.state === "recording") { 
+      r.pause(); 
+      setPaused(true); 
+      if (timerRef.current) clearInterval(timerRef.current); 
+    }
   }
+
   function resumeRecording() {
     const r = mediaRecorderRef.current;
     if (r && r.state === "paused") {
-      r.resume(); setPaused(false);
+      r.resume(); 
+      setPaused(false);
       timerRef.current = setInterval(() => {
-        setRecTimer(prev => { if (prev + 1 >= 90) { stopRecording(); return 90; } return prev + 1; });
+        setRecTimer(prev => {
+          const next = prev + 1;
+          recTimerRef.current = next; // 🔥 Update ref on resume as well
+          if (next >= 90) { 
+            stopRecording(); 
+            return 90; 
+          }
+          return next;
+        });
       }, 1000);
     }
   }
+
   function stopRecording() {
     const r = mediaRecorderRef.current;
     if (r && r.state !== "inactive") r.stop();
     if (timerRef.current) clearInterval(timerRef.current);
   }
-  function discardVideo() { setFbVideoBlob(null); setFbVideoFile(null); setFbVideoName(""); setVideoDuration(0); }
+
+  function discardVideo() { 
+    setFbVideoBlob(null); 
+    setFbVideoFile(null); 
+    setFbVideoName(""); 
+    setVideoDuration(0); 
+    recTimerRef.current = 0;
+  }
 
   const cur = caseData?.currency || "USD";
   const sym = CURRENCY_SYMBOLS[cur] ?? cur;
@@ -466,7 +507,6 @@ export default function CaseDetailPage() {
   const fundraisingStarted = amountCollected > 0;
   const pledgeNum = parseFloat(pledgeAmount) || 0;
   const freeContributionRemaining = Math.max(3 - userUnlockCount, 0);
-  // freeContributionRemaining > 0 keeps the first 3 contribution helps free.
   const hasUnlockCredit = walletBalance >= 1;
 
   const isRejected = caseData?.status === "rejected";
@@ -521,7 +561,6 @@ export default function CaseDetailPage() {
   const loadedResolutions = myResolutions;
   const submittedResType = unlockMode === "full" ? String(caseData?.category || "Direct Payment") : resType;
   const adminConfirmed = [1, "1", true, "true", "yes"].includes(caseData?.admin_confirmed);
-  // 🔥 FIX #4: Use imported isTrulyCompletedHelp
   const verifiedResolutions = getEligibleAffidavitResolutions(myResolutions);
   const visible = myResolutions.filter(r => !isContributionResolution(r));
 
