@@ -2051,6 +2051,9 @@ async function handleRequest(request, env, ctx) {
         if (!String(body?.text_message ?? body?.comment ?? "").trim()) {
           return json({ error: "Feedback caption is required" }, 400, origin);
         }
+        if (!String(body?.video_url || "").trim()) {
+          return json({ error: "A 60–90 second live-camera feedback video is required" }, 400, origin);
+        }
         let feedbackDeadline = null;
         try {
           const dn = await env.DB.prepare("SELECT feedback_deadline FROM case_submissions WHERE id = ?").bind(body?.case_id).first();

@@ -949,21 +949,22 @@ export default function CaseDetailPage() {
                 {/* 🔥 FIX #2: Show completed resolutions for owner */}
                 <OwnerCompletedResolutions caseId={id} caseData={caseData} seekerKyc={seekerKyc} heroName={heroName} sym={sym} cur={cur} />
 
-                {existingFeedback ? (
+                {existingFeedback && String(existingFeedback.status || "").toLowerCase() !== "rejected" ? (
                   <div className="rounded-xl bg-card border border-border p-4 text-center space-y-1">
                     <Star className="h-6 w-6 text-amber-400 mx-auto" fill="currentColor" />
                     <p className="text-sm font-semibold text-foreground">Thank you for sharing your feedback! 🤲</p>
-                    <p className="text-xs text-muted-foreground">Your message is now on the Givethra community wall.</p>
+                    <p className="text-xs text-muted-foreground">Your video feedback is awaiting Admin review.</p>
                   </div>
                 ) : (
                   <div className="rounded-xl bg-card border border-border p-4 space-y-3">
                     <div className="text-center">
                       <h3 className="font-bold text-sm text-foreground">Share your feedback 🙏</h3>
-                      <p className="text-xs text-muted-foreground">Tell everyone how Givethra helped you. Your message (with your first name) will appear on our community wall.</p>
+                      <p className="text-xs text-muted-foreground">A live-camera feedback video is required. Write your caption and record a clear video between 60 and 90 seconds.</p>
+                      {existingFeedback?.status === "rejected" && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-left text-xs text-red-700"><p className="font-semibold">Your previous feedback was rejected.</p><p className="mt-1">Reason: {existingFeedback.rejection_reason || "Admin requested a clearer video or caption."}</p><p className="mt-1">Please record a new video and submit your feedback again.</p></div>}
                     </div>
                     <Textarea value={fbText} onChange={e => setFbText(e.target.value)} rows={4} placeholder="Write your thank-you message..." />
                     <div className="space-y-2">
-                      <Label className="text-xs">Add a video (optional)</Label>
+                      <Label className="text-xs font-semibold">Feedback video (required · live camera · 60–90 seconds)</Label>
                       {fbVideoBlob ? (
                         <div className="space-y-2">
                           <video src={fbVideoBlob} controls className="w-full rounded-lg border max-h-48" />
@@ -984,16 +985,15 @@ export default function CaseDetailPage() {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <Button type="button" className="w-full min-h-12 touch-manipulation select-none" variant="outline" onClick={startRecording}><Video className="h-4 w-4" /> Record a Video (up to 90s)</Button>
-                          <p className="text-[11px] text-muted-foreground text-center">Or upload a video file</p>
-                          <Input type="file" accept="video/*" onChange={e => { const f = e.target.files?.[0] ?? null; setFbVideoFile(f); setFbVideoName(f?.name ?? ""); setFbVideoBlob(f ? URL.createObjectURL(f) : null); setVideoDuration(0); }} />
-                          {fbVideoName && !fbVideoBlob && <p className="text-xs text-teal-600">✓ {fbVideoName}</p>}
+                          <Button type="button" className="w-full min-h-12 touch-manipulation select-none" variant="outline" onClick={startRecording}><Video className="h-4 w-4" /> Open Camera & Record (60–90s)</Button>
+                          <p className="text-[11px] text-muted-foreground text-center">Camera recording is required; uploaded video files are not accepted.</p>
                         </div>
                       )}
                     </div>
                     <Button className="w-full" onClick={submitFeedback} disabled={fbSubmitting || recording || (!!fbVideoFile && videoDuration < 60)}>
                       {fbSubmitting ? "Posting..." : "Post Feedback to Community Wall 🤲"}
                     </Button>
+                    {!fbVideoFile && <p className="text-xs text-red-500">Video recording is required before posting.</p>}
                     {fbVideoFile && videoDuration < 60 && <p className="text-xs text-red-500">⏳ Video must be at least 60 seconds. Current: {videoDuration}s</p>}
                   </div>
                 )}

@@ -1896,6 +1896,7 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate, busyId }: any) {
       </div>
       {fb.text_message && <p className="text-sm whitespace-pre-line">{fb.text_message}</p>}
       {fb.video_url && <video src={fb.video_url} controls className="w-full rounded border max-h-56" />}
+      {status === "rejected" && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"><span className="font-semibold">Rejection reason:</span> {fb.rejection_reason || "No reason recorded."}</div>}
       {status === "pending_review" && (
         <div className="space-y-2 pt-1 border-t border-border">
           <Textarea placeholder="Rejection reason (e.g. 'video too short', 'unrelated content')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
