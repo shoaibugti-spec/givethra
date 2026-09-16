@@ -4,7 +4,7 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { getCaseById, getCaseResolutions } from "@/lib/api";
+import { getCaseById, getCaseResolutions, getCaseUnlock } from "@/lib/api";
 import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Printer } from "lucide-react";
@@ -53,11 +53,28 @@ export default function AffidavitPage() {
       setLoading(false);
       return () => { active = false; };
     }
-    Promise.all([getCaseById(caseId), getCaseResolutions(caseId)])
-      .then(([nextCase, resolutions]) => {
+    Promise.all([getCaseById(caseId), getCaseResolutions(caseId), getCaseUnlock(caseId, user.id, "full")])
+      .then(([nextCase, resolutions, fullUnlock]) => {
         if (!active) return;
         const completedList = (Array.isArray(resolutions) ? resolutions : []).filter(isTrulyCompletedHelp);
-        const verified = completedList.find((r) => r.receipt_url) || completedList[0] || null;
+        let verified = completedList.find((r) => r.receipt_url) || completedList[0] || null;
+        // Support the admin case-level direct-payment completion flow only for
+        // the authenticated user's own full/direct unlock—not contribution unlocks.
+        if (!verified && fullUnlock && String(fullUnlock.payment_type || "").toLowerCase() !== "partial" &&
+            String(nextCase?.status || "").toLowerCase() === "completed" &&
+            (nextCase?.paid_receipt_url || nextCase?.reference_number)) {
+          verified = {
+            ...nextCase,
+            id: `admin-direct-${nextCase.id}`,
+            status: "completed",
+            payment_type: "full",
+            paid_to: "institute",
+            transaction_id: nextCase.reference_number || "",
+            receipt_url: nextCase.paid_receipt_url || null,
+            amount_paid: nextCase.amount_collected || nextCase.amount_needed || 0,
+            completed_at: nextCase.closed_at || nextCase.reviewed_at || null,
+          };
+        }
         setCaseData(nextCase);
         setResolution(verified || null);
       })
@@ -80,7 +97,8 @@ export default function AffidavitPage() {
   const verificationCode = String(data.verification_security_code || data.security_code || data.id || caseId).slice(-16).toUpperCase();
   const receiptUrl = data.receipt_url || data.paid_receipt_url || caseData?.paid_receipt_url || "";
   const isContribution = isContributionResolution(data);
-  const role = isContribution ? "Hero" : "Requester";
+  // This route is opened by the helping user from My Help/View Case.
+  const role = "Hero";
 
   return (
     <Layout>

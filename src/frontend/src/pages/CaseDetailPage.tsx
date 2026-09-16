@@ -1201,7 +1201,27 @@ export default function CaseDetailPage() {
                 filtered out above and in MyHelpPage's record builder.
             ============================================================ */}
             {!isOwner && isCompleted && (myUnlock || myResolutions.length > 0) && (() => {
-              const verified = getEligibleAffidavitResolutions(myResolutions);
+              // Admin may complete a direct-help case using the case-level
+              // payment proof fields. Treat that as this full-unlock hero's
+              // verified direct help, but never use it for contribution unlocks.
+              const adminDirectResolution = myUnlock?.payment_type !== "partial" &&
+                String(caseData?.status || "").toLowerCase() === "completed" &&
+                Boolean(caseData?.paid_receipt_url || caseData?.reference_number)
+                ? {
+                    ...caseData,
+                    id: `admin-direct-${caseData.id}`,
+                    status: "completed",
+                    payment_type: "full",
+                    paid_to: "institute",
+                    transaction_id: caseData.reference_number || "",
+                    receipt_url: caseData.paid_receipt_url || null,
+                    amount_paid: caseData.amount_collected || caseData.amount_needed || 0,
+                    completed_at: caseData.closed_at || caseData.reviewed_at || null,
+                  }
+                : null;
+              const verified = getEligibleAffidavitResolutions(
+                adminDirectResolution ? [...myResolutions, adminDirectResolution] : myResolutions
+              );
               const badge = getHeroBadgeForCase(verified);
               const helpedDirect = verified.some(r => !isContributionResolution(r));
               const totalVerified = verified.reduce(
@@ -1229,6 +1249,7 @@ export default function CaseDetailPage() {
                           <div>
                             <p className="text-xs font-semibold text-foreground">{isContributionResolution(r) ? "Contribution" : "Direct Help"}</p>
                             <p className="text-xs text-muted-foreground">Payment proof received · {sym} {r.seeker_confirmed_amount ?? r.amount_paid} {cur}</p>
+                            {r.receipt_url && <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex text-xs font-medium text-primary hover:underline">View payment proof</a>}
                           </div>
                           <Button size="sm" variant="outline" className="shrink-0 gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, r, seekerKyc, heroName)}>
                             <FileText className="h-3.5 w-3.5" /> Affidavit
