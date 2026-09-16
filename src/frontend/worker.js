@@ -1021,15 +1021,26 @@ async function handleCases(request, env, user, url, parts, origin) {
       }
     }
 
-    await env.DB.prepare(
-      "INSERT INTO case_submissions (id, user_id, category, title, short_description, country, city, urgency, description, amount_needed, currency, why_help, deadline, institute_name, institute_contact, institute_address, payment_method, account_title, account_number, account_iban, photo_urls, selfie_url, video_url, category_details, was_free, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
-    ).bind(caseId, user.user_id, record.category || null, record.title || null, record.short_description || null, record.country || null, record.city || null, record.urgency || null, record.description || null, record.amount_needed || null, record.currency || "USD", record.why_help || null, record.deadline || null, record.institute_name || null, record.institute_contact || null, record.institute_address || null, record.payment_method || null, record.account_title || null, record.account_number || null, record.account_iban || null, photoUrls, record.selfie_url || null, record.video_url || null, categoryDetails, isFree ? 1 : 0, now()).run();
-    await syncUserCaseCounters(env, user.user_id);
-
+    // A paid submission consumes its one credit at the moment it is submitted.
+    // The charge is never refunded for approval or rejection. Roll it back only
+    // if the case row itself cannot be written, so a failed request is atomic.
     if (!isFree) {
       await deductCredits(env, user.user_id, 1, 'case_submission', `Case "${record.title || caseId}" submission fee`, caseId);
     }
 
+    try {
+      await env.DB.prepare(
+        "INSERT INTO case_submissions (id, user_id, category, title, short_description, country, city, urgency, description, amount_needed, currency, why_help, deadline, institute_name, institute_contact, institute_address, payment_method, account_title, account_number, account_iban, photo_urls, selfie_url, video_url, category_details, was_free, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+      ).bind(caseId, user.user_id, record.category || null, record.title || null, record.short_description || null, record.country || null, record.city || null, record.urgency || null, record.description || null, record.amount_needed || null, record.currency || "USD", record.why_help || null, record.deadline || null, record.institute_name || null, record.institute_contact || null, record.institute_address || null, record.payment_method || null, record.account_title || null, record.account_number || null, record.account_iban || null, photoUrls, record.selfie_url || null, record.video_url || null, categoryDetails, isFree ? 1 : 0, now()).run();
+    } catch (error) {
+      if (!isFree) {
+        await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(1, now(), user.user_id).run();
+        await addTransaction(env, user.user_id, 1, 'case_submission_rollback', `Rollback failed case submission ${caseId}`, caseId);
+      }
+      throw error;
+    }
+
+    await syncUserCaseCounters(env, user.user_id);
     return json({ id: caseId, user_id: user.user_id, ...record, was_free: isFree, credits_charged: isFree ? 0 : 1, free_reason: freeHistory.length === 0 ? "first_case" : isFree ? "second_free_case" : null, status: "pending" }, 201, origin);
   }
   return json({ error: "Method not allowed" }, 405, origin);
