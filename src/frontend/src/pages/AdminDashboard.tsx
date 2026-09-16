@@ -321,6 +321,7 @@ export default function AdminPage() {
   const [payFilter, setPayFilter] = useState<"ready" | "paid" | "rejected" | "all">("ready");
   const [depositStatusFilter, setDepositStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<"all" | "pending_review" | "approved" | "rejected">("all");
+  const [feedbackBusyId, setFeedbackBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -371,7 +372,10 @@ export default function AdminPage() {
       setWallets(wals);
       setUnlocks(unl);
       setSupportMsgs(sup);
-      setFeedbacks(fbs);
+      setFeedbacks(fbs.map((feedback: any) => ({
+        ...feedback,
+        status: String(feedback.status || "pending_review").toLowerCase() === "pending" ? "pending_review" : String(feedback.status || "pending_review").toLowerCase(),
+      })));
       setOffers(offs);
       setSuspensions(susp);
       setWithdrawals(wds);
@@ -479,19 +483,28 @@ export default function AdminPage() {
       toast.error("Please provide a rejection reason.");
       return;
     }
+    if (feedbackBusyId) return;
     const fb = feedbacks.find((f) => f.id === fbId);
-    await adminUpdateFeedback(fbId, { status, reviewed_at: new Date().toISOString(), reviewed_by: user?.email, rejection_reason: reason });
-    if (fb?.user_id && fb.case_id) {
-      if (status === "approved") {
-        await sendNotification(fb.user_id, "system", "Feedback Approved 🎉", "Your feedback is now live on the Givethra community wall. You can now submit a new case!", "/my-cases");
-      } else {
-        await sendNotification(fb.user_id, "system", "Feedback Needs Improvement", reason ? `Reason: ${reason}. Please re-record your video and message.` : "Please re-record your video and message, then resubmit.", `/cases/${fb.case_id}`);
+    const reviewedAt = new Date().toISOString();
+    setFeedbackBusyId(fbId);
+    try {
+      await adminUpdateFeedback(fbId, { status, reviewed_at: reviewedAt, reviewed_by: user?.email, rejection_reason: reason });
+      setFeedbacks((current) => current.map((item) => item.id === fbId ? { ...item, status, reviewed_at: reviewedAt, reviewed_by: user?.email, rejection_reason: reason } : item));
+      if (fb?.user_id && fb.case_id) {
+        if (status === "approved") {
+          await sendNotification(fb.user_id, "system", "Feedback Approved 🎉", "Your feedback is now live on the Givethra community wall. You can now submit a new case!", "/my-cases");
+        } else {
+          await sendNotification(fb.user_id, "system", "Feedback Needs Improvement", reason ? `Reason: ${reason}. Please re-record your video and message.` : "Please re-record your video and message, then resubmit.", `/cases/${fb.case_id}`);
+        }
       }
+      toast.success(status === "approved" ? "Feedback approved and published." : "Feedback rejected.");
+    } catch (error: any) {
+      console.error("Feedback update failed:", error);
+      toast.error(`Feedback update failed: ${error?.message || "Please try again."}`);
+    } finally {
+      setFeedbackBusyId(null);
     }
-    toast.success(`Feedback ${status}!`);
-    loadData();
   }
-
   async function checkAndSuspendUser(userId: string) {
     const casesForUser = caseList.filter((c) => c.user_id === userId);
     const rejectedCount = casesForUser.filter((c) => c.status === "rejected").length;
@@ -805,7 +818,7 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
               <TabsTrigger value="notify">Notify</TabsTrigger>
               <TabsTrigger value="offers">Offers {activeOffers > 0 && <span className="ml-1 bg-teal-500 text-white text-[10px] rounded-full px-1.5">{activeOffers}</span>}</TabsTrigger>
               <TabsTrigger value="support">Support {unreadSupport > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{unreadSupport}</span>}</TabsTrigger>
-              <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => f.status === "pending_review" && f.case_id).length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => f.status === "pending_review" && f.case_id).length}</span>}</TabsTrigger>
+              <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => f.status === "pending_review").length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => f.status === "pending_review").length}</span>}</TabsTrigger>
               <TabsTrigger value="suspensions">Suspensions {activeSuspensions > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{activeSuspensions}</span>}</TabsTrigger>
               <TabsTrigger value="earnings-withdrawals">Earnings Withdrawals {withdrawals.filter(w => w.status === "pending").length > 0 && <span className="ml-1 bg-amber-500 text-white text-[10px] rounded-full px-1.5">{withdrawals.filter(w => w.status === "pending").length}</span>}</TabsTrigger>
             </TabsList>
@@ -1037,10 +1050,10 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
                 ))}
               </div>
 
-              {visibleFeedbacks.filter((f) => !!f.case_id && (feedbackStatusFilter === "all" || f.status === feedbackStatusFilter)).length === 0 ? <Empty text="No matching feedback" /> :
+              {visibleFeedbacks.filter((f) => feedbackStatusFilter === "all" || f.status === feedbackStatusFilter).length === 0 ? <Empty text="No matching feedback" /> :
                 visibleFeedbacks
-                  .filter((f) => !!f.case_id && (feedbackStatusFilter === "all" || f.status === feedbackStatusFilter))
-                  .map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} />)}
+                  .filter((f) => feedbackStatusFilter === "all" || f.status === feedbackStatusFilter)
+                  .map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} busyId={feedbackBusyId} />)}
             </TabsContent>
 
             <TabsContent value="suspensions" className="space-y-4 mt-4">
@@ -1862,8 +1875,9 @@ function DepositCard({ d, onApprove, onReject }: any) {
   );
 }
 
-function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
+function FeedbackCard({ fb, profileMap, caseList, onUpdate, busyId }: any) {
   const [reason, setReason] = useState("");
+  const busy = busyId === fb.id;
   const p = profileMap[fb.user_id];
   const c = caseList.find((cs: any) => cs.id === fb.case_id);
   const status = fb.status || "pending_review";
@@ -1886,8 +1900,8 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate }: any) {
         <div className="space-y-2 pt-1 border-t border-border">
           <Textarea placeholder="Rejection reason (e.g. 'video too short', 'unrelated content')" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex gap-2">
-              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve — Post to Wall</Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(fb.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
+              <Button size="sm" disabled={busy} className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(fb.id, "approved")}><CheckCircle className="h-3.5 w-3.5 mr-1" /> {busy ? "Saving..." : "Approve — Post to Wall"}</Button>
+            <Button size="sm" disabled={busy} variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(fb.id, "rejected", reason)}><XCircle className="h-3.5 w-3.5 mr-1" /> {busy ? "Saving..." : "Reject"}</Button>
           </div>
         </div>
       )}

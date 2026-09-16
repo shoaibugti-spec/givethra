@@ -2326,6 +2326,7 @@ async function handleRequest(request, env, ctx) {
           "support-messages": { table: "support_messages", order: "created_at" },
           feedbacks: { table: "feedbacks", order: "created_at" },
           offers: { table: "category_offers", order: "updated_at" },
+          feedbacks: { table: "feedbacks", order: "created_at" },
           suspensions: { table: "user_suspensions", order: "suspended_at" },
         };
         const entry = tableMap[parts[2]];
