@@ -36,39 +36,39 @@ export default function PaymentProofPage() {
         const caseData = results[0].status === "fulfilled" ? results[0].value : null;
         const resolutions = results[1].status === "fulfilled" && Array.isArray(results[1].value) ? results[1].value : [];
         const unlocks = results[2].status === "fulfilled" && Array.isArray(results[2].value) ? results[2].value : [];
-
-        // 🔥 1. Find the specific resolution submitted by THIS user, or fallback to any available
-        const myResolution = resolutions.find((r: any) => String(r.hero_id) === String(user.id)) || resolutions[0];
         const userUnlock = unlocks.find((u: any) => String(u.case_id) === String(caseId));
 
-        // 🔥 2. Extract Payment Proof Image URL (Checking resolutions, unlocks, and caseData)
+        // 🔥 ORIGINAL LOGIC (jo pehle kaam kar raha tha)
+        const completed = resolutions.filter((r: any) => r.receipt_url || r.paid_receipt_url);
+
+        // 🔥 URL Extraction - jaise pehle tha + kuch extra safe fallbacks
         const url =
-          myResolution?.receipt_url ||
-          myResolution?.paid_receipt_url ||
-          userUnlock?.receipt_url ||
-          userUnlock?.paid_receipt_url ||
+          completed[0]?.receipt_url ||
+          completed[0]?.paid_receipt_url ||
           caseData?.paid_receipt_url ||
           caseData?.payment_receipt_url ||
           caseData?.payment_proof_url ||
           caseData?.receipt_url ||
+          userUnlock?.receipt_url ||
+          userUnlock?.paid_receipt_url ||
           "";
 
-        // 🔥 3. Extract Transaction ID (TXN Number) from all possible sources
+        // 🔥 TXN Number Extraction (naya add kiya hai)
         const txnId =
-          myResolution?.transaction_id ||
-          userUnlock?.transaction_id ||
+          completed[0]?.transaction_id ||
           caseData?.transaction_id ||
           caseData?.reference_number ||
           caseData?.consumer_no ||
           caseData?.payment_transaction_id ||
+          userUnlock?.transaction_id ||
           "";
 
         setCaseTitle(caseData?.title || "Payment proof");
         setProofUrl(url);
         setTransactionId(txnId);
 
-        if (!url) {
-          toast.error("Payment proof image is not available for this record.");
+        if (!url && !userUnlock) {
+          toast.error("Payment proof is not available for this help record.");
         }
       })
       .catch(() => {
@@ -133,21 +133,21 @@ export default function PaymentProofPage() {
           ) : proofUrl ? (
             <div className="space-y-4">
               
-              {/* 🔥 Transaction ID Display Block */}
+              {/* 🔥 TXN Number Display Block */}
               {transactionId && (
                 <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Transaction ID / Reference Number</p>
-                    <p className="font-mono text-base font-bold text-foreground">{transactionId}</p>
+                    <p className="font-mono text-base font-bold text-foreground truncate">{transactionId}</p>
                   </div>
-                  <Button size="sm" variant="outline" className="shrink-0" onClick={copyTxn}>
+                  <Button size="sm" variant="outline" className="shrink-0 ml-2" onClick={copyTxn}>
                     {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                     <span className="ml-1.5 hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
                   </Button>
                 </div>
               )}
 
-              {/* Payment Proof Image */}
+              {/* Payment Proof Image (Receipt Screenshot) */}
               <div className="flex min-h-[55vh] items-center justify-center rounded-xl border bg-white p-3">
                 <img src={proofUrl} alt="Verified payment proof" className="max-h-[70vh] w-auto max-w-full rounded object-contain" />
               </div>
@@ -163,16 +163,8 @@ export default function PaymentProofPage() {
               </div>
             </div>
           ) : (
-            <div className="py-20 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
-              <FileCheck2 className="h-8 w-8 opacity-30" />
-              <p>No payment proof image is available for this record.</p>
-              <p className="text-xs">This usually happens if the admin hasn't uploaded a receipt yet, or if the payment is still under verification.</p>
-              {transactionId && (
-                <div className="mt-2 w-full max-w-sm rounded-lg border border-primary/20 bg-primary/5 p-3 text-left">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Transaction ID</p>
-                  <p className="font-mono text-sm font-bold text-foreground">{transactionId}</p>
-                </div>
-              )}
+            <div className="py-20 text-center text-sm text-muted-foreground">
+              No payment proof is available for this record.
             </div>
           )}
         </section>
