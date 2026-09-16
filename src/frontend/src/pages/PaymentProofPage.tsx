@@ -1,9 +1,9 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { getCaseById, getCaseResolutions } from "@/lib/api";
+import { getCaseById, getCaseResolutions, getCasesByIds, getCaseUnlocksByHero } from "@/lib/api";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Download, ExternalLink, FileCheck2, Copy, Check, Image as ImageIcon, FileText } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, FileCheck2, Copy, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -16,51 +16,112 @@ export default function PaymentProofPage() {
   const [copied, setCopied] = useState(false);
   const [caseTitle, setCaseTitle] = useState("Payment proof");
   const [loading, setLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string>("");
 
-  // 🔥 Same as old working code
   const caseId = useMemo(() => {
     const match = location.pathname.match(/^\/payment-proof\/([^/]+)/);
+    console.log("🔥 [PaymentProof] URL:", location.pathname);
+    console.log("🔥 [PaymentProof] Extracted caseId:", match ? match[1] : "NOT FOUND");
     return match ? decodeURIComponent(match[1]) : "";
   }, [location.pathname]);
-
-  // 🔥 Detect if the proof is an image or PDF
-  const isImage = /\.(jpg|jpeg|png|webp|gif|heic|heif|bmp|svg)(\?.*)?$/i.test(proofUrl);
-  const isPdf = /\.pdf(\?.*)?$/i.test(proofUrl);
 
   useEffect(() => {
     let active = true;
     if (!user?.id || !caseId) {
       setLoading(false);
+      console.log("🔥 [PaymentProof] Skipped: user?.id =", user?.id, "caseId =", caseId);
       return () => { active = false; };
     }
 
-    Promise.all([getCaseById(caseId), getCaseResolutions(caseId)])
-      .then(([caseData, resolutions]) => {
+    console.log("🔥 [PaymentProof] Starting to load data for caseId:", caseId, "userId:", user.id);
+
+    // 🔥 FIX: Try EVERY possible source
+    Promise.allSettled([
+      getCaseById(caseId),                 // 0
+      getCaseResolutions(caseId),          // 1
+      getCasesByIds([caseId]),             // 2
+      getCaseUnlocksByHero(user.id),       // 3
+    ])
+      .then((results) => {
         if (!active) return;
 
-        const completed = (Array.isArray(resolutions) ? resolutions : [])
-          .filter((r: any) => r.receipt_url || r.paid_receipt_url);
+        const caseData = results[0].status === "fulfilled" ? results[0].value : null;
+        const resolutions = results[1].status === "fulfilled" && Array.isArray(results[1].value) ? results[1].value : [];
+        const casesByIds = results[2].status === "fulfilled" && Array.isArray(results[2].value) ? results[2].value : [];
+        const unlocks = results[3].status === "fulfilled" && Array.isArray(results[3].value) ? results[3].value : [];
 
-        const url =
-          completed[0]?.receipt_url ||
-          completed[0]?.paid_receipt_url ||
-          caseData?.paid_receipt_url ||
-          "";
+        console.log("🔥 [PaymentProof] caseData:", caseData);
+        console.log("🔥 [PaymentProof] resolutions:", resolutions);
+        console.log("🔥 [PaymentProof] casesByIds:", casesByIds);
+        console.log("🔥 [PaymentProof] unlocks (this user):", unlocks);
 
-        const txnId =
-          completed[0]?.transaction_id ||
-          caseData?.transaction_id ||
-          caseData?.reference_number ||
-          caseData?.consumer_no ||
-          caseData?.payment_transaction_id ||
-          "";
+        // 🔥 Try caseData first (broadest)
+        let url = "";
+        let txn = "";
+        let source = "";
 
-        setCaseTitle(caseData?.title || "Payment proof");
+        // Source 1: caseData direct fields
+        if (caseData) {
+          const candidate = caseData.paid_receipt_url || caseData.payment_receipt_url || caseData.payment_proof_url || caseData.receipt_url || "";
+          if (candidate) { url = candidate; source = "caseData"; }
+          txn = caseData.transaction_id || caseData.reference_number || caseData.consumer_no || caseData.payment_transaction_id || "";
+        }
+
+        // Source 2: casesByIds computed column
+        if (!url && casesByIds.length > 0) {
+          const c = casesByIds[0];
+          const candidate = c.payment_receipt_url || c.paid_receipt_url || c.payment_proof_url || c.receipt_url || "";
+          if (candidate) { url = candidate; source = "casesByIds"; }
+          if (!txn) txn = c.payment_transaction_id || c.transaction_id || c.reference_number || "";
+        }
+
+        // Source 3: resolutions
+        if (!url && resolutions.length > 0) {
+          const withReceipt = resolutions.find((r: any) => r.receipt_url || r.paid_receipt_url);
+          if (withReceipt) {
+            url = withReceipt.receipt_url || withReceipt.paid_receipt_url || "";
+            source = "resolutions";
+            if (!txn) txn = withReceipt.transaction_id || "";
+          }
+        }
+
+        // Source 4: unlocks
+        if (!url) {
+          const userUnlock = unlocks.find((u: any) => String(u.case_id) === String(caseId));
+          if (userUnlock) {
+            const candidate = userUnlock.receipt_url || userUnlock.paid_receipt_url || "";
+            if (candidate) { url = candidate; source = "unlocks"; }
+            if (!txn) txn = userUnlock.transaction_id || "";
+          }
+        }
+
+        console.log("🔥 [PaymentProof] ✅ FINAL URL:", url, "from source:", source);
+        console.log("🔥 [PaymentProof] ✅ FINAL TXN:", txn);
+
+        setCaseTitle(caseData?.title || casesByIds[0]?.title || "Payment proof");
         setProofUrl(url);
-        setTransactionId(txnId);
+        setTransactionId(txn);
+
+        // Build debug info
+        const dbg = [
+          `caseId: ${caseId}`,
+          `caseData keys: ${caseData ? Object.keys(caseData).join(",") : "null"}`,
+          `paid_receipt_url: ${caseData?.paid_receipt_url || "empty"}`,
+          `payment_receipt_url: ${caseData?.payment_receipt_url || "empty"}`,
+          `resolutions count: ${resolutions.length}`,
+          `resolutions with receipt: ${resolutions.filter((r:any) => r.receipt_url || r.paid_receipt_url).length}`,
+          `unlocks count: ${unlocks.length}`,
+          `URL source: ${source || "none"}`,
+        ].join("\n");
+        setDebugInfo(dbg);
       })
-      .catch(() => { if (active) toast.error("Unable to load payment proof."); })
-      .finally(() => { if (active) setLoading(false); });
+      .catch((err) => {
+        console.error("🔥 [PaymentProof] ERROR:", err);
+        if (active) toast.error("Unable to load payment proof.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
     return () => { active = false; };
   }, [caseId, user?.id]);
@@ -102,7 +163,6 @@ export default function PaymentProofPage() {
             </div>
           </div>
 
-          {/* TXN Number */}
           {!loading && proofUrl && transactionId && (
             <div className="mb-4 flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4">
               <div className="min-w-0 flex-1">
@@ -121,63 +181,25 @@ export default function PaymentProofPage() {
           {loading ? (
             <div className="py-20 text-center text-sm text-muted-foreground">Loading payment proof...</div>
           ) : proofUrl ? (
-            <div className="space-y-3">
-              {/* 🔥 Smart display: <img> for images, <iframe> for PDFs */}
-              {isImage ? (
-                <div className="flex min-h-[55vh] items-center justify-center rounded-xl border bg-white p-3">
-                  <img
-                    src={proofUrl}
-                    alt="Verified payment proof"
-                    className="max-h-[70vh] w-auto max-w-full rounded object-contain"
-                    onError={(e) => {
-                      console.error("Image failed to load:", proofUrl);
-                      toast.error("Image could not be displayed. Try opening the original.");
-                    }}
-                  />
-                </div>
-              ) : isPdf ? (
-                <iframe
-                  title="Verified payment proof"
-                  src={proofUrl}
-                  className="min-h-[70vh] w-full rounded-xl border bg-white"
-                />
-              ) : (
-                // Fallback: try iframe (some file types need iframe)
-                <iframe
-                  title="Verified payment proof"
-                  src={proofUrl}
-                  className="min-h-[70vh] w-full rounded-xl border bg-white"
-                />
-              )}
-
-              <a
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                href={proofUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open original proof <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
+            <iframe
+              title="Verified payment proof"
+              src={proofUrl}
+              className="min-h-[70vh] w-full rounded-xl border bg-white"
+            />
           ) : (
-            <div className="py-20 text-center text-sm text-muted-foreground flex flex-col items-center gap-3">
-              <ImageIcon className="h-10 w-10 opacity-30" />
+            <div className="py-10 text-center text-sm text-muted-foreground space-y-3">
               <p className="font-medium">No payment proof is available for this record.</p>
-              <p className="text-xs max-w-md">
-                This usually means the receipt hasn't been uploaded yet, or the payment is still under verification.
-              </p>
-              {transactionId && (
-                <div className="mt-2 w-full max-w-sm rounded-lg border border-primary/20 bg-primary/5 p-3 text-left">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Transaction ID</p>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <p className="font-mono text-sm font-bold text-foreground break-all">{transactionId}</p>
-                    <Button size="sm" variant="ghost" onClick={copyTxn}>
-                      {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <p className="text-xs">Debug info (please share this with support):</p>
+              <pre className="text-left text-[10px] bg-muted/50 p-3 rounded-lg whitespace-pre-wrap max-w-md mx-auto overflow-auto">
+                {debugInfo || "No debug info"}
+              </pre>
             </div>
+          )}
+
+          {proofUrl && (
+            <a className="mt-3 inline-flex items-center gap-1 text-xs text-primary hover:underline" href={proofUrl} target="_blank" rel="noopener noreferrer">
+              Open original proof <ExternalLink className="h-3 w-3" />
+            </a>
           )}
         </section>
       </main>
