@@ -687,7 +687,8 @@ export default function AdminPage() {
   const completedResolutionsCount = resolutions.filter((r) => ["approved", "completed"].includes(normalizedResolutionStatus(r))).length;
   const visibleDirectResolutions = (resolutionView === "pending" ? pendingDirectResolutions : resolutionView === "rejected" ? rejectedDirectResolutions : completedDirectResolutions).filter((r) => { const q = resolutionSearch.trim().toLowerCase(); if (!q) return true; const c = caseList.find((cs) => cs.id === r.case_id); const p = profileMap[r.hero_id] || profileMap[r.seeker_id]; const values = [r.id, r.case_id, r.hero_id, r.seeker_id, r.hero_email, r.transaction_id, c?.title, c?.category, p?.full_name, p?.email]; return values.some((v) => String(v || "").toLowerCase().includes(q)); });
   const visibleContributionResolutions = (resolutionView === "pending" ? pendingContributions : resolutionView === "rejected" ? rejectedContributions : completedContributions).filter((r) => { const q = resolutionSearch.trim().toLowerCase(); if (!q) return true; const c = caseList.find((cs) => cs.id === r.case_id); const p = profileMap[r.hero_id] || profileMap[r.seeker_id]; const values = [r.id, r.case_id, r.hero_id, r.seeker_id, r.hero_email, r.transaction_id, c?.title, c?.category, p?.full_name, p?.email]; return values.some((v) => String(v || "").toLowerCase().includes(q)); });
-  const visibleFeedbacks = feedbacks.filter((fb) => { const q = feedbackSearch.trim().toLowerCase(); if (!q) return true; const c = caseList.find((cs) => cs.id === fb.case_id); const p = profileMap[fb.user_id]; return [fb.id, fb.case_id, fb.user_id, fb.first_name, fb.text_message, c?.title, p?.full_name, p?.email].some((v) => String(v || "").toLowerCase().includes(q)); });
+  const completedCaseFeedbacks = feedbacks.filter((f) => !!f.case_id);
+  const visibleFeedbacks = completedCaseFeedbacks.filter((fb) => { const q = feedbackSearch.trim().toLowerCase(); if (!q) return true; const c = caseList.find((cs) => cs.id === fb.case_id); const p = profileMap[fb.user_id]; return [fb.id, fb.case_id, fb.user_id, fb.first_name, fb.text_message, c?.title, p?.full_name, p?.email].some((v) => String(v || "").toLowerCase().includes(q)); });
 
   const approvedCases = caseList.filter((c) => c.status === "approved");
   const completedCases = caseList.filter((c) => c.status === "completed");
@@ -1050,7 +1051,7 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
                 ))}
               </div>
 
-              {visibleFeedbacks.filter((f) => feedbackStatusFilter === "all" || f.status === feedbackStatusFilter).length === 0 ? <Empty text="No matching feedback" /> :
+              {visibleFeedbacks.filter((f) => feedbackStatusFilter === "all" || f.status === feedbackStatusFilter).length === 0 ? <Empty text={feedbackStatusFilter === "all" ? "No seeker feedback submitted yet — required caption and video are missing." : "No matching feedback"} /> :
                 visibleFeedbacks
                   .filter((f) => feedbackStatusFilter === "all" || f.status === feedbackStatusFilter)
                   .map((fb) => <FeedbackCard key={fb.id} fb={fb} profileMap={profileMap} caseList={caseList} onUpdate={updateFeedback} busyId={feedbackBusyId} />)}

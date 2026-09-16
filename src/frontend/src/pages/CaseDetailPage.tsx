@@ -427,7 +427,10 @@ export default function CaseDetailPage() {
         setPaused(false);
         if (timerRef.current) clearInterval(timerRef.current);
       };
+      // Set this immediately when MediaRecorder starts. Without it, mobile browsers
+      // fall back to the stale 0-second React timer in onstop.
       recorder.start();
+      recordingStartedAtRef.current = Date.now();
       timerRef.current = setInterval(() => {
         setRecTimer(prev => { if (prev + 1 >= 90) { stopRecording(); return 90; } return prev + 1; });
       }, 1000);
