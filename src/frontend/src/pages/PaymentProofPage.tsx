@@ -1,7 +1,7 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { getCaseById, getCaseResolutions } from "@/lib/api";
+import { getCaseById, getCaseResolutions, getCaseUnlocksByHero } from "@/lib/api";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Download, ExternalLink, FileCheck2, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -22,15 +22,18 @@ export default function PaymentProofPage() {
   useEffect(() => {
     let active = true;
     if (!user?.id || !caseId) { setLoading(false); return () => { active = false; }; }
-    Promise.all([getCaseById(caseId), getCaseResolutions(caseId)])
-      .then(([caseData, resolutions]) => {
+    Promise.allSettled([getCaseById(caseId), getCaseResolutions(caseId), getCaseUnlocksByHero(user.id)])
+      .then((results) => {
         if (!active) return;
-        const completed = (Array.isArray(resolutions) ? resolutions : [])
-          .filter((r: any) => r.receipt_url || r.paid_receipt_url);
-        const url = completed[0]?.receipt_url || completed[0]?.paid_receipt_url || caseData?.paid_receipt_url || "";
+        const caseData = results[0].status === "fulfilled" ? results[0].value : null;
+        const resolutions = results[1].status === "fulfilled" && Array.isArray(results[1].value) ? results[1].value : [];
+        const unlocks = results[2].status === "fulfilled" && Array.isArray(results[2].value) ? results[2].value : [];
+        const userUnlock = unlocks.find((u: any) => String(u.case_id) === String(caseId));
+        const completed = resolutions.filter((r: any) => r.receipt_url || r.paid_receipt_url);
+        const url = completed[0]?.receipt_url || completed[0]?.paid_receipt_url || caseData?.paid_receipt_url || caseData?.payment_proof_url || caseData?.receipt_url || "";
         setCaseTitle(caseData?.title || "Payment proof");
         setProofUrl(url);
-        if (!url) toast.error("Payment proof is not available yet.");
+        if (!url && !userUnlock) toast.error("Payment proof is not available for this help record.");
       })
       .catch(() => { if (active) toast.error("Unable to load payment proof."); })
       .finally(() => { if (active) setLoading(false); });

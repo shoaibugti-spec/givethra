@@ -4,7 +4,7 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { getCaseById, getCaseResolutions, getCaseUnlock } from "@/lib/api";
+import { getCaseById, getCaseResolutions, getCaseUnlocksByHero } from "@/lib/api";
 import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Printer } from "lucide-react";
@@ -53,16 +53,18 @@ export default function AffidavitPage() {
       setLoading(false);
       return () => { active = false; };
     }
-    Promise.all([getCaseById(caseId), getCaseResolutions(caseId), getCaseUnlock(caseId, user.id, "full")])
-      .then(([nextCase, resolutions, fullUnlock]) => {
+    Promise.allSettled([getCaseById(caseId), getCaseResolutions(caseId), getCaseUnlocksByHero(user.id)])
+      .then((results) => {
         if (!active) return;
-        const completedList = (Array.isArray(resolutions) ? resolutions : []).filter(isTrulyCompletedHelp);
-        let verified = completedList.find((r) => r.receipt_url) || completedList[0] || null;
-        // Support the admin case-level direct-payment completion flow only for
-        // the authenticated user's own full/direct unlock—not contribution unlocks.
-        if (!verified && fullUnlock && String(fullUnlock.payment_type || "").toLowerCase() !== "partial" &&
-            String(nextCase?.status || "").toLowerCase() === "completed" &&
-            (nextCase?.paid_receipt_url || nextCase?.reference_number)) {
+        const nextCase = results[0].status === "fulfilled" ? results[0].value : null;
+        const resolutions = results[1].status === "fulfilled" && Array.isArray(results[1].value) ? results[1].value : [];
+        const unlocks = results[2].status === "fulfilled" && Array.isArray(results[2].value) ? results[2].value : [];
+        const userUnlock = unlocks.find((u: any) => String(u.case_id) === String(caseId));
+        const completedList = resolutions.filter(isTrulyCompletedHelp);
+        let verified = completedList.find((r) => r.receipt_url || r.paid_receipt_url) || completedList[0] || null;
+        const adminReceipt = nextCase?.paid_receipt_url || nextCase?.payment_proof_url || nextCase?.receipt_url || null;
+        const directUnlock = userUnlock && String(userUnlock.payment_type || "").toLowerCase() !== "partial";
+        if (!verified && directUnlock && String(nextCase?.status || "").toLowerCase() === "completed" && (adminReceipt || nextCase?.reference_number)) {
           verified = {
             ...nextCase,
             id: `admin-direct-${nextCase.id}`,
@@ -70,7 +72,7 @@ export default function AffidavitPage() {
             payment_type: "full",
             paid_to: "institute",
             transaction_id: nextCase.reference_number || "",
-            receipt_url: nextCase.paid_receipt_url || null,
+            receipt_url: adminReceipt,
             amount_paid: nextCase.amount_collected || nextCase.amount_needed || 0,
             completed_at: nextCase.closed_at || nextCase.reviewed_at || null,
           };
