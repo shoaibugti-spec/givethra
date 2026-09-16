@@ -263,6 +263,7 @@ export default function CaseDetailPage() {
   const [paused, setPaused] = useState(false);
   const [recTimer, setRecTimer] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0); // 🔥 FIX #3: store video duration
+  const recordingStartedAtRef = useRef<number | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const liveVideoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -411,8 +412,10 @@ export default function CaseDetailPage() {
       videoChunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) videoChunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        // 🔥 FIX #3: Store the duration when recording stops
-        setVideoDuration(recTimer);
+        // Store actual elapsed recording time rather than a possibly stale React timer value.
+        const elapsedSeconds = recordingStartedAtRef.current ? Math.min(90, Math.floor((Date.now() - recordingStartedAtRef.current) / 1000)) : recTimer;
+        setVideoDuration(elapsedSeconds);
+        recordingStartedAtRef.current = null;
         const recordedType = recorder.mimeType || mimeType;
         const blob = new Blob(videoChunksRef.current, { type: recordedType });
         setFbVideoFile(new File([blob], "feedback.webm", { type: recordedType }));
@@ -655,7 +658,7 @@ export default function CaseDetailPage() {
   }
 
   async function submitFeedback() {
-    if (!fbText.trim() || !fbVideoFile) { toast.error("Please write a message AND record a 90-second video — both are required."); return; }
+    if (!fbText.trim() || !fbVideoFile) { toast.error("Please write a caption AND record the required live-camera video."); return; }
     // 🔥 FIX #3: Check minimum video duration
     if (recording) { toast.error("Please finish (Done) your video first."); return; }
     if (videoDuration < 60) {
@@ -990,9 +993,10 @@ export default function CaseDetailPage() {
                         </div>
                       )}
                     </div>
-                    <Button className="w-full" onClick={submitFeedback} disabled={fbSubmitting || recording || (!!fbVideoFile && videoDuration < 60)}>
+                    <Button className="w-full" onClick={submitFeedback} disabled={fbSubmitting || recording || !fbText.trim() || !fbVideoFile || videoDuration < 60}>
                       {fbSubmitting ? "Posting..." : "Post Feedback to Community Wall 🤲"}
                     </Button>
+                    {!fbText.trim() && <p className="text-xs text-red-500">Caption is required before posting.</p>}
                     {!fbVideoFile && <p className="text-xs text-red-500">Video recording is required before posting.</p>}
                     {fbVideoFile && videoDuration < 60 && <p className="text-xs text-red-500">⏳ Video must be at least 60 seconds. Current: {videoDuration}s</p>}
                   </div>
