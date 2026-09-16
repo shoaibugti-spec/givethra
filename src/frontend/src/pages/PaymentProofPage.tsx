@@ -1,23 +1,9 @@
-// src/frontend/src/pages/PaymentProofPage.tsx
-// 🔥 FIXED: Shows payment proof image + Transaction ID (TXN number) together
-// 🔥 FIXED: Removed Print/Save PDF button (was confusing and unnecessary)
-// 🔥 FIXED: Uses useParams instead of regex for reliable caseId extraction
-// 🔥 FIXED: Extracts receipt_url and transaction_id from all possible data sources
-
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { getCaseById, getCaseResolutions, getCaseUnlocksByHero } from "@/lib/api";
+import { getCaseById, getCaseResolutions } from "@/lib/api";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  Download,
-  ExternalLink,
-  FileCheck2,
-  Copy,
-  Check,
-  Image as ImageIcon,
-} from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, FileCheck2, Copy, Check, Image as ImageIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -25,7 +11,7 @@ export default function PaymentProofPage() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // 🔥 FIX: Use useParams to reliably extract caseId from the URL
+  // 🔥 Use useParams for reliable caseId extraction
   const { caseId } = useParams({ from: "/payment-proof/$caseId" });
 
   const [proofUrl, setProofUrl] = useState("");
@@ -36,78 +22,40 @@ export default function PaymentProofPage() {
 
   useEffect(() => {
     let active = true;
-
     if (!user?.id || !caseId) {
       setLoading(false);
-      return () => {
-        active = false;
-      };
+      return () => { active = false; };
     }
 
-    Promise.allSettled([
-      getCaseById(caseId),
-      getCaseResolutions(caseId),
-      getCaseUnlocksByHero(user.id),
-    ])
-      .then((results) => {
+    // 🔥 Use Promise.all like the OLD working version
+    Promise.all([getCaseById(caseId), getCaseResolutions(caseId)])
+      .then(([caseData, resolutions]) => {
         if (!active) return;
 
-        const caseData =
-          results[0].status === "fulfilled" ? results[0].value : null;
-        const resolutions =
-          results[1].status === "fulfilled" &&
-          Array.isArray(results[1].value)
-            ? results[1].value
-            : [];
-        const unlocks =
-          results[2].status === "fulfilled" &&
-          Array.isArray(results[2].value)
-            ? results[2].value
-            : [];
+        // 🔥 OLD WORKING LOGIC - extract from completed resolutions
+        const completed = (Array.isArray(resolutions) ? resolutions : [])
+          .filter((r: any) => r.receipt_url || r.paid_receipt_url);
 
-        // 🔥 Find THIS user's specific resolution first, then fall back to any
-        const myResolution =
-          resolutions.find(
-            (r: any) => String(r.hero_id) === String(user.id)
-          ) || resolutions[0];
-
-        const userUnlock = unlocks.find(
-          (u: any) => String(u.case_id) === String(caseId)
-        );
-
-        // 🔥 Extract Payment Proof Image URL — check all possible sources
         const url =
-          myResolution?.receipt_url ||
-          myResolution?.paid_receipt_url ||
+          completed[0]?.receipt_url ||
+          completed[0]?.paid_receipt_url ||
           caseData?.paid_receipt_url ||
-          caseData?.payment_receipt_url ||
-          caseData?.payment_proof_url ||
-          caseData?.receipt_url ||
-          userUnlock?.receipt_url ||
-          userUnlock?.paid_receipt_url ||
           "";
 
-        // 🔥 Extract Transaction ID (TXN number) — check all possible sources
+        // 🔥 Extract TXN number from all possible sources
         const txnId =
-          myResolution?.transaction_id ||
+          completed[0]?.transaction_id ||
           caseData?.transaction_id ||
           caseData?.reference_number ||
           caseData?.consumer_no ||
           caseData?.payment_transaction_id ||
-          userUnlock?.transaction_id ||
           "";
 
         setCaseTitle(caseData?.title || "Payment proof");
         setProofUrl(url);
         setTransactionId(txnId);
 
-        if (!url) {
-          console.warn(
-            "Payment proof image URL not found for case:",
-            caseId,
-            { myResolution, caseData, userUnlock }
-          );
-        }
+        if (!url) toast.error("Payment proof is not available yet.");
       })
       .catch(() => {
         if (active) toast.error("Unable to load payment proof.");
@@ -116,9 +64,7 @@ export default function PaymentProofPage() {
         if (active) setLoading(false);
       });
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [caseId, user?.id]);
 
   const copyTxn = () => {
@@ -134,9 +80,7 @@ export default function PaymentProofPage() {
       <Layout>
         <div className="mx-auto max-w-xl px-4 py-12 text-center">
           <h1 className="text-xl font-bold">Sign in required</h1>
-          <Button className="mt-5" onClick={() => navigate({ to: "/sign-in" })}>
-            Sign in
-          </Button>
+          <Button className="mt-5" onClick={() => navigate({ to: "/sign-in" })}>Sign in</Button>
         </div>
       </Layout>
     );
@@ -145,11 +89,17 @@ export default function PaymentProofPage() {
   return (
     <Layout>
       <main className="mx-auto max-w-4xl px-4 py-5 pb-24">
-        {/* 🔥 Print / Save PDF button REMOVED — only Back button remains */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
           <Button variant="ghost" onClick={() => navigate({ to: "/my-help" })}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Help
+            <ArrowLeft className="mr-2 h-4 w-4" />Back to My Help
           </Button>
+          <div className="flex gap-2">
+            {proofUrl && (
+              <a href={proofUrl} download target="_blank" rel="noopener noreferrer">
+                <Button variant="outline"><Download className="mr-2 h-4 w-4" />Download</Button>
+              </a>
+            )}
+          </div>
         </div>
 
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -162,98 +112,59 @@ export default function PaymentProofPage() {
           </div>
 
           {loading ? (
-            <div className="py-20 text-center text-sm text-muted-foreground">
-              Loading payment proof...
-            </div>
+            <div className="py-20 text-center text-sm text-muted-foreground">Loading payment proof...</div>
           ) : proofUrl ? (
             <div className="space-y-4">
-              {/* 🔥 Transaction ID (TXN) Display Block */}
+
+              {/* 🔥 TXN Number Display Block */}
               {transactionId && (
                 <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4">
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
                       Transaction ID / Reference Number
                     </p>
-                    <p className="font-mono text-base font-bold text-foreground truncate">
-                      {transactionId}
-                    </p>
+                    <p className="font-mono text-base font-bold text-foreground truncate">{transactionId}</p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 ml-2"
-                    onClick={copyTxn}
-                  >
-                    {copied ? (
-                      <Check className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                    <span className="ml-1.5 hidden sm:inline">
-                      {copied ? "Copied" : "Copy"}
-                    </span>
+                  <Button size="sm" variant="outline" className="shrink-0 ml-2" onClick={copyTxn}>
+                    {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    <span className="ml-1.5 hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
                   </Button>
                 </div>
               )}
 
-              {/* 🔥 Payment Proof Image (Receipt Screenshot) */}
-              <div className="flex min-h-[55vh] items-center justify-center rounded-xl border bg-white p-3">
-                <img
-                  src={proofUrl}
-                  alt="Verified payment proof"
-                  className="max-h-[70vh] w-auto max-w-full rounded object-contain"
-                />
-              </div>
+              {/* 🔥 Payment Proof Display - iframe works for BOTH images and PDFs (this is what made the OLD version work!) */}
+              <iframe
+                title="Verified payment proof"
+                src={proofUrl}
+                className="min-h-[70vh] w-full rounded-xl border bg-white"
+              />
 
-              {/* 🔥 Action Buttons — Download & Open Original */}
-              <div className="flex flex-wrap items-center justify-center gap-3 border-t pt-3">
-                <a
-                  href={proofUrl}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button className="gap-2">
-                    <Download className="h-4 w-4" /> Download payment proof image
-                  </Button>
-                </a>
-                <a
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                  href={proofUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open original <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+              {/* Open original link */}
+              <a
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                href={proofUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open original proof <ExternalLink className="h-3 w-3" />
+              </a>
             </div>
           ) : (
             <div className="py-20 text-center text-sm text-muted-foreground flex flex-col items-center gap-3">
               <ImageIcon className="h-10 w-10 opacity-30" />
-              <p className="font-medium">
-                No payment proof image is available for this record.
-              </p>
+              <p className="font-medium">No payment proof is available for this record.</p>
               <p className="text-xs max-w-md">
-                This usually means the receipt image hasn't been uploaded yet,
-                or the payment is still under verification by Givethra.
+                This usually means the receipt image hasn't been uploaded yet, or the payment is still under verification by Givethra.
               </p>
 
-              {/* Show TXN if available even without image */}
+              {/* Show TXN even without image */}
               {transactionId && (
                 <div className="mt-2 w-full max-w-sm rounded-lg border border-primary/20 bg-primary/5 p-3 text-left">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-                    Transaction ID
-                  </p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Transaction ID</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <p className="font-mono text-sm font-bold text-foreground break-all">
-                      {transactionId}
-                    </p>
+                    <p className="font-mono text-sm font-bold text-foreground break-all">{transactionId}</p>
                     <Button size="sm" variant="ghost" onClick={copyTxn}>
-                      {copied ? (
-                        <Check className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
+                      {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
