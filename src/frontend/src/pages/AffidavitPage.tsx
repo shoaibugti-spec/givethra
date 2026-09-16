@@ -104,7 +104,7 @@ export default function AffidavitPage() {
     <Layout>
       <main className="mx-auto max-w-3xl px-4 py-6 pb-24">
         <div className="mb-4 flex items-center justify-between print:hidden">
-          <Button variant="ghost" onClick={() => navigate({ to: `/cases/${caseId}` as "/" })}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
+          <Button variant="ghost" onClick={() => navigate({ to: "/my-help" })}><ArrowLeft className="mr-2 h-4 w-4" />Back to My Help</Button>
           <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print / Save PDF</Button>
         </div>
         {loading ? (

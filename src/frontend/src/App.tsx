@@ -57,6 +57,11 @@ const AffidavitPage = lazy(() =>
     default: () => <div>Failed to load page</div>,
   }))
 );
+const PaymentProofPage = lazy(() =>
+  import("@/pages/PaymentProofPage").catch(() => ({
+    default: () => <div>Failed to load page</div>,
+  }))
+);
 
 // Guided wizard — used by the Requester Visit route.
 const SubmitRequestWizard = lazy(() =>
@@ -282,6 +287,7 @@ function RootLayout() {
         "/kindness-wall",
         "/need-help",
         "/cases",
+        "/payment-proof",
       ];
       const isPublicRoute = publicPaths.includes(location.pathname) || location.pathname.startsWith("/cases/");
       if (!isPublicRoute) {
@@ -370,6 +376,15 @@ const affidavitRoute = createRoute({
   component: () => (
     <Suspense fallback={<PageLoader />}>
       <AffidavitPage />
+    </Suspense>
+  ),
+});
+const paymentProofRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/payment-proof/$caseId",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <PaymentProofPage />
     </Suspense>
   ),
 });
@@ -620,6 +635,7 @@ const routeTree = rootRoute.addChildren([
   casesRoute,
   caseDetailRoute,
   affidavitRoute,
+  paymentProofRoute,
   submitRequestRoute,
   onboardingSubmitRoute,
   profileRoute,

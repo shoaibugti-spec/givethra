@@ -354,6 +354,11 @@ export default function MyHelpPage() {
                   const isCompleted = record.status === "completed";
                   const isRejected = record.status === "rejected";
                   const isUnlockOnly = record.isUnlockOnly;
+                  const outcomeMessage = isUnlockOnly
+                    ? "🤲 Newborn Hero — you unlocked this case and took the first step toward helping."
+                    : record.type === "contribution"
+                      ? "🌱 Young Hero — your contribution joined other kind hearts and helped complete this case. May Allah accept your share."
+                      : "🦸 Hero — you completed direct help and brought real relief to this family. May Allah reward your generosity."
 
                   // 🔥 FIXED: 4 separate UI blocks
                   if (isUnlockOnly) {
@@ -382,6 +387,7 @@ export default function MyHelpPage() {
                               )}
                             </div>
                             <p className="font-semibold text-sm truncate">{record.caseTitle}</p>
+                            <p className="text-xs leading-relaxed text-teal-700 dark:text-teal-300">{outcomeMessage}</p>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                               <span>{record.caseCategory}</span>
                               {(record.caseCity || record.caseCountry) && (
@@ -411,10 +417,7 @@ export default function MyHelpPage() {
                             <Button
                               size="sm"
                               className="gap-2 bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[120px]"
-                              onClick={() => {
-                                const affidavitWindow = window.open(`/affidavit/${encodeURIComponent(record.caseId)}`, "_blank", "noopener,noreferrer");
-                                if (!affidavitWindow) toast.error("Please allow pop-ups to view the affidavit.");
-                              }}
+                              onClick={() => navigate({ to: "/affidavit/$caseId", params: { caseId: record.caseId } })}
                             >
                               <FileText className="h-3.5 w-3.5" /> View Affidavit
                             </Button>
@@ -470,19 +473,20 @@ export default function MyHelpPage() {
                               </span>
                             </div>
                             <p className="font-semibold text-sm truncate">{record.caseTitle}</p>
+                            <p className="text-xs leading-relaxed text-teal-700 dark:text-teal-300">{outcomeMessage}</p>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                               <span>{record.caseCategory}</span>
                               {record.amount > 0 && <span className="font-medium text-foreground">{s} {record.amount} {cur}</span>}
                             </div>
                             {record.transactionId && <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{record.transactionId}</span></p>}
-                            {record.receiptUrl && <a href={record.receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex text-xs font-medium text-primary hover:underline">View payment proof</a>}
+                            {record.receiptUrl && <Button size="sm" variant="link" className="h-auto p-0 text-xs font-medium text-primary" onClick={() => navigate({ to: "/payment-proof/$caseId", params: { caseId: record.caseId } })}>View payment proof</Button>}
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
                             className="gap-2 bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[120px]"
-                            onClick={() => window.open(`/affidavit/${encodeURIComponent(record.caseId)}`, "_blank", "noopener,noreferrer")}
+                            onClick={() => navigate({ to: "/affidavit/$caseId", params: { caseId: record.caseId } })}
                           >
                             <FileText className="h-3.5 w-3.5" /> View Affidavit
                           </Button>
@@ -516,12 +520,13 @@ export default function MyHelpPage() {
                             </span>
                           </div>
                           <p className="font-semibold text-sm truncate">{record.caseTitle}</p>
+                            <p className="text-xs leading-relaxed text-teal-700 dark:text-teal-300">{outcomeMessage}</p>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span>{record.caseCategory}</span>
                             {record.amount > 0 && <span className="font-medium text-foreground">{s} {record.amount} {cur}</span>}
                           </div>
                           {record.transactionId && <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{record.transactionId}</span></p>}
-                          {record.receiptUrl && <a href={record.receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex text-xs font-medium text-primary hover:underline">View payment proof</a>}
+                          {record.receiptUrl && <Button size="sm" variant="link" className="h-auto p-0 text-xs font-medium text-primary" onClick={() => navigate({ to: "/payment-proof/$caseId", params: { caseId: record.caseId } })}>View payment proof</Button>}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -529,7 +534,7 @@ export default function MyHelpPage() {
                           <Button
                             size="sm"
                             className="gap-2 bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[120px]"
-                            onClick={() => window.open(`/affidavit/${encodeURIComponent(record.caseId)}`, "_blank", "noopener,noreferrer")}
+                            onClick={() => navigate({ to: "/affidavit/$caseId", params: { caseId: record.caseId } })}
                           >
                             <FileText className="h-3.5 w-3.5" /> View Affidavit
                           </Button>
