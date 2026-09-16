@@ -237,33 +237,40 @@ export default function MyHelpPage() {
           currency: "PKR",
           status: "pending",
         };
-        const isPartial = unlock.payment_type === "partial";
+        const isPartial = String(unlock.payment_type || "").toLowerCase() === "partial";
+        const isFullUnlock = !isPartial;
         const caseIsCompleted = String(caseRecord.status || "").toLowerCase() === "completed";
-
-        const outcome = caseIsCompleted ? "unlock_only_completed" : "unlock_only_pending";
+        // Some admin completion flows store the verified direct-payment evidence
+        // on the case itself rather than creating/updating a resolution row.
+        // Only a full/direct unlock may use that evidence; a contribution unlock
+        // remains unlock-only until this hero submits their own proof.
+        const adminTransactionId = caseRecord.reference_number || caseRecord.payment_transaction_id || "";
+        const adminReceiptUrl = caseRecord.paid_receipt_url || caseRecord.payment_receipt_url || null;
+        const hasVerifiedDirectPayment = isFullUnlock && caseIsCompleted && Boolean(adminTransactionId || adminReceiptUrl);
+        const outcome = hasVerifiedDirectPayment ? "paid_completed" : caseIsCompleted ? "unlock_only_completed" : "unlock_only_pending";
 
         recordList.push({
           id: unlock.id,
-          type: isPartial ? "contribution" : "direct",
-          amount: Number(unlock.pledged_amount ?? 0),
-          transactionId: "N/A",
-          receiptUrl: null,
-          status: caseIsCompleted ? "completed" : "pending",
-          completedAt: unlock.unlocked_at,
+          type: hasVerifiedDirectPayment ? "direct" : isPartial ? "contribution" : "direct",
+          amount: hasVerifiedDirectPayment ? Number(caseRecord.amount_collected || caseRecord.amount_needed || unlock.pledged_amount || 0) : Number(unlock.pledged_amount ?? 0),
+          transactionId: hasVerifiedDirectPayment ? adminTransactionId : "N/A",
+          receiptUrl: hasVerifiedDirectPayment ? adminReceiptUrl : null,
+          status: hasVerifiedDirectPayment ? "completed" : caseIsCompleted ? "completed" : "pending",
+          completedAt: hasVerifiedDirectPayment ? (caseRecord.closed_at || caseRecord.reviewed_at || unlock.unlocked_at) : unlock.unlocked_at,
           caseId: caseId,
           caseTitle: caseRecord.title || "Unlocked case",
           caseCategory: caseRecord.category || "Other",
           caseCountry: caseRecord.country || "",
           caseCity: caseRecord.city || "",
           currency: caseRecord.currency || "PKR",
-          resolution: null,
-          isApproved: false,
+          resolution: hasVerifiedDirectPayment ? { ...caseRecord, status: "completed", payment_type: "full", transaction_id: adminTransactionId, receipt_url: adminReceiptUrl } : null,
+          isApproved: hasVerifiedDirectPayment,
           seekerName: "—",
           seekerCnic: "",
           heroName: user.fullName || "You",
           heroCnic: "",
-          isUnlockOnly: true,
-          caseCompletedByOther: caseIsCompleted,
+          isUnlockOnly: !hasVerifiedDirectPayment,
+          caseCompletedByOther: caseIsCompleted && !hasVerifiedDirectPayment,
           outcome,
         });
       }
