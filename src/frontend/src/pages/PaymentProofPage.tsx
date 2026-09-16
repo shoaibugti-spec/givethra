@@ -56,8 +56,17 @@ export default function PaymentProofPage() {
         </div>
         <section className="rounded-2xl border bg-card p-4 shadow-sm">
           <div className="mb-4 flex items-center gap-3 border-b pb-4"><FileCheck2 className="h-6 w-6 text-primary" /><div><h1 className="font-bold">Verified Payment Proof</h1><p className="text-xs text-muted-foreground">{caseTitle}</p></div></div>
-          {loading ? <div className="py-20 text-center text-sm text-muted-foreground">Loading payment proof...</div> : proofUrl ? <iframe title="Verified payment proof" src={proofUrl} className="min-h-[70vh] w-full rounded-xl border bg-white" /> : <div className="py-20 text-center text-sm text-muted-foreground">No payment proof is available for this record.</div>}
-          {proofUrl && <a className="mt-3 inline-flex items-center gap-1 text-xs text-primary hover:underline" href={proofUrl} target="_blank" rel="noopener noreferrer">Open original proof <ExternalLink className="h-3 w-3" /></a>}
+          {loading ? <div className="py-20 text-center text-sm text-muted-foreground">Loading payment proof...</div> : proofUrl ? (
+            <div className="space-y-3">
+              <div className="flex min-h-[55vh] items-center justify-center rounded-xl border bg-white p-3">
+                <img src={proofUrl} alt="Verified payment proof" className="max-h-[70vh] w-auto max-w-full rounded object-contain" />
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 border-t pt-3">
+                <a href={proofUrl} download target="_blank" rel="noopener noreferrer"><Button className="gap-2"><Download className="h-4 w-4" />Download payment proof image</Button></a>
+                <a className="inline-flex items-center gap-1 text-xs text-primary hover:underline" href={proofUrl} target="_blank" rel="noopener noreferrer">Open original <ExternalLink className="h-3 w-3" /></a>
+              </div>
+            </div>
+          ) : <div className="py-20 text-center text-sm text-muted-foreground">No payment proof is available for this record.</div>}
         </section>
       </main>
     </Layout>

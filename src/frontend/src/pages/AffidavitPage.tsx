@@ -64,10 +64,17 @@ export default function AffidavitPage() {
         let verified = completedList.find((r) => r.receipt_url || r.paid_receipt_url) || completedList[0] || null;
         const adminReceipt = nextCase?.paid_receipt_url || nextCase?.payment_proof_url || nextCase?.receipt_url || null;
         const directUnlock = userUnlock && String(userUnlock.payment_type || "").toLowerCase() !== "partial";
-        if (!verified && directUnlock && String(nextCase?.status || "").toLowerCase() === "completed" && (adminReceipt || nextCase?.reference_number)) {
+        const caseCompleted = String(nextCase?.status || "").toLowerCase() === "completed";
+        const ownContributionResolution = resolutions.find((r: any) =>
+          String(r.hero_id || "") === String(user.id) && isTrulyCompletedHelp(r)
+        );
+        // Generate the affidavit from the verified completion itself. A receipt
+        // is supporting evidence, not a prerequisite for rendering the signed
+        // affidavit. Unlock-only users are still excluded.
+        if (!verified && directUnlock && caseCompleted) {
           verified = {
             ...nextCase,
-            id: `admin-direct-${nextCase.id}`,
+            id: `generated-direct-${nextCase.id}`,
             status: "completed",
             payment_type: "full",
             paid_to: "institute",
@@ -75,6 +82,15 @@ export default function AffidavitPage() {
             receipt_url: adminReceipt,
             amount_paid: nextCase.amount_collected || nextCase.amount_needed || 0,
             completed_at: nextCase.closed_at || nextCase.reviewed_at || null,
+          };
+        } else if (!verified && userUnlock && String(userUnlock.payment_type || "").toLowerCase() === "partial" && ownContributionResolution && caseCompleted) {
+          verified = {
+            ...ownContributionResolution,
+            id: `generated-contribution-${nextCase?.id || caseId}`,
+            status: "completed",
+            payment_type: "partial",
+            paid_to: "givethra",
+            completed_at: ownContributionResolution.completed_at || nextCase?.closed_at || null,
           };
         }
         setCaseData(nextCase);
