@@ -636,16 +636,11 @@ export default function AdminPage() {
   }
 
   async function cleanupAllRejectedFiles() {
-    if (!confirm("This will permanently delete all files associated with rejected KYC and cases. Are you sure?")) return;
+    if (!confirm("This will permanently delete all files associated with rejected KYC, cases, deposits, feedback, direct help, contributions, withdrawals, and support messages. Are you sure?")) return;
     setLoading(true);
     try {
-      const rejectedKyc = kycList.filter((k) => k.status === "rejected");
-      for (const k of rejectedKyc) {
-        const urls = collectKycFileUrls(k);
-        if (urls.length) await deleteStorageFiles(urls);
-        await adminUpdateKyc(k.id, { cnic_front_url: null, cnic_back_url: null, selfie_url: null, passport_url: null, face_video_url: null });
-      }
-      toast.success(`Cleaned ${rejectedKyc.length} KYC cases!`);
+      const result = await adminDeleteFiles([]);
+      toast.success(`Cleaned ${Number(result?.deleted || 0)} files from ${Number(result?.records || 0)} rejected records.`);
     } catch (e) {
       toast.error("Cleanup failed, check console.");
       console.error(e);

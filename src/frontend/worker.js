@@ -515,6 +515,43 @@ async function deleteRejectedUploadFiles(env, urls, excluded = {}) {
   return { deleted, skipped_shared: skippedShared };
 }
 
+async function cleanupAllRejectedUploadFiles(env) {
+  const definitions = [
+    ["kyc_submissions", "lower(COALESCE(status, '')) = 'rejected'", ["cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url"]],
+    ["case_submissions", "lower(COALESCE(status, '')) = 'rejected'", ["photo_urls", "selfie_url", "video_url", "paid_receipt_url", "category_details"]],
+    ["deposits", "lower(COALESCE(status, '')) = 'rejected'", ["proof_url"]],
+    ["feedbacks", "lower(COALESCE(status, '')) = 'rejected'", ["video_url"]],
+    ["case_resolutions", "lower(COALESCE(status, '')) IN ('rejected', 'disputed')", ["receipt_url", "paid_receipt_url"]],
+    ["withdrawal_requests", "lower(COALESCE(status, '')) = 'rejected'", ["payment_proof_url"]],
+    ["support_messages", "lower(COALESCE(status, '')) = 'rejected'", ["attachment_url"]],
+  ];
+  const urls = [];
+  const records = [];
+  for (const [table, where, columns] of definitions) {
+    try {
+      const rows = await env.DB.prepare(`SELECT * FROM ${table} WHERE ${where}`).all();
+      for (const row of rows.results || []) {
+        urls.push(...columns.flatMap((column) => collectUploadUrls(row[column])));
+        records.push({ table, id: row.id, columns });
+      }
+    } catch (error) {
+      console.warn("Rejected upload scan skipped", table, error);
+    }
+  }
+  const result = await deleteRejectedUploadFiles(env, urls);
+  let referencesCleared = 0;
+  for (const record of records) {
+    try {
+      const assignments = record.columns.map((column) => `${column} = NULL`).join(", ");
+      await env.DB.prepare(`UPDATE ${record.table} SET ${assignments} WHERE id = ?`).bind(record.id).run();
+      referencesCleared += 1;
+    } catch (error) {
+      console.warn("Rejected upload reference cleanup skipped", record.table, record.id, error);
+    }
+  }
+  return { ...result, records: records.length, references_cleared: referencesCleared };
+}
+
 async function getWalletBalance(env, userId) {
   const row = await env.DB.prepare(
     "SELECT balance FROM wallets WHERE user_id = ?"
@@ -2557,7 +2594,9 @@ async function handleRequest(request, env, ctx) {
       if (parts[2] === "delete-files" && request.method === "POST") {
         const body = await readJson(request);
         const urls = Array.isArray(body?.urls) ? body.urls : [];
-        const result = await deleteRejectedUploadFiles(env, urls);
+        const result = urls.length
+          ? await deleteRejectedUploadFiles(env, urls)
+          : await cleanupAllRejectedUploadFiles(env);
         return json(result, 200, origin);
       }
     }
