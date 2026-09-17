@@ -2372,7 +2372,12 @@ async function handleRequest(request, env, ctx) {
         };
         const entry = tableMap[parts[2]];
         if (entry) {
-          const rows = await env.DB.prepare(`SELECT * FROM ${entry.table} ORDER BY ${entry.order} DESC`).all();
+          const select = parts[2] === "profiles"
+            ? "p.*, u.email AS email, u.signed_up_at AS signed_up_at, u.full_name AS user_full_name, u.avatar_url AS user_avatar_url"
+            : "*";
+          const from = parts[2] === "profiles" ? "profiles p LEFT JOIN users u ON u.user_id = p.user_id" : entry.table;
+          const order = parts[2] === "profiles" ? "p.updated_at" : entry.order;
+          const rows = await env.DB.prepare(`SELECT ${select} FROM ${from} ORDER BY ${order} DESC`).all();
           const results = entry.table === "case_submissions"
             ? (rows.results || []).map(decodeCaseRow)
             : (rows.results || []);
