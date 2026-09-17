@@ -431,6 +431,89 @@ function pick(body, fields) {
   return Object.fromEntries(fields.filter((field) => body && body[field] !== undefined).map((field) => [field, body[field]]));
 }
 
+function uploadKeyFromUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const parsed = new URL(value.trim());
+    if (parsed.origin !== PUBLIC_ORIGIN || !parsed.pathname.startsWith("/uploads/")) return null;
+    const key = decodeURIComponent(parsed.pathname.slice("/uploads/".length));
+    if (!key || key.includes("..") || key.startsWith("/")) return null;
+    return key;
+  } catch {
+    return null;
+  }
+}
+
+function collectUploadUrls(value, output = []) {
+  if (typeof value === "string") {
+    if (uploadKeyFromUrl(value) && !output.includes(value.trim())) output.push(value.trim());
+    return output;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectUploadUrls(item, output));
+    return output;
+  }
+  if (value && typeof value === "object") {
+    Object.values(value).forEach((item) => collectUploadUrls(item, output));
+  }
+  return output;
+}
+
+function removeUploadUrls(value) {
+  if (typeof value === "string") return uploadKeyFromUrl(value) ? null : value;
+  if (Array.isArray(value)) return value.map(removeUploadUrls).filter((item) => item !== null);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, removeUploadUrls(item)]));
+  }
+  return value;
+}
+
+async function hasOtherUploadReference(env, url, excluded = {}) {
+  const checks = [
+    ["kyc_submissions", ["cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url"]],
+    ["case_submissions", ["selfie_url", "video_url", "paid_receipt_url", "photo_urls", "category_details"]],
+    ["case_resolutions", ["receipt_url"]],
+    ["deposits", ["proof_url"]],
+    ["feedbacks", ["video_url"]],
+    ["support_messages", ["attachment_url"]],
+    ["withdrawal_requests", ["payment_proof_url"]],
+  ];
+  for (const [table, columns] of checks) {
+    for (const column of columns) {
+      try {
+        const query = `SELECT id FROM ${table} WHERE ${column} LIKE ?${excluded.table === table ? " AND id != ?" : ""} LIMIT 1`;
+        const params = excluded.table === table ? [`%${url}%`, excluded.id] : [`%${url}%`];
+        const row = await env.DB.prepare(query).bind(...params).first();
+        if (row) return true;
+      } catch {
+        // Additive deployments may not have every optional table/column yet.
+      }
+    }
+  }
+  return false;
+}
+
+async function deleteRejectedUploadFiles(env, urls, excluded = {}) {
+  const candidates = [...new Set((urls || []).flatMap((value) => collectUploadUrls(value)))];
+  let deleted = 0;
+  let skippedShared = 0;
+  for (const url of candidates) {
+    if (await hasOtherUploadReference(env, url, excluded)) {
+      skippedShared += 1;
+      continue;
+    }
+    const key = uploadKeyFromUrl(url);
+    if (!key) continue;
+    try {
+      await env.UPLOADS.delete(key);
+      deleted += 1;
+    } catch (error) {
+      console.error("Rejected upload cleanup failed", key, error);
+    }
+  }
+  return { deleted, skipped_shared: skippedShared };
+}
+
 async function getWalletBalance(env, userId) {
   const row = await env.DB.prepare(
     "SELECT balance FROM wallets WHERE user_id = ?"
@@ -2198,6 +2281,11 @@ async function handleRequest(request, env, ctx) {
           const row = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first();
           if (!row) return json({ error: "Withdrawal request not found" }, 404, origin);
           await env.DB.prepare("UPDATE withdrawal_requests SET status = ?, payment_proof_url = COALESCE(?, payment_proof_url), reviewed_by = ?, reviewed_at = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE completed_at END WHERE id = ?").bind(status, proof, user.user_id, now(), status, now(), parts[3]).run();
+          if (status === "rejected" && String(row.status || "").toLowerCase() !== "rejected") {
+            const cleanup = await deleteRejectedUploadFiles(env, [row.payment_proof_url], { table: "withdrawal_requests", id: parts[3] });
+            await env.DB.prepare("UPDATE withdrawal_requests SET payment_proof_url = NULL WHERE id = ?").bind(parts[3]).run();
+            console.log("Rejected withdrawal upload cleanup", parts[3], cleanup);
+          }
           if (status === "completed") await env.DB.prepare("UPDATE earnings_wallets SET balance_pkr = MAX(0, balance_pkr - ?), updated_at = ? WHERE user_id = ?").bind(Number(row.amount_pkr), now(), row.user_id).run();
           return json(await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first(), 200, origin);
         }
@@ -2296,6 +2384,11 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           const params = fields.map((field) => values[field]);
           await env.DB.prepare(`UPDATE deposits SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...params, recordId).run();
+          if (requestedStatus === "rejected" && String(current.status || "").toLowerCase() !== "rejected") {
+            const cleanup = await deleteRejectedUploadFiles(env, [current.proof_url], { table: "deposits", id: recordId });
+            await env.DB.prepare("UPDATE deposits SET proof_url = NULL WHERE id = ?").bind(recordId).run();
+            console.log("Rejected deposit upload cleanup", recordId, cleanup);
+          }
           if (requestedStatus === "approved" && current.status !== "approved") {
             const credits = Number(values.credits ?? current.credits ?? current.amount ?? 0);
             if (!Number.isFinite(credits) || credits < 0) return json({ error: "Invalid deposit credits" }, 400, origin);
@@ -2336,6 +2429,13 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No KYC fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE kyc_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          if (values.status === "rejected" && String(current.status || "").toLowerCase() !== "rejected") {
+            const cleanup = await deleteRejectedUploadFiles(env, [current.cnic_front_url, current.cnic_back_url, current.selfie_url, current.passport_url, current.face_video_url], { table: "kyc_submissions", id: recordId });
+            await env.DB.prepare(
+              "UPDATE kyc_submissions SET cnic_front_url = NULL, cnic_back_url = NULL, selfie_url = NULL, passport_url = NULL, face_video_url = NULL WHERE id = ?"
+            ).bind(recordId).run();
+            console.log("Rejected KYC upload cleanup", recordId, cleanup);
+          }
           if (values.status !== undefined) {
             const effectiveKyc = await env.DB.prepare(
               `SELECT lower(status) AS status FROM kyc_submissions
@@ -2384,11 +2484,22 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No case fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE case_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          if (String(values.status || "").toLowerCase() === "rejected" && String(current.status || "").toLowerCase() !== "rejected") {
+            let categoryDetails = current.category_details;
+            try { categoryDetails = typeof categoryDetails === "string" ? JSON.parse(categoryDetails) : categoryDetails; } catch { /* preserve as a scalar */ }
+            const cleanup = await deleteRejectedUploadFiles(env, [current.photo_urls, current.selfie_url, current.video_url, current.paid_receipt_url, categoryDetails], { table: "case_submissions", id: recordId });
+            await env.DB.prepare(
+              "UPDATE case_submissions SET photo_urls = NULL, selfie_url = NULL, video_url = NULL, paid_receipt_url = NULL, category_details = NULL WHERE id = ?"
+            ).bind(recordId).run();
+            console.log("Rejected case upload cleanup", recordId, cleanup);
+          }
           await syncUserCaseCounters(env, current.user_id);
           return json(await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
         }
         if (parts[2] === "feedbacks" && recordId) {
           const body = await readJson(request);
+          const current = await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(recordId).first();
+          if (!current) return json({ error: "Feedback not found" }, 404, origin);
           const requestedStatus = String(body?.status || "").toLowerCase();
           if (requestedStatus === "rejected" && !String(body?.rejection_reason || "").trim()) {
             return json({ error: "A rejection reason is required" }, 400, origin);
@@ -2398,15 +2509,27 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No feedback fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE feedbacks SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          if (requestedStatus === "rejected" && String(current.status || "").toLowerCase() !== "rejected") {
+            const cleanup = await deleteRejectedUploadFiles(env, [current.video_url], { table: "feedbacks", id: recordId });
+            await env.DB.prepare("UPDATE feedbacks SET video_url = NULL WHERE id = ?").bind(recordId).run();
+            console.log("Rejected feedback upload cleanup", recordId, cleanup);
+          }
           return json(await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(recordId).first(), 200, origin);
         }
         if (parts[2] === "resolutions" && recordId) {
           const body = await readJson(request);
+          const current = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first();
+          if (!current) return json({ error: "Resolution not found" }, 404, origin);
           const allowed = ["status", "admin_confirmed", "admin_confirmed_at", "completed_at", "notes"];
           const values = pick(body, allowed);
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No resolution fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          if (["rejected", "disputed"].includes(String(values.status || "").toLowerCase()) && !["rejected", "disputed"].includes(String(current.status || "").toLowerCase())) {
+            const cleanup = await deleteRejectedUploadFiles(env, [current.receipt_url], { table: "case_resolutions", id: recordId });
+            await env.DB.prepare("UPDATE case_resolutions SET receipt_url = NULL WHERE id = ?").bind(recordId).run();
+            console.log("Rejected resolution upload cleanup", recordId, cleanup);
+          }
           const updated = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first();
           if (updated && String(updated.status || "").toLowerCase() === "completed" && [1, "1", true, "true"].includes(updated.admin_confirmed)) {
             await synchronizeCompletedCase(env, recordId);
@@ -2433,18 +2556,8 @@ async function handleRequest(request, env, ctx) {
       if (parts[2] === "delete-files" && request.method === "POST") {
         const body = await readJson(request);
         const urls = Array.isArray(body?.urls) ? body.urls : [];
-        let deleted = 0;
-        for (const value of urls) {
-          try {
-            const parsed = new URL(String(value));
-            const marker = "/uploads/";
-            const index = parsed.pathname.indexOf(marker);
-            if (index < 0) continue;
-            const key = decodeURIComponent(parsed.pathname.slice(index + marker.length));
-            if (key) { await env.UPLOADS.delete(key); deleted += 1; }
-          } catch { /* Ignore malformed or external URLs. */ }
-        }
-        return json({ deleted }, 200, origin);
+        const result = await deleteRejectedUploadFiles(env, urls);
+        return json(result, 200, origin);
       }
     }
 

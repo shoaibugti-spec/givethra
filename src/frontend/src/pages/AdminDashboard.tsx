@@ -48,7 +48,10 @@ import {
   uploadFileToStorage,
 } from "@/lib/api";
 
-const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
+const ADMIN_EMAILS = new Set([
+  "shoaibugti@gmail.com",
+  "shoaibahmedbugti5@gmail.com",
+]);
 
 const ALL_CATEGORIES = [
   "Electricity Bill", "Gas Bill", "Water Bill", "House Rent",
@@ -325,7 +328,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
-    if (user?.email !== ADMIN_EMAIL) { navigate({ to: "/" }); return; }
+    if (!ADMIN_EMAILS.has(String(user?.email || "").toLowerCase())) { navigate({ to: "/" }); return; }
     loadData();
     const interval = setInterval(() => { loadSupportMessages(); }, 5000);
     return () => clearInterval(interval);
