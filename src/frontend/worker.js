@@ -1,7 +1,7 @@
 // src/frontend/worker.js
 // Givethra - Complete Cloudflare Worker with all APIs including Onboarding Status
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
-// Assistant REMOVED - shoaibugti@gmail.com is no longer assistant.
+// The designated assistant may perform verification and rejection reviews.
 //
 // 🔥 FIXED (this pass): 
 //   1. /uploads/ handler now auto-detects Content-Type by extension if R2 metadata is missing
@@ -11,6 +11,7 @@
 const PUBLIC_ORIGIN = "https://givethra.org";
 
 const ADMIN_EMAILS = new Set([
+  "shoaibugti@gmail.com",
   "shoaibahmedbugti5@gmail.com",
 ]);
 
