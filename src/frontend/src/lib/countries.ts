@@ -1,4 +1,4 @@
-export interface CountryOption { name: string; code: string }
+export interface CountryOption { name: string; code: string; flag?: string }
 
 export const COUNTRIES: CountryOption[] = [
   {

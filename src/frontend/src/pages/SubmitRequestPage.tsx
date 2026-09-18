@@ -1,6 +1,9 @@
 // src/frontend/src/pages/SubmitRequestPage.tsx
 // Fully refactored with enhanced T&C, feedback suspension, and complete validation.
 // FIXED: Free case logic — first case free, second chance free if first rejected.
+// 🔥 NEW: Uses shared creditGate for consistent credit checking and auto-redirect.
+// 🔥 FIXED: Video recording 0s bug resolved using useRef + wall-clock + blob metadata.
+// 🔥 FIXED: Food & Groceries now has FIXED amount of Rs 6,000.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -67,8 +70,11 @@ import {
   Heart,
 } from "lucide-react";
 
+// 🔥 NEW: Import shared credit gate
+import { checkCreditGate } from "@/lib/creditGate";
+
 // ============================================================
-//  CATEGORY ASSISTANCE LIMITS POLICY (unchanged)
+//  CATEGORY ASSISTANCE LIMITS POLICY
 // ============================================================
 const CATEGORY_LIMITS: Record<
   string,
@@ -83,13 +89,14 @@ const CATEGORY_LIMITS: Record<
   "Widow & Elderly Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
   "Child Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
   "Disability Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
+  // 🔥 FIXED: Food & Groceries now fixed at Rs 6,000 (was max 12,000)
+  "Food & Groceries": { type: "fixed", amount: 6000, label: "Fixed Rs 6,000 per family" },
   "Electricity Bill": { type: "verified", label: "1 Month Verified Bill" },
   "Gas Bill": { type: "verified", label: "1 Month Verified Bill" },
   "Water Bill": { type: "verified", label: "1 Month Verified Bill" },
   "House Rent": { type: "verified", label: "1 Month Verified Rent" },
   "School, College & University Fees": { type: "verified", label: "1 Student / 1 Month Verified Fee" },
   "Education, Books & Admission": { type: "verified", label: "Verified Cost" },
-  "Food & Groceries": { type: "max", maxAmount: 12000, label: "Max Rs 12,000 per family" },
   "Medicines": { type: "verified", label: "Verified Prescription Cost" },
   "Medical & Treatment": { type: "verified", label: "Verified Treatment Bill" },
   "Home Repair": { type: "max", maxAmount: 18000, label: "Max Rs 18,000" },
@@ -558,7 +565,13 @@ export default function SubmitRequestPage() {
   const [tried1, setTried1] = useState(false);
   const [tried2, setTried2] = useState(false);
 
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(() => {
+    try {
+      const value = localStorage.getItem("givethra_prefill_category") || "";
+      localStorage.removeItem("givethra_prefill_category");
+      return value;
+    } catch { return ""; }
+  });
   const [title, setTitle] = useState("");
   const [shortDesc, setShortDesc] = useState("");
   const [country, setCountry] = useState("");
@@ -642,6 +655,10 @@ export default function SubmitRequestPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const videoChunksRef = useRef<Blob[]>([]);
 
+  // 🔥 FIX: useRef + wall-clock time to accurately track video duration
+  const videoTimerRef = useRef(0);
+  const videoStartTimeRef = useRef<number | null>(null);
+
   const [offer, setOffer] = useState<any>(null);
   const [hasClaimedOfferBefore, setHasClaimedOfferBefore] = useState(false);
   const [activeCaseCount, setActiveCaseCount] = useState(0);
@@ -717,6 +734,16 @@ export default function SubmitRequestPage() {
     }
   }, [debtTotalAmount, category]);
 
+  // 🔥 FIX: Auto-fill amount for Fixed categories (like Food & Groceries)
+  useEffect(() => {
+    if (isFixedAmount(category)) {
+      const fixedVal = getFixedAmountValue(category);
+      if (fixedVal) {
+        setAmount(fixedVal.toString());
+      }
+    }
+  }, [category, disabilityMode]);
+
   // ===== LOAD USER STATS =====
   async function loadUserStats() {
     if (!user?.id) {
@@ -735,8 +762,6 @@ export default function SubmitRequestPage() {
       setUserRejectionCount(rejectedCases);
       setUserFreeCasesUsed(freeCasesUsed);
 
-      // 🔥 FIX: Simplified free case logic
-      // Free if: no free used yet, OR (one free used AND it was rejected)
       const lastFreeRejected = cases?.some((c: any) => c.was_free === true && String(c.status || "").toLowerCase() === "rejected") || false;
       const canUseFree = freeCasesUsed === 0 || (freeCasesUsed === 1 && lastFreeRejected);
       const freeDisabled = rejectedCases >= 3 || freeCasesUsed >= MAX_FREE_CASES || !canUseFree;
@@ -799,7 +824,7 @@ export default function SubmitRequestPage() {
   }
 
   // ============================================================
-  //  ✅ COMPLETE extraConditionalDocs() - FIXED (unchanged)
+  //  ✅ COMPLETE extraConditionalDocs() - FIXED
   // ============================================================
   function extraConditionalDocs(): { key: string; label: string; hint?: string }[] {
     const list: { key: string; label: string; hint?: string }[] = [];
@@ -1173,7 +1198,6 @@ export default function SubmitRequestPage() {
       const settings = await getUserSettings(user.id);
       if (settings?.currency && settings.currency !== "USD") setCurrency(settings.currency);
       const counts = await getCaseCounts(user.id);
-      // Count active cases (pending, approved, completed)
       const activeCount = (counts?.pending || 0) + (counts?.approved || 0) + (counts?.completed || 0);
       setActiveCaseCount(activeCount);
     } catch (err) {
@@ -1194,7 +1218,6 @@ export default function SubmitRequestPage() {
       throw new Error(`File size (${fileSizeMB.toFixed(1)}MB) exceeds 50MB limit. Please record a shorter video.`);
     }
 
-    // Use the new upload function from api.ts
     try {
       const url = await uploadFileToStorage(file, path);
       return url;
@@ -1294,7 +1317,8 @@ export default function SubmitRequestPage() {
   }
 
   // ============================================================
-  //  VIDEO RECORDING - Enhanced for clarity and reliability
+  //  🔥 VIDEO RECORDING - FULLY FIXED (0s BUG RESOLVED)
+  //  Uses useRef + wall-clock time + blob metadata for accuracy
   // ============================================================
   async function startVideoRecording() {
     try {
@@ -1325,6 +1349,8 @@ export default function SubmitRequestPage() {
       setStream(s);
       setVideoRecording(true);
       setVideoTimer(0);
+      videoTimerRef.current = 0;                    // 🔥 Reset ref
+      videoStartTimeRef.current = Date.now();       // 🔥 Set wall-clock start
 
       setTimeout(() => {
         if (liveVideoRef.current) {
@@ -1351,15 +1377,54 @@ export default function SubmitRequestPage() {
       };
 
       recorder.onstop = async () => {
-        if (videoTimer < 60) {
-          toast.error("Please record at least 60 seconds so your story can be verified clearly.");
+        // 🔥 FIX: Compute duration from wall-clock + ref (never stale)
+        const wallClockSeconds = videoStartTimeRef.current
+          ? Math.floor((Date.now() - videoStartTimeRef.current) / 1000)
+          : 0;
+        const estimate = Math.max(videoTimerRef.current, wallClockSeconds, videoTimer);
+        videoStartTimeRef.current = null;
+        console.log("🎥 [onstop] timer:", videoTimerRef.current, "wall:", wallClockSeconds, "state:", videoTimer, "estimate:", estimate);
+
+        const blob = new Blob(videoChunksRef.current, { type: "video/webm" });
+
+        // 🔥 BEST: Read ACTUAL duration from the recorded blob (100% accurate)
+        let actualDuration = estimate;
+        try {
+          actualDuration = await new Promise<number>((resolve) => {
+            const v = document.createElement("video");
+            v.preload = "metadata";
+            const timeout = setTimeout(() => resolve(estimate), 3000);
+            v.onloadedmetadata = () => {
+              clearTimeout(timeout);
+              const dur = Math.floor(v.duration) || estimate;
+              URL.revokeObjectURL(v.src);
+              resolve(dur);
+            };
+            v.onerror = () => {
+              clearTimeout(timeout);
+              URL.revokeObjectURL(v.src);
+              resolve(estimate);
+            };
+            v.src = URL.createObjectURL(blob);
+          });
+        } catch {
+          actualDuration = estimate;
+        }
+
+        console.log("🎥 [blob] actual duration:", actualDuration, "seconds");
+
+        // 🔥 CRITICAL: Use actualDuration for the 60s check
+        if (actualDuration < 60) {
+          toast.error(`Please record at least 60 seconds. Current: ${actualDuration}s`);
           setVideoRecording(false);
           setUploadingVideo(false);
           s.getTracks().forEach((t) => t.stop());
           videoChunksRef.current = [];
+          videoTimerRef.current = 0;
+          setVideoTimer(0);
           return;
         }
-        const blob = new Blob(videoChunksRef.current, { type: "video/webm" });
+
         const fileSizeMB = blob.size / (1024 * 1024);
         console.log(`Video size: ${fileSizeMB.toFixed(2)} MB`);
 
@@ -1382,7 +1447,7 @@ export default function SubmitRequestPage() {
             `cases/${user?.id}/${Date.now()}_appeal.webm`
           );
           setVideoUrl(url);
-          toast.success(`Video uploaded successfully! (${fileSizeMB.toFixed(1)}MB)`);
+          toast.success(`Video uploaded successfully! (${fileSizeMB.toFixed(1)}MB, ${actualDuration}s)`);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           if (msg.includes("size") || msg.includes("limit")) {
@@ -1402,6 +1467,7 @@ export default function SubmitRequestPage() {
       const interval = setInterval(() => {
         sec++;
         setVideoTimer(sec);
+        videoTimerRef.current = sec;                // 🔥 Update ref every second
         if (sec >= 90) {
           clearInterval(interval);
           if (recorder.state === "recording") recorder.stop();
@@ -1417,6 +1483,12 @@ export default function SubmitRequestPage() {
   }
 
   function stopVideoRecording() {
+    // 🔥 Update ref with wall-clock before stopping
+    if (videoStartTimeRef.current) {
+      const wallClockSeconds = Math.floor((Date.now() - videoStartTimeRef.current) / 1000);
+      videoTimerRef.current = Math.max(videoTimerRef.current, wallClockSeconds);
+      console.log("🎥 [stop] final timer:", videoTimerRef.current);
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
     }
@@ -1584,7 +1656,8 @@ export default function SubmitRequestPage() {
     }
 
     if (easy) {
-      if (!isOtherInstitute && !instituteName) return "Please select your institute/company from the list.";
+      const selectedInstitute = (instituteName || catFields.institute_name || "").trim();
+      if (!isOtherInstitute && !selectedInstitute) return "Please select your institute/company from the list.";
       if (isOtherInstitute) {
         if (!otherName.trim()) return "Please enter the institute name.";
         if (!otherContact.trim()) return "Please enter the institute contact number.";
@@ -1713,13 +1786,10 @@ export default function SubmitRequestPage() {
     try {
       const uid = user.id;
 
-      // Fetch fresh case data
       const freshCases = await getCasesByUser(uid);
       const freshRejections = freshCases?.filter((c: any) => c.status === "rejected").length || 0;
       const freshFreeUsed = freshCases?.filter((c: any) => c.was_free === true).length || 0;
 
-      // 🔥 FIX: Simplified free case logic
-      // Free if: no free used yet, OR (one free used AND it was rejected)
       const lastFreeRejected = freshCases?.some((c: any) => c.was_free === true && String(c.status || "").toLowerCase() === "rejected") || false;
       const canUseFree = freshFreeUsed === 0 || (freshFreeUsed === 1 && lastFreeRejected);
       const freeDisabled = freshRejections >= 3 || freshFreeUsed >= MAX_FREE_CASES || !canUseFree;
@@ -1740,7 +1810,6 @@ export default function SubmitRequestPage() {
         return;
       }
 
-      // First free case: if canUseFree is true
       const firstFree = canUseFree && !freeDisabled;
 
       let offerFree = false;
@@ -1760,10 +1829,15 @@ export default function SubmitRequestPage() {
       const free = firstFree || offerFree;
 
       if (!free) {
-        const wallet = await getWallet(uid);
-        if (!wallet || wallet.balance < 1) {
-          toast.error("Insufficient credits! You need 1 credit.");
-          navigate({ to: "/wallet" });
+        const isFreeAllowed = false;
+        const result = checkCreditGate({
+          balance,
+          required: 1,
+          isFreeAllowed,
+          navigate,
+          context: "case_submit",
+        });
+        if (!result) {
           setSubmitting(false);
           return;
         }
@@ -1779,7 +1853,7 @@ export default function SubmitRequestPage() {
       const finalInstitute = easy
         ? isOtherInstitute
           ? otherName
-          : instituteName
+          : (instituteName || catFields.institute_name || "")
         : catFields.institute_name ||
           catFields.hospital_name ||
           catFields.provider ||
@@ -1821,7 +1895,6 @@ export default function SubmitRequestPage() {
         is_institute_in_list: !isOtherInstitute,
       };
 
-      // ===== PAYMENT RECEIVER DETAILS =====
       if (needsPaymentReceiver) {
         categoryDetails.receiver_name = receiverName;
         categoryDetails.receiver_contact = receiverContact;
@@ -1831,7 +1904,6 @@ export default function SubmitRequestPage() {
         categoryDetails.receiver_shop_name = receiverShopName;
       }
 
-      // ===== DEBT RELIEF SPECIFIC =====
       if (isDebtCategory(category)) {
         categoryDetails.debt_total_amount = parseFloat(debtTotalAmount) || 0;
         categoryDetails.debt_percentage = 5;
@@ -1903,7 +1975,6 @@ export default function SubmitRequestPage() {
         finalAmount = parseFloat(amount) || 0;
       }
 
-      // Build the case object
       const caseData = {
         user_id: uid,
         category,
@@ -2273,7 +2344,9 @@ export default function SubmitRequestPage() {
                       key={n}
                       type="button"
                       onClick={() => {
+                        setIsOtherInstitute(false);
                         setInstituteName(n);
+                        setCatFields((p) => ({ ...p, institute_name: n }));
                         setInstituteSearch("");
                       }}
                       className="w-full text-left px-3 py-2.5 text-sm hover:bg-primary/5"
@@ -2288,7 +2361,15 @@ export default function SubmitRequestPage() {
               )}
               <button
                 type="button"
-                onClick={() => setIsOtherInstitute(true)}
+                onClick={() => {
+                  setIsOtherInstitute(true);
+                  setInstituteName("");
+                  setCatFields((p) => {
+                    const next = { ...p };
+                    delete next.institute_name;
+                    return next;
+                  });
+                }}
                 className="text-xs text-primary font-medium underline"
               >
                 My institute is not in the list — add manually
@@ -2303,7 +2384,14 @@ export default function SubmitRequestPage() {
               </p>
               <button
                 type="button"
-                onClick={() => setInstituteName("")}
+                onClick={() => {
+                  setInstituteName("");
+                  setCatFields((p) => {
+                    const next = { ...p };
+                    delete next.institute_name;
+                    return next;
+                  });
+                }}
                 className="text-xs text-primary underline shrink-0"
               >
                 Change
@@ -2562,7 +2650,7 @@ export default function SubmitRequestPage() {
 
   if (checkingFeedback) return <Layout><div className="text-center py-20">Loading...</div></Layout>;
 
-  // ----- Feedback Block (no new case submission until feedback given) -----
+  // ----- Feedback Block -----
   if (blockedByFeedback) {
     return (
       <Layout>
@@ -2613,7 +2701,7 @@ export default function SubmitRequestPage() {
             <h1 className="text-2xl font-bold">KYC Verification Required</h1>
             <p className="text-muted-foreground">Complete identity verification before submitting a request.</p>
             <Button asChild>
-              <Link to="/kyc">Complete KYC</Link>
+              <Link to="/kyc" onClick={() => { try { sessionStorage.setItem("givethra_kyc_return_to", "/submit-request"); } catch { /* ignore */ } }}>Complete KYC</Link>
             </Button>
           </div>
         </div>
@@ -2621,7 +2709,7 @@ export default function SubmitRequestPage() {
     );
   }
 
-  // ===== SUSPENDED PAGE (with 5-credit unlock) =====
+  // ===== SUSPENDED PAGE =====
   if (isSuspended) {
     const canUnlock = balance >= UNLOCK_CREDITS_REQUIRED;
     return (
@@ -2799,7 +2887,6 @@ export default function SubmitRequestPage() {
             <div className="space-y-2">
               <Label>Help Category *</Label>
               
-              {/* ✅ FIX: Added notranslate div to prevent Google Translate conflicts */}
               <div className="notranslate" translate="no">
                 <Select
                   value={category}
@@ -2807,6 +2894,10 @@ export default function SubmitRequestPage() {
                     setCategory(v);
                     setInstituteName("");
                     setIsOtherInstitute(false);
+                    setInstituteSearch("");
+                    setEduSubType("");
+                    setEduAdmissionLevel("");
+                    setEduSubFields({});
                     setRefNumber("");
                     setOtherName("");
                     setOtherContact("");
@@ -2847,7 +2938,6 @@ export default function SubmitRequestPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {/* ✅ End of fix */}
 
               {willBeFree && !isFreeDisabled && (
                 <p className="text-xs text-green-600 font-medium flex items-center gap-1">
@@ -3136,6 +3226,7 @@ export default function SubmitRequestPage() {
                         type="button"
                         onClick={() => {
                           setInstituteName(c.name);
+                          setCatFields((p) => ({ ...p, institute_name: c.name }));
                           setIsOtherInstitute(false);
                         }}
                         className={`px-3 py-2.5 rounded-lg border text-xs font-medium text-left ${
@@ -3779,9 +3870,6 @@ export default function SubmitRequestPage() {
                   {category === "School, College & University Fees" && (
                     <p className="text-xs text-muted-foreground">💡 Enter the 1 month fee amount from your challan.</p>
                   )}
-                  {category === "Food & Groceries" && (
-                    <p className="text-xs text-muted-foreground">💡 Maximum Rs 12,000 per family.</p>
-                  )}
                   {category === "Home Repair" && (
                     <p className="text-xs text-muted-foreground">💡 Maximum Rs 18,000.</p>
                   )}
@@ -4002,8 +4090,6 @@ export default function SubmitRequestPage() {
                 </div>
               )}
             </div>
-
-            {/* ===== CONFIRM CHECKBOX REMOVED FROM HERE - NOW IN STEP 4 ===== */}
 
             {/* ===== NAVIGATION ===== */}
             <div className="flex gap-3">

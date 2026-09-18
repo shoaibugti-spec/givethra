@@ -4,7 +4,7 @@ const CURRENT_SERVICE_WORKER_CACHE = "givethra-v3";
 function isLegacyKey(key: string): boolean {
   const normalized = key.toLowerCase();
   if (CURRENT_KEYS.has(key)) return false;
-  return normalized.includes("supabase") || normalized.startsWith("sb-") || normalized.includes("sb-access-token") || normalized.includes("old_givethra");
+  return normalized.includes("supabase") || normalized.startsWith("sb-") || normalized.includes("sb-access-token") || normalized.includes("old_givethra") || normalized.includes("auth") || normalized.includes("token");
 }
 
 export function clearLegacyBrowserState(): void {

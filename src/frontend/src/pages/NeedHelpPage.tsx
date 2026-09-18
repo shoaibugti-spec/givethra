@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { getKycStatus } from "@/lib/api";
 import {
   Gift, ShieldCheck, FileText, Camera, Video, CheckCircle2, Coins,
   Lock, Heart, Zap, Building2, Sparkles, Clock, ChevronDown,
@@ -13,13 +14,26 @@ import {
 } from "lucide-react";
 
 export default function NeedHelpPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [openCat, setOpenCat] = useState<string | null>(null);
 
-  function goSubmit() {
-    if (isAuthenticated) navigate({ to: "/submit-request" });
-    else navigate({ to: "/sign-up" });
+  async function goSubmit() {
+    if (!isAuthenticated) {
+      navigate({ to: "/sign-in", search: { role: "requester", redirect: "/need-help" } });
+      return;
+    }
+    try {
+      const kyc = await getKycStatus(user!.id);
+      const status = String(kyc?.status || "none").trim().toLowerCase();
+      if (status !== "approved") {
+        try { sessionStorage.setItem("givethra_kyc_return_to", "/need-help"); } catch { /* ignore */ }
+      }
+      navigate({ to: status === "approved" ? "/onboarding-submit" : "/kyc" });
+    } catch {
+      try { sessionStorage.setItem("givethra_kyc_return_to", "/need-help"); } catch { /* ignore */ }
+      navigate({ to: "/kyc" });
+    }
   }
 
   // ============================================================

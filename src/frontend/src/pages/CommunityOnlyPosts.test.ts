@@ -23,6 +23,17 @@ describe("community-only Public Posts", () => {
     expect(homeSource).toContain("<FeedbackWall />");
   });
 
+  it("keeps the four feed tabs mapped to distinct server ranking contracts", () => {
+    expect(communitySource).toContain('setFeedTab("latest")');
+    expect(communitySource).toContain('setFeedTab("most-supported")');
+    expect(communitySource).toContain('setFeedTab("my-posts")');
+    expect(workerSource).toContain('tab === "latest"');
+    expect(workerSource).toContain('tab === "most-supported"');
+    expect(workerSource).toContain('tab === "my-posts"');
+    expect(workerSource).toContain("cp.created_at DESC, cp.id DESC");
+    expect(workerSource).toContain("COALESCE(sc.support_count, 0) DESC");
+  });
+
   it("keeps separate Direct Payments and Contributions admin queues", () => {
     expect(adminSource).toContain('value="verify">Direct Payments');
     expect(adminSource).toContain('value="contributions">Contributions');

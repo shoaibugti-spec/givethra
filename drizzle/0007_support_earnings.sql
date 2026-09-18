@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN support_earnings_usd REAL NOT NULL DEFAULT 0;

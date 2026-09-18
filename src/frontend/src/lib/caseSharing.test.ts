@@ -19,7 +19,7 @@ describe("case sharing", () => {
     expect(payload.title).toBe("Help: Help to Pay Rent");
     expect(payload.text).toContain("Help to Pay Rent");
     expect(payload.text).toContain("Rs 45,000");
-    expect(payload.url).toBe("https://givethra.org/cases/rent-123");
+    expect(payload.url).toBe("https://givethra.org/share/cases/rent-123");
   });
 
   it("keeps the published-case actions clear and compact", () => {
@@ -33,7 +33,7 @@ describe("case sharing", () => {
   it("falls back to the longer description and safe encoded case id", () => {
     const payload = buildCaseShareData({ id: "case/with spaces", description: "Please help this person today." }, "https://givethra.org");
     expect(payload.text).toContain("Please help this person today.");
-    expect(payload.url).toBe("https://givethra.org/cases/case%2Fwith%20spaces");
+    expect(payload.url).toBe("https://givethra.org/share/cases/case%2Fwith%20spaces");
   });
 });
 

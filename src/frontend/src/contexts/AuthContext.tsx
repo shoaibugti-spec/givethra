@@ -1,3 +1,4 @@
+// src/frontend/src/contexts/AuthContext.tsx
 import {
   type ReactNode,
   createContext,
@@ -40,11 +41,13 @@ interface AuthContextValue {
   isHero: boolean;
   isHelpSeeker: boolean;
   isAdmin: boolean;
+  isAssistant: boolean;  // ✅ نیا
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const ROLE_KEY = "givethra_role";
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
+const ASSISTANT_EMAIL = "shoaibugti@gmail.com";  // ✅ نیا
 
 function safeLocalGet(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -95,17 +98,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<UserPublic | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<UserRole>(() => {
+    const stored = safeLocalGet(ROLE_KEY);
+    return stored === "hero" || stored === "help_seeker" ? stored : null;
+  });
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const googleInitializedRef = useRef(false);
+  const googlePromptRetryRef = useRef(0);
+  const googlePromptTimerRef = useRef<number | null>(null);
+  const googleLoginTimerRef = useRef<number | null>(null);
 
-  // ✅ Worker کو verify کریں
   useEffect(() => {
     clearLegacyBrowserState();
     const token = getTokenFromLocation();
     if (token) {
       fetchWithTimeout(`${WORKER_URL}/verify`, {
+        credentials: "include",
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
@@ -133,6 +143,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  useEffect(() => () => {
+    if (googlePromptTimerRef.current) window.clearTimeout(googlePromptTimerRef.current);
+    if (googleLoginTimerRef.current) window.clearTimeout(googleLoginTimerRef.current);
+  }, []);
+
   const refreshUser = useCallback(async () => {
     const token = getTokenFromLocation();
     if (!token) {
@@ -142,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       const res = await fetchWithTimeout(`${WORKER_URL}/verify`, {
+        credentials: "include",
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -167,13 +183,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const finishGoogleLogin = useCallback(async (credential: string) => {
+    if (googleLoginTimerRef.current) window.clearTimeout(googleLoginTimerRef.current);
+    if (googlePromptTimerRef.current) window.clearTimeout(googlePromptTimerRef.current);
+    googlePromptRetryRef.current = 0;
     setLoginError(null);
     try {
-      const response = await fetchWithTimeout(`${WORKER_URL}/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
-      }, 15000);
+      let response: Response | null = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await fetchWithTimeout(`${WORKER_URL}/auth/google`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ credential }),
+          }, 15000);
+          break;
+        } catch (error) {
+          if (attempt === 1) throw error;
+          await new Promise((resolve) => window.setTimeout(resolve, 700));
+        }
+      }
+      if (!response) throw new Error("Google sign-in verification did not return a response.");
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.token || !data.user) {
         throw new Error(data.error || `Google sign-in could not be verified (HTTP ${response.status}).`);
@@ -219,6 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearLegacyBrowserState();
     setLoginError(null);
     setIsLoggingIn(true);
+    googlePromptRetryRef.current = 0;
+    if (googlePromptTimerRef.current) window.clearTimeout(googlePromptTimerRef.current);
+    if (googleLoginTimerRef.current) window.clearTimeout(googleLoginTimerRef.current);
     const deadline = Date.now() + 5000;
     while (!(window as any).google?.accounts?.id && Date.now() < deadline) {
       await new Promise((resolve) => window.setTimeout(resolve, 50));
@@ -231,7 +264,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoggingIn(false);
       return;
     }
-
 
     if (!googleInitializedRef.current) {
       googleIdentity.accounts.id.initialize({
@@ -246,21 +278,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         auto_select: false,
         cancel_on_tap_outside: true,
+        context: "signin",
+        use_fedcm_for_prompt: true,
+        itp_support: true,
       });
       googleInitializedRef.current = true;
     }
-    googleIdentity.accounts.id.prompt((notification: any) => {
-      if (notification?.isNotDisplayed?.()) {
+    const openGooglePrompt = () => {
+      googleIdentity.accounts.id.prompt((notification: any) => {
+        const unavailable = notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.();
+        if (!unavailable) return;
+        if (googlePromptRetryRef.current < 3) {
+          googlePromptRetryRef.current += 1;
+          googlePromptTimerRef.current = window.setTimeout(openGooglePrompt, 650);
+          return;
+        }
+        const fallback = document.getElementById("google-account-chooser-fallback");
+        if (fallback && !fallback.dataset.rendered) {
+          fallback.dataset.rendered = "1";
+          fallback.classList.remove("hidden");
+          googleIdentity.accounts.id.renderButton(fallback, {
+            type: "standard",
+            theme: "outline",
+            size: "large",
+            text: "signin_with",
+            shape: "rectangular",
+            width: Math.min(360, Math.max(240, fallback.clientWidth || 320)),
+          });
+        }
         setIsLoggingIn(false);
-        setLoginError("Google sign-in could not open. Please allow Google prompts/pop-ups and try again.");
-      }
-    });
-    window.setTimeout(() => {
+        setLoginError(null);
+      });
+    };
+    openGooglePrompt();
+    googleLoginTimerRef.current = window.setTimeout(() => {
       setIsLoggingIn((active) => {
-        if (active) setLoginError("Google sign-in timed out. Please try again.");
+        if (active) setLoginError("Google account selection is taking longer than expected. Please select your account when the Google prompt appears.");
         return false;
       });
-    }, 30000);
+    }, 60000);
   }, [finishGoogleLogin, isLoggingIn]);
 
   const handleLogout = useCallback(async () => {
@@ -273,15 +329,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = "/";
   }, [queryClient]);
 
-  const storedRole = (safeLocalGet(ROLE_KEY) as UserRole) ?? null;
   const setRole = (r: UserRole) => {
     if (r) safeLocalSet(ROLE_KEY, r);
     else safeLocalRemove(ROLE_KEY);
+    setSelectedRole(r);
   };
 
   const isAuthenticated = !!userId && !!user;
-  const role: UserRole = isAuthenticated ? storedRole : null;
+  const role: UserRole = isAuthenticated ? selectedRole : null;
   const isAdmin = isAuthenticated && user?.email === ADMIN_EMAIL;
+  const isAssistant = isAuthenticated && user?.email === ASSISTANT_EMAIL;  // ✅ نیا
 
   const value: AuthContextValue = {
     user,
@@ -299,6 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isHero: role === "hero",
     isHelpSeeker: role === "help_seeker",
     isAdmin,
+    isAssistant,  // ✅ نیا
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -323,6 +381,7 @@ export function useAuth(): AuthContextValue {
       isHero: false,
       isHelpSeeker: false,
       isAdmin: false,
+      isAssistant: false,  // ✅ نیا
     };
   }
   return ctx;

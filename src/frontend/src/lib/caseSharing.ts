@@ -18,7 +18,9 @@ export function buildCaseShareData(caseData: ShareableCase, origin = typeof wind
   const currency = String(caseData.currency || "USD").toUpperCase();
   const symbol = CURRENCY_SYMBOLS[currency] || currency;
   const amountText = amount > 0 ? ` Goal: ${symbol} ${amount.toLocaleString()} .` : "";
-  const url = new URL(`/cases/${encodeURIComponent(String(caseData.id))}`, origin).toString();
+  // Use a crawler-friendly preview endpoint. It returns rich Open Graph metadata
+  // (including the approved selfie) and redirects human visitors to the SPA case page.
+  const url = new URL(`/share/cases/${encodeURIComponent(String(caseData.id))}`, origin).toString();
   const text = `Please help this Givethra case: ${title}. ${description}${amountText}`;
   return { title: `Help: ${title}`, text, url };
 }

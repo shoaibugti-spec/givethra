@@ -3,6 +3,7 @@
 // This is the main dashboard page shown after role selection
 
 import InstallButton from "@/components/InstallButton";
+import CompletionCooldownBanner from "@/components/CompletionCooldownBanner";
 import Layout from "@/components/Layout";
 import HeroesWall from "@/components/HeroesWall";
 import KindnessWall from "@/components/KindnessWall";
@@ -25,6 +26,7 @@ import { orderCasesForViewer } from "@/lib/caseOrdering";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   BadgeCheck,
+  Briefcase,
   Building2,
   MailCheck,
   Phone,
@@ -49,10 +51,23 @@ import {
   GraduationCap,
   Stethoscope,
   ShoppingCart,
+  Share2,
+  Home,
+  BookOpen,
+  Pill,
+  Apple,
+  Baby,
+  Accessibility,
+  Gem,
+  Wrench,
+  Tractor,
+  CreditCard,
+  Siren,
+  MoreHorizontal,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   getApprovedCases,
   getCategoryCounts,
@@ -61,24 +76,62 @@ import {
   getUnlockCount,
   getUnreadNotificationsCount,
   getProfile,
+  searchUsers,
+  getCommunityPosts,
+  createCommunityPost,
+  getUserSupports,
+  getEarningsSummary,
+  requestWithdrawal,
+  supportPost,
+  followUser,
+  unfollowUser,
 } from "@/lib/api";
+import SlidingHomePanel from "@/components/SlidingHomePanel";
+
+// Support earnings conversion: 10,000 = $1.
 
 const FACEBOOK_URL =
   "https://www.facebook.com/profile.php?id=61590715263595";
-const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
+const INSTAGRAM_URL =
+  "https://www.instagram.com/givethra.community";
 const WHATSAPP_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const CONTACT_EMAIL = "info@givethra.org";
 
-// Category-specific visual treatments
-const CATEGORY_SLIDE_STYLE: Record<string, { icon: typeof Battery; color: string; bg: string }> = {
-  "Electricity Bill": { icon: Battery, color: "text-amber-600", bg: "bg-amber-500/10" },
-  "Gas Bill": { icon: Flame, color: "text-orange-600", bg: "bg-orange-500/10" },
-  "Water Bill": { icon: Droplets, color: "text-sky-600", bg: "bg-sky-500/10" },
-  "School Fees": { icon: GraduationCap, color: "text-indigo-600", bg: "bg-indigo-500/10" },
-  "Medical & Treatment": { icon: Stethoscope, color: "text-rose-600", bg: "bg-rose-500/10" },
-  "Business / Work Help": { icon: ShoppingCart, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-  "Other": { icon: Gift, color: "text-teal-600", bg: "bg-teal-600" },
+const CATEGORY_SLIDE_STYLE: Record<
+  string,
+  { icon: typeof Battery; color: string; bg: string }
+> = {
+  "Electricity Bill": {
+    icon: Battery,
+    color: "text-amber-600",
+    bg: "bg-amber-500/10",
+  },
+  "Gas Bill": {
+    icon: Flame,
+    color: "text-orange-600",
+    bg: "bg-orange-500/10",
+  },
+  "Water Bill": {
+    icon: Droplets,
+    color: "text-sky-600",
+    bg: "bg-sky-500/10",
+  },
+  "School Fees": {
+    icon: GraduationCap,
+    color: "text-indigo-600",
+    bg: "bg-indigo-500/10",
+  },
+  "Medical & Treatment": {
+    icon: Stethoscope,
+    color: "text-rose-600",
+    bg: "bg-rose-500/10",
+  },
+  "Business / Work Help": {
+    icon: ShoppingCart,
+    color: "text-emerald-600",
+    bg: "bg-emerald-500/10",
+  },
 };
 
 const ANNOUNCEMENT =
@@ -125,6 +178,13 @@ function sym(cur?: string) {
   return CURRENCY_SYMBOLS[cur || "USD"] ?? (cur || "$");
 }
 
+function normalizePublishedCategory(value: unknown): string {
+  const category = String(value ?? "").trim();
+  if (category === "School, College & University Fees") return "School Fees";
+  if (category === "Education, Books & Admission") return "Education & Books";
+  return category;
+}
+
 const FILTER_CATEGORIES = [
   "Electricity Bill",
   "Gas Bill",
@@ -145,14 +205,48 @@ const FILTER_CATEGORIES = [
   "Livestock / Farming",
   "Debt Relief",
   "Emergency Help",
-  "Other",
 ];
+
+const CATEGORY_SLIDE_MEDIA: Record<string, string> = {
+  "Electricity Bill": "/assets/generated/category-electricity-bill.jpg",
+  "Gas Bill": "/assets/generated/category-gas-bill.jpg",
+  "Water Bill": "/assets/generated/category-water-bill.jpg",
+  "House Rent": "/assets/generated/category-house-rent.jpg",
+  "School Fees": "/assets/generated/category-school-fees.jpg",
+  "Education & Books": "/assets/generated/category-education-books.jpg",
+  "Medical & Treatment": "/assets/generated/category-medical-treatment.jpg",
+  Medicines: "/assets/generated/category-medicines.jpg",
+  "Food & Groceries": "/assets/generated/category-food-groceries.jpg",
+  "Child Support": "/assets/generated/category-child-support.jpg",
+  "Widow & Elderly Support": "/assets/generated/category-widow-elderly.jpg",
+  "Disability Support": "/assets/generated/category-disability-support.jpg",
+  "Marriage Support": "/assets/generated/category-marriage-support.jpg",
+  "Business / Work Help": "/assets/generated/category-business-work.jpg",
+  "Home Repair": "/assets/generated/category-home-repair.jpg",
+  "Funeral Expenses": "/assets/generated/category-funeral-expenses.jpg",
+  "Livestock / Farming": "/assets/generated/category-livestock-farming.jpg",
+  "Debt Relief": "/assets/generated/category-debt-relief.jpg",
+  "Emergency Help": "/assets/generated/category-emergency-help.jpg",
+};
+
+const CATEGORY_ICON: Record<string, typeof Battery> = {
+  "Electricity Bill": Battery, "Gas Bill": Flame, "Water Bill": Droplets, "House Rent": Home,
+  "School Fees": GraduationCap, "Education & Books": BookOpen, "Medical & Treatment": Stethoscope, Medicines: Pill,
+  "Food & Groceries": Apple, "Child Support": Baby, "Widow & Elderly Support": Heart, "Disability Support": Accessibility,
+  "Marriage Support": Gem, "Business / Work Help": ShoppingCart, "Home Repair": Wrench, "Funeral Expenses": Heart,
+  "Livestock / Farming": Tractor, "Debt Relief": CreditCard, "Emergency Help": Siren,
+};
+
+const CATEGORY_FORM_NAME: Record<string, string> = {
+  "School Fees": "School, College & University Fees",
+  "Education & Books": "Education, Books & Admission",
+};
 
 const HELP_NOW_CATEGORY_SLIDES = FILTER_CATEGORIES.map((category) => ({
   key: `category_${category}`,
   category,
   to: "/submit-request",
-  style: CATEGORY_SLIDE_STYLE[category] || CATEGORY_SLIDE_STYLE.Other,
+  style: CATEGORY_SLIDE_STYLE[category] || { icon: Gift, color: "text-teal-600", bg: "bg-teal-600" },
 }));
 
 const CATEGORY_APPEAL: Record<string, string> = {
@@ -163,7 +257,7 @@ const CATEGORY_APPEAL: Record<string, string> = {
   "School Fees": "Help a child stay in school 📚",
   "Education & Books": "Help a student keep learning 📖",
   "Medical & Treatment": "Help save a life through treatment 🏥",
-  "Medicines": "Help a patient get their medicine 💊",
+  Medicines: "Help a patient get their medicine 💊",
   "Food & Groceries": "Help fill an empty plate 🍚",
   "Child Support": "Help brighten a child's future 👶",
   "Widow & Elderly Support": "Be a support for a widow or elder 🤲",
@@ -175,26 +269,302 @@ const CATEGORY_APPEAL: Record<string, string> = {
   "Livestock / Farming": "Help a farmer earn a living 🐄",
   "Debt Relief": "Help free someone from debt's burden 🙏",
   "Emergency Help": "Help someone in an urgent crisis 🚨",
-  "Other": "Be someone's hope today 🤲",
 };
 
-const URGENCIES = ["Low", "Medium", "High", "Emergency"];
+const URGENCIES = [
+  "Low",
+  "Medium",
+  "High",
+  "Emergency",
+];
 
 const TRUST_BADGES = [
-  { icon: MailCheck, label: "Email Verified", color: "text-emerald-600" },
-  { icon: Phone, label: "Mobile Verified", color: "text-blue-600" },
-  { icon: BadgeCheck, label: "Identity Verified", color: "text-violet-600" },
-  { icon: Building2, label: "Institution Verified", color: "text-orange-600" },
+  {
+    icon: MailCheck,
+    label: "Email Verified",
+    color: "text-emerald-600",
+  },
+  {
+    icon: Phone,
+    label: "Mobile Verified",
+    color: "text-blue-600",
+  },
+  {
+    icon: BadgeCheck,
+    label: "Identity Verified",
+    color: "text-violet-600",
+  },
+  {
+    icon: Building2,
+    label: "Institution Verified",
+    color: "text-orange-600",
+  },
 ];
+
+function relativePostTime(value: unknown) {
+  const timestamp = new Date(String(value || "")).getTime();
+  if (!Number.isFinite(timestamp)) return "Recently";
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: number }) {
+  const { user } = useAuth();
+  const { role } = useRole();
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [supports, setSupports] = useState(0);
+  const [supportsGiven, setSupportsGiven] = useState(0);
+  const [supportEarningsUsd, setSupportEarningsUsd] = useState(0);
+  const [earningsSummary, setEarningsSummary] = useState<any>(null);
+  const [activeMoneyTab, setActiveMoneyTab] = useState<"earning" | "support" | "wallet">(() => {
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("givethra_home_mode") : null;
+    return saved === "earning" || saved === "wallet" ? saved : "support";
+  });
+  const [withdrawalForm, setWithdrawalForm] = useState({ amount: "", bank_name: "", account_title: "", account_number: "" });
+  const [posts, setPosts] = useState<any[]>([]);
+  const [feedTab, setFeedTab] = useState<"for-you" | "latest" | "most-supported" | "my-posts">("for-you");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [busyPost, setBusyPost] = useState<string | null>(null);
+  const [postCooldownUntil, setPostCooldownUntil] = useState<number | null>(null);
+  const [clockMs, setClockMs] = useState(() => Date.now());
+  const [userQuery, setUserQuery] = useState("");
+  const [submittedUserQuery, setSubmittedUserQuery] = useState("");
+  const [userResults, setUserResults] = useState<any[]>([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+
+  const loadHomeData = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    const [walletResult, supportResult, earningsResult, postsResult, ownPostsResult] = await Promise.allSettled([
+      getWallet(user.id),
+      getUserSupports(user.id),
+      getEarningsSummary(),
+      getCommunityPosts(feedTab),
+      getCommunityPosts("my-posts"),
+    ]);
+    if (walletResult.status === "fulfilled") setWalletBalance(Number(walletResult.value?.balance || 0));
+    if (supportResult.status === "fulfilled") setSupports(Number(supportResult.value?.supports || 0));
+    if (supportResult.status === "fulfilled") {
+      const supportData = supportResult.value as typeof supportResult.value & {
+        supportsGiven?: number;
+        supportEarningsUsd?: number;
+      };
+      setSupportsGiven(Number(supportData?.supportsGiven || 0));
+      setSupportEarningsUsd(Number(supportData?.supportEarningsUsd || 0));
+    }
+    if (earningsResult.status === "fulfilled") setEarningsSummary(earningsResult.value);
+    if (postsResult.status === "fulfilled") setPosts(Array.isArray(postsResult.value) ? postsResult.value : []);
+    if (ownPostsResult.status === "fulfilled") {
+      const latest = ownPostsResult.value
+        .filter((post: any) => post.user_id === user.id && post.created_at)
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+      const next = latest ? new Date(latest.created_at).getTime() + 24 * 60 * 60 * 1000 : 0;
+      setPostCooldownUntil(next > Date.now() ? next : null);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadHomeData(); }, [user?.id, feedTab]);
+  useEffect(() => {
+    const onPanelTab = (event: Event) => {
+      const tab = (event as CustomEvent<"support" | "earning" | "wallet">).detail;
+      if (tab === "support" || tab === "earning" || tab === "wallet") setActiveMoneyTab(tab);
+    };
+    window.addEventListener("givethra-home-panel-tab", onPanelTab);
+    return () => window.removeEventListener("givethra-home-panel-tab", onPanelTab);
+  }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (activeMoneyTab !== "support" || posts.length === 0) return;
+    const newest = posts.reduce((max, post) => Math.max(max, new Date(post?.created_at || 0).getTime()), 0);
+    if (newest > 0) {
+      window.dispatchEvent(new CustomEvent("givethra-support-posts-seen", { detail: { newest } }));
+    }
+  }, [activeMoneyTab, posts]);
+
+  useEffect(() => {
+    const query = submittedUserQuery.trim();
+    if (query.length < 2) {
+      setUserResults([]);
+      setSearchingUsers(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setSearchingUsers(true);
+      try {
+        const results = await searchUsers(query);
+        if (!cancelled) setUserResults(Array.isArray(results) ? results : []);
+      } catch {
+        if (!cancelled) setUserResults([]);
+      } finally {
+        if (!cancelled) setSearchingUsers(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [submittedUserQuery]);
+
+  const submitPost = async () => {
+    const text = message.trim();
+    if (!text || !user?.id || (postCooldownUntil != null && postCooldownUntil > Date.now())) return;
+    setPosting(true);
+    try {
+      const created = await createCommunityPost({ message: text, user_id: user.id, display_name: user.fullName || "User", is_guest: false });
+      setPosts((current) => [{ ...created, display_name: created?.display_name || user.fullName || "User", message: text, likes_count: 0, support_count: 0 }, ...current]);
+      setMessage("");
+      setPostCooldownUntil(Date.now() + 24 * 60 * 60 * 1000);
+      toast.success("Your post is live. You can publish again after 24 hours.");
+    } catch (error) {
+      const nextPostAt = Number((error as any)?.nextPostAt ? new Date((error as any).nextPostAt).getTime() : 0);
+      if (nextPostAt > Date.now()) setPostCooldownUntil(nextPostAt);
+      toast.error(error instanceof Error ? error.message : "Post could not be published");
+    } finally {
+      setPosting(false);
+    }
+  };
+  const cooldownRemainingMs = Math.max(0, (postCooldownUntil || 0) - clockMs);
+  const cooldownHours = Math.floor(cooldownRemainingMs / (1000 * 60 * 60));
+  const cooldownMinutes = Math.floor((cooldownRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
+  const cooldownSeconds = Math.floor((cooldownRemainingMs % (1000 * 60)) / 1000);
+  const postLocked = cooldownRemainingMs > 0;
+
+  const sharePost = async (post: any) => {
+    const text = `${post.display_name || "Givethra member"}: ${post.message || ""}`;
+    const url = `${window.location.origin}/community`;
+    if (navigator.share) await navigator.share({ title: "Givethra post", text, url });
+    else await navigator.clipboard?.writeText(`${text}\n${url}`);
+  };
+  const reactToPost = async (post: any) => {
+    if (!post?.id || post.supported_by_me || post.user_id === user?.id) return;
+    setBusyPost(`support:${post.id}`);
+    try {
+      const result = await supportPost(String(post.id));
+      setPosts((current) => current.map((item) => item.id === post.id ? {
+        ...item,
+        support_count: Number(result?.support_count ?? Number(item.support_count || 0) + 1),
+        supported_by_me: true,
+      } : item));
+      setSupports((value) => value + 1);
+      if (result?.supportEarningsUsd != null) setSupportEarningsUsd(Number(result.supportEarningsUsd));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Support could not be added");
+    } finally {
+      setBusyPost(null);
+    }
+  };
+  const togglePostHero = async (post: any) => {
+    if (!post?.user_id || post.user_id === user?.id) return;
+    setBusyPost(`hero:${post.id}`);
+    try {
+      if (post.is_following) await unfollowUser(String(post.user_id));
+      else await followUser(String(post.user_id));
+      setPosts((current) => current.map((item) => item.id === post.id ? { ...item, is_following: !post.is_following } : item));
+    } finally {
+      setBusyPost(null);
+    }
+  };
+
+  return (
+      <SlidingHomePanel onTabChange={setActiveMoneyTab}>
+      <div className="min-h-full bg-muted/20 pb-24">
+        <div className="mx-auto max-w-3xl space-y-4 px-3 py-4 md:px-5 md:py-7">
+          <section className="rounded-2xl bg-card px-5 py-5 shadow-sm border border-border">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Givethra Home</p>
+                <h1 className="mt-1 text-2xl font-bold text-foreground md:text-3xl">Welcome {role === "hero" ? "Hero" : "Requester"}</h1>
+                <p className="mt-1 text-sm text-muted-foreground">{role === "hero" ? "Your kindness creates real impact." : "Share your journey and connect with support."}</p>
+              </div>
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
+                {(user?.fullName || "U").slice(0, 1).toUpperCase()}
+              </div>
+            </div>
+            {activeMoneyTab === "support" ? <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4"><p className="font-semibold">Support Center</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Support others and receive support on your own posts. Both given and received Supports count toward your 5,000 eligibility target.</p><p className="mt-2 text-[11px] text-muted-foreground">10,000 Supports = $1</p><p className="mt-3 text-xs font-semibold text-primary">Eligibility: {Number(earningsSummary?.eligibility_supports || 0).toLocaleString()} / 5,000 Supports</p></div> : null}
+            {activeMoneyTab === "earning" ? <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:bg-amber-950/20"><div className="flex items-center justify-between"><p className="font-semibold">Earnings</p><span className={earningsSummary?.earnings_eligible ? "text-emerald-600" : "text-amber-700"}>{earningsSummary?.earnings_eligible ? "Eligible" : "Not eligible yet"}</span></div><p className="mt-1 text-xs text-muted-foreground">Your posts earn only after eligibility. Current earnings: ${Number(earningsSummary?.earnings_usd || supportEarningsUsd).toFixed(4)}</p><div className="mt-3 space-y-2">{(earningsSummary?.posts || []).map((entry: any) => <div key={entry.id} className="flex justify-between rounded-lg bg-white/70 px-3 py-2 text-xs"><span>Post {String(entry.post_id).slice(0, 8)} · {entry.supports} Support</span><strong>{Number(entry.amount_pkr).toFixed(2)} PKR</strong></div>)}</div></div> : null}
+            {activeMoneyTab === "wallet" ? <div className="mt-5 rounded-xl border border-primary/15 bg-primary/5 p-4"><div className="flex items-center justify-between"><p className="font-semibold">Wallet</p><strong className="text-primary">{Number(earningsSummary?.wallet_pkr || 0).toFixed(2)} PKR</strong></div><p className="mt-1 text-xs text-muted-foreground">Withdrawal opens from the 30th through the 3rd. Minimum 300 PKR.</p><div className="mt-4 rounded-2xl border border-primary/15 bg-background p-4 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-primary">Withdrawal Request</p><div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-semibold text-muted-foreground">Bank name<input value={withdrawalForm.bank_name} onChange={e => setWithdrawalForm({ ...withdrawalForm, bank_name: e.target.value })} placeholder="Enter bank name" className="h-10 rounded-lg border border-border bg-muted/20 px-3 text-sm font-normal text-foreground" /></label><label className="grid gap-1 text-xs font-semibold text-muted-foreground">Account title<input value={withdrawalForm.account_title} onChange={e => setWithdrawalForm({ ...withdrawalForm, account_title: e.target.value })} placeholder="Enter account title" className="h-10 rounded-lg border border-border bg-muted/20 px-3 text-sm font-normal text-foreground" /></label><label className="grid gap-1 text-xs font-semibold text-muted-foreground">Account number / IBAN<input value={withdrawalForm.account_number} onChange={e => setWithdrawalForm({ ...withdrawalForm, account_number: e.target.value })} placeholder="Enter account number or IBAN" className="h-10 rounded-lg border border-border bg-muted/20 px-3 text-sm font-normal text-foreground" /></label><label className="grid gap-1 text-xs font-semibold text-muted-foreground">Amount (PKR)<input value={withdrawalForm.amount} onChange={e => setWithdrawalForm({ ...withdrawalForm, amount: e.target.value })} placeholder="Minimum 300 PKR" inputMode="decimal" className="h-10 rounded-lg border border-border bg-muted/20 px-3 text-sm font-normal text-foreground" /></label><Button className="w-full" disabled={!earningsSummary?.withdrawal_open || Number(earningsSummary?.wallet_pkr || 0) < 300} onClick={async () => { try { await requestWithdrawal({ ...withdrawalForm, amount: Number(withdrawalForm.amount || earningsSummary?.wallet_pkr || 0) }); toast.success("Withdrawal request sent to Admin."); setEarningsSummary(await getEarningsSummary()); } catch (error) { toast.error(error instanceof Error ? error.message : "Withdrawal failed"); } }}>Request withdrawal</Button></div></div></div> : null}
+            {activeMoneyTab === "wallet" && (earningsSummary?.withdrawals || []).length > 0 ? <div className="mt-4 rounded-2xl border border-border bg-card p-4"><p className="text-sm font-bold">Withdrawal History</p><div className="mt-3 space-y-2">{earningsSummary.withdrawals.map((item: any) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs"><span>{Number(item.amount_pkr).toFixed(2)} PKR · <strong className="capitalize">{item.status}</strong></span>{item.payment_proof_url ? <a href={item.payment_proof_url} target="_blank" rel="noreferrer" className="font-semibold text-primary underline">View payment proof</a> : <span className="text-muted-foreground">Awaiting admin proof</span>}</div>)}</div></div> : null}
+          </section>
+
+          {activeMoneyTab === "support" ? <>
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <Search className="h-4 w-4 text-primary" />
+              <div>
+                <h2 className="text-sm font-bold text-foreground">Find people in Givethra</h2>
+                <p className="text-xs text-muted-foreground">Search by name or username, then open their profile.</p>
+              </div>
+            </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input value={userQuery} onChange={(event) => setUserQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") setSubmittedUserQuery(userQuery); }} placeholder="Search name or @username" className="h-11 w-full rounded-xl border border-border bg-muted/20 pl-10 pr-24 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+              <button type="button" onClick={() => setSubmittedUserQuery(userQuery)} disabled={userQuery.trim().length < 2} className="absolute right-1 top-1 h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">Search</button>
+            </div>
+            {submittedUserQuery.trim().length >= 2 && (
+              <div className="mt-3 space-y-2">
+                {searchingUsers ? <p className="py-3 text-center text-xs text-muted-foreground">Searching…</p> : userResults.length === 0 ? <p className="py-3 text-center text-xs text-muted-foreground">No users found.</p> : userResults.map((result) => (
+                  <Link key={result.user_id} to="/profile/$id" params={{ id: String(result.user_id) }} className="flex items-center gap-3 rounded-xl border border-border/70 p-3 transition hover:border-primary/40 hover:bg-primary/5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-bold text-primary">{result.avatar_url ? <img src={result.avatar_url} alt="" className="h-full w-full object-cover" /> : String(result.full_name || "U").slice(0, 1).toUpperCase()}</div>
+                    <div className="min-w-0"><p className="truncate text-sm font-semibold">{result.full_name || "Givethra member"}</p><p className="truncate text-xs text-muted-foreground">{result.username ? `@${result.username}` : "Givethra member"}{result.city ? ` · ${result.city}` : ""}</p></div>
+                    <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">{(user?.fullName || "U").slice(0, 1).toUpperCase()}</div>
+              <div className="min-w-0 flex-1">
+                <p className="mb-2 text-sm font-semibold">{user?.fullName || "Your profile"}</p>
+                <textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="What’s on your mind to share?" rows={3} className="w-full resize-none rounded-xl border border-border bg-muted/20 p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+                <div className="mt-3 flex items-center justify-between gap-3"><span className="text-[11px] text-muted-foreground">{postLocked ? `Post locked · ${cooldownHours}h ${cooldownMinutes}m ${cooldownSeconds}s left` : "One post per 24 hours · Support others to grow the community"}</span><Button onClick={submitPost} disabled={posting || !message.trim() || postLocked}>{posting ? "Posting..." : postLocked ? "Post Locked" : "Post"}</Button></div>
+              </div>
+            </div>
+          </section>
+
+          <div className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm">
+            {[ ["for-you", "For You"], ["latest", "Latest"], ["most-supported", "Most Supported"], ["my-posts", "My Posts"] ].map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setFeedTab(value as typeof feedTab)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${feedTab === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>{label}</button>
+            ))}
+          </div>
+
+          {loading ? <div className="py-12 text-center text-sm text-muted-foreground">Loading your feed...</div> : posts.length === 0 ? <div className="rounded-2xl border border-dashed bg-card py-12 text-center text-sm text-muted-foreground">No posts yet. Be the first to share something.</div> : posts.map((post) => (
+            <article key={post.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex items-center gap-3"><Link to="/profile/$id" params={{ id: String(post.user_id || "me") }} className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-bold text-primary">{post.avatar_url ? <img src={post.avatar_url} alt="" className="h-full w-full object-cover" /> : String(post.display_name || "U").slice(0, 1).toUpperCase()}</Link><div className="min-w-0"><div className="flex items-center gap-2"><Link to="/profile/$id" params={{ id: String(post.user_id || "me") }} className="truncate text-sm font-semibold hover:text-primary">{post.display_name || "User"}</Link>{post.user_id && post.user_id !== user?.id && <button type="button" disabled={busyPost === `hero:${post.id}`} onClick={() => togglePostHero(post)} className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">{post.is_following ? "Hero ✓" : "Hero"}</button>}</div><p className="text-xs text-muted-foreground">{relativePostTime(post.created_at)} · {post.is_verified ? "Verified member" : "Givethra member"}</p></div></div>
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{post.message}</p>
+              <div className="mt-4 flex gap-2 border-t border-border pt-3"><button type="button" disabled={busyPost === `support:${post.id}` || Boolean(post.supported_by_me) || post.user_id === user?.id} onClick={() => reactToPost(post)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${post.supported_by_me ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-primary/20 text-primary hover:bg-primary/10"}`}>{post.supported_by_me ? "Supported ✓" : "🫴🏻 Support"} · {Number(post.support_count || 0)}</button><button type="button" onClick={() => sharePost(post)} className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"><Share2 className="h-4 w-4" /> Share</button></div>
+            </article>
+          ))}
+          </> : null}
+        </div>
+      </div>
+      </SlidingHomePanel>
+  );
+}
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const { role } = useRole();
+
   const [cases, setCases] = useState<any[]>([]);
-  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>(
-    {}
-  );
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [notifCount, setNotifCount] = useState(0);
 
@@ -202,6 +572,8 @@ export default function HomePage() {
   const [balance, setBalance] = useState(0);
   const [unlockCount, setUnlockCount] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [homeMode, setHomeMode] = useState<"support" | "earning">(() => (localStorage.getItem("givethra_home_mode") === "earning" || localStorage.getItem("givethra_home_mode") === "wallet" ? "earning" : "support"));
 
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -213,12 +585,19 @@ export default function HomePage() {
   const [detectedCountry, setDetectedCountry] = useState<string | null>(null);
   const [userCountry, setUserCountry] = useState<string | null>(null);
   const [detectedCity, setDetectedCity] = useState<string | null>(null);
+
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Load cases on mount
+  useEffect(() => {
+    const onModeChange = (event: Event) => setHomeMode((event as CustomEvent<"support" | "earning">).detail === "earning" ? "earning" : "support");
+    window.addEventListener("givethra-home-panel-tab", onModeChange);
+    return () => window.removeEventListener("givethra-home-panel-tab", onModeChange);
+  }, []);
+
   useEffect(() => {
     loadCases();
     loadCategoryCounts();
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
@@ -227,9 +606,12 @@ export default function HomePage() {
               `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&localityLanguage=en`
             );
             const data = await res.json();
-            if (data?.countryName) setDetectedCountry(data.countryName);
-            if (data?.city || data?.locality)
+            if (data?.countryName) {
+              setDetectedCountry(data.countryName);
+            }
+            if (data?.city || data?.locality) {
               setDetectedCity(data.city || data.locality);
+            }
           } catch {}
         },
         () => {},
@@ -243,10 +625,11 @@ export default function HomePage() {
       setUserCountry(null);
       return;
     }
-    getProfile(user.id).then((profile) => setUserCountry(profile?.country || null)).catch(() => setUserCountry(null));
+    getProfile(user.id)
+      .then((profile) => setUserCountry(profile?.country || null))
+      .catch(() => setUserCountry(null));
   }, [user?.id]);
 
-  // Load user-specific data when authenticated
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       runUserGuide(user.id);
@@ -269,9 +652,7 @@ export default function HomePage() {
     try {
       const count = await getUnreadNotificationsCount(user.id);
       setNotifCount(count ?? 0);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   async function loadGuideStatus() {
@@ -281,9 +662,7 @@ export default function HomePage() {
       setKycStatus(kyc?.status ?? "none");
       const wallet = await getWallet(user.id);
       setBalance(wallet?.balance ?? 0);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   async function loadUnlockCount() {
@@ -291,9 +670,7 @@ export default function HomePage() {
     try {
       const count = await getUnlockCount(user.id);
       setUnlockCount(count ?? 0);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   async function loadCases() {
@@ -311,146 +688,85 @@ export default function HomePage() {
   async function loadCategoryCounts() {
     try {
       const counts = await getCategoryCounts();
-      setCategoryCounts(counts ?? {});
+      const normalized = Object.entries(counts ?? {}).reduce<Record<string, number>>((result, [category, count]) => {
+        const label = normalizePublishedCategory(category);
+        result[label] = (result[label] || 0) + Number(count || 0);
+        return result;
+      }, {});
+      setCategoryCounts(normalized);
     } catch {
-      // ignore
+      // The published cases remain visible even if the count endpoint is unavailable.
     }
   }
 
-  // ====== SLIDE DEFINITIONS ======
   const HAND_SLIDE = {
     key: "hero",
     type: "image" as const,
     image: "/assets/generated/hero-givethra.dim_1200x500.jpg",
   };
 
-  // Build guide slides based on auth status
   const guideSlides: any[] = [];
-
-  // Always include the hand slide first
   guideSlides.push(HAND_SLIDE);
 
-  if (!isAuthenticated) {
-    guideSlides.push({
-      key: "free_helps",
-      type: "action",
-      icon: Gift,
-      title: "🎉 First 3 helps are FREE!",
-      desc: "Become a Hero and unlock your first 3 cases for free. After that, 1 credit per help. Start today.",
-      cta: "Become a Hero — Free",
-      to: "/sign-in",
-      color: "text-green-600",
-      bg: "bg-green-500/10",
-    });
-    guideSlides.push({
-      key: "free_case",
-      type: "action",
-      icon: FileText,
-      title: "📝 Submit your FIRST case FREE!",
-      desc: "Complete KYC and submit your first case with no fee. Heroes will verify and help you.",
-      cta: "Submit Free Case",
-      to: "/sign-in",
-      color: "text-primary",
-      bg: "bg-primary/10",
-    });
-  } else {
-    if (kycStatus !== "approved") {
-      guideSlides.push({ key: "announce", type: "announce", to: "/kyc" });
-      guideSlides.push({
-        key: "kyc",
-        type: "guide",
-        icon: ShieldCheck,
-        title: "Step 1: Verify your identity",
-        desc: "You've signed up — now complete your KYC. Add your CNIC photos (front, back, selfie) as shown on the KYC page. Tap here to start.",
-        to: "/kyc",
-        color: "text-violet-600",
-        bg: "bg-violet-500/10",
-      });
-    }
-    if (kycStatus === "approved") {
-      guideSlides.push({
-        key: "submit",
-        type: "guide",
-        icon: FileText,
-        title: "Submit your FIRST case — FREE! 🎉",
-        desc: "Your identity is verified! Your first case is completely free to submit. Tap here to start your request.",
-        to: "/submit-request",
-        color: "text-primary",
-        bg: "bg-primary/10",
-      });
+  guideSlides.push(
+    ...HELP_NOW_CATEGORY_SLIDES.map((slide) => ({
+      key: slide.key,
+      type: "category" as const,
+      category: slide.category,
+      icon: CATEGORY_ICON[slide.category] || slide.style.icon,
+      image: CATEGORY_SLIDE_MEDIA[slide.category],
+      title: slide.category,
+      desc: CATEGORY_APPEAL[slide.category] || `Submit a verified ${slide.category} case.`,
+      cta: "Submit this case",
+      to: slide.to,
+      color: slide.style.color,
+      bg: slide.style.bg,
+    }))
+  );
 
-      if (unlockCount < 3) {
-        guideSlides.push({
-          key: "free_helps_auth",
-          type: "guide",
-          icon: Gift,
-          title: "🎉 Your first 3 helps are FREE!",
-          desc: `As a Hero, your first ${3 - unlockCount} unlocks are completely free. After that, 1 credit per help. Start helping now!`,
-          to: "/cases",
-          color: "text-green-600",
-          bg: "bg-green-500/10",
-        });
-      }
-
-      guideSlides.push({
-        key: "help",
-        type: "guide",
-        icon: Heart,
-        title: "Help someone — become a Hero",
-        desc: "Browse verified cases and help a real person by paying their institute directly. You'll get an affidavit as proof. Tap here to help.",
-        to: "/cases",
-        cta: "Help Now",
-        color: "text-rose-600",
-        bg: "bg-rose-500/10",
-      });
-    }
-  }
-
-  // Category slides
-  guideSlides.push(...HELP_NOW_CATEGORY_SLIDES.map((slide) => ({
-    key: slide.key,
-    type: "category" as const,
-    category: slide.category,
-    icon: slide.style.icon,
-    title: slide.category,
-    desc: CATEGORY_APPEAL[slide.category] || `Submit a verified ${slide.category} case.`,
-    cta: "Submit this case",
-    to: slide.to,
-    color: slide.style.color,
-    bg: slide.style.bg,
-  })));
-
-  // Touch controls
   const sliderTouchStart = useRef<number | null>(null);
+
   function handleSliderTouchStart(event: React.TouchEvent<HTMLDivElement>) {
     sliderTouchStart.current = event.changedTouches[0]?.clientX ?? null;
   }
+
   function handleSliderTouchEnd(event: React.TouchEvent<HTMLDivElement>) {
     const start = sliderTouchStart.current;
     const end = event.changedTouches[0]?.clientX;
     sliderTouchStart.current = null;
-    if (start == null || end == null || guideSlides.length <= 1) return;
+
+    if (start == null || end == null || guideSlides.length <= 1) {
+      return;
+    }
+
     const delta = end - start;
     if (Math.abs(delta) < 40) return;
-    setSlideIndex((prev) => (prev + (delta < 0 ? 1 : guideSlides.length - 1)) % guideSlides.length);
+
+    setSlideIndex(
+      (prev) => (prev + (delta < 0 ? 1 : guideSlides.length - 1)) % guideSlides.length
+    );
   }
 
-  // Auto-slide timer
   useEffect(() => {
     if (guideSlides.length <= 1) return;
+
     const t = setInterval(() => {
       setSlideIndex((prev) => (prev + 1) % guideSlides.length);
-    }, 6000);
+    }, 3000); // 3 seconds per slide
+
     return () => clearInterval(t);
   }, [guideSlides.length]);
 
   useEffect(() => {
-    if (slideIndex >= guideSlides.length) setSlideIndex(0);
+    if (slideIndex >= guideSlides.length) {
+      setSlideIndex(0);
+    }
   }, [guideSlides.length, slideIndex]);
 
   const countries = Array.from(
     new Set(cases.map((c) => c.country).filter(Boolean))
   ).sort();
+
   const cities = Array.from(
     new Set(
       cases
@@ -460,11 +776,15 @@ export default function HomePage() {
     )
   ).sort();
 
+  // Sort by published count while preserving the original sequence for ties and zeros.
+  const orderedCategories = [...FILTER_CATEGORIES].sort((a, b) => Number(categoryCounts[b] || 0) - Number(categoryCounts[a] || 0));
+
   let filtered = cases.filter((c) => {
     if (filterCountry !== "all" && c.country !== filterCountry) return false;
     if (filterCity !== "all" && c.city !== filterCity) return false;
-    if (filterCat !== "all" && c.category !== filterCat) return false;
+    if (filterCat !== "all" && normalizePublishedCategory(c.category) !== filterCat) return false;
     if (filterUrgency !== "all" && c.urgency !== filterUrgency) return false;
+
     if (search.trim()) {
       const q = search.toLowerCase();
       if (
@@ -473,20 +793,18 @@ export default function HomePage() {
         !c.description?.toLowerCase().includes(q) &&
         !c.institute_name?.toLowerCase().includes(q) &&
         !c.city?.toLowerCase().includes(q)
-      )
+      ) {
         return false;
+      }
     }
     return true;
   });
 
   filtered = orderCasesForViewer(filtered, userCountry || detectedCountry, sortBy);
 
-  const activeFilterCount = [
-    filterCountry,
-    filterCity,
-    filterCat,
-    filterUrgency,
-  ].filter((f) => f !== "all").length;
+  const activeFilterCount = [filterCountry, filterCity, filterCat, filterUrgency].filter(
+    (f) => f !== "all"
+  ).length;
 
   function resetFilters() {
     setFilterCountry("all");
@@ -499,13 +817,18 @@ export default function HomePage() {
 
   function selectCategory(cat: string) {
     setFilterCat(filterCat === cat ? "all" : cat);
-    setTimeout(
-      () => resultsRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100
-    );
+    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   }
 
   const currentSlide = guideSlides[slideIndex] ?? HAND_SLIDE;
+
+  function goToProtectedAction(to: string) {
+    if (!isAuthenticated) {
+      navigate({ to: "/sign-in" });
+      return;
+    }
+    navigate({ to: to as any });
+  }
 
   function renderSlideContent() {
     if (currentSlide.type === "image") {
@@ -513,25 +836,23 @@ export default function HomePage() {
         <img
           src={currentSlide.image}
           alt="Givethra"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover object-top"
         />
       );
     }
+
     if (currentSlide.type === "announce") {
       return (
         <button
           type="button"
-          onClick={() => navigate({ to: currentSlide.to })}
-          className="w-full h-52 md:h-72 bg-gradient-to-br from-primary to-primary/80 text-white flex flex-col items-center justify-center text-center px-6 gap-2 cursor-pointer"
+          onClick={() => goToProtectedAction(currentSlide.to)}
+          className="w-full h-full bg-gradient-to-br from-primary to-primary/80 text-white flex flex-col items-center justify-center text-center px-6 gap-2 cursor-pointer"
         >
           <span className="text-4xl">🎉</span>
-          <div className="text-2xl md:text-3xl font-black tracking-wide">
-            First Case FREE! 🎉
-          </div>
+          <div className="text-2xl md:text-3xl font-black tracking-wide">First Case FREE! 🎉</div>
           <p className="text-sm font-semibold opacity-90">Complete your KYC & submit your first request with zero fees</p>
           <p className="text-sm max-w-sm leading-relaxed opacity-95">
-            Complete your KYC and submit your{" "}
-            <strong>first case completely FREE</strong> — no fee!
+            Complete your KYC and submit your <strong>first case completely FREE</strong> — no fee!
           </p>
           <span className="inline-flex items-center gap-1 text-sm font-bold bg-white/20 rounded-full px-4 py-1.5 mt-1">
             Complete your KYC now <ChevronRight className="h-4 w-4" />
@@ -539,65 +860,63 @@ export default function HomePage() {
         </button>
       );
     }
+
     if (currentSlide.type === "category") {
-      return (
-        <button
-          type="button"
-          onClick={() => navigate({ to: currentSlide.to })}
-          className="w-full h-52 md:h-72 bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
-        >
-          <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg || "bg-primary/10"} flex items-center justify-center`}>
-            <currentSlide.icon className={`h-8 w-8 ${currentSlide.color || "text-primary"}`} />
-          </div>
-          <h3 className="font-display text-xl font-bold text-foreground">{currentSlide.title}</h3>
-          <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{currentSlide.desc}</p>
-          <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">{currentSlide.cta} <ChevronRight className="h-4 w-4" /></span>
-        </button>
-      );
+      return <img src={currentSlide.image} alt="" loading="eager" draggable={false} className="pointer-events-none h-full w-full select-none object-cover object-top" />;
     }
+
     if (currentSlide.type === "action") {
       return (
         <button
           type="button"
-          onClick={() => navigate({ to: currentSlide.to })}
-          className="w-full h-52 md:h-72 bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
+          onClick={() => goToProtectedAction(currentSlide.to)}
+          className="w-full h-full bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
         >
-          <div
-            className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}
-          >
+          <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}>
             <currentSlide.icon className={`h-8 w-8 ${currentSlide.color}`} />
           </div>
-          <h3 className="font-display text-xl font-bold text-foreground">
-            {currentSlide.title}
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-            {currentSlide.desc}
-          </p>
+          <h3 className="font-display text-xl font-bold text-foreground">{currentSlide.title}</h3>
+          <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{currentSlide.desc}</p>
           <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">
             {currentSlide.cta} <ChevronRight className="h-4 w-4" />
           </span>
         </button>
       );
     }
+
+    if (currentSlide.type === "guide" && currentSlide.image) {
+      return (
+        <div className="relative h-full w-full overflow-hidden bg-slate-950">
+          <img src={currentSlide.image} alt="Identity verification" loading="eager" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-transparent" />
+          <div className="relative z-10 flex h-full max-w-[72%] flex-col justify-center gap-2 px-5 text-white md:max-w-[58%] md:px-8">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/30 ring-1 ring-white/20">
+              <ShieldCheck className="h-5 w-5 text-violet-200" />
+            </div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">Secure verification</p>
+            <h3 className="font-display text-lg font-bold leading-tight md:text-2xl">Complete Your KYC to Submit Your Case</h3>
+            <p className="text-xs leading-relaxed text-white/85 md:text-sm">Verify your identity with CNIC photos, selfie and a short video.</p>
+            <button type="button" onClick={() => goToProtectedAction(currentSlide.to)} className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-lg active:scale-95">
+              Start verification <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <button
         type="button"
-        onClick={() => navigate({ to: currentSlide.to })}
-        className="w-full h-52 md:h-72 bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
+        onClick={() => goToProtectedAction(currentSlide.to)}
+        className="w-full h-full bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer"
       >
-        <div
-          className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}
-        >
+        <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}>
           <currentSlide.icon className={`h-8 w-8 ${currentSlide.color}`} />
         </div>
-        <h3 className="font-display text-xl font-bold text-foreground">
-          {currentSlide.title}
-        </h3>
-        <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-          {currentSlide.desc}
-        </p>
+        <h3 className="font-display text-xl font-bold text-foreground">{currentSlide.title}</h3>
+        <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{currentSlide.desc}</p>
         <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">
-            {currentSlide.cta || "Tap to continue"} <ChevronRight className="h-4 w-4" />
+          {currentSlide.cta || "Tap to continue"} <ChevronRight className="h-4 w-4" />
         </span>
       </button>
     );
@@ -606,786 +925,623 @@ export default function HomePage() {
   return (
     <Layout>
       <div className="bg-background pb-20 md:pb-0">
-      <InstallButton />
+        {homeMode === "support" && <>
+        <InstallButton />
+        <CompletionCooldownBanner />
 
-      {ANNOUNCEMENT && (
-        <div className="bg-primary text-primary-foreground overflow-hidden relative h-9 flex items-center border-b border-primary/30">
-          <div className="absolute left-0 top-0 bottom-0 z-10 bg-primary px-2 flex items-center">
-            <Gift className="h-4 w-4" />
-          </div>
-          <div className="whitespace-nowrap animate-marquee pl-10">
-            <span className="text-sm font-medium px-4">{ANNOUNCEMENT}</span>
-            <span className="text-sm font-medium px-4">{ANNOUNCEMENT}</span>
-          </div>
-        </div>
-      )}
-
-      <section className="relative overflow-hidden bg-card border-b border-border">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-          <div className="absolute bottom-0 -left-16 h-48 w-48 rounded-full bg-primary/8 blur-2xl" />
-        </div>
-        <div className="relative max-w-7xl mx-auto px-4 pt-8 pb-6 md:py-12 flex flex-col md:flex-row items-center gap-6 md:gap-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55 }}
-            className="flex-1 space-y-4 text-center md:text-left"
-          >
-            <h1 className="font-display text-3xl md:text-5xl font-bold text-foreground leading-tight">
-              <span className="text-foreground">Real People.</span><br />
-              <span className="text-primary">Real Needs. Real Help.</span>
-            </h1>
-            <p className="text-base text-muted-foreground max-w-md">
-              Connect with verified people, support genuine needs, and create
-              meaningful impact.
-            </p>
-
-            {!isAuthenticated && (
-              <div className="flex gap-3 justify-center md:justify-start">
-                <Button
-                  size="lg"
-                  onClick={() => navigate({ to: "/become-hero" })}
-                  className="h-11 px-6 font-semibold flex-1 sm:flex-none"
-                >
-                  Become a Hero
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => navigate({ to: "/need-help" })}
-                  className="h-11 px-6 font-semibold flex-1 sm:flex-none"
-                >
-                  Request Help
-                </Button>
-              </div>
-            )}
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.65, delay: 0.15 }}
-            className="flex-1 w-full space-y-4"
-          >
-              <div id="givethra-help-slider" className="relative h-52 w-full rounded-2xl overflow-hidden shadow-xl touch-pan-y" onTouchStart={handleSliderTouchStart} onTouchEnd={handleSliderTouchEnd}>
-              {renderSlideContent()}
+        {ANNOUNCEMENT && (
+          <div className="bg-primary text-primary-foreground overflow-hidden relative h-9 flex items-center border-b border-primary/30">
+            <div className="absolute left-0 top-0 bottom-0 z-10 bg-primary px-2 flex items-center">
+              <Gift className="h-4 w-4" />
             </div>
-          </motion.div>
-        </div>
-      </section>
+            <div className="whitespace-nowrap animate-marquee pl-10">
+              <span className="text-sm font-medium px-4">{ANNOUNCEMENT}</span>
+              <span className="text-sm font-medium px-4">{ANNOUNCEMENT}</span>
+            </div>
+          </div>
+        )}
 
-      {/* WhatsApp Channel & Customer Support */}
-      <section className="py-4 px-4 bg-background border-b border-border">
-        <div className="max-w-7xl mx-auto flex items-center justify-center gap-6 flex-wrap">
-          <a
-            href={WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-green-600 transition-colors"
-          >
-            <MessageCircle className="h-6 w-6 text-green-600" />
-            <span>WhatsApp Channel</span>
-          </a>
-          <span className="text-muted-foreground text-lg select-none">|</span>
-          <a
-            href="https://wa.me/message/42CJXLUYEI2KM1?src=qr"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
-          >
-            <MessageCircle className="h-6 w-6 text-primary" />
-            <span>24/7 Customer Support</span>
-          </a>
-        </div>
-      </section>
+        {/* --- UPDATED HERO & CATEGORY SECTION (NoBroker Style) --- */}
+        <section className="relative overflow-hidden bg-card border-b border-border">
+          <div className="relative mx-auto max-w-7xl px-4 pt-6 pb-6 md:py-8 flex flex-col items-center gap-6">
+            
+            {/* SMART BUTTONS ABOVE SLIDER */}
+            <div className="flex w-full max-w-6xl flex-col sm:flex-row gap-3 mb-2">
+              <Button
+                size="lg"
+                onClick={() => navigate({ to: "/become-hero" })}
+                className="h-14 flex-1 rounded-2xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-base sm:text-lg shadow-sm shadow-amber-200 transition-all hover:scale-[1.01] active:scale-[0.99]"
+              >
+                <Heart className="h-5 w-5 sm:h-6 sm:w-6 mr-2" /> Become a Hero (Help Others)
+              </Button>
+              <Button
+                size="lg"
+                onClick={() => navigate({ to: "/need-help" })}
+                className="h-14 flex-1 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base sm:text-lg shadow-sm shadow-blue-200 transition-all hover:scale-[1.01] active:scale-[0.99]"
+              >
+                <FileText className="h-5 w-5 sm:h-6 sm:w-6 mr-2" /> Request Help (Requester)
+              </Button>
+            </div>
 
-      {isAuthenticated && (
-        <section className="bg-background border-b border-border py-5 px-4">
-          <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              onClick={() => navigate({ to: "/become-hero" })}
-              className="text-left rounded-2xl border border-border bg-card hover:border-primary hover:shadow-md transition-all p-5 flex items-start gap-4 group"
+            {/* 1. MAIN SLIDER (Full Image, No Dots) */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.65, delay: 0.15 }}
+              className="relative w-full max-w-6xl"
             >
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Heart className="h-6 w-6 text-primary" />
+              <div
+                id="givethra-help-slider"
+                className="relative h-56 sm:h-72 md:h-[400px] w-full overflow-hidden rounded-3xl shadow-lg touch-pan-y bg-muted"
+                onTouchStart={handleSliderTouchStart}
+                onTouchEnd={handleSliderTouchEnd}
+              >
+                {renderSlideContent()}
               </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="font-bold text-foreground flex items-center gap-1">
-                  Become a Hero{" "}
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                </h3>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Browse verified cases and help someone directly by paying
-                  their institute.
+            </motion.div>
+
+            {/* 2. CATEGORY CARDS (NoBroker Style) */}
+            <div className="w-full max-w-6xl mt-2">
+              <div className="mb-4 text-center">
+                <h2 className="text-base md:text-lg font-bold text-foreground">
+                  Select a Category &amp; Submit Your Help Request
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Tap a shortcut to start the first step of your case submission.
                 </p>
               </div>
-            </button>
 
-            <button
-              onClick={() => navigate({ to: "/need-help" })}
-              className="text-left rounded-2xl border border-border bg-card hover:border-primary hover:shadow-md transition-all p-5 flex items-start gap-4 group"
-            >
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <FileText className="h-6 w-6 text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="font-bold text-foreground flex items-center gap-1">
-                  Need Help?{" "}
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                </h3>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Submit your first case FREE with documents and get verified,
-                  direct support.
-                </p>
-              </div>
-            </button>
-          </div>
-        </section>
-      )}
+              {/* Horizontal Scroll Container */}
+              <div className="relative">
+                <div className="flex gap-2.5 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                  {FILTER_CATEGORIES.map((category) => {
+                    const Icon = CATEGORY_ICON[category] || MoreHorizontal;
+                    const active = selectedCategory === category;
+                    const image = CATEGORY_SLIDE_MEDIA[category] || "/assets/generated/help-livelihood.jpg";
+                    
+                    return (
+                      <button
+                        key={category}
+                        type="button"
+                        aria-label={`Start ${category} help request`}
+                        onClick={() => {
+                          if (!isAuthenticated) {
+                            navigate({ to: "/sign-in" });
+                            return;
+                          }
+                          setSelectedCategory(category);
+                          try {
+                            localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category);
+                          } catch {}
+                          navigate({ to: "/submit-request" });
+                        }}
+                        className={`group flex min-w-[100px] w-[100px] flex-col overflow-hidden rounded-2xl border bg-white text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[.98] snap-start ${
+                          active ? "border-primary ring-2 ring-primary/40" : "border-slate-200"
+                        }`}
+                      >
+                        {/* Image at top */}
+                        <div className="relative h-14 w-full overflow-hidden bg-slate-100 sm:h-16">
+                          <img
+                            src={image}
+                            alt={category}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        </div>
 
-      {detectedCountry && (
-        <section className="bg-primary/5 border-b border-border py-2.5 px-4">
-          <div className="max-w-7xl mx-auto flex items-center gap-2 text-sm">
-            <MapPin className="h-4 w-4 text-primary shrink-0" />
-            <span className="text-muted-foreground">Your location:</span>
-            <span className="font-semibold text-foreground">
-              {detectedCity ? `${detectedCity}, ` : ""}
-              {detectedCountry}
-            </span>
-            <button
-              onClick={() => {
-                setFilterCountry(detectedCountry);
-                if (detectedCity) setFilterCity(detectedCity);
-                setTimeout(
-                  () =>
-                    resultsRef.current?.scrollIntoView({ behavior: "smooth" }),
-                  100
-                );
-              }}
-              className="ml-auto text-xs bg-primary text-white px-3 py-1 rounded-full font-medium shrink-0"
-            >
-              Show local cases
-            </button>
-          </div>
-        </section>
-      )}
+                        {/* Text & Icon at bottom */}
+                        <div className="flex flex-1 flex-col items-center justify-between p-1.5">
+                          <span className="text-[9px] font-bold leading-tight text-slate-800 line-clamp-2 h-6 flex items-center justify-center">
+                            {category}
+                          </span>
+                          
+                          {/* Separate Icon Button */}
+                          <span
+                            className={`mt-1 flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                              active ? "bg-primary text-white" : "bg-primary/10 text-primary group-hover:bg-primary/20"
+                            }`}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
-      <section className="bg-background border-b border-border py-4 px-4">
-        <div className="max-w-7xl mx-auto space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search hospital, school, city, title..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 h-11"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowFilters(!showFilters)}
-              className="gap-2 flex-1"
-            >
-              <SlidersHorizontal className="h-4 w-4" /> Filters{" "}
-              {activeFilterCount > 0 && (
-                <span className="bg-primary text-white text-[10px] rounded-full px-1.5">
-                  {activeFilterCount}
-                </span>
-              )}
-            </Button>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="flex-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
-                <SelectItem value="amount_low">Amount: Low to High</SelectItem>
-                <SelectItem value="amount_high">Amount: High to Low</SelectItem>
-                <SelectItem value="urgent">Most Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {showFilters && (
-            <div className="rounded-2xl border bg-card p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Filters</h3>
-                {activeFilterCount > 0 && (
-                  <button
-                    onClick={resetFilters}
-                    className="text-xs text-red-600 flex items-center gap-1"
-                  >
-                    <X className="h-3 w-3" /> Clear all
-                  </button>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Country</Label>
-                <Select
-                  value={filterCountry}
-                  onValueChange={(v) => {
-                    setFilterCountry(v);
-                    setFilterCity("all");
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem value="all">All Countries</SelectItem>
-                    {countries.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">City</Label>
-                <Select
-                  value={filterCity}
-                  onValueChange={setFilterCity}
-                  disabled={filterCountry === "all"}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        filterCountry === "all"
-                          ? "Select country first"
-                          : "All cities"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem value="all">All Cities</SelectItem>
-                    {cities.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs">Category</Label>
-                <Select value={filterCat} onValueChange={setFilterCat}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {FILTER_CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Urgency</Label>
-                <div className="grid grid-cols-5 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFilterUrgency("all")}
-                    className={`px-1 py-2 rounded-lg border text-xs font-medium ${
-                      filterUrgency === "all"
-                        ? "bg-primary text-white border-primary"
-                        : "border-border"
-                    }`}
-                  >
-                    All
-                  </button>
-                  {URGENCIES.map((u) => (
-                    <button
-                      key={u}
-                      type="button"
-                      onClick={() => setFilterUrgency(u)}
-                      className={`px-1 py-2 rounded-lg border text-xs font-medium ${
-                        filterUrgency === u
-                          ? "bg-primary text-white border-primary"
-                          : "border-border"
+                {/* Dots Indicator below the Category Slider */}
+                <div className="flex justify-center gap-1.5 mt-1">
+                  {guideSlides.map((slide, i) => (
+                    <span
+                      key={slide.key}
+                      aria-label={`Slide ${i + 1} of ${guideSlides.length}`}
+                      className={`h-1.5 rounded-full transition-all ${
+                        i === slideIndex ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/30"
                       }`}
-                    >
-                      {u}
-                    </button>
+                    />
                   ))}
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </section>
 
-      <section className="bg-muted/30 border-b border-border py-4 px-4">
-        <div className="max-w-7xl mx-auto">
-          <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">
-            Tap a category to filter
-          </p>
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-1">
-            {FILTER_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => selectCategory(cat)}
-                className={`flex flex-col items-center shrink-0 min-w-[68px] p-2 rounded-xl transition-colors ${
-                  filterCat === cat
-                    ? "bg-primary/10 ring-1 ring-primary"
-                    : "hover:bg-muted"
-                }`}
-              >
-                <span className="text-xl">{CATEGORY_EMOJI[cat] ?? "📌"}</span>
-                <span className="text-sm font-bold text-foreground">
-                  {categoryCounts[cat] ?? 0}
-                </span>
-                <span className="text-[10px] text-muted-foreground text-center leading-tight">
-                  {cat}
-                </span>
-              </button>
-            ))}
           </div>
-        </div>
-      </section>
+        </section>
+        {/* --- END OF UPDATED HERO & CATEGORY SECTION --- */}
 
-      <section
-        ref={resultsRef}
-        className="py-8 px-4 bg-background scroll-mt-32"
-      >
-        <div className="max-w-7xl mx-auto space-y-5">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-lg font-bold">
-              {filterCat !== "all" ? `${filterCat} Cases` : "Verified Cases"}
-              <span className="ml-2 text-sm text-muted-foreground font-normal">
-                ({filtered.length})
-              </span>
-            </h2>
-            {activeFilterCount > 0 && (
-              <button
-                onClick={resetFilters}
-                className="text-xs text-primary font-semibold"
+        {/* NOTE: WhatsApp Section has been moved below KindnessWall as requested */}
+
+        {/* Active Cases Search & Filters Section */}
+        <section className="bg-background border-b border-border py-4 px-4">
+          <div className="max-w-7xl mx-auto space-y-3">
+            {/* Title added here as requested */}
+            <div className="mb-2">
+              <h2 className="font-display text-lg font-bold text-foreground">Active Cases – Become a Hero and Help People</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Search and filter through all verified cases that need support right now.</p>
+            </div>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="text"
+                placeholder="Search hospital, school, city, title..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 h-11"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2 flex-1"
               >
-                Clear filters
-              </button>
+                <SlidersHorizontal className="h-4 w-4" />
+                Filters {activeFilterCount > 0 && (
+                  <span className="bg-primary text-white text-[10px] rounded-full px-1.5">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="amount_low">Amount: Low to High</SelectItem>
+                  <SelectItem value="amount_high">Amount: High to Low</SelectItem>
+                  <SelectItem value="urgent">Most Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {showFilters && (
+              <div className="rounded-2xl border bg-card p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Filters</h3>
+                  {activeFilterCount > 0 && (
+                    <button onClick={resetFilters} className="text-xs text-red-600 flex items-center gap-1">
+                      <X className="h-3 w-3" /> Clear all
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Country</Label>
+                  <Select value={filterCountry} onValueChange={(v) => { setFilterCountry(v); setFilterCity("all"); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="all">All Countries</SelectItem>
+                      {countries.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">City</Label>
+                  <Select value={filterCity} onValueChange={setFilterCity} disabled={filterCountry === "all"}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={filterCountry === "all" ? "Select country first" : "All cities"} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="all">All Cities</SelectItem>
+                      {cities.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Category</Label>
+                  <Select value={filterCat} onValueChange={setFilterCat}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {FILTER_CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Urgency</Label>
+                  <div className="grid grid-cols-5 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFilterUrgency("all")}
+                      className={`px-1 py-2 rounded-lg border text-xs font-medium ${
+                        filterUrgency === "all" ? "bg-primary text-white border-primary" : "border-border"
+                      }`}
+                    >
+                      All
+                    </button>
+                    {URGENCIES.map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        onClick={() => setFilterUrgency(u)}
+                        className={`px-1 py-2 rounded-lg border text-xs font-medium ${
+                          filterUrgency === u ? "bg-primary text-white border-primary" : "border-border"
+                        }`}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
+        </section>
 
-          {loading ? (
-            <div className="text-center py-16 text-muted-foreground">
-              Loading...
+        {/* Category Counts Section */}
+        <section className="bg-muted/30 border-b border-border py-4 px-4">
+          <div className="max-w-7xl mx-auto">
+            <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">
+              Tap a category to filter cases
+            </p>
+
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-1">
+              {orderedCategories.map((cat) => {
+                const count = Number(categoryCounts[cat] || 0);
+                const active = filterCat === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => selectCategory(cat)}
+                    className={`group relative flex flex-col items-center shrink-0 min-w-[76px] rounded-2xl border p-2.5 transition-all ${
+                      active
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-sm"
+                        : count > 0
+                          ? "border-primary/20 bg-card shadow-sm hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
+                          : "border-transparent hover:bg-muted"
+                    }`}
+                  >
+                    <span className={`mb-1 flex h-10 w-10 items-center justify-center rounded-full text-xl ${active || count > 0 ? "bg-primary/10" : "bg-muted/60"}`}>
+                      {CATEGORY_EMOJI[cat] ?? "📌"}
+                    </span>
+                    <span className={`text-sm font-extrabold ${count > 0 ? "text-primary" : "text-foreground"}`}>{count}</span>
+                    <span className="mt-0.5 text-[10px] font-semibold text-muted-foreground text-center leading-tight">{cat}</span>
+                  </button>
+                );
+              })}
             </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-16 rounded-xl border border-dashed border-border bg-muted/20">
-              <p className="text-foreground font-semibold">No cases found.</p>
-              <p className="text-muted-foreground text-sm mt-1">
-                Try changing your filters or location.
-              </p>
+          </div>
+        </section>
+
+        <section ref={resultsRef} className="py-8 px-4 bg-background scroll-mt-32">
+          <div className="max-w-7xl mx-auto space-y-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-lg font-bold">
+                {filterCat !== "all" ? `${filterCat} Cases` : "Verified Cases"}
+                <span className="ml-2 text-sm text-muted-foreground font-normal">({filtered.length})</span>
+              </h2>
               {activeFilterCount > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={resetFilters}
-                >
-                  Clear Filters
-                </Button>
+                <button onClick={resetFilters} className="text-xs text-primary font-semibold">
+                  Clear filters
+                </button>
               )}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map((c, i) => {
-                const cur = c.currency || "USD";
-                const s = sym(cur);
-                const needed = Number(c.amount_needed ?? 0);
-                const collected = Number(c.amount_collected ?? 0);
-                const percent =
-                  needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
-                const remaining = Math.max(needed - collected, 0);
-                const appeal =
-                  CATEGORY_APPEAL[c.category] ?? "Be someone's hope today 🤲";
-                const isDone = needed > 0 && collected >= needed;
-                return (
-                  <motion.div
-                    key={c.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(i * 0.05, 0.4) }}
-                  >
-                    <div
-                      className="rounded-2xl border border-border bg-card overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all h-full flex flex-col"
-                      onClick={() =>
-                        navigate({
-                          to: "/cases/$id",
-                          params: { id: c.id },
-                        })
-                      }
+
+            {loading ? (
+              <div className="text-center py-16 text-muted-foreground">Loading...</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-16 rounded-xl border border-dashed border-border bg-muted/20">
+                <p className="text-foreground font-semibold">No cases found.</p>
+                <p className="text-muted-foreground text-sm mt-1">Try changing your filters or location.</p>
+                {activeFilterCount > 0 && (
+                  <Button variant="outline" size="sm" className="mt-4" onClick={resetFilters}>
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filtered.map((c, i) => {
+                  const cur = c.currency || "USD";
+                  const s = sym(cur);
+                  const needed = Number(c.amount_needed ?? 0);
+                  const collected = Number(c.amount_collected ?? 0);
+                  const percent = needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
+                  const remaining = Math.max(needed - collected, 0);
+                  const displayCategory = normalizePublishedCategory(c.category);
+                  const appeal = CATEGORY_APPEAL[displayCategory] ?? "Be someone's hope today 🤲";
+                  const selfieUrl = typeof c.selfie_url === "string" && c.selfie_url.trim() ? c.selfie_url : null;
+                  const requesterName = String(c.full_name || c.display_name || "Verified requester").trim();
+                  const isDone = needed > 0 && collected >= needed;
+
+                  return (
+                    <motion.div
+                      key={c.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(i * 0.05, 0.4) }}
                     >
-                      <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-4 border-b border-border">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold bg-card text-primary px-2.5 py-1 rounded-full border border-primary/20">
-                            <span>{CATEGORY_EMOJI[c.category] ?? "📌"}</span>{" "}
-                            {c.category}
-                          </span>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              c.urgency === "Emergency"
-                                ? "bg-red-100 text-red-700"
-                                : c.urgency === "High"
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {c.urgency}
-                          </span>
-                        </div>
-                        <p className="text-sm font-bold text-foreground leading-snug">
-                          {appeal}
-                        </p>
-                      </div>
-
-                      <div className="p-4 space-y-3 flex-1 flex flex-col">
-                        <div>
-                          <h3 className="font-bold text-lg leading-snug line-clamp-2 text-foreground">
-                            {c.title}
-                          </h3>
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                            {c.short_description}
-                          </p>
-                        </div>
-
-                        {needed > 0 && (
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-2xl font-black text-primary">
-                              {s} {needed}
-                            </span>
-                            <span className="text-xs font-medium text-muted-foreground">
-                              {cur} needed
-                            </span>
-                          </div>
-                        )}
-
-                        {needed > 0 && (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-green-600">
-                                {s} {collected} raised
-                              </span>
-                              <span className="text-muted-foreground">
-                                {isDone ? "Fully helped 🎉" : `${percent}%`}
-                              </span>
-                            </div>
-                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                              <div
-                                className={`h-2 rounded-full transition-all ${
-                                  isDone ? "bg-green-500" : "bg-primary"
-                                }`}
-                                style={{ width: `${percent}%` }}
+                      <div
+                        className="rounded-2xl border border-border bg-card overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all h-full flex flex-col"
+                        onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}
+                      >
+                        {selfieUrl && (
+                          <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-card to-teal-50 px-4 pt-4">
+                            <div className="flex items-center gap-3 rounded-2xl border border-primary/10 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
+                              <img
+                                src={selfieUrl}
+                                alt={`${requesterName} selfie`}
+                                loading="lazy"
+                                className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-md"
                               />
-                            </div>
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-muted-foreground">
-                                Goal:{" "}
-                                <strong className="text-foreground">
-                                  {s} {needed}
-                                </strong>
-                              </span>
-                              {!isDone && (
-                                <span className="text-primary font-semibold">
-                                  {s} {remaining} left
-                                </span>
-                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+                                  <ShieldCheck className="h-3.5 w-3.5" /> Verified requester
+                                </div>
+                                <p className="mt-1 truncate text-sm font-bold text-foreground">{requesterName}</p>
+                                <p className="text-[11px] text-muted-foreground">Identity verified for this help request</p>
+                              </div>
                             </div>
                           </div>
                         )}
+                        <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-4 border-b border-border">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold bg-card text-primary px-2.5 py-1 rounded-full border border-primary/20">
+                              <span>{CATEGORY_EMOJI[displayCategory] ?? "📌"}</span>
+                              {displayCategory}
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                c.urgency === "Emergency" ? "bg-red-100 text-red-700" :
+                                c.urgency === "High" ? "bg-orange-100 text-orange-700" : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {c.urgency}
+                            </span>
+                          </div>
+                          <p className="text-sm font-bold text-foreground leading-snug">{appeal}</p>
+                        </div>
 
-                        {c.deadline &&
-                          (() => {
-                            const daysLeft = Math.ceil(
-                              (new Date(c.deadline).getTime() - Date.now()) /
-                                (1000 * 60 * 60 * 24)
-                            );
+                        <div className="p-4 space-y-3 flex-1 flex flex-col">
+                          <div>
+                            <h3 className="font-bold text-lg leading-snug line-clamp-2 text-foreground">{c.title}</h3>
+                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{c.short_description}</p>
+                            {c.description && (
+                              <div className="mt-3 rounded-xl bg-primary/5 px-3 py-2.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-primary">Case story</p>
+                                <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-relaxed text-foreground/80">{c.description}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {needed > 0 && (
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-2xl font-black text-primary">{s} {needed}</span>
+                              <span className="text-xs font-medium text-muted-foreground">{cur} needed</span>
+                            </div>
+                          )}
+
+                          {needed > 0 && (
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-green-600">{s} {collected} raised</span>
+                                <span className="text-muted-foreground">{isDone ? "Fully helped 🎉" : `${percent}%`}</span>
+                              </div>
+                              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                                <div
+                                  className={`h-2 rounded-full transition-all ${isDone ? "bg-green-500" : "bg-primary"}`}
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-muted-foreground">Goal: <strong className="text-foreground">{s} {needed}</strong></span>
+                                {!isDone && <span className="text-primary font-semibold">{s} {remaining} left</span>}
+                              </div>
+                            </div>
+                          )}
+
+                          {c.deadline && (() => {
+                            const daysLeft = Math.ceil((new Date(c.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                             if (daysLeft < 0) return null;
                             return (
                               <div
                                 className={`text-xs font-bold px-2 py-1 rounded-lg text-center ${
-                                  daysLeft <= 3
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-amber-100 text-amber-700"
+                                  daysLeft <= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
                                 }`}
                               >
-                                ⏳{" "}
-                                {daysLeft === 0
-                                  ? "Expires TODAY!"
-                                  : daysLeft === 1
-                                  ? "1 day left!"
-                                  : `${daysLeft} days left to help!`}
+                                ⏳ {daysLeft === 0 ? "Expires TODAY!" : daysLeft === 1 ? "1 day left!" : `${daysLeft} days left to help!`}
                               </div>
                             );
                           })()}
 
-                        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border mt-auto">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {c.city}, {c.country}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-primary font-semibold">
-                            Help now <ChevronRight className="h-3.5 w-3.5" />
-                          </span>
+                          <div className="mt-auto space-y-3 border-t border-border pt-3">
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              {c.city}, {c.country}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Help now with ${c.title || "this case"}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                navigate({ to: "/cases/$id", params: { id: c.id } });
+                              }}
+                              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-extrabold text-primary-foreground shadow-md transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                            >
+                              <Heart className="h-4 w-4" fill="currentColor" />
+                              Help Now
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                            <p className="text-center text-[11px] text-muted-foreground">View full case details and choose how to help</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="py-8 px-4 bg-muted/30 border-y border-border">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="font-display text-lg font-bold mb-5 text-center">
-            Built on Trust &amp; Verification
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {TRUST_BADGES.map(({ icon: Icon, label, color }, i) => (
-              <motion.div
-                key={label}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="flex items-center gap-3 rounded-xl bg-card border border-border p-3"
-              >
-                <div className="h-9 w-9 rounded-lg bg-card flex items-center justify-center shrink-0">
-                  <Icon className={`h-5 w-5 ${color}`} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1">
-                    <BadgeCheck className="h-3 w-3 text-emerald-500" />
-                    <span className="text-xs font-semibold">{label}</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Verified</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-3xl mx-auto px-4 pt-8">
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-center sm:text-left">
-            <h3 className="font-bold text-foreground">
-              📱 Get the Givethra Android App
-            </h3>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Verified cases, anytime — right on your phone.
-            </p>
-          </div>
-          <a
-            href="/Givethra.apk"
-            download
-            className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl font-semibold text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
-          >
-            Download App
-          </a>
-        </div>
-      </section>
-
-      <section className="py-10 px-4 bg-background">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <h2 className="font-display text-lg font-bold text-center">
-            How Givethra Works
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              {
-                step: "01",
-                title: "Request Help",
-                desc: "Complete KYC and submit your first case FREE with documents.",
-                emoji: "📝",
-              },
-              {
-                step: "02",
-                title: "Get Verified",
-                desc: "Our team reviews documents and approves your case for Heroes.",
-                emoji: "✅",
-              },
-              {
-                step: "03",
-                title: "Receive Direct Support",
-                desc: "Heroes unlock your case and pay institutions directly.",
-                emoji: "🌟",
-              },
-            ].map(({ step, title, desc, emoji }, i) => (
-              <motion.div
-                key={step}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.12 }}
-                className="relative flex flex-col items-center text-center gap-3 rounded-xl bg-card border border-border p-5"
-              >
-                <span className="absolute -top-3 left-4 text-xs font-black text-primary/30">
-                  {step}
-                </span>
-                <span className="text-3xl">{emoji}</span>
-                <h3 className="font-bold text-sm">{title}</h3>
-                <p className="text-xs text-muted-foreground">{desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {!isAuthenticated && (
-        <section className="py-10 px-4 bg-primary text-primary-foreground">
-          <div className="max-w-xl mx-auto text-center space-y-4">
-            <h2 className="font-display text-2xl font-bold">
-              Ready to make a difference?
-            </h2>
-            <p className="text-primary-foreground/80 text-sm">
-              Join Heroes changing lives through verified, direct support.
-            </p>
-            <div className="flex gap-3 justify-center">
-              <Button
-                size="lg"
-                variant="secondary"
-                onClick={() => navigate({ to: "/become-hero" })}
-                className="h-11 px-6 font-semibold"
-              >
-                Become a Hero
-              </Button>
-              <Button
-                size="lg"
-                onClick={() => navigate({ to: "/sign-up" })}
-                className="h-11 px-6 font-semibold bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-              >
-                Request Help
-              </Button>
-            </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </section>
-      )}
 
-      <section className="py-10 px-4 bg-card border-t border-border">
-        <div className="max-w-2xl mx-auto text-center space-y-5">
-          <div className="space-y-1">
-            <h2 className="font-display text-lg font-bold text-foreground">
-              Connect with Givethra
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Follow us and reach out — we're here to help.
-            </p>
-          </div>
-          <div className="flex items-center justify-center gap-3">
-            <a
-              href={FACEBOOK_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Facebook"
-              className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-            >
-              <Facebook className="h-5 w-5" />
-            </a>
-            <a
-              href={INSTAGRAM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Instagram"
-              className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-            >
-              <Instagram className="h-5 w-5" />
-            </a>
-            <a
-              href="https://www.linkedin.com/company/givethra-org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="LinkedIn"
-              className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-            >
-              <Linkedin className="h-5 w-5" />
-            </a>
+        <HeroesWall />
+        <KindnessWall />
+
+        {/* --- WHATSAPP SECTION RELOCATED HERE (Below KindnessWall, Above App Download) --- */}
+        <section className="py-6 px-4 bg-background border-b border-border">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-6 flex-wrap">
             <a
               href={WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="WhatsApp Channel"
-              className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
+              className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-green-600 transition-colors"
             >
-              <MessageCircle className="h-5 w-5" />
+              <MessageCircle className="h-6 w-6 text-green-600" />
+              <span>WhatsApp Channel</span>
             </a>
+            <span className="text-muted-foreground text-lg select-none">|</span>
             <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              aria-label="Email"
-              className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
+              href="https://wa.me/message/42CJXLUYEI2KM1?src=qr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
             >
-              <Mail className="h-5 w-5" />
+              <MessageCircle className="h-6 w-6 text-primary" />
+              <span>24/7 Customer Support</span>
             </a>
           </div>
+        </section>
 
-          <a
-            href={WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline"
-          >
-            <MessageCircle className="h-4 w-4" /> Follow our WhatsApp Channel
-          </a>
+        <section className="py-8 px-4 bg-background border-y border-border">
+          <div className="mx-auto max-w-3xl rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-teal-50 p-6 text-center shadow-sm">
+            <p className="text-2xl">📱</p><h2 className="mt-2 font-display text-xl font-bold">Get the Givethra Android App</h2><p className="mt-1 text-sm text-muted-foreground">Verified cases, anytime — right on your phone.</p><Button className="mt-4">Download App</Button><div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4"><span>Verified &amp; Secure</span><span>100% Transparency</span><span>Compassion</span><span>Global Community</span><span>Safe &amp; Private</span><span>Your Data is Protected</span></div>
+          </div>
+        </section>
+        <section className="py-8 px-4 bg-muted/30 border-y border-border">
+          <div className="max-w-7xl mx-auto">
+            <h2 className="font-display text-lg font-bold mb-5 text-center">Built on Trust &amp; Verification</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {TRUST_BADGES.map(({ icon: Icon, label, color }, i) => (
+                <motion.div
+                  key={label}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="flex items-center gap-3 rounded-xl bg-card border border-border p-3"
+                >
+                  <div className="h-9 w-9 rounded-lg bg-card flex items-center justify-center shrink-0">
+                    <Icon className={`h-5 w-5 ${color}`} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1">
+                      <BadgeCheck className="h-3 w-3 text-emerald-500" />
+                      <span className="text-xs font-semibold">{label}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Verified</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
 
-          <div>
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-            >
-              <Mail className="h-4 w-4" /> {CONTACT_EMAIL}
+        <section className="py-10 px-4 bg-background">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <h2 className="font-display text-lg font-bold text-center">How Givethra Works</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { step: "01", title: "Request Help", desc: "Complete KYC and submit your first case FREE with documents.", emoji: "📝" },
+                { step: "02", title: "Get Verified", desc: "Our team reviews documents and approves your case for Heroes.", emoji: "✅" },
+                { step: "03", title: "Receive Direct Support", desc: "Heroes unlock your case and pay institutions directly.", emoji: "🌟" },
+              ].map(({ step, title, desc, emoji }, i) => (
+                <motion.div
+                  key={step}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.12 }}
+                  className="relative flex flex-col items-center text-center gap-3 rounded-xl bg-card border border-border p-5"
+                >
+                  <span className="absolute -top-3 left-4 text-xs font-black text-primary/30">{step}</span>
+                  <span className="text-3xl">{emoji}</span>
+                  <h3 className="font-bold text-sm">{title}</h3>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-10 px-4 bg-card border-t border-border">
+          <div className="max-w-2xl mx-auto text-center space-y-5">
+            <div className="space-y-1">
+              <h2 className="font-display text-lg font-bold text-foreground">Connect with Givethra</h2>
+              <p className="text-sm text-muted-foreground">Follow us and reach out — we're here to help.</p>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <Facebook className="h-5 w-5" />
+              </a>
+              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <Instagram className="h-5 w-5" />
+              </a>
+              <a href="https://www.linkedin.com/company/givethra-org/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <Linkedin className="h-5 w-5" />
+              </a>
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Channel" className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <MessageCircle className="h-5 w-5" />
+              </a>
+              <a href={`mailto:${CONTACT_EMAIL}`} aria-label="Email" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
+                <Mail className="h-5 w-5" />
+              </a>
+            </div>
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline">
+              <MessageCircle className="h-4 w-4" /> Follow our WhatsApp Channel
             </a>
+            <div>
+              <a href={`mailto:${CONTACT_EMAIL}`} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                <Mail className="h-4 w-4" /> {CONTACT_EMAIL}
+              </a>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
+              <Link to="/about" className="hover:text-primary transition-colors">About</Link>
+              <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
+              <Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="hover:text-primary transition-colors">Terms</Link>
+              <Link to="/community-guidelines" className="hover:text-primary transition-colors">Community Guidelines</Link>
+              <Link to="/contact" className="hover:text-primary transition-colors">Contact Us</Link>
+            </div>
+            <p className="text-xs text-muted-foreground pt-1">
+              © {new Date().getFullYear()} Givethra. All rights reserved.
+            </p>
           </div>
+        </section>
+        </>}
 
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
-            <Link
-              to="/about"
-              className="hover:text-primary transition-colors"
-            >
-              About
-            </Link>
-            <Link to="/faq" className="hover:text-primary transition-colors">
-              FAQ
-            </Link>
-            <Link
-              to="/privacy"
-              className="hover:text-primary transition-colors"
-            >
-              Privacy Policy
-            </Link>
-            <Link
-              to="/terms"
-              className="hover:text-primary transition-colors"
-            >
-              Terms
-            </Link>
-            <Link
-              to="/community-guidelines"
-              className="hover:text-primary transition-colors"
-            >
-              Community Guidelines
-            </Link>
-            <Link
-              to="/contact"
-              className="hover:text-primary transition-colors"
-            >
-              Contact Us
-            </Link>
-          </div>
-          <p className="text-xs text-muted-foreground pt-1">
-            © {new Date().getFullYear()} Givethra. All rights reserved.
-          </p>
-        </div>
-      </section>
+        {isAuthenticated && <HomeSocialDashboard notificationCount={notifCount} />}
       </div>
     </Layout>
   );

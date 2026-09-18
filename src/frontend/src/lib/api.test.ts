@@ -34,8 +34,8 @@ describe("adminSendSupportReply", () => {
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer verified-token",
-        "X-Guest-ID": "session-guest",
       },
+      credentials: "include",
       body: JSON.stringify({ user_id: "recipient-1", message: "Your request has been reviewed." }),
     });
   });
@@ -57,8 +57,8 @@ describe("adminSendSupportReply", () => {
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer verified-token",
-        "X-Guest-ID": "session-guest",
       },
+      credentials: "include",
       body: JSON.stringify({ user_id: "recipient-1" }),
     });
   });
@@ -88,6 +88,7 @@ describe("adminSendSupportReply", () => {
         "Content-Type": "application/json",
         Authorization: "Bearer verified-token",
       },
+      credentials: "include",
       body: JSON.stringify({ user_id: "seeker-1", is_active: false }),
     });
   });
