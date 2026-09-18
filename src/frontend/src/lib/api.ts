@@ -323,6 +323,16 @@ export async function checkUsernameAvailability(username: string) {
   return readApiResponse<{ available: boolean; suggestions: string[] }>(res);
 }
 
+// The worker profile response already includes public profile, posts, follow counts, supports, and active-case data.
+export async function getFullProfile(userId: string, profileRole?: "hero" | "requester" | null) {
+  return getProfile(userId, profileRole);
+}
+
+export async function getUserActivities(userId: string) {
+  const profile = await getFullProfile(userId);
+  return Array.isArray(profile?.posts) ? profile.posts : [];
+}
+
 export async function updateProfile(userId: string, data: any, profileRole?: "hero" | "requester" | null) {
   const query = profileRole ? `?profile_role=${encodeURIComponent(profileRole)}` : "";
   const res = await fetchWithAuth(`${WORKER_URL}/api/profiles/${userId}${query}`, {

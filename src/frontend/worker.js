@@ -1,15 +1,8 @@
 // src/frontend/worker.js
 // Givethra - Complete Cloudflare Worker with all APIs including Onboarding Status
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
-// The designated assistant may perform verification and rejection reviews.
-//
-// 🔥 FIXED (this pass): 
-//   1. /uploads/ handler now auto-detects Content-Type by extension if R2 metadata is missing
-//   2. /uploads/ handler sets Content-Disposition: inline (so images/PDFs render in iframe/img)
-//   3. Removed X-Content-Type-Options: nosniff so browsers can display files inline
 
 const PUBLIC_ORIGIN = "https://givethra.org";
-
 const ADMIN_EMAILS = new Set([
   "shoaibugti@gmail.com",
   "shoaibahmedbugti5@gmail.com",
@@ -23,25 +16,11 @@ function corsHeaders(origin) {
   const allowOrigin = origin === PUBLIC_ORIGIN ? origin : PUBLIC_ORIGIN;
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Guest-ID",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
-}
-
-function sessionCookie(token, maxAge = 60 * 60 * 24 * 30) {
-  return `app_session_id=${encodeURIComponent(token)}; Max-Age=${maxAge}; Path=/; Secure; HttpOnly; SameSite=None`;
-}
-
-function cookieValue(request, name) {
-  const header = request.headers.get("Cookie") || "";
-  for (const part of header.split(";")) {
-    const [key, ...value] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(value.join("="));
-  }
-  return "";
 }
 
 function json(data, status = 200, origin = "") {
@@ -54,21 +33,8 @@ function json(data, status = 200, origin = "") {
   });
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function now() {
   return new Date().toISOString();
-}
-
-function id() {
-  return crypto.randomUUID();
 }
 
 async function ensureUserCoreRows(env, user) {
@@ -124,6 +90,9 @@ async function sendNotification(env, userId, type, title, message, link = null) 
   ).bind(notificationId, String(userId), String(type), String(title), String(message), link, createdAt).run();
   return { id: notificationId, user_id: String(userId), type, title, message, link, is_read: 0, created_at: createdAt };
 }
+function id() {
+  return crypto.randomUUID();
+}
 
 function base64UrlEncode(value) {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
@@ -171,7 +140,7 @@ function isAdmin(user) {
 
 function bearer(request) {
   const value = request.headers.get("Authorization") || "";
-  return value.replace(/^Bearer\s+/i, "").trim() || cookieValue(request, "app_session_id");
+  return value.replace(/^Bearer\s+/i, "").trim();
 }
 
 async function verifyGoogleCredential(credential, clientId) {
@@ -361,7 +330,7 @@ function requestedUserId(url) {
 }
 
 function canAccessUser(user, userId) {
-  return isAdmin(user) || !userId || Boolean(user && user.user_id === userId);
+  return isAdmin(user) || !userId || user.user_id === userId;
 }
 
 async function maybeAutoSuspendForMissingFeedback(env, userId) {
@@ -432,126 +401,9 @@ function pick(body, fields) {
   return Object.fromEntries(fields.filter((field) => body && body[field] !== undefined).map((field) => [field, body[field]]));
 }
 
-function uploadKeyFromUrl(value) {
-  if (typeof value !== "string" || !value.trim()) return null;
-  try {
-    const parsed = new URL(value.trim());
-    if (parsed.origin !== PUBLIC_ORIGIN || !parsed.pathname.startsWith("/uploads/")) return null;
-    const key = decodeURIComponent(parsed.pathname.slice("/uploads/".length));
-    if (!key || key.includes("..") || key.startsWith("/")) return null;
-    return key;
-  } catch {
-    return null;
-  }
-}
-
-function collectUploadUrls(value, output = []) {
-  if (typeof value === "string") {
-    if (uploadKeyFromUrl(value) && !output.includes(value.trim())) output.push(value.trim());
-    return output;
-  }
-  if (Array.isArray(value)) {
-    value.forEach((item) => collectUploadUrls(item, output));
-    return output;
-  }
-  if (value && typeof value === "object") {
-    Object.values(value).forEach((item) => collectUploadUrls(item, output));
-  }
-  return output;
-}
-
-function removeUploadUrls(value) {
-  if (typeof value === "string") return uploadKeyFromUrl(value) ? null : value;
-  if (Array.isArray(value)) return value.map(removeUploadUrls).filter((item) => item !== null);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, removeUploadUrls(item)]));
-  }
-  return value;
-}
-
-async function hasOtherUploadReference(env, url, excluded = {}) {
-  const checks = [
-    ["kyc_submissions", ["cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url"]],
-    ["case_submissions", ["selfie_url", "video_url", "paid_receipt_url", "photo_urls", "category_details"]],
-    ["case_resolutions", ["receipt_url"]],
-    ["deposits", ["proof_url"]],
-    ["feedbacks", ["video_url"]],
-    ["support_messages", ["attachment_url"]],
-    ["withdrawal_requests", ["payment_proof_url"]],
-  ];
-  for (const [table, columns] of checks) {
-    for (const column of columns) {
-      try {
-        const query = `SELECT id FROM ${table} WHERE ${column} LIKE ?${excluded.table === table ? " AND id != ?" : ""} LIMIT 1`;
-        const params = excluded.table === table ? [`%${url}%`, excluded.id] : [`%${url}%`];
-        const row = await env.DB.prepare(query).bind(...params).first();
-        if (row) return true;
-      } catch {
-        // Additive deployments may not have every optional table/column yet.
-      }
-    }
-  }
-  return false;
-}
-
-async function deleteRejectedUploadFiles(env, urls, excluded = {}) {
-  const candidates = [...new Set((urls || []).flatMap((value) => collectUploadUrls(value)))];
-  let deleted = 0;
-  let skippedShared = 0;
-  for (const url of candidates) {
-    if (await hasOtherUploadReference(env, url, excluded)) {
-      skippedShared += 1;
-      continue;
-    }
-    const key = uploadKeyFromUrl(url);
-    if (!key) continue;
-    try {
-      await env.UPLOADS.delete(key);
-      deleted += 1;
-    } catch (error) {
-      console.error("Rejected upload cleanup failed", key, error);
-    }
-  }
-  return { deleted, skipped_shared: skippedShared };
-}
-
-async function cleanupAllRejectedUploadFiles(env) {
-  const definitions = [
-    ["kyc_submissions", "lower(COALESCE(status, '')) = 'rejected'", ["cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url"]],
-    ["case_submissions", "lower(COALESCE(status, '')) = 'rejected'", ["photo_urls", "selfie_url", "video_url", "paid_receipt_url", "category_details"]],
-    ["deposits", "lower(COALESCE(status, '')) = 'rejected'", ["proof_url"]],
-    ["feedbacks", "lower(COALESCE(status, '')) = 'rejected'", ["video_url"]],
-    ["case_resolutions", "lower(COALESCE(status, '')) IN ('rejected', 'disputed')", ["receipt_url", "paid_receipt_url"]],
-    ["withdrawal_requests", "lower(COALESCE(status, '')) = 'rejected'", ["payment_proof_url"]],
-    ["support_messages", "lower(COALESCE(status, '')) = 'rejected'", ["attachment_url"]],
-  ];
-  const urls = [];
-  const records = [];
-  for (const [table, where, columns] of definitions) {
-    try {
-      const rows = await env.DB.prepare(`SELECT * FROM ${table} WHERE ${where}`).all();
-      for (const row of rows.results || []) {
-        urls.push(...columns.flatMap((column) => collectUploadUrls(row[column])));
-        records.push({ table, id: row.id, columns });
-      }
-    } catch (error) {
-      console.warn("Rejected upload scan skipped", table, error);
-    }
-  }
-  const result = await deleteRejectedUploadFiles(env, urls);
-  let referencesCleared = 0;
-  for (const record of records) {
-    try {
-      const assignments = record.columns.map((column) => `${column} = NULL`).join(", ");
-      await env.DB.prepare(`UPDATE ${record.table} SET ${assignments} WHERE id = ?`).bind(record.id).run();
-      referencesCleared += 1;
-    } catch (error) {
-      console.warn("Rejected upload reference cleanup skipped", record.table, record.id, error);
-    }
-  }
-  return { ...result, records: records.length, references_cleared: referencesCleared };
-}
-
+// ============================================================
+//  CREDIT TRANSACTIONS HELPERS
+// ============================================================
 async function getWalletBalance(env, userId) {
   const row = await env.DB.prepare(
     "SELECT balance FROM wallets WHERE user_id = ?"
@@ -588,6 +440,9 @@ async function addCredits(env, userId, amount, type, description, referenceId = 
   await addTransaction(env, userId, amount, type, description, referenceId);
 }
 
+// ============================================================
+//  PROFILE HANDLER
+// ============================================================
 function hasBioContactInfo(value) {
   return /\d|@|https?:\/\/|www\.|whats?app|e[- ]?mail|email|phone|contact|telegram|signal|wechat|imo/i.test(String(value || ""));
 }
@@ -603,48 +458,12 @@ function withoutPrivateContact(value) {
   return safe;
 }
 
-async function getProfileSupportData(env, userId) {
-  try {
-    return await env.DB.prepare(
-      "SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(supports_given, 0) AS supports_given, COALESCE(eligibility_supports, 0) AS eligibility_supports, COALESCE(earnings_eligible, 0) AS earnings_eligible, eligible_at, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?"
-    ).bind(userId).first() || { supports_count: 0, supports_given: 0, eligibility_supports: 0, earnings_eligible: 0, support_earnings_usd: 0 };
-  } catch {
-    try {
-      return await env.DB.prepare(
-        "SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(supports_given, 0) AS supports_given FROM users WHERE user_id = ?"
-      ).bind(userId).first() || { supports_count: 0, support_earnings_usd: 0 };
-    } catch {
-      return { supports_count: 0, support_earnings_usd: 0 };
-    }
-  }
-}
-
-function withdrawalWindow(date = new Date()) {
-  const day = date.getUTCDate();
-  return day >= 30 || day <= 3;
-}
-
-function nextWithdrawalDate(date = new Date()) {
-  const next = new Date(date);
-  if (date.getUTCDate() <= 3) next.setUTCDate(3);
-  else next.setUTCMonth(next.getUTCMonth() + 1, 30);
-  return next.toISOString().slice(0, 10);
-}
-
-async function getEarningsSummary(env, userId) {
-  const profile = await getProfileSupportData(env, userId);
-  const wallet = await env.DB.prepare("SELECT COALESCE(balance_pkr, 0) AS balance FROM earnings_wallets WHERE user_id = ?").bind(userId).first();
-  const rows = await env.DB.prepare("SELECT * FROM support_earnings WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").bind(userId).all();
-  const withdrawals = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE user_id = ? ORDER BY requested_at DESC LIMIT 50").bind(userId).all();
-  return { ...profile, wallet_pkr: Number(wallet?.balance || 0), earnings_usd: Number(profile?.support_earnings_usd || 0), posts: rows.results || [], withdrawals: withdrawals.results || [], withdrawal_open: withdrawalWindow(), next_withdrawal_date: nextWithdrawalDate() };
-}
-
 async function handleProfile(request, env, user, parts, origin) {
   const userId = String(parts[2] || user.user_id || "");
   if (!userId || (request.method !== "GET" && !canAccessUser(user, userId))) return json({ error: "Forbidden" }, 403, origin);
   const queryRole = String(new URL(request.url).searchParams.get("profile_role") || "").toLowerCase();
   const profileRole = queryRole === "hero" || queryRole === "requester" ? queryRole : (user?.role === "hero" ? "hero" : "requester");
-  const allowedFields = ["full_name", "first_name", "last_name", "username", "age", "gender", "id_number", "phone_number", "country", "country_code", "city", "bio", "preferred_language", "avatar_url", "cover_url"];
+  const allowedFields = ["full_name", "phone_number", "country", "city", "bio", "preferred_language", "avatar_url", "cover_url"];
 
   if (request.method === "GET") {
     try {
@@ -653,9 +472,9 @@ async function handleProfile(request, env, user, parts, origin) {
         const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
         const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
         const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-        const supportData = await getProfileSupportData(env, userId);
+        const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
         const profileData = user?.user_id === userId ? variant : withoutPrivateContact(variant);
-        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), support_earnings_usd:Number(supportData?.support_earnings_usd||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
+        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
       }
     } catch { /* migration is additive; use legacy profile until applied */ }
     const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
@@ -663,10 +482,10 @@ async function handleProfile(request, env, user, parts, origin) {
     const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
     const activeCase = profileRole === "requester" ? await env.DB.prepare("SELECT * FROM case_submissions WHERE user_id=? AND lower(COALESCE(status,'')) IN ('approved','open','in_progress') ORDER BY submitted_at DESC LIMIT 1").bind(userId).first() : null;
     const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-    const supportData = await getProfileSupportData(env, userId);
+    const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
     const profileData = user?.user_id === userId ? (profile || {}) : withoutPrivateContact(profile || {});
     const safeCase = user?.user_id === userId ? activeCase : withoutPrivateContact(activeCase);
-    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), support_earnings_usd:Number(supportData?.support_earnings_usd||0), is_following:Boolean(following), posts:posts.results||[], active_case:safeCase||null }, 200, origin);
+    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts:posts.results||[], active_case:safeCase||null }, 200, origin);
   }
   if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
   const body = await readJson(request);
@@ -675,19 +494,6 @@ async function handleProfile(request, env, user, parts, origin) {
   if (Object.prototype.hasOwnProperty.call(values, "bio") && hasBioContactInfo(values.bio)) {
     return json({ error: "Bio cannot contain phone numbers, email addresses, @ symbols, or contact information." }, 422, origin);
   }
-  if (values.username) {
-    const username = String(values.username).trim().toLowerCase();
-    let conflict = null;
-    try {
-      conflict = await env.DB.prepare("SELECT user_id FROM profile_variants WHERE lower(username) = ? AND user_id != ? LIMIT 1").bind(username, userId).first();
-    } catch {
-      try {
-        conflict = await env.DB.prepare("SELECT user_id FROM profiles WHERE lower(username) = ? AND user_id != ? LIMIT 1").bind(username, userId).first();
-      } catch { /* legacy schema has no username column yet */ }
-    }
-    if (conflict) return json({ error: "This username is already taken. Please choose another one.", code: "USERNAME_TAKEN" }, 409, origin);
-    values.username = username;
-  }
   const timestamp = now();
 
   try {
@@ -695,19 +501,15 @@ async function handleProfile(request, env, user, parts, origin) {
     const merged = { ...(current || {}), ...values };
     await env.DB.prepare(
       `INSERT INTO profile_variants
-        (id, user_id, profile_role, full_name, first_name, last_name, username, age, gender, id_number, phone_number, country, country_code, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, user_id, profile_role, full_name, phone_number, country, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(user_id, profile_role) DO UPDATE SET
-        full_name = excluded.full_name, first_name = excluded.first_name, last_name = excluded.last_name,
-        username = excluded.username, age = excluded.age, gender = excluded.gender, id_number = excluded.id_number,
-        phone_number = excluded.phone_number, country = excluded.country, country_code = excluded.country_code,
+        full_name = excluded.full_name, phone_number = excluded.phone_number, country = excluded.country,
         city = excluded.city, bio = excluded.bio, preferred_language = excluded.preferred_language,
         avatar_url = excluded.avatar_url, cover_url = excluded.cover_url, updated_at = excluded.updated_at`
-    ).bind(current?.id || id(), userId, profileRole, merged.full_name || null, merged.first_name || null,
-      merged.last_name || null, merged.username || null, merged.age ? Number(merged.age) : null, merged.gender || null,
-      merged.id_number || null, merged.phone_number || null, merged.country || null, merged.country_code || null,
-      merged.city || null, merged.bio || null, merged.preferred_language || "en", merged.avatar_url || null,
-      merged.cover_url || null, current?.created_at || timestamp, timestamp).run();
+    ).bind(current?.id || id(), userId, profileRole, merged.full_name || null, merged.phone_number || null,
+      merged.country || null, merged.city || null, merged.bio || null, merged.preferred_language || "en",
+      merged.avatar_url || null, merged.cover_url || null, current?.created_at || timestamp, timestamp).run();
     const saved = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
     if (saved) {
       await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?")
@@ -732,154 +534,21 @@ async function handleProfile(request, env, user, parts, origin) {
   return json({ ...merged, profile_role: profileRole }, 200, origin);
 }
 
-async function handleUserSearch(request, env, user, url, origin) {
-  if (!user) return json({ error: "Authentication required" }, 401, origin);
-  if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
-  const query = String(url.searchParams.get("q") || "").trim().replace(/[%_]/g, "").slice(0, 60);
-  if (query.length < 2) return json([], 200, origin);
-  const pattern = `%${query}%`;
-  let rows;
-  try {
-    rows = await env.DB.prepare(
-      `SELECT u.user_id,
-        COALESCE(v.full_name, p.full_name, u.full_name, 'Givethra member') AS full_name,
-        COALESCE(v.username, p.username) AS username,
-        COALESCE(v.avatar_url, p.avatar_url, u.avatar_url) AS avatar_url,
-        COALESCE(v.country, p.country) AS country,
-        COALESCE(v.city, p.city) AS city
-       FROM users u
-       LEFT JOIN profiles p ON p.user_id = u.user_id
-       LEFT JOIN profile_variants v ON v.user_id = u.user_id AND v.profile_role = 'hero'
-       WHERE lower(COALESCE(v.full_name, p.full_name, u.full_name, '')) LIKE lower(?)
-          OR lower(COALESCE(v.username, p.username, '')) LIKE lower(?)
-       ORDER BY lower(COALESCE(v.full_name, p.full_name, u.full_name, '')) ASC
-       LIMIT 20`
-    ).bind(pattern, pattern).all();
-  } catch {
-    rows = await env.DB.prepare(
-      `SELECT u.user_id,
-        COALESCE(p.full_name, u.full_name, cp.display_name, 'Givethra member') AS full_name,
-        NULL AS username,
-        COALESCE(p.avatar_url, u.avatar_url) AS avatar_url,
-        p.country AS country,
-        p.city AS city
-       FROM users u
-       LEFT JOIN profiles p ON p.user_id = u.user_id
-       LEFT JOIN community_posts cp ON cp.user_id = u.user_id
-       WHERE lower(COALESCE(p.full_name, u.full_name, cp.display_name, '')) LIKE lower(?)
-          OR lower(COALESCE(cp.display_name, '')) LIKE lower(?)
-       GROUP BY u.user_id
-       ORDER BY lower(COALESCE(p.full_name, u.full_name, cp.display_name, '')) ASC
-       LIMIT 20`
-    ).bind(pattern, pattern).all();
-  }
-  return json((rows.results || []).map((row) => ({
-    user_id: row.user_id,
-    full_name: row.full_name,
-    username: row.username || null,
-    avatar_url: row.avatar_url || null,
-    country: row.country || null,
-    city: row.city || null,
-  })), 200, origin);
-}
-
-async function handleUsernameAvailability(request, env, user, url, origin) {
-  if (!user) return json({ error: "Authentication required" }, 401, origin);
-  if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
-  const username = String(url.searchParams.get("username") || "").trim().toLowerCase();
-  if (!/^[a-z0-9_]{3,24}$/.test(username)) return json({ available: false, suggestions: [] }, 200, origin);
-  const taken = async (candidate) => {
-    try {
-      return Boolean(await env.DB.prepare("SELECT user_id FROM profile_variants WHERE lower(username) = ? AND user_id != ? LIMIT 1").bind(candidate, user.user_id).first());
-    } catch {
-      try {
-        return Boolean(await env.DB.prepare("SELECT user_id FROM profiles WHERE lower(username) = ? AND user_id != ? LIMIT 1").bind(candidate, user.user_id).first());
-      } catch { return false; }
-    }
-  };
-  const isTaken = await taken(username);
-  const suggestions = [];
-  for (const candidate of [`${username}_help`, `${username}_hero`, `${username}${new Date().getFullYear()}`, `${username}_official`]) {
-    if (candidate.length <= 24 && !(await taken(candidate))) suggestions.push(candidate);
-    if (suggestions.length === 3) break;
-  }
-  return json({ available: !isTaken, suggestions }, 200, origin);
-}
-
-async function handleProfileStats(request, env, user, url, parts, origin) {
-  if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
-  const userId = String(parts[2] || "").trim();
-  if (!user || !userId) return json({ error: "Authentication required" }, 401, origin);
-
-  const casesRows = await env.DB.prepare(
-    "SELECT c.*, CASE WHEN lower(COALESCE(c.status, '')) = 'completed' OR EXISTS (SELECT 1 FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed') THEN 'completed' ELSE c.status END AS effective_status FROM case_submissions c WHERE c.user_id = ? ORDER BY c.submitted_at DESC"
-  ).bind(userId).all();
-  const resolutionsRows = await env.DB.prepare(
-    "SELECT r.*, c.status AS case_status, c.title AS case_title FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id WHERE r.hero_id = ? ORDER BY r.submitted_at DESC"
-  ).bind(userId).all();
-  const unlocksRows = await env.DB.prepare(
-    "SELECT * FROM case_unlocks WHERE hero_id = ? ORDER BY unlocked_at DESC"
-  ).bind(userId).all();
-
-  const cases = (casesRows.results || []).map((row) => ({ ...row, status: row.effective_status || row.status }));
-  const resolutions = resolutionsRows.results || [];
-  const unlocks = unlocksRows.results || [];
-  const normalized = (value) => String(value || "").trim().toLowerCase();
-  const completed = (row) => {
-    if (normalized(row.case_status) === "completed" || normalized(row.status) === "completed") return true;
-    const confirmed = [1, "1", true, "true", "yes"].includes(row.admin_confirmed);
-    return confirmed && ["approved", "verified", "confirmed", "seeker_confirmed"].includes(normalized(row.status));
-  };
-  const completedResolutions = resolutions.filter(completed);
-  const contribution = (row) => [row.paid_to, row.paidTo, row.payment_type, row.paymentType].some((value) => ["givethra", "contribution", "fundraising", "partial"].includes(normalized(value)));
-  const amount = (row) => Number(row.seeker_confirmed_amount ?? row.verified_amount ?? row.amount_paid ?? row.amount ?? row.amount_collected ?? 0) || 0;
-  const caseAmount = (row) => [row.amount_collected, row.verified_amount, row.amount_needed].map(Number).find((value) => Number.isFinite(value) && value > 0) || 0;
-  const requesterCompleted = cases.filter((row) => normalized(row.status) === "completed");
-
-  return json({
-    cases,
-    resolutions,
-    unlocks,
-    requester: {
-      totalSubmitted: cases.length,
-      totalApproved: cases.filter((row) => normalized(row.status) === "approved").length,
-      totalRejected: cases.filter((row) => normalized(row.status) === "rejected").length,
-      totalCompleted: requesterCompleted.length,
-      totalExpired: cases.filter((row) => normalized(row.status) === "expired").length,
-      totalHelpReceived: requesterCompleted.reduce((sum, row) => sum + caseAmount(row), 0),
-    },
-    hero: {
-      totalUnlocks: unlocks.length,
-      directHelps: completedResolutions.filter((row) => !contribution(row)).length,
-      contributions: completedResolutions.filter(contribution).length,
-      totalAmountHelped: completedResolutions.reduce((sum, row) => sum + amount(row), 0),
-    },
-  }, 200, origin);
-}
-
+// ============================================================
+//  KYC HANDLER
+// ============================================================
 async function handleKyc(request, env, user, url, parts, origin) {
   const queryUser = requestedUserId(url);
-  const target = queryUser || user?.user_id || "";
+  const target = queryUser || user.user_id;
+  if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+
   if (request.method === "GET") {
-    const isOwnOrAdmin = canAccessUser(user, target);
     const rows = await env.DB.prepare(
       "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC, rowid DESC LIMIT ?"
     ).bind(target, Number(url.searchParams.get("limit") || 50)).all();
-    if (isOwnOrAdmin) {
-      return json(rows.results || [], 200, origin);
-    } else {
-      const limited = (rows.results || []).map((r) => ({
-        id: r.id,
-        user_id: r.user_id,
-        status: r.status,
-        submitted_at: r.submitted_at,
-      }));
-      return json(limited, 200, origin);
-    }
+    return json(rows.results || [], 200, origin);
   }
   if (request.method === "POST") {
-    if (!user) return json({ error: "Authentication required" }, 401, origin);
-    if (!canAccessUser(user, user.user_id)) return json({ error: "Forbidden" }, 403, origin);
     const body = await readJson(request);
     const record = pick(body, ["full_name", "date_of_birth", "address", "cnic_number", "cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url", "document_type"]);
     const existing = await env.DB.prepare(
@@ -940,27 +609,6 @@ async function handleKyc(request, env, user, url, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
-function normalizeUploadedUrl(value) {
-  if (typeof value !== "string" || !value) return value;
-  try {
-    const parsed = new URL(value);
-    const key = parsed.pathname === "/uploads" ? parsed.searchParams.get("key") : null;
-    if (key && /^[A-Za-z0-9._/-]+$/.test(key)) return `${PUBLIC_ORIGIN}/uploads/${key}`;
-  } catch {
-    // Keep non-URL legacy values unchanged; the frontend will not render them.
-  }
-  return value;
-}
-
-function normalizeCaseMedia(value) {
-  if (typeof value === "string") return normalizeUploadedUrl(value);
-  if (Array.isArray(value)) return value.map(normalizeCaseMedia);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalizeCaseMedia(item)]));
-  }
-  return value;
-}
-
 function decodeCaseRow(row) {
   if (!row) return row;
   const result = { ...row };
@@ -969,19 +617,12 @@ function decodeCaseRow(row) {
       try { result[field] = JSON.parse(result[field]); } catch { /* preserve legacy plain strings */ }
     }
   }
-  for (const field of ["selfie_url", "video_url", "photo_urls", "category_details"]) {
-    result[field] = normalizeCaseMedia(result[field]);
-  }
   return result;
 }
 
-function fixedCaseAmount(category) {
-  if (category === "Emergency Help") return 3000;
-  if (category === "Livestock / Farming") return 8000;
-  if (["Child Support", "Widow & Elderly Support", "Disability Support"].includes(category)) return 6000;
-  return null;
-}
-
+// ============================================================
+//  CASES HANDLER
+// ============================================================
 async function handleCases(request, env, user, url, parts, origin) {
   if (request.method === "GET") {
     if (parts[2] === "approved") {
@@ -995,8 +636,8 @@ async function handleCases(request, env, user, url, parts, origin) {
       const publicVisitor = !user;
       const visibility = isAdmin(user) || publicVisitor ? " AND lower(status) IN ('approved', 'published', 'active', 'completed')" : " AND (user_id = ? OR lower(status) IN ('approved', 'published', 'active', 'completed'))";
       const params = isAdmin(user) || publicVisitor ? ids : [...ids, user.user_id];
-      const rows = await env.DB.prepare(`SELECT c.*, CASE WHEN EXISTS (SELECT 1 FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed') THEN 'completed' ELSE c.status END AS effective_status, (SELECT r.transaction_id FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_transaction_id, (SELECT r.receipt_url FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_receipt_url FROM case_submissions c WHERE c.id IN (${placeholders})${visibility.replace(/status/g, "c.status")}`).bind(...params).all();
-      const found = new Map((rows.results || []).map((row) => [row.id, decodeCaseRow({ ...row, status: row.effective_status || row.status })]));
+      const rows = await env.DB.prepare(`SELECT * FROM case_submissions WHERE id IN (${placeholders})${visibility}`).bind(...params).all();
+      const found = new Map((rows.results || []).map((row) => [row.id, decodeCaseRow(row)]));
       return json(ids.map((value) => found.get(value)).filter(Boolean), 200, origin);
     }
     if (parts[2] && parts[2] !== "counts" && parts[2] !== "category-counts") {
@@ -1013,7 +654,7 @@ async function handleCases(request, env, user, url, parts, origin) {
       if (!row) return json({ error: "Not found" }, 404, origin);
 
       const status = String(row.status || "").toLowerCase();
-      let allowed = isAdmin(user) || row.user_id === user?.user_id || ["approved", "published", "active"].includes(status);
+      let allowed = isAdmin(user) || row.user_id === user.user_id || ["approved", "published", "active"].includes(status);
 
       if (!allowed && status === "completed" && user?.user_id) {
         const access = await env.DB.prepare(
@@ -1041,48 +682,26 @@ async function handleCases(request, env, user, url, parts, origin) {
       const counts = Object.fromEntries((rows.results || []).filter((row) => row.category).map((row) => [row.category, Number(row.count || 0)]));
       return json(counts, 200, origin);
     }
-    const sql = target ? "SELECT c.*, CASE WHEN EXISTS (SELECT 1 FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed') THEN 'completed' ELSE c.status END AS effective_status, (SELECT r.transaction_id FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_transaction_id, (SELECT r.receipt_url FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_receipt_url FROM case_submissions c WHERE c.user_id = ? ORDER BY c.submitted_at DESC" : "SELECT c.*, CASE WHEN EXISTS (SELECT 1 FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed') THEN 'completed' ELSE c.status END AS effective_status, (SELECT r.transaction_id FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_transaction_id, (SELECT r.receipt_url FROM case_resolutions r WHERE r.case_id = c.id AND lower(COALESCE(r.status, '')) = 'completed' ORDER BY r.completed_at DESC, r.submitted_at DESC LIMIT 1) AS payment_receipt_url FROM case_submissions c ORDER BY c.submitted_at DESC";
+    const sql = target ? "SELECT * FROM case_submissions WHERE user_id = ? ORDER BY submitted_at DESC" : "SELECT * FROM case_submissions ORDER BY submitted_at DESC";
     const rows = target ? await env.DB.prepare(sql).bind(target).all() : await env.DB.prepare(sql).all();
-    return json((rows.results || []).map((row) => decodeCaseRow({ ...row, status: row.effective_status || row.status })), 200, origin);
+    return json((rows.results || []).map(decodeCaseRow), 200, origin);
   }
   if (request.method === "POST" && !parts[2]) {
     if (!user) return json({ error: "Authentication required" }, 401, origin);
     if (!isAdmin(user)) {
       const suspension = await getActiveSuspension(env, user.user_id);
       if (suspension) return suspendedActionResponse(origin, suspension);
-      const kyc = await env.DB.prepare(
-        "SELECT status, rejection_reason FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC LIMIT 1"
-      ).bind(user.user_id).first();
-      const kycStatus = String(kyc?.status || "none").trim().toLowerCase();
-      if (kycStatus !== "approved") {
-        return json({
-          error: kycStatus === "rejected"
-            ? "Your KYC was rejected. Please submit KYC again before submitting a case."
-            : kycStatus === "pending"
-              ? "Your KYC is under review. You can submit a case after admin approval."
-              : "KYC approval is required before submitting a case.",
-          code: "KYC_REQUIRED",
-          kyc_status: kycStatus,
-          rejection_reason: kyc?.rejection_reason || null,
-        }, 403, origin);
-      }
     }
     const body = await readJson(request);
     const record = pick(body, ["category", "title", "short_description", "country", "city", "urgency", "description", "amount_needed", "currency", "why_help", "deadline", "institute_name", "institute_contact", "institute_address", "payment_method", "account_title", "account_number", "account_iban", "photo_urls", "selfie_url", "video_url", "category_details", "was_free"]);
-    const fixedAmount = fixedCaseAmount(record.category);
-    if (fixedAmount !== null) record.amount_needed = fixedAmount;
     const caseId = body?.id || id();
     const photoUrls = Array.isArray(record.photo_urls) || (record.photo_urls && typeof record.photo_urls === "object") ? JSON.stringify(record.photo_urls) : (record.photo_urls || null);
     const categoryDetails = Array.isArray(record.category_details) || (record.category_details && typeof record.category_details === "object") ? JSON.stringify(record.category_details) : (record.category_details || null);
 
-    const freeAttempts = await env.DB.prepare(
-      "SELECT was_free, status FROM case_submissions WHERE user_id = ? AND COALESCE(was_free, 0) = 1 ORDER BY submitted_at ASC"
-    ).bind(user.user_id).all();
+    const freeAttempts = await env.DB.prepare("SELECT was_free, status FROM case_submissions WHERE user_id = ? AND COALESCE(was_free, 0) = 1 ORDER BY submitted_at ASC").bind(user.user_id).all();
     const freeHistory = freeAttempts.results || [];
-
-    const firstFreeRejected = freeHistory.some((c) => String(c.status || "").toLowerCase() === "rejected");
-    const isFree = freeHistory.length === 0 || (freeHistory.length === 1 && firstFreeRejected);
-
+    const lastFreeWasRejected = freeHistory.length === 1 && String(freeHistory[0]?.status || "").toLowerCase() === "rejected";
+    const isFree = freeHistory.length < 2;
     if (!isFree) {
       const balance = await getWalletBalance(env, user.user_id);
       if (balance < 1) {
@@ -1090,28 +709,23 @@ async function handleCases(request, env, user, url, parts, origin) {
       }
     }
 
+    await env.DB.prepare(
+      "INSERT INTO case_submissions (id, user_id, category, title, short_description, country, city, urgency, description, amount_needed, currency, why_help, deadline, institute_name, institute_contact, institute_address, payment_method, account_title, account_number, account_iban, photo_urls, selfie_url, video_url, category_details, was_free, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+    ).bind(caseId, user.user_id, record.category || null, record.title || null, record.short_description || null, record.country || null, record.city || null, record.urgency || null, record.description || null, record.amount_needed || null, record.currency || "USD", record.why_help || null, record.deadline || null, record.institute_name || null, record.institute_contact || null, record.institute_address || null, record.payment_method || null, record.account_title || null, record.account_number || null, record.account_iban || null, photoUrls, record.selfie_url || null, record.video_url || null, categoryDetails, isFree ? 1 : 0, now()).run();
+    await syncUserCaseCounters(env, user.user_id);
+
     if (!isFree) {
       await deductCredits(env, user.user_id, 1, 'case_submission', `Case "${record.title || caseId}" submission fee`, caseId);
     }
 
-    try {
-      await env.DB.prepare(
-        "INSERT INTO case_submissions (id, user_id, category, title, short_description, country, city, urgency, description, amount_needed, currency, why_help, deadline, institute_name, institute_contact, institute_address, payment_method, account_title, account_number, account_iban, photo_urls, selfie_url, video_url, category_details, was_free, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
-      ).bind(caseId, user.user_id, record.category || null, record.title || null, record.short_description || null, record.country || null, record.city || null, record.urgency || null, record.description || null, record.amount_needed || null, record.currency || "USD", record.why_help || null, record.deadline || null, record.institute_name || null, record.institute_contact || null, record.institute_address || null, record.payment_method || null, record.account_title || null, record.account_number || null, record.account_iban || null, photoUrls, record.selfie_url || null, record.video_url || null, categoryDetails, isFree ? 1 : 0, now()).run();
-    } catch (error) {
-      if (!isFree) {
-        await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(1, now(), user.user_id).run();
-        await addTransaction(env, user.user_id, 1, 'case_submission_rollback', `Rollback failed case submission ${caseId}`, caseId);
-      }
-      throw error;
-    }
-
-    await syncUserCaseCounters(env, user.user_id);
     return json({ id: caseId, user_id: user.user_id, ...record, was_free: isFree, credits_charged: isFree ? 0 : 1, free_reason: freeHistory.length === 0 ? "first_case" : isFree ? "second_free_case" : null, status: "pending" }, 201, origin);
   }
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+// ============================================================
+//  HEROES WALL HANDLER
+// ============================================================
 async function handleHeroesWall(request, env, origin) {
   if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
   const url = new URL(request.url);
@@ -1190,6 +804,9 @@ async function handleHeroesWall(request, env, origin) {
   return json({ cases: wallCases, metrics: { solved_cases: completedCases.length, total_amount: totalAmount, currency: completedCases[0]?.currency || "PKR" } }, 200, origin);
 }
 
+// ============================================================
+//  COMMUNITY POSTS HANDLER
+// ============================================================
 async function signSessionPayload(payload, secret) {
   if (!secret) return null;
   const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
@@ -1258,49 +875,25 @@ async function insertCommunityNotification(env, ctx, recipientId, actorId, actor
   ).bind(id(), recipientId, type, title, `${publicDisplayName(actorName, "A Givethra member")}: ${message}`, "/community", now()).run());
 }
 
-async function refreshSupportEligibility(env, userId) {
-  const received = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE user_id = ?").bind(userId).first();
-  const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(userId).first();
-  const supportsReceived = Number(received?.count || 0);
-  const supportsGiven = Number(given?.count || 0);
-  const eligibilitySupports = supportsReceived + supportsGiven;
-  const eligible = eligibilitySupports >= 5000;
-  await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = CASE WHEN COALESCE(earnings_eligible, 0) = 1 OR ? >= 5000 THEN 1 ELSE 0 END, eligible_at = CASE WHEN eligible_at IS NULL AND ? >= 5000 THEN ? ELSE eligible_at END, updated_at = ? WHERE user_id = ?").bind(supportsReceived, supportsGiven, eligibilitySupports, eligibilitySupports, eligibilitySupports, now(), now(), userId).run();
-  return { supportsReceived, supportsGiven, eligibilitySupports, eligible };
-}
-
 async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, postId, actorName) {
   if (!originalUserId || !sourceUserId || originalUserId === sourceUserId) return { added: false, supports: 0, creditsEarned: 0 };
-  const post = await env.DB.prepare("SELECT created_at FROM community_posts WHERE id = ? AND user_id = ?").bind(postId, originalUserId).first();
-  if (!post) return { added: false, supports: 0, creditsEarned: 0, unavailable: true };
-  const existing = await env.DB.prepare("SELECT id FROM user_supports WHERE source_user_id = ? AND post_id = ? LIMIT 1").bind(sourceUserId, postId).first();
-  if (existing) {
-    const current = await getProfileSupportData(env, originalUserId);
-    return { added: false, supports: Number(current?.supports_count || 0), supportEarningsUsd: Number(current?.support_earnings_usd || 0), alreadySupported: true };
-  }
   const inserted = await env.DB.prepare(
     "INSERT OR IGNORE INTO user_supports (id, user_id, source_user_id, post_id, created_at) VALUES (?, ?, ?, ?, ?)"
   ).bind(id(), originalUserId, sourceUserId, postId, now()).run();
-  if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, creditsEarned: 0, alreadySupported: true };
-  const current = await getProfileSupportData(env, originalUserId);
-  const targetEligibility = await refreshSupportEligibility(env, originalUserId);
-  const supports = targetEligibility.supportsReceived;
-  const supportsGiven = targetEligibility.supportsGiven;
-  const eligibilitySupports = targetEligibility.eligibilitySupports;
-  const eligible = Number(current?.earnings_eligible || 0) === 1 || targetEligibility.eligible;
-  const eligibleAt = Number(current?.earnings_eligible || 0) === 1 ? current?.eligible_at : (eligible ? now() : null);
-  const postSupportRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE post_id = ? AND user_id = ?").bind(postId, originalUserId).first();
-  const postSupports = Number(postSupportRow?.count || 0);
-  const payableSupports = eligible ? Math.min(postSupports, 1000) : 0;
-  const supportEarningsUsd = Number((payableSupports / 10000).toFixed(4));
-  await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = ?, eligible_at = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportsGiven, eligibilitySupports, eligible ? 1 : 0, eligibleAt, supportEarningsUsd, now(), originalUserId).run();
-  if (eligible && postSupports <= 1000) {
-    await env.DB.prepare("INSERT OR IGNORE INTO support_earnings (id, user_id, post_id, supports, amount_pkr, amount_usd, created_at) VALUES (?, ?, ?, 1, 0.1, 0.0001, ?)").bind(id(), originalUserId, postId, now()).run();
-    await env.DB.prepare("INSERT INTO earnings_wallets (user_id, balance_pkr, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance_pkr = balance_pkr + excluded.balance_pkr, updated_at = excluded.updated_at").bind(originalUserId, 0.1, now()).run();
+  if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, creditsEarned: 0 };
+  const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(originalUserId).first();
+  const supports = Number(current?.supports_count || 0) + 1;
+  const previousCredits = Number(current?.credits_from_supports || 0);
+  const totalCredits = Math.floor(supports / 100);
+  const creditsEarned = Math.max(0, totalCredits - previousCredits);
+  await env.DB.prepare("UPDATE users SET supports_count = ?, credits_from_supports = ?, updated_at = ? WHERE user_id = ?").bind(supports, totalCredits, now(), originalUserId).run();
+  await env.DB.prepare("UPDATE community_posts SET repost_count = COALESCE(repost_count, 0) + 1 WHERE id = ?").bind(postId).run();
+  if (creditsEarned > 0) {
+    await addCredits(env, originalUserId, creditsEarned, "support_to_credit", `${creditsEarned * 100} supports converted to ${creditsEarned} credit${creditsEarned === 1 ? "" : "s"}`, postId);
+    await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "credit_earned", "Credit earned from Supports", `${creditsEarned} credit${creditsEarned === 1 ? "" : "s"} earned from ${creditsEarned * 100} Supports`);
   }
-  await refreshSupportEligibility(env, sourceUserId);
   await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);
-  return { added: true, supports, supportsGiven, eligibilitySupports, earningsEligible: eligible, eligibleAt, supportEarningsUsd };
+  return { added: true, supports, creditsEarned };
 }
 
 async function handleCommunityPosts(request, env, user, url, parts, origin, ctx) {
@@ -1310,50 +903,27 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     const tab = url.searchParams.get("tab") || "for-you";
     let filter = "";
     const binds = [actorId, actorId];
-    binds.push(user?.user_id || actorId);
     if (tab === "my-heroes" && user) { filter = "WHERE cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)"; binds.push(user.user_id); }
-    if (tab === "my-posts") {
-      if (user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
-      else filter = "WHERE 1 = 0";
-    }
-    const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3 + COALESCE(sc.support_count,0) * 3)";
-    const supportScore = "COALESCE(sc.support_count,0)";
+    if (tab === "my-posts" && user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
+    const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3)";
     const heroBoost = "(CASE WHEN cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 100 ELSE 0 END)";
     const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.signed_up_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
     const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
-    const rankSeed = Number.isFinite(Number(url.searchParams.get("seed"))) ? Math.trunc(Number(url.searchParams.get("seed"))) : 0;
-    const stableVariation = `((abs(length(cp.id) * 31 + ${rankSeed}) % 100) / 100.0 * 8)`;
-    const profile = Math.abs(rankSeed) % 3;
-    const forYouScore = profile === 0
-      ? `${engagementScore} * 1.0 + ${supportScore} * 5.0 + ${freshnessBoost} * 2.0 + ${heroBoost} * 1.5 + ${newCreatorBoost}`
-      : profile === 1
-        ? `${engagementScore} * 1.5 + ${supportScore} * 2.0 + ${freshnessBoost} * 6.0 + ${heroBoost} * 2.0 + ${newCreatorBoost} * 4.0`
-        : `${engagementScore} * 2.0 + ${supportScore} * 3.0 + ${freshnessBoost} * 3.0 + ${heroBoost} * 5.0 + ${newCreatorBoost} * 2.0`;
-    const orderBy = tab === "latest"
-      ? "cp.created_at DESC, cp.id DESC"
-      : tab === "most-supported"
-        ? "COALESCE(sc.support_count, 0) DESC, cp.created_at DESC, cp.id DESC"
-        : tab === "my-posts"
-          ? "cp.created_at DESC, cp.id DESC"
-          : `${forYouScore} + ${stableVariation} DESC, cp.created_at DESC, cp.id DESC`;
-    if (tab === "for-you") binds.push(user?.user_id || actorId);
+    const orderBy = tab === "my-posts" ? "cp.created_at DESC" : tab === "my-heroes" ? `${heroBoost} DESC, ${engagementScore} DESC, cp.created_at DESC` : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC`;
+    if (tab !== "my-posts") binds.push(user?.user_id || actorId);
     const posts = await env.DB.prepare(
       `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),
-       support_counts AS (SELECT post_id, COUNT(*) AS support_count FROM user_supports GROUP BY post_id),
-       support_by_actor AS (SELECT post_id, 1 AS supported_by_me FROM user_supports WHERE source_user_id = ? GROUP BY post_id),
        comment_counts AS (SELECT post_id, COUNT(*) AS comments_count FROM community_post_comments GROUP BY post_id),
        repost_counts AS (SELECT repost_id, COUNT(*) AS repost_count FROM community_posts WHERE repost_id IS NOT NULL GROUP BY repost_id)
        SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, u.signed_up_at AS user_created_at, p.avatar_url,
        COALESCE(lc.likes_count,0) AS likes_count, COALESCE(cc.comments_count,0) AS comments_count, COALESCE(lc.is_liked,0) AS is_liked,
-       COALESCE(sc.support_count,0) AS support_count, COALESCE(sba.supported_by_me,0) AS supported_by_me,
        COALESCE(rc.repost_count,0) AS repost_count,
        CASE WHEN cp.user_id IS NOT NULL AND cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 1 ELSE 0 END AS is_following
        FROM community_posts cp LEFT JOIN users u ON cp.user_id=u.user_id LEFT JOIN profiles p ON p.user_id=cp.user_id
-       LEFT JOIN like_counts lc ON lc.post_id=cp.id LEFT JOIN support_counts sc ON sc.post_id=cp.id LEFT JOIN support_by_actor sba ON sba.post_id=cp.id
-       LEFT JOIN comment_counts cc ON cc.post_id=cp.id LEFT JOIN repost_counts rc ON rc.repost_id=cp.id
+       LEFT JOIN like_counts lc ON lc.post_id=cp.id LEFT JOIN comment_counts cc ON cc.post_id=cp.id LEFT JOIN repost_counts rc ON rc.repost_id=cp.id
        ${filter} ORDER BY ${orderBy} LIMIT 500`
     ).bind(...binds).all();
-    return json((posts.results || []).map((post) => ({ ...post, is_guest: !post.user_id, display_name: publicDisplayName(post.user_name, publicDisplayName(post.display_name,"User")), is_verified: post.user_kyc_status === "approved", is_new_creator: Boolean(post.user_created_at && (Date.now() - new Date(post.user_created_at).getTime()) <= 30 * 86400000), likes_count: Number(post.likes_count||0), comments_count: Number(post.comments_count||0), support_count: Number(post.support_count||0), supported_by_me: Boolean(post.supported_by_me), repost_count: Number(post.repost_count||0), is_liked: Boolean(post.is_liked), is_following: Boolean(post.is_following) })), 200, origin);
+    return json((posts.results || []).map((post) => ({ ...post, is_guest: !post.user_id, display_name: publicDisplayName(post.user_name, publicDisplayName(post.display_name,"User")), is_verified: post.user_kyc_status === "approved", is_new_creator: Boolean(post.user_created_at && (Date.now() - new Date(post.user_created_at).getTime()) <= 30 * 86400000), likes_count: Number(post.likes_count||0), comments_count: Number(post.comments_count||0), repost_count: Number(post.repost_count||0), is_liked: Boolean(post.is_liked), is_following: Boolean(post.is_following) })), 200, origin);
   }
 
   if (request.method === "POST" && parts.length === 3) {
@@ -1363,17 +933,12 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     if (!message && !repostId) return json({ error: "Message or repost ID required" }, 400, origin);
     const guest = user ? null : guestIdentity(request, body);
     if (!user && !guest) return json({ error: "Guest identity is required" }, 400, origin);
-    const authorId = user?.user_id || guest.id;
-    if (user) {
-      const recent = await env.DB.prepare("SELECT created_at FROM community_posts WHERE user_id = ? AND datetime(created_at) >= datetime('now', '-24 hours') ORDER BY datetime(created_at) DESC LIMIT 1").bind(authorId).first();
-      if (recent) return json({ error: "You can publish one post every 24 hours.", code: "POST_COOLDOWN", next_post_at: new Date(new Date(recent.created_at).getTime() + 24 * 60 * 60 * 1000).toISOString() }, 429, origin);
-    }
     const postId = id();
     const displayName = user ? publicDisplayName(user.full_name,"User") : guest.name;
     let finalMessage = message;
     if (repostId) { const original = await env.DB.prepare("SELECT display_name, message FROM community_posts WHERE id = ?").bind(repostId).first(); if (!original) return json({ error: "Original post not found" }, 404, origin); finalMessage = `${body?.repost_comment ? String(body.repost_comment).trim() + " — " : ""}Reposted from ${publicDisplayName(original.display_name,"User")}`; }
     await env.DB.prepare(`INSERT INTO community_posts (id,user_id,display_name,message,role,repost_id,repost_comment,created_at) VALUES (?,?,?,?,?,?,?,?)`).bind(postId,user?.user_id||guest.id,displayName,finalMessage,body?.role||null,repostId,body?.repost_comment||null,now()).run();
-    let supportResult = { added: false, supports: 0, supportEarningsUsd: 0 };
+    let supportResult = { added: false, supports: 0, creditsEarned: 0 };
     if (repostId) {
       const original = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(repostId).first();
       if (original?.user_id) supportResult = await recordCommunitySupport(env, ctx, original.user_id, user?.user_id || guest.id, repostId, displayName);
@@ -1395,6 +960,9 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+// ============================================================
+//  COMMUNITY LIKES HANDLER
+// ============================================================
 async function handleCommunityLikes(request, env, user, url, parts, origin, ctx) {
   const postId = parts[3];
   if (!postId) return json({ error: "Post ID required" }, 400, origin);
@@ -1443,6 +1011,9 @@ async function handleCommunityLikes(request, env, user, url, parts, origin, ctx)
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+// ============================================================
+//  COMMUNITY COMMENTS HANDLER
+// ============================================================
 async function handleCommunityComments(request, env, user, url, parts, origin, ctx) {
   const postId = parts[3];
   if (!postId) return json({ error: "Post ID required" }, 400, origin);
@@ -1504,23 +1075,6 @@ async function handleCommunityComments(request, env, user, url, parts, origin, c
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
-async function handleCommunitySupport(request, env, user, origin, ctx) {
-  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
-  const body = await readJson(request).catch(() => ({}));
-  const guest = user ? null : guestIdentity(request, body);
-  const sourceUserId = user?.user_id || guest?.id;
-  const postId = String(body?.post_id || "").trim();
-  if (!sourceUserId) return json({ error: "Guest identity is required" }, 400, origin);
-  if (!postId) return json({ error: "Post ID is required" }, 400, origin);
-  const post = await env.DB.prepare("SELECT id, user_id, created_at FROM community_posts WHERE id = ?").bind(postId).first();
-  if (!post) return json({ error: "Post not found" }, 404, origin);
-  if (!post.user_id) return json({ error: "Guest posts cannot receive Supports" }, 422, origin);
-  const actorName = user ? publicDisplayName(user.full_name, "User") : guest.name;
-  const result = await recordCommunitySupport(env, ctx, String(post.user_id), sourceUserId, postId, actorName);
-  if (result.unavailable) return json({ error: "Supports are available on new community posts only", code: "SUPPORTS_NOT_AVAILABLE" }, 409, origin);
-  const postSupportCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE post_id = ?").bind(postId).first();
-  return json({ post_id: postId, supported: Boolean(result.added || result.alreadySupported), support_count: Number(postSupportCount?.count || 0), ...result }, result.added ? 201 : 200, origin);
-}
 
 async function handleFollow(request, env, user, url, parts, origin, ctx) {
   const body = await readJson(request).catch(() => ({}));
@@ -1529,18 +1083,9 @@ async function handleFollow(request, env, user, url, parts, origin, ctx) {
     const userId = url.searchParams.get("user") || user?.user_id;
     const type = url.searchParams.get("type") === "requesters" ? "requesters" : "heroes";
     if (!userId) return json([], 200, origin);
-    const where = type === "requesters" ? "f.following_id = ?" : "f.follower_id = ?";
-    const other = type === "requesters" ? "f.follower_id" : "f.following_id";
-    const rows = await env.DB.prepare(
-      `SELECT f.created_at, ${other} AS user_id,
-              COALESCE(p.full_name, u.full_name, u.email, 'User') AS full_name,
-              p.avatar_url, u.kyc_status
-       FROM follows f
-       LEFT JOIN users u ON u.user_id = ${other}
-       LEFT JOIN profiles p ON p.user_id = ${other}
-       WHERE ${where}
-       ORDER BY f.created_at DESC`
-    ).bind(userId).all();
+    const where = type === "requesters" ? "f.follower_id = ?" : "f.following_id = ?";
+    const selected = type === "requesters" ? "f.follower_id" : "f.following_id";
+    const rows = await env.DB.prepare(`SELECT f.created_at, u.user_id, COALESCE(p.full_name, u.full_name, u.email, 'User') AS full_name, p.avatar_url, u.kyc_status FROM follows f LEFT JOIN users u ON u.user_id = ${selected} LEFT JOIN profiles p ON p.user_id = ${selected} WHERE ${where} ORDER BY f.created_at DESC`).bind(userId).all();
     return json((rows.results || []).map((row) => ({ ...row, is_verified: String(row.kyc_status || '').toLowerCase() === 'approved' })), 200, origin);
   }
   if (!targetId) return json({ error: "Target user ID required" }, 400, origin);
@@ -1559,6 +1104,9 @@ async function handleFollow(request, env, user, url, parts, origin, ctx) {
   return json({ error: "Method not allowed" },405,origin);
 }
 
+// ============================================================
+//  NOTIFICATIONS HANDLER
+// ============================================================
 async function handleNotifications(request, env, user, url, parts, origin) {
   const requested = url.searchParams.get("user_id") || user?.user_id;
   if (!requested || !canAccessUser(user, requested)) {
@@ -1611,41 +1159,39 @@ async function handleNotifications(request, env, user, url, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+// ============================================================
+//  SYNC COMPLETED CASE (FIXED)
+// ============================================================
 async function synchronizeCompletedCase(env, resolutionId) {
+  // Get the resolution and verify it's truly completed
   const resolution = await env.DB.prepare(
-    "SELECT case_id, paid_to, status, admin_confirmed, resolution_type FROM case_resolutions WHERE id = ?"
+    "SELECT r.case_id, r.hero_id, r.seeker_id, r.paid_to, r.status, r.admin_confirmed, c.title AS case_title FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id WHERE r.id = ?"
   ).bind(resolutionId).first();
   if (!resolution?.case_id) return null;
-
-  const isApproved = String(resolution.status || "").toLowerCase() === "completed" &&
-                      [1, "1", true, "true"].includes(resolution.admin_confirmed);
+  
+  const normalizedStatus = String(resolution.status || "").trim().toLowerCase();
+  const isApproved = ["completed", "approved", "seeker_confirmed"].includes(normalizedStatus) &&
+                      [1, "1", true, "true", "yes"].includes(resolution.admin_confirmed);
   if (!isApproved) return null;
 
+  // Sum all approved resolutions for this case
   const totals = await env.DB.prepare(
     `SELECT c.user_id, c.amount_needed, c.amount_collected,
             COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0)) 
                       FROM case_resolutions r
                       WHERE r.case_id = c.id
-                        AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
-                        AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')
-                        AND lower(COALESCE(r.paid_to, '')) = 'givethra'), 0) AS contribution_total,
-            COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0)) 
-                      FROM case_resolutions r
-                      WHERE r.case_id = c.id
-                        AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
-                        AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')
-                        AND lower(COALESCE(r.paid_to, '')) != 'givethra'), 0) AS direct_total
+                        AND lower(COALESCE(r.status, '')) IN ('completed', 'approved', 'seeker_confirmed')
+                        AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true', 'yes')), 0) AS verified_total
      FROM case_submissions c WHERE c.id = ?`
   ).bind(resolution.case_id).first();
   if (!totals) return null;
 
-  const contributionTotal = Number(totals.contribution_total || 0);
-  const directTotal = Number(totals.direct_total || 0);
-  const verifiedTotal = Math.max(contributionTotal + directTotal, Number(totals.amount_collected || 0));
+  const verifiedTotal = Math.max(Number(totals.verified_total || 0), Number(totals.amount_collected || 0));
+  const directPayment = String(resolution.paid_to || "").toLowerCase() !== "givethra";
   const goalReached = Number(totals.amount_needed || 0) <= 0 || verifiedTotal >= Number(totals.amount_needed || 0);
 
-  const nextStatus = (contributionTotal === 0 && goalReached) ? "completed" : undefined;
-
+  // Update case: amount_collected and status if completed
+  const nextStatus = directPayment && goalReached ? "completed" : undefined;
   if (nextStatus) {
     await env.DB.prepare(
       "UPDATE case_submissions SET amount_collected = ?, status = ? WHERE id = ?"
@@ -1657,9 +1203,21 @@ async function synchronizeCompletedCase(env, resolutionId) {
   }
 
   if (totals.user_id) await syncUserCaseCounters(env, totals.user_id);
-  return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "approved" };
+  if (nextStatus === "completed") {
+    const title = resolution.case_title || "your case";
+    if (resolution.hero_id) {
+      await sendNotification(env, resolution.hero_id, "help_completed", "Your help was verified ✅", `Your help for “${title}” was verified and completed.`, `/cases/${resolution.case_id}`);
+    }
+    if (totals.user_id && totals.user_id !== resolution.hero_id) {
+      await sendNotification(env, totals.user_id, "help_completed", "Your case is complete ✅", `Your case “${title}” has received verified help and is now complete.`, `/cases/${resolution.case_id}`);
+    }
+  }
+  return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "open" };
 }
 
+// ============================================================
+//  MAIN HANDLER
+// ============================================================
 async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const origin = url.origin;
@@ -1676,67 +1234,6 @@ async function handleRequest(request, env, ctx) {
     return json({ status: "ok", timestamp: now() }, 200, origin);
   }
 
-  if (url.pathname === '/Givethra.apk' || url.pathname.endsWith('.apk')) {
-    try {
-      const assetResponse = await env.ASSETS.fetch(request);
-
-      const assetContentType = assetResponse.headers.get('Content-Type') || '';
-      if (assetResponse.status === 200 && !assetContentType.toLowerCase().includes('text/html')) {
-        const headers = new Headers(assetResponse.headers);
-        headers.set('Content-Type', 'application/vnd.android.package-archive');
-        headers.set('Content-Disposition', 'attachment; filename="Givethra.apk"');
-        headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-        headers.set('Accept-Ranges', 'bytes');
-
-        return new Response(assetResponse.body, {
-          status: 200,
-          headers: headers
-        });
-      }
-
-      const uploadObject = await env.UPLOADS.get('Givethra.apk');
-      if (uploadObject) {
-        const headers = new Headers();
-        headers.set('Content-Type', 'application/vnd.android.package-archive');
-        headers.set('Content-Disposition', 'attachment; filename="Givethra.apk"');
-        headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-        headers.set('Content-Length', String(uploadObject.size));
-        headers.set('Accept-Ranges', 'bytes');
-        headers.set('Access-Control-Allow-Origin', '*');
-
-        return new Response(uploadObject.body, {
-          status: 200,
-          headers: headers
-        });
-      }
-
-      return new Response(JSON.stringify({
-        error: 'APK file not found',
-        message: 'Please contact support or try again later.',
-        path: url.pathname
-      }), {
-        status: 404,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
-        }
-      });
-
-    } catch (error) {
-      console.error('APK fetch error:', error);
-      return new Response(JSON.stringify({
-        error: 'APK download failed',
-        message: 'An unexpected error occurred. Please try again later.'
-      }), {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
-        }
-      });
-    }
-  }
-
   if (parts[0] === "auth" && parts[1] === "google" && request.method === "POST") {
     try {
       const body = await readJson(request);
@@ -1747,9 +1244,7 @@ async function handleRequest(request, env, ctx) {
       const account = await findOrCreateUser(env, identity);
       const token = await signSession(account, env.JWT_SECRET);
       if (!token) return json({ error: "Authentication is not configured", code: "AUTH_NOT_CONFIGURED" }, 500, origin);
-      const response = json({ token, user: account }, 200, origin);
-      response.headers.set("Set-Cookie", sessionCookie(token));
-      return response;
+      return json({ token, user: account }, 200, origin);
     } catch (error) {
       console.error("Google authentication reconciliation failed", error);
       return json({ error: "Authentication or database request failed", code: "AUTH_RECONCILIATION_FAILED" }, 500, origin);
@@ -1762,119 +1257,35 @@ async function handleRequest(request, env, ctx) {
     return json({ valid: true, user }, 200, origin);
   }
 
-  // ============================================================
-  //  🔥 FIXED: /uploads/ handler - Content-Type auto-detect + inline
-  // ============================================================
-  if (url.pathname === "/uploads" || url.pathname.startsWith("/uploads/")) {
-    const rawKey = url.pathname === "/uploads"
-      ? url.searchParams.get("key") || ""
-      : url.pathname.slice(9);
-    let key = rawKey;
-    try { key = decodeURIComponent(rawKey); } catch { /* keep the raw key */ }
-    if (!key) return new Response("File not found", { status: 404 });
+  // Public static assets
+  if (url.pathname.startsWith("/uploads/")) {
+    const key = url.pathname.slice(9);
     try {
       const object = await env.UPLOADS.get(key);
       if (!object) return new Response("File not found", { status: 404 });
-
-      // 🔥 Auto-detect content type by extension if R2 metadata is missing
-      let contentType = object.httpMetadata?.contentType || "";
-      if (!contentType || contentType === "application/octet-stream") {
-        const lower = key.toLowerCase();
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) contentType = "image/jpeg";
-        else if (lower.endsWith(".png")) contentType = "image/png";
-        else if (lower.endsWith(".webp")) contentType = "image/webp";
-        else if (lower.endsWith(".gif")) contentType = "image/gif";
-        else if (lower.endsWith(".heic")) contentType = "image/heic";
-        else if (lower.endsWith(".heif")) contentType = "image/heif";
-        else if (lower.endsWith(".bmp")) contentType = "image/bmp";
-        else if (lower.endsWith(".svg")) contentType = "image/svg+xml";
-        else if (lower.endsWith(".pdf")) contentType = "application/pdf";
-        else if (lower.endsWith(".mp4")) contentType = "video/mp4";
-        else if (lower.endsWith(".webm")) contentType = "video/webm";
-        else if (lower.endsWith(".mov")) contentType = "video/quicktime";
-        else contentType = "application/octet-stream";
-      }
-
       const headers = new Headers({
-        "Content-Type": contentType,
+        "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
         "Cache-Control": "public, max-age=31536000",
-        // 🔥 FIX: Removed X-Content-Type-Options: nosniff so browsers can render inline
-        // 🔥 FIX: Explicitly set inline so browsers display instead of forcing download
-        "Content-Disposition": "inline",
-        "Access-Control-Allow-Origin": PUBLIC_ORIGIN,
+        "X-Content-Type-Options": "nosniff",
       });
-
-      // Override to attachment only if download explicitly requested
       if (url.searchParams.get("download") === "1") {
         const fileName = decodeURIComponent(key.split("/").pop() || "download")
-          .replace(/[\r\n"]+/g, "_")
+          .replace(/[\\r\\n\\\"]+/g, "_")
           .slice(0, 180) || "download";
         headers.set("Content-Disposition", `attachment; filename="${fileName}"`);
       }
-
       return new Response(object.body, { headers });
     } catch {
       return new Response("File not found", { status: 404 });
     }
   }
-
-  const caseShareMatch = request.method === "GET" && (
-    (parts.length === 2 && parts[0] === "cases" && parts[1]) ||
-    (parts.length === 3 && parts[0] === "share" && parts[1] === "cases" && parts[2])
-  );
-  if (caseShareMatch && env.DB && env.ASSETS) {
-    const isDedicatedShareUrl = parts[0] === "share";
-    const sharedCaseId = decodeURIComponent(isDedicatedShareUrl ? parts[2] : parts[1]);
-    const sharedCase = await env.DB.prepare(
-      "SELECT id, title, short_description, description, category, amount_needed, currency, city, country, selfie_url, status FROM case_submissions WHERE id = ? AND lower(status) IN ('approved', 'published', 'active') LIMIT 1"
-    ).bind(sharedCaseId).first();
-    if (sharedCase) {
-      const shell = await env.ASSETS.fetch(new Request(new URL("/", url), request));
-      const sourceHtml = await shell.text();
-      const title = escapeHtml(sharedCase.title || "Verified Givethra Help Case");
-      const category = escapeHtml(sharedCase.category || "Verified Help Request");
-      const amount = Number(sharedCase.amount_needed || 0);
-      const currency = escapeHtml(String(sharedCase.currency || "USD").toUpperCase());
-      const location = escapeHtml([sharedCase.city, sharedCase.country].filter(Boolean).join(", "));
-      const baseDescription = String(sharedCase.short_description || sharedCase.description || "Support a verified Givethra help request.").trim();
-      const description = escapeHtml(`${category}${amount > 0 ? ` · Goal: ${currency} ${amount.toLocaleString()}` : ""}${location ? ` · ${location}` : ""}. ${baseDescription} Tap to view the verified case and help now.`);
-      const canonical = escapeHtml(`${PUBLIC_ORIGIN}/cases/${encodeURIComponent(String(sharedCase.id))}`);
-      const image = escapeHtml(normalizeUploadedUrl(sharedCase.selfie_url) || `${PUBLIC_ORIGIN}/assets/generated/hero-givethra.dim_1200x500.jpg`);
-      const redirect = escapeHtml(`/cases/${encodeURIComponent(String(sharedCase.id))}`);
-      const metadata = `
-        <title>${title} · ${category} · Givethra</title>
-        <meta name="description" content="${description}">
-        <link rel="canonical" href="${canonical}">
-        <meta property="og:type" content="article">
-        <meta property="og:site_name" content="Givethra">
-        <meta property="og:title" content="${title} · ${category}">
-        <meta property="og:description" content="${description}">
-        <meta property="og:url" content="${canonical}">
-        <meta property="og:image" content="${image}">
-        <meta property="og:image:secure_url" content="${image}">
-        <meta property="og:image:alt" content="Verified requester selfie for ${title}">
-        <meta property="og:image:type" content="image/jpeg">
-        <meta property="og:image:width" content="1200">
-        <meta property="og:image:height" content="1200">
-        <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="${title} · ${category}">
-        <meta name="twitter:description" content="${description}">
-        <meta name="twitter:image" content="${image}">`;
-      const redirectMarkup = isDedicatedShareUrl
-        ? `<meta http-equiv="refresh" content="0;url=${redirect}"><script>if (!/bot|crawler|spider|preview|facebookexternalhit|whatsapp/i.test(navigator.userAgent)) location.replace(${JSON.stringify(`/cases/${String(sharedCase.id)}`)});</script>`
-        : "";
-      const html = sourceHtml.replace(/<head([^>]*)>/i, `<head$1>${metadata}${redirectMarkup}`);
-      const headers = new Headers(shell.headers);
-      headers.set("Content-Type", "text/html; charset=utf-8");
-      headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
-      return new Response(html, { status: shell.status, headers });
-    }
-  }
-
   if (env.ASSETS && parts[0] !== "api" && request.method === "GET") {
     return env.ASSETS.fetch(request);
   }
 
+  // ============================================================
+  //  PUBLIC: Community Posts (no auth required for reading)
+  // ============================================================
   if (parts[0] === "api" && parts[1] === "heroes-wall") {
     return handleHeroesWall(request, env, origin);
   }
@@ -1894,10 +1305,6 @@ async function handleRequest(request, env, ctx) {
     const rows = await env.DB.prepare("SELECT fc.*, u.full_name as user_name FROM feedback_comments fc LEFT JOIN users u ON fc.user_id = u.user_id").all();
     return json(rows.results || [], 200, origin);
   }
-  if (parts[0] === "api" && parts[1] === "support" && parts.length === 2) {
-    const supportUser = await authenticate(request, env, googleClientId(env));
-    return handleCommunitySupport(request, env, supportUser, origin, ctx);
-  }
   if (parts[0] === "api" && parts[1] === "follow") {
     const followUser = await authenticate(request, env, googleClientId(env));
     return handleFollow(request, env, followUser, url, parts, origin, ctx);
@@ -1912,7 +1319,7 @@ async function handleRequest(request, env, ctx) {
       ).bind(now(), now(), user.user_id).run();
       return json({ updated: true, user_id: user.user_id }, 200, origin);
     }
-
+    
     if (parts[2] === "posts" && parts.length === 3 && request.method === "GET") {
       return handleCommunityPosts(request, env, user, url, parts, origin, ctx);
     }
@@ -1927,25 +1334,18 @@ async function handleRequest(request, env, ctx) {
     }
   }
 
+  // ============================================================
+  //  AUTH REQUIRED: All other APIs
+  // ============================================================
   const user = await authenticate(request, env, googleClientId(env));
   if (!user && parts[0] !== "api") {
     return json({ error: "Authentication required" }, 401, origin);
   }
 
   if (parts[0] === "api") {
-    if (parts[1] === "username-availability") {
-      return handleUsernameAvailability(request, env, user, url, origin);
-    }
-    if (parts[1] === "user-search") {
-      return handleUserSearch(request, env, user, url, origin);
-    }
-
+    // ✅ PROFILES
     if (parts[1] === "profiles") {
       return handleProfile(request, env, user, parts, origin);
-    }
-
-    if (parts[1] === "profile-stats") {
-      return handleProfileStats(request, env, user, url, parts, origin);
     }
 
     if (parts[1] === "kyc-submissions") {
@@ -1962,31 +1362,8 @@ async function handleRequest(request, env, ctx) {
 
     if (parts[1] === "user-supports" && parts[2] && request.method === "GET") {
       const target = String(parts[2]);
-      const row = await getProfileSupportData(env, target);
-      const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(target).first();
-      return json({ user_id: target, supports: Number(row?.supports_count || 0), supportsReceived: Number(row?.supports_count || 0), supportsGiven: Number(row?.supports_given || given?.count || 0), eligibilitySupports: Number(row?.eligibility_supports || 0), earningsEligible: Boolean(row?.earnings_eligible), eligibleAt: row?.eligible_at || null, supportEarningsUsd: Number(row?.support_earnings_usd || 0), supportsPerDollar: 10000 }, 200, origin);
-    }
-
-    if (parts[1] === "earnings" && parts[2] === "me" && request.method === "GET") {
-      return json(await getEarningsSummary(env, user.user_id), 200, origin);
-    }
-
-    if (parts[1] === "withdrawals" && request.method === "POST") {
-      if (!withdrawalWindow()) return json({ error: "Withdrawals are open from the 30th through the 3rd of each month." }, 409, origin);
-      const body = await readJson(request);
-      const summary = await getEarningsSummary(env, user.user_id);
-      const amount = Number(body?.amount || summary.wallet_pkr);
-      const bankName = String(body?.bank_name || '').trim();
-      const accountTitle = String(body?.account_title || '').trim();
-      const accountNumber = String(body?.account_number || '').trim();
-      if (!summary.earnings_eligible) return json({ error: "Complete 5,000 Support eligibility first." }, 422, origin);
-      if (!bankName || !accountTitle || !accountNumber) return json({ error: "Bank name, account title and account number are required." }, 400, origin);
-      if (amount < 300 || Number(summary.wallet_pkr) < amount) return json({ error: "Minimum withdrawal is 300 PKR and cannot exceed your wallet balance." }, 422, origin);
-      const pending = await env.DB.prepare("SELECT id FROM withdrawal_requests WHERE user_id = ? AND status IN ('pending', 'approved') LIMIT 1").bind(user.user_id).first();
-      if (pending) return json({ error: "You already have a withdrawal request in process." }, 409, origin);
-      const requestId = id();
-      await env.DB.prepare("INSERT INTO withdrawal_requests (id, user_id, amount_pkr, bank_name, account_title, account_number, status, requested_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)").bind(requestId, user.user_id, amount, bankName, accountTitle, accountNumber, now()).run();
-      return json({ id: requestId, status: "pending" }, 201, origin);
+      const row = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports, COALESCE(credits_from_supports, 0) AS creditsFromSupports FROM users WHERE user_id = ?").bind(target).first();
+      return json({ user_id: target, supports: Number(row?.supports || 0), creditsFromSupports: Number(row?.creditsFromSupports || 0) }, 200, origin);
     }
 
     if (parts[1] === "wallets" && parts[2]) {
@@ -2084,9 +1461,6 @@ async function handleRequest(request, env, ctx) {
         }
         if (!String(body?.text_message ?? body?.comment ?? "").trim()) {
           return json({ error: "Feedback caption is required" }, 400, origin);
-        }
-        if (!String(body?.video_url || "").trim()) {
-          return json({ error: "A 60–90 second live-camera feedback video is required" }, 400, origin);
         }
         let feedbackDeadline = null;
         try {
@@ -2306,30 +1680,6 @@ async function handleRequest(request, env, ctx) {
         return json({ sent, failed: userIds.length - sent }, 201, origin);
       }
 
-      if (parts[2] === "withdrawals") {
-        if (request.method === "GET") {
-          const rows = await env.DB.prepare("SELECT w.*, u.full_name, u.email FROM withdrawal_requests w LEFT JOIN users u ON u.user_id = w.user_id ORDER BY w.requested_at DESC").all();
-          return json(rows.results || [], 200, origin);
-        }
-        if (request.method === "PUT" && parts[3]) {
-          const body = await readJson(request);
-          const status = ["approved", "rejected", "completed"].includes(String(body?.status)) ? String(body.status) : null;
-          if (!status) return json({ error: "Invalid withdrawal status" }, 400, origin);
-          const proof = body?.payment_proof_url ? String(body.payment_proof_url).trim() : null;
-          const row = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first();
-          if (!row) return json({ error: "Withdrawal request not found" }, 404, origin);
-          await env.DB.prepare("UPDATE withdrawal_requests SET status = ?, payment_proof_url = COALESCE(?, payment_proof_url), reviewed_by = ?, reviewed_at = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE completed_at END WHERE id = ?").bind(status, proof, user.user_id, now(), status, now(), parts[3]).run();
-          if (status === "rejected" && String(row.status || "").toLowerCase() !== "rejected") {
-            const cleanup = await deleteRejectedUploadFiles(env, [row.payment_proof_url], { table: "withdrawal_requests", id: parts[3] });
-            await env.DB.prepare("UPDATE withdrawal_requests SET payment_proof_url = NULL WHERE id = ?").bind(parts[3]).run();
-            console.log("Rejected withdrawal upload cleanup", parts[3], cleanup);
-          }
-          if (status === "completed") await env.DB.prepare("UPDATE earnings_wallets SET balance_pkr = MAX(0, balance_pkr - ?), updated_at = ? WHERE user_id = ?").bind(Number(row.amount_pkr), now(), row.user_id).run();
-          return json(await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first(), 200, origin);
-        }
-        return json({ error: "Method not allowed" }, 405, origin);
-      }
-
       if (parts[2] === "wallets") {
         if (request.method === "GET") {
           const target = url.searchParams.get("user_id");
@@ -2363,7 +1713,6 @@ async function handleRequest(request, env, ctx) {
           deposits: { table: "deposits", order: "submitted_at" },
           profiles: { table: "profiles", order: "updated_at" },
           wallets: { table: "wallets", order: "updated_at" },
-          withdrawals: { table: "withdrawal_requests", order: "requested_at" },
           unlocks: { table: "case_unlocks", order: "unlocked_at" },
           "support-messages": { table: "support_messages", order: "created_at" },
           feedbacks: { table: "feedbacks", order: "created_at" },
@@ -2372,16 +1721,8 @@ async function handleRequest(request, env, ctx) {
         };
         const entry = tableMap[parts[2]];
         if (entry) {
-          const select = parts[2] === "profiles"
-            ? "p.*, u.email AS email, u.signed_up_at AS signed_up_at, u.full_name AS user_full_name, u.avatar_url AS user_avatar_url"
-            : "*";
-          const from = parts[2] === "profiles" ? "profiles p LEFT JOIN users u ON u.user_id = p.user_id" : entry.table;
-          const order = parts[2] === "profiles" ? "p.updated_at" : entry.order;
-          const rows = await env.DB.prepare(`SELECT ${select} FROM ${from} ORDER BY ${order} DESC`).all();
-          const results = entry.table === "case_submissions"
-            ? (rows.results || []).map(decodeCaseRow)
-            : (rows.results || []);
-          return json(results, 200, origin);
+          const rows = await env.DB.prepare(`SELECT * FROM ${entry.table} ORDER BY ${entry.order} DESC`).all();
+          return json(rows.results || [], 200, origin);
         }
       }
 
@@ -2394,7 +1735,7 @@ async function handleRequest(request, env, ctx) {
         const body = await readJson(request);
         const target = String(body?.user_id || "").trim();
         if (!target) return json({ error: "User ID is required" }, 400, origin);
-        const existing = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(target).first();
+        const existing = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ? ORDER BY suspended_at DESC LIMIT 1").bind(target).first();
         const active = body?.is_active ? 1 : 0;
         const suspensionCount = body?.suspension_count ?? existing?.suspension_count ?? 0;
         const suspendedAt = body?.suspended_at ?? existing?.suspended_at ?? (active ? now() : null);
@@ -2427,11 +1768,6 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           const params = fields.map((field) => values[field]);
           await env.DB.prepare(`UPDATE deposits SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...params, recordId).run();
-          if (requestedStatus === "rejected" && String(current.status || "").toLowerCase() !== "rejected") {
-            const cleanup = await deleteRejectedUploadFiles(env, [current.proof_url], { table: "deposits", id: recordId });
-            await env.DB.prepare("UPDATE deposits SET proof_url = NULL WHERE id = ?").bind(recordId).run();
-            console.log("Rejected deposit upload cleanup", recordId, cleanup);
-          }
           if (requestedStatus === "approved" && current.status !== "approved") {
             const credits = Number(values.credits ?? current.credits ?? current.amount ?? 0);
             if (!Number.isFinite(credits) || credits < 0) return json({ error: "Invalid deposit credits" }, 400, origin);
@@ -2472,13 +1808,6 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No KYC fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE kyc_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
-          if (values.status === "rejected" && String(current.status || "").toLowerCase() !== "rejected") {
-            const cleanup = await deleteRejectedUploadFiles(env, [current.cnic_front_url, current.cnic_back_url, current.selfie_url, current.passport_url, current.face_video_url], { table: "kyc_submissions", id: recordId });
-            await env.DB.prepare(
-              "UPDATE kyc_submissions SET cnic_front_url = NULL, cnic_back_url = NULL, selfie_url = NULL, passport_url = NULL, face_video_url = NULL WHERE id = ?"
-            ).bind(recordId).run();
-            console.log("Rejected KYC upload cleanup", recordId, cleanup);
-          }
           if (values.status !== undefined) {
             const effectiveKyc = await env.DB.prepare(
               `SELECT lower(status) AS status FROM kyc_submissions
@@ -2489,16 +1818,15 @@ async function handleRequest(request, env, ctx) {
             ).bind(current.user_id).first();
             await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?")
               .bind(String(effectiveKyc?.status || values.status).toLowerCase(), now(), current.user_id).run();
-
             if (String(current.status || "").trim().toLowerCase() !== values.status) {
               if (values.status === "approved") {
                 await sendNotification(
                   env,
                   current.user_id,
                   "kyc_approved",
-                  "KYC Approved ✅",
-                  "Your identity has been verified. Please complete your request to get help.",
-                  "/submit-request"
+                  "KYC Approved",
+                  "Your identity has been verified. Please complete the onboarding guide to get started.",
+                  "/onboarding"
                 );
               } else if (values.status === "rejected") {
                 const reason = String(values.rejection_reason || "").trim();
@@ -2507,9 +1835,7 @@ async function handleRequest(request, env, ctx) {
                   current.user_id,
                   "kyc_rejected",
                   "KYC Needs Attention",
-                  reason
-                    ? `Your KYC submission was rejected. Reason: ${reason}. Please update and resubmit your KYC.`
-                    : "Your KYC submission was rejected. Please update and resubmit your KYC.",
+                  reason ? `Your KYC submission was rejected. Reason: ${reason}. Please update and resubmit your KYC.` : "Your KYC submission was rejected. Please update and resubmit your KYC.",
                   "/kyc"
                 );
               }
@@ -2527,22 +1853,11 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No case fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE case_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
-          if (String(values.status || "").toLowerCase() === "rejected" && String(current.status || "").toLowerCase() !== "rejected") {
-            let categoryDetails = current.category_details;
-            try { categoryDetails = typeof categoryDetails === "string" ? JSON.parse(categoryDetails) : categoryDetails; } catch { /* preserve as a scalar */ }
-            const cleanup = await deleteRejectedUploadFiles(env, [current.photo_urls, current.selfie_url, current.video_url, current.paid_receipt_url, categoryDetails], { table: "case_submissions", id: recordId });
-            await env.DB.prepare(
-              "UPDATE case_submissions SET photo_urls = NULL, selfie_url = NULL, video_url = NULL, paid_receipt_url = NULL, category_details = NULL WHERE id = ?"
-            ).bind(recordId).run();
-            console.log("Rejected case upload cleanup", recordId, cleanup);
-          }
           await syncUserCaseCounters(env, current.user_id);
           return json(await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
         }
         if (parts[2] === "feedbacks" && recordId) {
           const body = await readJson(request);
-          const current = await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(recordId).first();
-          if (!current) return json({ error: "Feedback not found" }, 404, origin);
           const requestedStatus = String(body?.status || "").toLowerCase();
           if (requestedStatus === "rejected" && !String(body?.rejection_reason || "").trim()) {
             return json({ error: "A rejection reason is required" }, 400, origin);
@@ -2552,27 +1867,15 @@ async function handleRequest(request, env, ctx) {
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No feedback fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE feedbacks SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
-          if (requestedStatus === "rejected" && String(current.status || "").toLowerCase() !== "rejected") {
-            const cleanup = await deleteRejectedUploadFiles(env, [current.video_url], { table: "feedbacks", id: recordId });
-            await env.DB.prepare("UPDATE feedbacks SET video_url = NULL WHERE id = ?").bind(recordId).run();
-            console.log("Rejected feedback upload cleanup", recordId, cleanup);
-          }
           return json(await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(recordId).first(), 200, origin);
         }
         if (parts[2] === "resolutions" && recordId) {
           const body = await readJson(request);
-          const current = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first();
-          if (!current) return json({ error: "Resolution not found" }, 404, origin);
           const allowed = ["status", "admin_confirmed", "admin_confirmed_at", "completed_at", "notes"];
           const values = pick(body, allowed);
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No resolution fields to update" }, 400, origin);
           await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
-          if (["rejected", "disputed"].includes(String(values.status || "").toLowerCase()) && !["rejected", "disputed"].includes(String(current.status || "").toLowerCase())) {
-            const cleanup = await deleteRejectedUploadFiles(env, [current.receipt_url], { table: "case_resolutions", id: recordId });
-            await env.DB.prepare("UPDATE case_resolutions SET receipt_url = NULL WHERE id = ?").bind(recordId).run();
-            console.log("Rejected resolution upload cleanup", recordId, cleanup);
-          }
           const updated = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first();
           if (updated && String(updated.status || "").toLowerCase() === "completed" && [1, "1", true, "true"].includes(updated.admin_confirmed)) {
             await synchronizeCompletedCase(env, recordId);
@@ -2599,13 +1902,24 @@ async function handleRequest(request, env, ctx) {
       if (parts[2] === "delete-files" && request.method === "POST") {
         const body = await readJson(request);
         const urls = Array.isArray(body?.urls) ? body.urls : [];
-        const result = urls.length
-          ? await deleteRejectedUploadFiles(env, urls)
-          : await cleanupAllRejectedUploadFiles(env);
-        return json(result, 200, origin);
+        let deleted = 0;
+        for (const value of urls) {
+          try {
+            const parsed = new URL(String(value));
+            const marker = "/uploads/";
+            const index = parsed.pathname.indexOf(marker);
+            if (index < 0) continue;
+            const key = decodeURIComponent(parsed.pathname.slice(index + marker.length));
+            if (key) { await env.UPLOADS.delete(key); deleted += 1; }
+          } catch { /* Ignore malformed or external URLs. */ }
+        }
+        return json({ deleted }, 200, origin);
       }
     }
 
+    // ============================================================
+    //  CREDIT TRANSACTIONS
+    // ============================================================
     if (parts[1] === "transactions" && parts[2]) {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
       const target = parts[2];
@@ -2616,6 +1930,9 @@ async function handleRequest(request, env, ctx) {
       return json(rows.results || [], 200, origin);
     }
 
+    // ============================================================
+    //  ONBOARDING STATUS
+    // ============================================================
     if (parts[1] === "onboarding-status" && parts[2]) {
       const target = parts[2];
       if (!canAccessUser(user, target)) {
@@ -2641,6 +1958,9 @@ async function handleRequest(request, env, ctx) {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
+    // ============================================================
+    //  CASE UNLOCKS
+    // ============================================================
     if (parts[1] === "case-unlocks") {
       if (parts[2] === "count" && request.method === "GET") {
         const heroId = String(url.searchParams.get("hero_id") || "").trim();
@@ -2687,8 +2007,8 @@ async function handleRequest(request, env, ctx) {
         const unlockId = body?.id || id();
         try {
           await env.DB.prepare(
-            `INSERT INTO case_unlocks (id, case_id, hero_id, pledged_amount, credits_charged, payment_type, status, source, unlocked_at)
-             VALUES (?, ?, ?, ?, ?, ?, 'approved', 'user', ?)`
+            `INSERT INTO case_unlocks (id, case_id, hero_id, pledged_amount, credits_charged, payment_type, unlocked_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
           ).bind(unlockId, caseId, heroId, body.pledged_amount ?? null, creditsCharged, paymentType, now()).run();
         } catch (error) {
           if (creditsCharged > 0) await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(creditsCharged, now(), heroId).run();
@@ -2700,11 +2020,14 @@ async function handleRequest(request, env, ctx) {
           await addTransaction(env, heroId, -creditsCharged, type, desc, unlockId);
         }
         const saved = await env.DB.prepare("SELECT * FROM case_unlocks WHERE id = ?").bind(unlockId).first();
-        return json(saved || { id: unlockId, case_id: caseId, hero_id: heroId, pledged_amount: body.pledged_amount ?? null, credits_charged: creditsCharged, payment_type: paymentType, status: 'approved', source: 'user', unlocked_at: now() }, 201, origin);
+        return json(saved || { id: unlockId, case_id: caseId, hero_id: heroId, pledged_amount: body.pledged_amount ?? null, credits_charged: creditsCharged, payment_type: paymentType, unlocked_at: now() }, 201, origin);
       }
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
+    // ============================================================
+    //  CASE RESOLUTIONS
+    // ============================================================
     if (parts[1] === "case-resolutions") {
       if (request.method === "GET") {
         const caseId = String(url.searchParams.get("case_id") || "").trim();
@@ -2724,7 +2047,9 @@ async function handleRequest(request, env, ctx) {
             filters.push("r.hero_id = ?");
             bind.push(heroId);
           } else if (String(user?.email || "").trim()) {
-            filters.push("lower(u.email) = lower(?)");
+            // If IDs differ, return only rows owned by that authenticated email.
+  // A helper may read only their own resolution rows.
+  filters.push("lower(u.email) = lower(?)");
             bind.push(String(user.email).trim());
           } else {
             return json({ error: "Forbidden" }, 403, origin);
@@ -2745,6 +2070,7 @@ async function handleRequest(request, env, ctx) {
           const suspension = await getActiveSuspension(env, user.user_id);
           if (suspension) return suspendedActionResponse(origin, suspension);
         }
+        // Ensure paid_to is correctly set: if not provided, default to "institute" (direct help)
         const paidTo = body.paid_to === "givethra" ? "givethra" : "institute";
         await env.DB.prepare(
           `INSERT INTO case_resolutions
@@ -2777,7 +2103,7 @@ async function handleRequest(request, env, ctx) {
           const params = fields.map((field) => values[field]);
           await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((f) => `${f} = ?`).join(", ")} WHERE id = ?`).bind(...params, parts[2]).run();
           const updated = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(parts[2]).first();
-          if (updated && String(updated.status || "").toLowerCase() === "completed" && [1, "1", true, "true"].includes(updated.admin_confirmed)) {
+          if (updated && ["completed", "approved", "seeker_confirmed"].includes(String(updated.status || "").trim().toLowerCase()) && [1, "1", true, "true", "yes"].includes(updated.admin_confirmed)) {
             await synchronizeCompletedCase(env, parts[2]);
           }
           return json(updated, 200, origin);
@@ -2786,6 +2112,9 @@ async function handleRequest(request, env, ctx) {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
+    // ============================================================
+    //  OFFERS
+    // ============================================================
     if (parts[1] === "offers") {
       if (request.method === "GET") {
         const category = url.searchParams.get("category");
@@ -2794,7 +2123,7 @@ async function handleRequest(request, env, ctx) {
         const rows = await env.DB.prepare(sql).bind(...bind).all();
         return json(rows.results || [], 200, origin);
       }
-      if (parts[2] === "usage" && request.method === "PUT") {
+      if (parts[1] === "offers" && parts[2] === "usage" && request.method === "PUT") {
         const body = await readJson(request);
         await env.DB.prepare(
           "UPDATE category_offers SET used_count = ? WHERE category = ?"
@@ -2805,6 +2134,9 @@ async function handleRequest(request, env, ctx) {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
+    // ============================================================
+    //  OFFER CLAIMS
+    // ============================================================
     if (parts[1] === "offer-claims") {
       if (request.method === "GET" && parts[2] === "count") {
         const userId = url.searchParams.get("user_id");
@@ -2824,6 +2156,9 @@ async function handleRequest(request, env, ctx) {
       return json({ error: "Method not allowed" }, 405, origin);
     }
 
+    // ============================================================
+    //  USER SUSPENSION
+    // ============================================================
     if (parts[1] === "user-suspension" && parts[2]) {
       if (request.method === "GET") {
         const row = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(parts[2]).first();
