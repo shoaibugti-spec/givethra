@@ -1016,3 +1016,33 @@ export async function setOnboardingStatus(userId: string, completed: boolean): P
   });
   if (!res.ok) throw new Error("Failed to update onboarding status");
 }
+
+// ---------- COMMUNITY CONTRIBUTIONS (separate from the Wallet) ----------
+export async function getDonationSummary() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/donations/summary`, { headers: headers() });
+  return readApiResponse(res);
+}
+export async function getDonationHistory() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/donations`, { headers: headers() });
+  return readApiResponse(res);
+}
+export async function submitDonation(data: Record<string, unknown>) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/donations`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+  return readApiResponse(res);
+}
+export async function adminGetDonations() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/donations`, { headers: headers(), cache: "no-store" });
+  return readApiResponse(res);
+}
+export async function adminUpdateDonation(id: string, data: Record<string, unknown>) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/donations/${encodeURIComponent(id)}`, { method: "PUT", headers: headers(), body: JSON.stringify(data) });
+  return readApiResponse(res);
+}
+export async function adminGetContributionSpending() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/contribution-spending`, { headers: headers(), cache: "no-store" });
+  return readApiResponse(res);
+}
+export async function adminSpendContribution(data: Record<string, unknown>) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/contribution-spending`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
+  return readApiResponse(res);
+}

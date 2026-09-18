@@ -100,6 +100,11 @@ const MyHelpPage = lazy(() =>
     default: () => <div>Failed to load page</div>,
   }))
 );
+const DonationPage = lazy(() =>
+  import("@/pages/DonationPage").catch(() => ({
+    default: () => <div>Failed to load page</div>,
+  }))
+);
 const AdminPage = lazy(() =>
   import("@/pages/AdminDashboard").catch(() => ({
     default: () => <div>Failed to load page</div>,
@@ -446,6 +451,15 @@ const myHelpRoute = createRoute({
     </Suspense>
   ),
 });
+const donationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/donation",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <DonationPage />
+    </Suspense>
+  ),
+});
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
@@ -650,6 +664,7 @@ const routeTree = rootRoute.addChildren([
   profileRoute,
   myCasesRoute,
   myHelpRoute,
+  donationRoute,
   adminRoute,
   aboutRoute,
   accountPrivacyRoute,

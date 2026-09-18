@@ -14,6 +14,7 @@ import {
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
+import AdminDonationsPanel from "@/components/AdminDonationsPanel";
 import {
   adminGetAllKyc,
   adminGetAllCases,
@@ -820,7 +821,12 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
               <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => f.status === "pending_review").length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => f.status === "pending_review").length}</span>}</TabsTrigger>
               <TabsTrigger value="suspensions">Suspensions {activeSuspensions > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{activeSuspensions}</span>}</TabsTrigger>
               <TabsTrigger value="earnings-withdrawals">Earnings Withdrawals {withdrawals.filter(w => w.status === "pending").length > 0 && <span className="ml-1 bg-amber-500 text-white text-[10px] rounded-full px-1.5">{withdrawals.filter(w => w.status === "pending").length}</span>}</TabsTrigger>
+              <TabsTrigger value="donations">Donations</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="donations" className="space-y-4 mt-4">
+              <AdminDonationsPanel />
+            </TabsContent>
 
             <TabsContent value="overview" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

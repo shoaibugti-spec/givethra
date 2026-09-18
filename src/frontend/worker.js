@@ -1344,6 +1344,77 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
+    // COMMUNITY CONTRIBUTIONS: deliberately separate from the Credits Wallet.
+    if (parts[1] === "donations") {
+      if (request.method === "GET" && parts[2] === "summary") {
+        const target = user.user_id;
+        const totals = await env.DB.prepare(`SELECT
+          COALESCE((SELECT SUM(amount) FROM donations WHERE user_id = ? AND status IN ('approved','completed')), 0) AS total_contributed,
+          COALESCE((SELECT SUM(amount) FROM donations WHERE user_id = ? AND status = 'pending'), 0) AS pending_amount,
+          COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'debit'), 0) AS amount_used,
+          COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'credit'), 0) - COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'debit'), 0) AS available_balance`).bind(target, target, target, target, target).first();
+        return json({ total_contributed: Number(totals?.total_contributed || 0), pending_amount: Number(totals?.pending_amount || 0), amount_used: Number(totals?.amount_used || 0), available_balance: Math.max(0, Number(totals?.available_balance || 0)) }, 200, origin);
+      }
+      if (request.method === "GET") {
+        const rows = await env.DB.prepare("SELECT * FROM donations WHERE user_id = ? ORDER BY submitted_at DESC").bind(user.user_id).all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const amount = Number(body?.amount);
+        const frequency = String(body?.frequency || "once").toLowerCase();
+        const method = String(body?.payment_method || "").trim();
+        const reference = String(body?.payment_reference || "").trim();
+        if (!Number.isFinite(amount) || amount <= 0 || amount > 10000000) return json({ error: "Enter a valid contribution amount" }, 400, origin);
+        if (!["once", "monthly"].includes(frequency)) return json({ error: "Invalid contribution frequency" }, 400, origin);
+        if (!method || !reference) return json({ error: "Payment method and reference are required" }, 400, origin);
+        const donationId = id(); const submittedAt = now();
+        await env.DB.prepare(`INSERT INTO donations (id,user_id,amount,currency,frequency,payment_method,payment_reference,proof_url,status,submitted_at) VALUES (?,?,?,?,?,?,?,?, 'pending',?)`).bind(donationId, user.user_id, amount, String(body?.currency || "PKR"), frequency, method, reference, body?.proof_url || null, submittedAt).run();
+        await env.DB.prepare(`INSERT INTO contribution_status_history (id,donation_id,from_status,to_status,note,changed_at,changed_by) VALUES (?,?,?,?,?,?,?)`).bind(id(), donationId, null, "pending", "Contribution submitted for verification", submittedAt, user.user_id).run();
+        return json(await env.DB.prepare("SELECT * FROM donations WHERE id = ?").bind(donationId).first(), 201, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "admin" && parts[2] === "donations") {
+      if (!isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
+      if (request.method === "GET") {
+        const rows = await env.DB.prepare("SELECT d.*, COALESCE(p.full_name, u.full_name, u.email) AS donor_name, u.email AS donor_email FROM donations d LEFT JOIN users u ON u.user_id = d.user_id LEFT JOIN profiles p ON p.user_id = d.user_id ORDER BY CASE d.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, d.submitted_at DESC").all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "PUT" && parts[3]) {
+        const donation = await env.DB.prepare("SELECT * FROM donations WHERE id = ?").bind(parts[3]).first();
+        if (!donation) return json({ error: "Donation not found" }, 404, origin);
+        const body = await readJson(request); const nextStatus = String(body?.status || "").toLowerCase();
+        if (!["approved", "rejected", "completed"].includes(nextStatus)) return json({ error: "Invalid donation status" }, 400, origin);
+        if (donation.status === "approved" && nextStatus === "rejected") return json({ error: "Approved contributions cannot be rejected" }, 409, origin);
+        const existingCredit = await env.DB.prepare("SELECT id FROM contribution_ledger WHERE donation_id = ? AND entry_type = 'credit' LIMIT 1").bind(donation.id).first();
+        if (!existingCredit && ["approved", "completed"].includes(nextStatus)) {
+          await env.DB.prepare("INSERT INTO contribution_ledger (id,donation_id,user_id,entry_type,amount,currency,note,created_at,created_by) VALUES (?,?,?,?,?,?,?,?,?)").bind(id(), donation.id, donation.user_id, "credit", Number(donation.amount), donation.currency, "Approved community contribution", now(), user.user_id).run();
+        }
+        const reviewedAt = now();
+        await env.DB.prepare("UPDATE donations SET status = ?, admin_notes = ?, rejection_reason = ?, reviewed_at = ?, reviewed_by = ?, completed_at = ? WHERE id = ?").bind(nextStatus, body?.admin_notes || null, nextStatus === "rejected" ? String(body?.rejection_reason || "Not approved") : null, reviewedAt, user.user_id, nextStatus === "completed" ? reviewedAt : donation.completed_at, donation.id).run();
+        await env.DB.prepare("INSERT INTO contribution_status_history (id,donation_id,from_status,to_status,note,changed_at,changed_by) VALUES (?,?,?,?,?,?,?)").bind(id(), donation.id, donation.status, nextStatus, body?.admin_notes || null, reviewedAt, user.user_id).run();
+        return json(await env.DB.prepare("SELECT * FROM donations WHERE id = ?").bind(donation.id).first(), 200, origin);
+      }
+    }
+    if (parts[1] === "admin" && parts[2] === "contribution-spending") {
+      if (!isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
+      if (request.method === "GET") { const rows = await env.DB.prepare("SELECT s.*, c.title AS case_title, c.amount_needed, c.status AS case_status FROM contribution_spending s LEFT JOIN case_submissions c ON c.id = s.case_id ORDER BY s.created_at DESC").all(); return json(rows.results || [], 200, origin); }
+      if (request.method === "POST") {
+        const body = await readJson(request); const caseId = String(body?.case_id || "").trim(); const amount = Number(body?.amount);
+        if (!caseId || !Number.isFinite(amount) || amount <= 0) return json({ error: "Case and a valid amount are required" }, 400, origin);
+        const approvedCase = await env.DB.prepare("SELECT id, title, status, amount_needed FROM case_submissions WHERE id = ? AND lower(status) IN ('approved','published','active','open','in_progress')").bind(caseId).first();
+        if (!approvedCase) return json({ error: "Only an approved active case can receive contribution funds" }, 409, origin);
+        const balanceRow = await env.DB.prepare("SELECT COALESCE(SUM(CASE WHEN entry_type='credit' THEN amount ELSE -amount END),0) AS balance FROM contribution_ledger").first();
+        const balance = Number(balanceRow?.balance || 0); if (amount > balance) return json({ error: "Contribution balance is insufficient" }, 409, origin);
+        const spendId = id(); const timestamp = now();
+        await env.DB.batch([
+          env.DB.prepare("INSERT INTO contribution_ledger (id,case_id,entry_type,amount,currency,note,created_at,created_by) VALUES (?,?,?,?,?,?,?,?)").bind(id(), caseId, "debit", amount, "PKR", `Allocated to ${approvedCase.title || caseId}`, timestamp, user.user_id),
+          env.DB.prepare("INSERT INTO contribution_spending (id,case_id,amount,currency,status,admin_notes,created_at,created_by,completed_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(spendId, caseId, amount, "PKR", "completed", body?.admin_notes || null, timestamp, user.user_id, timestamp),
+        ]);
+        return json(await env.DB.prepare("SELECT * FROM contribution_spending WHERE id = ?").bind(spendId).first(), 201, origin);
+      }
+    }
     // ✅ PROFILES
     if (parts[1] === "profiles") {
       return handleProfile(request, env, user, parts, origin);
