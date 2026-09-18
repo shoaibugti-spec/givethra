@@ -3,6 +3,7 @@
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
 
 const PUBLIC_ORIGIN = "https://givethra.org";
+const PUBLIC_ORIGINS = new Set([PUBLIC_ORIGIN, "https://www.givethra.org"]);
 const ADMIN_EMAILS = new Set([
   "shoaibugti@gmail.com",
   "shoaibahmedbugti5@gmail.com",
@@ -13,7 +14,7 @@ function googleClientId(env) {
 }
 
 function corsHeaders(origin) {
-  const allowOrigin = origin === PUBLIC_ORIGIN ? origin : PUBLIC_ORIGIN;
+  const allowOrigin = PUBLIC_ORIGINS.has(origin) ? origin : PUBLIC_ORIGIN;
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
