@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
-  HeartHandshake,
+  WalletCards,
   Heart,
   Menu,
   Moon,
@@ -206,7 +206,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   aria-current={isRouteActive("/donation") ? "page" : undefined}
                   className={iconLinkClass("/donation")}
                 >
-                  <HeartHandshake className="h-5 w-5" />
+                  <WalletCards className="h-5 w-5" />
                 </Link>
                 <button
                   type="button"

@@ -1352,8 +1352,10 @@ async function handleRequest(request, env, ctx) {
           COALESCE((SELECT SUM(amount) FROM donations WHERE user_id = ? AND status IN ('approved','completed')), 0) AS total_contributed,
           COALESCE((SELECT SUM(amount) FROM donations WHERE user_id = ? AND status = 'pending'), 0) AS pending_amount,
           COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'debit'), 0) AS amount_used,
-          COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'credit'), 0) - COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'debit'), 0) AS available_balance`).bind(target, target, target, target, target).first();
-        return json({ total_contributed: Number(totals?.total_contributed || 0), pending_amount: Number(totals?.pending_amount || 0), amount_used: Number(totals?.amount_used || 0), available_balance: Math.max(0, Number(totals?.available_balance || 0)) }, 200, origin);
+          COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'credit'), 0) - COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'debit'), 0) AS available_balance,
+          COALESCE((SELECT SUM(amount_paid) FROM case_resolutions WHERE hero_id = ? AND lower(COALESCE(status, '')) IN ('approved','completed') AND lower(COALESCE(paid_to, 'institute')) <> 'givethra'), 0) AS direct_help,
+          COALESCE((SELECT SUM(amount_paid) FROM case_resolutions WHERE hero_id = ? AND lower(COALESCE(status, '')) IN ('approved','completed') AND lower(COALESCE(paid_to, '')) = 'givethra'), 0) AS contribution_help`).bind(target, target, target, target, target, target, target).first();
+        return json({ total_contributed: Number(totals?.total_contributed || 0), pending_amount: Number(totals?.pending_amount || 0), amount_used: Number(totals?.amount_used || 0), available_balance: Math.max(0, Number(totals?.available_balance || 0)), direct_help: Number(totals?.direct_help || 0), contribution_help: Number(totals?.contribution_help || 0) }, 200, origin);
       }
       if (request.method === "GET") {
         const rows = await env.DB.prepare("SELECT * FROM donations WHERE user_id = ? ORDER BY submitted_at DESC").bind(user.user_id).all();
