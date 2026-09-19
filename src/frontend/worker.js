@@ -459,6 +459,59 @@ function withoutPrivateContact(value) {
   return safe;
 }
 
+async function getProfileSupportData(env, userId) {
+  const empty = { supports_count: 0, supports_given: 0, eligibility_supports: 0, earnings_eligible: 0, eligible_at: null, support_earnings_usd: 0 };
+  try {
+    const [profile, received, given, ledger] = await Promise.all([
+      env.DB.prepare("SELECT COALESCE(earnings_eligible, 0) AS earnings_eligible, eligible_at, COALESCE(support_earnings_usd, 0) AS stored_earnings_usd FROM users WHERE user_id = ?").bind(userId).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE user_id = ?").bind(userId).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(userId).first(),
+      env.DB.prepare("SELECT COALESCE(SUM(amount_usd), 0) AS earnings_usd FROM support_earnings WHERE user_id = ?").bind(userId).first(),
+    ]);
+    const supportsReceived = Number(received?.count || 0);
+    const supportsGiven = Number(given?.count || 0);
+    const ledgerEarnings = Number(ledger?.earnings_usd || 0);
+    return {
+      supports_count: supportsReceived,
+      supports_given: supportsGiven,
+      eligibility_supports: supportsReceived + supportsGiven,
+      earnings_eligible: Number(profile?.earnings_eligible || 0),
+      eligible_at: profile?.eligible_at || null,
+      // Keep the established stored value when an older database has no ledger rows.
+      support_earnings_usd: ledgerEarnings > 0 ? ledgerEarnings : Number(profile?.stored_earnings_usd || 0),
+    };
+  } catch {
+    // Compatibility fallback for older production schemas.
+    try {
+      return await env.DB.prepare(
+        "SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(supports_given, 0) AS supports_given, COALESCE(eligibility_supports, 0) AS eligibility_supports, COALESCE(earnings_eligible, 0) AS earnings_eligible, eligible_at, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?"
+      ).bind(userId).first() || empty;
+    } catch {
+      return empty;
+    }
+  }
+}
+
+function withdrawalWindow(date = new Date()) {
+  const day = date.getUTCDate();
+  return day >= 30 || day <= 3;
+}
+
+function nextWithdrawalDate(date = new Date()) {
+  const next = new Date(date);
+  if (date.getUTCDate() <= 3) next.setUTCDate(3);
+  else next.setUTCMonth(next.getUTCMonth() + 1, 30);
+  return next.toISOString().slice(0, 10);
+}
+
+async function getEarningsSummary(env, userId) {
+  const profile = await getProfileSupportData(env, userId);
+  const wallet = await env.DB.prepare("SELECT COALESCE(balance_pkr, 0) AS balance FROM earnings_wallets WHERE user_id = ?").bind(userId).first();
+  const rows = await env.DB.prepare("SELECT * FROM support_earnings WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").bind(userId).all();
+  const withdrawals = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE user_id = ? ORDER BY requested_at DESC LIMIT 50").bind(userId).all();
+  return { ...profile, wallet_pkr: Number(wallet?.balance || 0), earnings_usd: Number(profile?.support_earnings_usd || 0), posts: rows.results || [], withdrawals: withdrawals.results || [], withdrawal_open: withdrawalWindow(), next_withdrawal_date: nextWithdrawalDate() };
+}
+
 async function handleProfile(request, env, user, parts, origin) {
   const userId = String(parts[2] || user.user_id || "");
   if (!userId || (request.method !== "GET" && !canAccessUser(user, userId))) return json({ error: "Forbidden" }, 403, origin);
