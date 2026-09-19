@@ -345,11 +345,11 @@ export async function updateProfile(userId: string, data: any, profileRole?: "he
 }
 
 // ---------- WALLET ----------
-export async function getUserSupports(userId: string): Promise<{ user_id: string; supports: number; creditsFromSupports: number; supportsGiven?: number; eligibilitySupports?: number; earningsEligible?: boolean; eligibleAt?: string | null; supportEarningsUsd?: number }> {
+export async function getUserSupports(userId: string): Promise<{ user_id: string; supports: number; creditsFromSupports: number; supportsGiven?: number; eligibilitySupports?: number; earningsEligible?: boolean; eligibleAt?: string | null; supportEarningsUsd?: number; supportEarningsPkr?: number }> {
   const res = await fetchWithAuth(`${WORKER_URL}/api/user-supports/${encodeURIComponent(userId)}`, { headers: headers(), cache: "no-store" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || `Support balance request failed (${res.status})`);
-  return { user_id: String(data?.user_id || userId), supports: Number(data?.supports || 0), creditsFromSupports: Number(data?.creditsFromSupports || 0), supportsGiven: Number(data?.supportsGiven || 0), eligibilitySupports: Number(data?.eligibilitySupports || 0), earningsEligible: Boolean(data?.earningsEligible), eligibleAt: data?.eligibleAt || null, supportEarningsUsd: Number(data?.supportEarningsUsd || 0) };
+  return { user_id: String(data?.user_id || userId), supports: Number(data?.supports || 0), creditsFromSupports: Number(data?.creditsFromSupports || 0), supportsGiven: Number(data?.supportsGiven || 0), eligibilitySupports: Number(data?.eligibilitySupports || 0), earningsEligible: Boolean(data?.earningsEligible), eligibleAt: data?.eligibleAt || null, supportEarningsUsd: Number(data?.supportEarningsUsd || 0), supportEarningsPkr: Number(data?.supportEarningsPkr || 0) };
 }
 
 export async function getWallet(userId: string) {

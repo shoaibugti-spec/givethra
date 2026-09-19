@@ -1436,8 +1436,23 @@ async function handleRequest(request, env, ctx) {
 
     if (parts[1] === "user-supports" && parts[2] && request.method === "GET") {
       const target = String(parts[2]);
-      const row = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports, COALESCE(credits_from_supports, 0) AS creditsFromSupports FROM users WHERE user_id = ?").bind(target).first();
-      return json({ user_id: target, supports: Number(row?.supports || 0), creditsFromSupports: Number(row?.creditsFromSupports || 0) }, 200, origin);
+      if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+      const [userRow, receivedRow, givenRow] = await Promise.all([
+        env.DB.prepare("SELECT COALESCE(supports_count, 0) AS storedSupports, COALESCE(credits_from_supports, 0) AS storedCredits FROM users WHERE user_id = ?").bind(target).first(),
+        env.DB.prepare("SELECT COUNT(*) AS supports FROM user_supports WHERE user_id = ?").bind(target).first(),
+        env.DB.prepare("SELECT COUNT(*) AS supports FROM user_supports WHERE source_user_id = ?").bind(target).first(),
+      ]);
+      const supports = Math.max(Number(userRow?.storedSupports || 0), Number(receivedRow?.supports || 0));
+      const creditsFromSupports = Math.max(Number(userRow?.storedCredits || 0), Math.floor(supports / 100));
+      const supportsGiven = Number(givenRow?.supports || 0);
+      const eligibilitySupports = 5000;
+      const earningsEligible = supports >= eligibilitySupports;
+      const supportEarningsPkr = earningsEligible ? Math.floor((supports - eligibilitySupports) / 1000) * 100 : 0;
+      if (supports !== Number(userRow?.storedSupports || 0) || creditsFromSupports !== Number(userRow?.storedCredits || 0)) {
+        await env.DB.prepare("UPDATE users SET supports_count = ?, credits_from_supports = ?, updated_at = ? WHERE user_id = ?")
+          .bind(supports, creditsFromSupports, now(), target).run();
+      }
+      return json({ user_id: target, supports, creditsFromSupports, supportsGiven, eligibilitySupports, earningsEligible, supportEarningsPkr }, 200, origin);
     }
 
     if (parts[1] === "wallets" && parts[2]) {

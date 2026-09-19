@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import {
   getWallet,
   getTransactions,
+  getUserSupports,
   getUserSuspension,
   insertDeposit,
   uploadFileToStorage,
@@ -56,6 +57,14 @@ export default function WalletPage() {
   const [balance, setBalance] = useState(0);
   const [isSuspended, setIsSuspended] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [supportsData, setSupportsData] = useState({
+    supports: 0,
+    creditsFromSupports: 0,
+    supportsGiven: 0,
+    eligibilitySupports: 5000,
+    earningsEligible: false,
+    supportEarningsPkr: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState<"nayapay" | "binance">("nayapay");
   const [amount, setAmount] = useState("");
@@ -101,8 +110,19 @@ export default function WalletPage() {
       setBalance(wallet?.balance ?? 0);
       const suspension = await getUserSuspension(user!.id);
       setIsSuspended(Boolean(suspension?.is_active));
-      const txs = await getTransactions(user!.id);
+      const [txs, supportMetrics] = await Promise.all([
+        getTransactions(user!.id),
+        getUserSupports(user!.id),
+      ]);
       setTransactions(txs ?? []);
+      setSupportsData({
+        supports: Number(supportMetrics?.supports || 0),
+        creditsFromSupports: Number(supportMetrics?.creditsFromSupports || 0),
+        supportsGiven: Number(supportMetrics?.supportsGiven || 0),
+        eligibilitySupports: Number(supportMetrics?.eligibilitySupports || 5000),
+        earningsEligible: Boolean(supportMetrics?.earningsEligible),
+        supportEarningsPkr: Number(supportMetrics?.supportEarningsPkr || 0),
+      });
     } catch (err) {
       console.error("Failed to load wallet data:", err);
     } finally {
@@ -200,6 +220,26 @@ export default function WalletPage() {
           <div className="text-4xl font-bold">{balance.toLocaleString()}</div>
           <div className="text-sm opacity-80 mt-1">
             ≈ ${balance.toLocaleString()} USD · 1 Credit = $1
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Supports Received</span>
+            <span className="text-xl font-bold text-foreground">{supportsData.supports.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center justify-between border-t pt-3">
+            <span className="text-sm text-muted-foreground">Credits Earned from Supports</span>
+            <span className="text-xl font-bold text-primary">{supportsData.creditsFromSupports.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center justify-between border-t pt-3">
+            <span className="text-sm text-muted-foreground">Supports Given</span>
+            <span className="text-xl font-bold text-foreground">{supportsData.supportsGiven.toLocaleString()}</span>
+          </div>
+          <div className="rounded-lg bg-primary/5 p-3 text-xs text-muted-foreground space-y-1">
+            <p>100 Supports = 1 Credit. Credits earned from Supports are non-withdrawable and can only be used for case submission, contribution unlocks, and suspension unlock.</p>
+            <p>{supportsData.earningsEligible ? `Support earnings eligible: ₨${supportsData.supportEarningsPkr.toLocaleString()}` : `${Math.max(0, supportsData.eligibilitySupports - supportsData.supports).toLocaleString()} more Supports needed for earnings eligibility (${supportsData.eligibilitySupports.toLocaleString()} total).`}</p>
+            <p>After eligibility, every 1,000 additional Supports = ₨100 support value.</p>
           </div>
         </div>
 
