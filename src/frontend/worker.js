@@ -876,25 +876,47 @@ async function insertCommunityNotification(env, ctx, recipientId, actorId, actor
   ).bind(id(), recipientId, type, title, `${publicDisplayName(actorName, "A Givethra member")}: ${message}`, "/community", now()).run());
 }
 
+async function refreshSupportEligibility(env, userId) {
+  const received = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE user_id = ?").bind(userId).first();
+  const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(userId).first();
+  const supportsReceived = Number(received?.count || 0);
+  const supportsGiven = Number(given?.count || 0);
+  const eligibilitySupports = supportsReceived + supportsGiven;
+  const eligible = eligibilitySupports >= 5000;
+  await env.DB.prepare(
+    "UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = CASE WHEN COALESCE(earnings_eligible, 0) = 1 OR ? >= 5000 THEN 1 ELSE 0 END, eligible_at = CASE WHEN eligible_at IS NULL AND ? >= 5000 THEN ? ELSE eligible_at END, updated_at = ? WHERE user_id = ?"
+  ).bind(supportsReceived, supportsGiven, eligibilitySupports, eligibilitySupports, eligibilitySupports, now(), now(), userId).run();
+  return { supportsReceived, supportsGiven, eligibilitySupports, eligible };
+}
+
 async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, postId, actorName) {
-  if (!originalUserId || !sourceUserId || originalUserId === sourceUserId) return { added: false, supports: 0, creditsEarned: 0 };
+  if (!originalUserId || !sourceUserId || originalUserId === sourceUserId) return { added: false, supports: 0, supportEarningsUsd: 0 };
+  const post = await env.DB.prepare("SELECT created_at FROM community_posts WHERE id = ? AND user_id = ?").bind(postId, originalUserId).first();
+  if (!post) return { added: false, supports: 0, supportEarningsUsd: 0, unavailable: true };
+  const existing = await env.DB.prepare("SELECT id FROM user_supports WHERE source_user_id = ? AND post_id = ? LIMIT 1").bind(sourceUserId, postId).first();
+  if (existing) {
+    const current = await refreshSupportEligibility(env, originalUserId);
+    return { added: false, supports: current.supportsReceived, supportEarningsUsd: 0, alreadySupported: true };
+  }
   const inserted = await env.DB.prepare(
     "INSERT OR IGNORE INTO user_supports (id, user_id, source_user_id, post_id, created_at) VALUES (?, ?, ?, ?, ?)"
   ).bind(id(), originalUserId, sourceUserId, postId, now()).run();
-  if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, creditsEarned: 0 };
-  const current = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(originalUserId).first();
-  const supports = Number(current?.supports_count || 0) + 1;
-  const previousCredits = Number(current?.credits_from_supports || 0);
-  const totalCredits = Math.floor(supports / 100);
-  const creditsEarned = Math.max(0, totalCredits - previousCredits);
-  await env.DB.prepare("UPDATE users SET supports_count = ?, credits_from_supports = ?, updated_at = ? WHERE user_id = ?").bind(supports, totalCredits, now(), originalUserId).run();
-  await env.DB.prepare("UPDATE community_posts SET repost_count = COALESCE(repost_count, 0) + 1 WHERE id = ?").bind(postId).run();
-  if (creditsEarned > 0) {
-    await addCredits(env, originalUserId, creditsEarned, "support_to_credit", `${creditsEarned * 100} supports converted to ${creditsEarned} credit${creditsEarned === 1 ? "" : "s"}`, postId);
-    await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "credit_earned", "Credit earned from Supports", `${creditsEarned} credit${creditsEarned === 1 ? "" : "s"} earned from ${creditsEarned * 100} Supports`);
-  }
+  if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, supportEarningsUsd: 0, alreadySupported: true };
+  const targetEligibility = await refreshSupportEligibility(env, originalUserId);
+  const supports = targetEligibility.supportsReceived;
+  const supportsGiven = targetEligibility.supportsGiven;
+  const eligibilitySupports = targetEligibility.eligibilitySupports;
+  const current = await env.DB.prepare("SELECT earnings_eligible, eligible_at FROM users WHERE user_id = ?").bind(originalUserId).first();
+  const eligible = Number(current?.earnings_eligible || 0) === 1 || targetEligibility.eligible;
+  const eligibleAt = Number(current?.earnings_eligible || 0) === 1 ? current?.eligible_at : (eligible ? now() : null);
+  const postSupportRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE post_id = ? AND user_id = ?").bind(postId, originalUserId).first();
+  const postSupports = Number(postSupportRow?.count || 0);
+  const payableSupports = eligible ? Math.min(postSupports, 1000) : 0;
+  const supportEarningsUsd = Number((payableSupports / 10000).toFixed(4));
+  await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = ?, eligible_at = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportsGiven, eligibilitySupports, eligible ? 1 : 0, eligibleAt, supportEarningsUsd, now(), originalUserId).run();
+  await refreshSupportEligibility(env, sourceUserId);
   await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);
-  return { added: true, supports, creditsEarned };
+  return { added: true, supports, supportsGiven, eligibilitySupports, earningsEligible: eligible, eligibleAt, supportEarningsUsd };
 }
 
 async function handleCommunityPosts(request, env, user, url, parts, origin, ctx) {
@@ -903,25 +925,27 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     const actorId = user?.user_id || guest?.id || "";
     const tab = url.searchParams.get("tab") || "for-you";
     let filter = "";
-    const binds = [actorId, actorId];
+    const binds = [actorId, actorId, actorId];
     if (tab === "my-heroes" && user) { filter = "WHERE cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)"; binds.push(user.user_id); }
     if (tab === "my-posts" && user) { filter = "WHERE cp.user_id = ?"; binds.push(user.user_id); }
-    const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3)";
+    const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3 + COALESCE(sc.support_count,0) * 3)";
     const heroBoost = "(CASE WHEN cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 100 ELSE 0 END)";
     const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.signed_up_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
     const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
-    const orderBy = tab === "my-posts" ? "cp.created_at DESC" : tab === "my-heroes" ? `${heroBoost} DESC, ${engagementScore} DESC, cp.created_at DESC` : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC`;
-    if (tab !== "my-posts") binds.push(user?.user_id || actorId);
+    const orderBy = tab === "latest" ? "cp.created_at DESC, cp.id DESC" : tab === "most-supported" ? "COALESCE(sc.support_count, 0) DESC, cp.created_at DESC, cp.id DESC" : tab === "my-posts" ? "cp.created_at DESC, cp.id DESC" : tab === "my-heroes" ? `${heroBoost} DESC, ${engagementScore} DESC, cp.created_at DESC` : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC`;
+    if (tab === "for-you" || tab === "my-heroes") binds.push(user?.user_id || actorId);
     const posts = await env.DB.prepare(
       `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),
        comment_counts AS (SELECT post_id, COUNT(*) AS comments_count FROM community_post_comments GROUP BY post_id),
-       repost_counts AS (SELECT repost_id, COUNT(*) AS repost_count FROM community_posts WHERE repost_id IS NOT NULL GROUP BY repost_id)
+       repost_counts AS (SELECT repost_id, COUNT(*) AS repost_count FROM community_posts WHERE repost_id IS NOT NULL GROUP BY repost_id),
+       support_counts AS (SELECT post_id, COUNT(*) AS support_count, MAX(CASE WHEN source_user_id = ? THEN 1 ELSE 0 END) AS supported_by_me FROM user_supports GROUP BY post_id)
        SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, u.signed_up_at AS user_created_at, p.avatar_url,
        COALESCE(lc.likes_count,0) AS likes_count, COALESCE(cc.comments_count,0) AS comments_count, COALESCE(lc.is_liked,0) AS is_liked,
        COALESCE(rc.repost_count,0) AS repost_count,
+       COALESCE(sc.support_count,0) AS support_count, COALESCE(sc.supported_by_me,0) AS supported_by_me,
        CASE WHEN cp.user_id IS NOT NULL AND cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 1 ELSE 0 END AS is_following
        FROM community_posts cp LEFT JOIN users u ON cp.user_id=u.user_id LEFT JOIN profiles p ON p.user_id=cp.user_id
-       LEFT JOIN like_counts lc ON lc.post_id=cp.id LEFT JOIN comment_counts cc ON cc.post_id=cp.id LEFT JOIN repost_counts rc ON rc.repost_id=cp.id
+       LEFT JOIN like_counts lc ON lc.post_id=cp.id LEFT JOIN comment_counts cc ON cc.post_id=cp.id LEFT JOIN repost_counts rc ON rc.repost_id=cp.id LEFT JOIN support_counts sc ON sc.post_id=cp.id
        ${filter} ORDER BY ${orderBy} LIMIT 500`
     ).bind(...binds).all();
     return json((posts.results || []).map((post) => ({ ...post, is_guest: !post.user_id, display_name: publicDisplayName(post.user_name, publicDisplayName(post.display_name,"User")), is_verified: post.user_kyc_status === "approved", is_new_creator: Boolean(post.user_created_at && (Date.now() - new Date(post.user_created_at).getTime()) <= 30 * 86400000), likes_count: Number(post.likes_count||0), comments_count: Number(post.comments_count||0), repost_count: Number(post.repost_count||0), is_liked: Boolean(post.is_liked), is_following: Boolean(post.is_following) })), 200, origin);
@@ -1607,6 +1631,19 @@ async function handleRequest(request, env, ctx) {
     }
 
     if (parts[1] === "support") {
+      if (request.method === "POST" && !parts[2]) {
+        const body = await readJson(request);
+        const postId = String(body?.post_id || "").trim();
+        const guest = user ? null : guestIdentity(request, body);
+        const actorId = user?.user_id || guest?.id;
+        if (!actorId) return json({ error: "Authentication required" }, 401, origin);
+        if (!postId) return json({ error: "Post ID is required" }, 400, origin);
+        const post = await env.DB.prepare("SELECT user_id, display_name FROM community_posts WHERE id = ?").bind(postId).first();
+        if (!post?.user_id) return json({ error: "Post not found" }, 404, origin);
+        const result = await recordCommunitySupport(env, ctx, post.user_id, actorId, postId, user?.full_name || guest?.name || "A Givethra member");
+        const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE post_id = ?").bind(postId).first();
+        return json({ ...result, post_id: postId, support_count: Number(count?.count || 0), alreadySupported: Boolean(result.alreadySupported) }, result.added ? 201 : 200, origin);
+      }
       if (parts[2] === "messages") {
         if (request.method === "GET") {
           const target = url.searchParams.get("user_id") || user.user_id;
