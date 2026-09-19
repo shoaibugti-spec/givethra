@@ -1422,6 +1422,11 @@ async function handleRequest(request, env, ctx) {
 
   if (parts[0] === "api") {
     // COMMUNITY CONTRIBUTIONS: deliberately separate from the Credits Wallet.
+    if (parts[1] === "earnings" && parts[2] === "me" && request.method === "GET") {
+      if (!user) return json({ error: "Authentication required" }, 401, origin);
+      return json(await getEarningsSummary(env, user.user_id), 200, origin);
+    }
+
     if (parts[1] === "donations") {
       if (request.method === "GET" && parts[2] === "summary") {
         const target = user.user_id;
@@ -1515,19 +1520,19 @@ async function handleRequest(request, env, ctx) {
       const target = String(parts[2]);
       if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
       const [userRow, receivedRow, givenRow] = await Promise.all([
-        env.DB.prepare("SELECT COALESCE(supports_count, 0) AS storedSupports, COALESCE(credits_from_supports, 0) AS storedCredits FROM users WHERE user_id = ?").bind(target).first(),
+        env.DB.prepare("SELECT COALESCE(supports_count, 0) AS storedSupports, COALESCE(supports_given, 0) AS storedSupportsGiven, COALESCE(eligibility_supports, 0) AS storedEligibility, COALESCE(credits_from_supports, 0) AS storedCredits FROM users WHERE user_id = ?").bind(target).first(),
         env.DB.prepare("SELECT COUNT(*) AS supports FROM user_supports WHERE user_id = ?").bind(target).first(),
         env.DB.prepare("SELECT COUNT(*) AS supports FROM user_supports WHERE source_user_id = ?").bind(target).first(),
       ]);
       const supports = Math.max(Number(userRow?.storedSupports || 0), Number(receivedRow?.supports || 0));
       const creditsFromSupports = Math.max(Number(userRow?.storedCredits || 0), Math.floor(supports / 100));
       const supportsGiven = Number(givenRow?.supports || 0);
-      const eligibilitySupports = 5000;
-      const earningsEligible = supports >= eligibilitySupports;
-      const supportEarningsPkr = earningsEligible ? Math.floor((supports - eligibilitySupports) / 1000) * 100 : 0;
-      if (supports !== Number(userRow?.storedSupports || 0) || creditsFromSupports !== Number(userRow?.storedCredits || 0)) {
-        await env.DB.prepare("UPDATE users SET supports_count = ?, credits_from_supports = ?, updated_at = ? WHERE user_id = ?")
-          .bind(supports, creditsFromSupports, now(), target).run();
+      const eligibilitySupports = supports + supportsGiven;
+      const earningsEligible = eligibilitySupports >= 5000;
+      const supportEarningsPkr = earningsEligible ? Math.floor((eligibilitySupports - 5000) / 1000) * 100 : 0;
+      if (supports !== Number(userRow?.storedSupports || 0) || supportsGiven !== Number(userRow?.storedSupportsGiven || 0) || eligibilitySupports !== Number(userRow?.storedEligibility || 0) || creditsFromSupports !== Number(userRow?.storedCredits || 0)) {
+        await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, credits_from_supports = ?, earnings_eligible = CASE WHEN ? >= 5000 THEN 1 ELSE COALESCE(earnings_eligible, 0) END, updated_at = ? WHERE user_id = ?")
+          .bind(supports, supportsGiven, eligibilitySupports, creditsFromSupports, eligibilitySupports, now(), target).run();
       }
       return json({ user_id: target, supports, creditsFromSupports, supportsGiven, eligibilitySupports, earningsEligible, supportEarningsPkr }, 200, origin);
     }
