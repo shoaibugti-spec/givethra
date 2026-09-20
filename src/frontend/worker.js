@@ -1364,6 +1364,9 @@ async function handleRequest(request, env, ctx) {
   if (parts[0] === "api" && parts[1] === "dreams" && request.method === "GET") {
     return handleDreams(request, env, null, url, parts, origin);
   }
+  if (parts[0] === "api" && parts[1] === "dream-payment-accounts" && request.method === "GET") {
+    return handleDreamPaymentAccounts(request, env, null, parts, origin);
+  }
 
   // ============================================================
   //  PUBLIC: Community Posts (no auth required for reading)
@@ -1425,7 +1428,7 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
-    if (parts[1] === "dream-participations" || (parts[1] === "admin" && ["dreams", "dream-participations"].includes(parts[2]))) {
+    if (parts[1] === "dream-participations" || (parts[1] === "admin" && ["dreams", "dream-participations", "dream-payment-accounts"].includes(parts[2]))) {
       return handleDreams(request, env, user, url, parts, origin);
     }
     // COMMUNITY CONTRIBUTIONS: deliberately separate from the Credits Wallet.
@@ -2424,6 +2427,29 @@ export default {
 // ============================================================
 //  DREAMS (independent from Help cases and the Credit wallet)
 // ============================================================
+async function handleDreamPaymentAccounts(request, env, user, parts, origin) {
+  if (!env.DB) return json([], 200, origin);
+  if (parts[1] === "admin" && !isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
+  if (request.method === "GET") {
+    const rows = await env.DB.prepare(`SELECT id,label,method,account_title,account_number,instructions,is_active FROM dream_payment_accounts ${parts[1] === "admin" ? "" : "WHERE is_active=1"} ORDER BY created_at ASC`).all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (parts[1] !== "admin") return json({ error: "Method not allowed" }, 405, origin);
+  const body = await readJson(request); const timestamp = now();
+  const values = [String(body?.label || '').trim(), String(body?.method || '').trim(), body?.account_title ? String(body.account_title).trim() : null, String(body?.account_number || '').trim(), body?.instructions ? String(body.instructions).trim() : null, body?.is_active === false ? 0 : 1];
+  if (!values[0] || !values[1] || !values[3]) return json({ error: "Label, payment method and account number are required" }, 400, origin);
+  if (request.method === "POST") {
+    const accountId = id();
+    await env.DB.prepare("INSERT INTO dream_payment_accounts (id,label,method,account_title,account_number,instructions,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(accountId,...values,timestamp,timestamp).run();
+    return json({ id: accountId, ...body }, 201, origin);
+  }
+  if (request.method === "PUT" && parts[3]) {
+    await env.DB.prepare("UPDATE dream_payment_accounts SET label=?,method=?,account_title=?,account_number=?,instructions=?,is_active=?,updated_at=? WHERE id=?").bind(...values,timestamp,parts[3]).run();
+    return json({ id: parts[3], ...body }, 200, origin);
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+
 async function handleDreams(request, env, user, url, parts, origin) {
   if (!env.DB) return json([], 200, origin);
   const isAdminRequest = parts[1] === "admin";
@@ -2443,16 +2469,17 @@ async function handleDreams(request, env, user, url, parts, origin) {
     const dreamId = String(body?.id || id()).trim();
     const values = {
       name: String(body?.name || '').trim(), category: String(body?.category || '').trim(), description: String(body?.description || '').trim(),
+      contribution_amount: Math.max(0, Number(body?.contribution_amount || 0)),
       image_url: body?.image_url ? String(body.image_url).slice(0,2000) : null, dream_price: Number(body?.dream_price || 0), actual_market_price: body?.actual_market_price === '' || body?.actual_market_price == null ? null : Number(body.actual_market_price),
       participant_capacity: Math.max(0, Math.floor(Number(body?.participant_capacity || 0))), internal_percentage_unit: body?.internal_percentage_unit === '' || body?.internal_percentage_unit == null ? null : Number(body.internal_percentage_unit), credit_award: Math.max(0, Number(body?.credit_award || 0)), announcement_at: body?.announcement_at || null, status: String(body?.status || 'open'), publication_status: String(body?.publication_status || 'draft')
     };
     if (!values.name || !values.category || !values.description || !Number.isFinite(values.dream_price) || values.dream_price <= 0) return json({ error: "Name, category, description and Dream Price are required" }, 400, origin);
     if (request.method === "POST") {
-      await env.DB.prepare(`INSERT INTO dreams (id,name,category,description,image_url,dream_price,actual_market_price,participant_capacity,internal_percentage_unit,credit_award,announcement_at,status,publication_status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(dreamId, values.name, values.category, values.description, values.image_url, values.dream_price, values.actual_market_price, values.participant_capacity, values.internal_percentage_unit, values.credit_award, values.announcement_at, values.status, values.publication_status, timestamp, timestamp).run();
+      await env.DB.prepare(`INSERT INTO dreams (id,name,category,description,image_url,dream_price,contribution_amount,actual_market_price,participant_capacity,internal_percentage_unit,credit_award,announcement_at,status,publication_status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(dreamId, values.name, values.category, values.description, values.image_url, values.dream_price, values.contribution_amount, values.actual_market_price, values.participant_capacity, values.internal_percentage_unit, values.credit_award, values.announcement_at, values.status, values.publication_status, timestamp, timestamp).run();
       return json({ id: dreamId, ...values }, 201, origin);
     }
     if (request.method === "PUT" && parts[3]) {
-      await env.DB.prepare(`UPDATE dreams SET name=?,category=?,description=?,image_url=?,dream_price=?,actual_market_price=?,participant_capacity=?,internal_percentage_unit=?,credit_award=?,announcement_at=?,status=?,publication_status=?,updated_at=? WHERE id=?`).bind(values.name,values.category,values.description,values.image_url,values.dream_price,values.actual_market_price,values.participant_capacity,values.internal_percentage_unit,values.credit_award,values.announcement_at,values.status,values.publication_status,timestamp,parts[3]).run();
+      await env.DB.prepare(`UPDATE dreams SET name=?,category=?,description=?,image_url=?,dream_price=?,contribution_amount=?,actual_market_price=?,participant_capacity=?,internal_percentage_unit=?,credit_award=?,announcement_at=?,status=?,publication_status=?,updated_at=? WHERE id=?`).bind(values.name,values.category,values.description,values.image_url,values.dream_price,values.contribution_amount,values.actual_market_price,values.participant_capacity,values.internal_percentage_unit,values.credit_award,values.announcement_at,values.status,values.publication_status,timestamp,parts[3]).run();
       return json({ id: parts[3], ...values }, 200, origin);
     }
   }
@@ -2488,7 +2515,7 @@ async function handleDreams(request, env, user, url, parts, origin) {
   }
 
   if (request.method === "GET") {
-    const base = `SELECT d.id, d.name, d.category, d.description, d.image_url, d.dream_price, d.participant_capacity, d.status, d.announcement_at,
+    const base = `SELECT d.id, d.name, d.category, d.description, d.image_url, d.dream_price, d.participant_capacity, d.contribution_amount, d.status, d.announcement_at,
       COALESCE(SUM(CASE WHEN lower(COALESCE(p.status, '')) IN ('approved','active','completed') THEN p.contribution_amount ELSE 0 END), 0) AS funded_amount,
       COALESCE(SUM(CASE WHEN lower(COALESCE(p.status, '')) IN ('approved','active','completed') THEN 1 ELSE 0 END), 0) AS approved_participants
       FROM dreams d LEFT JOIN dream_participations p ON p.dream_id = d.id WHERE lower(COALESCE(d.publication_status, '')) = 'published'`;
@@ -2503,6 +2530,10 @@ async function handleDreams(request, env, user, url, parts, origin) {
   if (!dream || !['open','active'].includes(String(dream.status || '').toLowerCase())) return json({ error: "This Dream is not open" }, 409, origin);
   const existing = await env.DB.prepare("SELECT id,status FROM dream_participations WHERE dream_id=? AND user_id=? AND lower(status) NOT IN ('rejected','cancelled') LIMIT 1").bind(dreamId,user.user_id).first();
   if (existing) return json({ error: "You are already part of this Dream", participation: existing }, 409, origin);
+  const activeOther = await env.DB.prepare("SELECT id FROM dream_participations WHERE user_id=? AND lower(status) IN ('pending_approval','approved','active') AND dream_id<>? LIMIT 1").bind(user.user_id,dreamId).first();
+  if (activeOther) return json({ error: "You already have an active Dream. Complete your current Dream journey before joining another Dream." }, 409);
+  const funding = await env.DB.prepare("SELECT dream_price, COALESCE((SELECT SUM(contribution_amount) FROM dream_participations WHERE dream_id=? AND lower(status) IN ('approved','active','completed')),0) AS funded FROM dreams WHERE id=?").bind(dreamId,dreamId).first();
+  if (Number(funding?.funded || 0) >= Number(funding?.dream_price || 0) || Number(funding?.funded || 0) + amount > Number(funding?.dream_price || 0)) return json({ error: "This Dream has reached its funding target or the contribution exceeds the remaining amount." }, 409);
   const timestamp = now(); const participationId = id();
   await env.DB.prepare(`INSERT INTO dream_participations (id,dream_id,user_id,full_name,father_husband_name,cnic_number,mobile_number,payment_method,contribution_amount,transaction_id,proof_url,note,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'pending_approval',?,?)`).bind(participationId,dreamId,user.user_id,body?.full_name || user.full_name || null,body?.father_husband_name || null,body?.cnic_number || null,body?.mobile_number || null,body?.payment_method || null,amount,transactionId,body?.proof_url || null,body?.note || null,timestamp,timestamp).run();
   await sendNotification(env,user.user_id,"dream","Dream Submitted","Your Dream participation has been submitted and is awaiting verification.",`/dreams/${dreamId}`);

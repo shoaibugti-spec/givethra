@@ -1087,3 +1087,17 @@ export async function adminReviewDreamParticipation(id: string, data: { status: 
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dream-participations/${encodeURIComponent(id)}`, { method: "PUT", headers: headers(), body: JSON.stringify(data) });
   return readApiResponse(res);
 }
+
+
+export async function getDreamPaymentAccounts() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/dream-payment-accounts`, { headers: headers(), cache: "no-store" });
+  return readApiResponse<any[]>(res);
+}
+export async function adminGetDreamPaymentAccounts() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dream-payment-accounts`, { headers: headers(), cache: "no-store" });
+  return readApiResponse<any[]>(res);
+}
+export async function adminSaveDreamPaymentAccount(data: any, id?: string) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dream-payment-accounts${id ? `/${encodeURIComponent(id)}` : ""}`, { method: id ? "PUT" : "POST", headers: headers(), body: JSON.stringify(data) });
+  return readApiResponse(res);
+}
