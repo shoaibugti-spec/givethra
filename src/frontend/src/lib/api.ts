@@ -1046,3 +1046,24 @@ export async function adminSpendContribution(data: Record<string, unknown>) {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/contribution-spending`, { method: "POST", headers: headers(), body: JSON.stringify(data) });
   return readApiResponse(res);
 }
+
+// ---------- DREAMS ----------
+export async function getDreams() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/dreams`, { headers: headers() });
+  if (!res.ok) throw new Error("Dreams are not available yet");
+  return readArrayResponse(res);
+}
+
+export async function getDream(id: string) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/dreams/${encodeURIComponent(id)}`, { headers: headers() });
+  return readApiResponse(res);
+}
+
+export async function createDreamParticipation(data: Record<string, unknown>) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/dream-participations`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  return readApiResponse(res);
+}

@@ -263,6 +263,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="hidden md:block border-t border-border/50">
           <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
             <NavLink to="/cases">Browse Cases</NavLink>
+            <NavLink to="/dreams">Dreams</NavLink>
             {isAuthenticated && <NavLink to="/my-help">My Help</NavLink>}
             {isAuthenticated && <NavLink to="/my-cases">My Cases</NavLink>}
             {isAuthenticated && (
@@ -280,6 +281,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavLink to="/cases" onClick={closeMenu}>
               Browse Cases
             </NavLink>
+            <div className="py-1"><NavLink to="/dreams" onClick={closeMenu}>Dreams</NavLink></div>
             {isAuthenticated && (
               <>
                 <div className="py-1"><NavLink to="/my-help" onClick={closeMenu}>My Help</NavLink></div>

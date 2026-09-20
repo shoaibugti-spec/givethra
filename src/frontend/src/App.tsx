@@ -210,6 +210,16 @@ const KindnessWallPage = lazy(() =>
     default: () => <div>Failed to load page</div>,
   }))
 );
+const DreamsPage = lazy(() =>
+  import("@/pages/DreamsPage").catch(() => ({
+    default: () => <div>Failed to load page</div>,
+  }))
+);
+const DreamDetailPage = lazy(() =>
+  import("@/pages/DreamDetailPage").catch(() => ({
+    default: () => <div>Failed to load page</div>,
+  }))
+);
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -293,6 +303,7 @@ function RootLayout() {
         "/community",
         "/heroes-wall",
         "/kindness-wall",
+        "/dreams",
         "/need-help",
         "/cases",
         "/payment-proof",
@@ -303,7 +314,8 @@ function RootLayout() {
         publicPaths.includes(location.pathname) ||
         location.pathname.startsWith("/cases/") ||
         location.pathname.startsWith("/payment-proof/") ||
-        location.pathname.startsWith("/affidavit/");
+        location.pathname.startsWith("/affidavit/") ||
+        location.pathname.startsWith("/dreams/");
       if (!isPublicRoute) {
         navigate({ to: "/" });
       }
@@ -649,6 +661,24 @@ const kindnessWallRoute = createRoute({
     </Suspense>
   ),
 });
+const dreamsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dreams",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <DreamsPage />
+    </Suspense>
+  ),
+});
+const dreamDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dreams/$id",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <DreamDetailPage />
+    </Suspense>
+  ),
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -686,6 +716,8 @@ const routeTree = rootRoute.addChildren([
   communityRoute,
   heroesWallRoute,
   kindnessWallRoute,
+  dreamsRoute,
+  dreamDetailRoute,
 ]);
 
 const router = createRouter({ routeTree });

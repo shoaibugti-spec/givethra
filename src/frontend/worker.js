@@ -1361,6 +1361,10 @@ async function handleRequest(request, env, ctx) {
     return env.ASSETS.fetch(request);
   }
 
+  if (parts[0] === "api" && parts[1] === "dreams" && request.method === "GET") {
+    return handleDreams(request, env, null, url, parts, origin);
+  }
+
   // ============================================================
   //  PUBLIC: Community Posts (no auth required for reading)
   // ============================================================
@@ -1421,6 +1425,9 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
+    if (parts[1] === "dream-participations") {
+      return handleDreams(request, env, user, url, parts, origin);
+    }
     // COMMUNITY CONTRIBUTIONS: deliberately separate from the Credits Wallet.
     if (parts[1] === "earnings" && parts[2] === "me" && request.method === "GET") {
       if (!user) return json({ error: "Authentication required" }, 401, origin);
@@ -2412,3 +2419,42 @@ export default {
     }
   },
 };
+
+
+// ============================================================
+//  DREAMS (independent from Help cases and the Credit wallet)
+// ============================================================
+async function handleDreams(request, env, user, url, parts, origin) {
+  if (!env.DB) return json([], 200, origin);
+  if (request.method === "GET") {
+    const base = `SELECT d.id, d.name, d.category, d.description, d.image_url, d.dream_price,
+      d.participant_capacity, d.status, d.announcement_at,
+      COALESCE(SUM(CASE WHEN lower(COALESCE(p.status, '')) IN ('approved','active','completed') THEN p.contribution_amount ELSE 0 END), 0) AS funded_amount,
+      COALESCE(SUM(CASE WHEN lower(COALESCE(p.status, '')) IN ('approved','active','completed') THEN 1 ELSE 0 END), 0) AS approved_participants
+      FROM dreams d LEFT JOIN dream_participations p ON p.dream_id = d.id
+      WHERE lower(COALESCE(d.publication_status, '')) = 'published'`;
+    if (parts[2]) {
+      const row = await env.DB.prepare(`${base} AND d.id = ? GROUP BY d.id LIMIT 1`).bind(parts[2]).first();
+      return row ? json(row, 200, origin) : json({ error: "Dream not found" }, 404, origin);
+    }
+    const rows = await env.DB.prepare(`${base} AND lower(COALESCE(d.status, '')) IN ('open','active') GROUP BY d.id ORDER BY d.created_at DESC`).all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (parts[0] !== "api" || parts[1] !== "dream-participations" || request.method !== "POST") {
+    return json({ error: "Method not allowed" }, 405, origin);
+  }
+  if (!user) return json({ error: "Authentication required" }, 401, origin);
+  const body = await readJson(request);
+  const dreamId = String(body?.dream_id || "").trim();
+  const amount = Number(body?.contribution_amount || 0);
+  const transactionId = String(body?.transaction_id || "").trim();
+  if (!dreamId || !Number.isFinite(amount) || amount <= 0 || !transactionId) return json({ error: "Dream, amount and transaction ID are required" }, 400, origin);
+  const dream = await env.DB.prepare("SELECT id, name, status, participant_capacity FROM dreams WHERE id = ? AND lower(COALESCE(publication_status, '')) = 'published'").bind(dreamId).first();
+  if (!dream || !['open', 'active'].includes(String(dream.status || '').toLowerCase())) return json({ error: "This Dream is not open" }, 409, origin);
+  const existing = await env.DB.prepare("SELECT id, status FROM dream_participations WHERE dream_id = ? AND user_id = ? AND lower(status) NOT IN ('rejected','cancelled') LIMIT 1").bind(dreamId, user.user_id).first();
+  if (existing) return json({ error: "You are already part of this Dream", participation: existing }, 409, origin);
+  const timestamp = now();
+  const participationId = id();
+  await env.DB.prepare(`INSERT INTO dream_participations (id, dream_id, user_id, contribution_amount, transaction_id, proof_url, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_approval', ?, ?)`).bind(participationId, dreamId, user.user_id, amount, transactionId, body?.proof_url ? String(body.proof_url).slice(0, 2000) : null, body?.note ? String(body.note).slice(0, 2000) : null, timestamp, timestamp).run();
+  return json({ id: participationId, dream_id: dreamId, status: "pending_approval", message: "Dream submission received for admin verification" }, 201, origin);
+}

@@ -64,6 +64,7 @@ import {
   CreditCard,
   Siren,
   MoreHorizontal,
+  Sparkles,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -946,7 +947,16 @@ export default function HomePage() {
           <div className="relative mx-auto max-w-7xl px-4 pt-6 pb-6 md:py-8 flex flex-col items-center gap-6">
             
             {/* SMART BUTTONS ABOVE SLIDER */}
-            <div className="flex w-full max-w-6xl flex-col sm:flex-row gap-3 mb-2">
+            <div className="flex w-full max-w-6xl flex-col gap-3 mb-2">
+              <Button
+                size="lg"
+                onClick={() => navigate({ to: "/dreams" })}
+                className="h-14 w-full rounded-2xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-500 font-bold text-base text-white shadow-sm shadow-teal-200 transition-all hover:scale-[1.01] hover:from-teal-800 hover:to-emerald-600 active:scale-[0.99] sm:text-lg"
+              >
+                <Sparkles className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> Make This My Dream
+                <ChevronRight className="ml-auto h-5 w-5" />
+              </Button>
+              <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 size="lg"
                 onClick={() => navigate({ to: "/become-hero" })}
@@ -961,6 +971,7 @@ export default function HomePage() {
               >
                 <FileText className="h-5 w-5 sm:h-6 sm:w-6 mr-2" /> Request Help (Requester)
               </Button>
+              </div>
             </div>
 
             {/* 1. MAIN SLIDER (Full Image, No Dots) */}
@@ -986,9 +997,7 @@ export default function HomePage() {
                 <h2 className="text-base md:text-lg font-bold text-foreground">
                   Select a Category &amp; Submit Your Help Request
                 </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Tap a shortcut to start the first step of your case submission.
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Tap a category to start your help request.</p>
               </div>
 
               {/* Horizontal Scroll Container */}
@@ -1066,6 +1075,17 @@ export default function HomePage() {
           </div>
         </section>
         {/* --- END OF UPDATED HERO & CATEGORY SECTION --- */}
+
+        <section className="border-b border-teal-100 bg-gradient-to-r from-teal-50 via-white to-amber-50 px-4 py-7">
+          <div className="mx-auto flex max-w-6xl flex-col gap-4 rounded-3xl border border-teal-100 bg-white/80 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Givethra Dreams</p>
+              <h2 className="mt-1 font-display text-2xl font-bold text-foreground">Take a step toward something meaningful.</h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Explore cars, appliances and other community-funded Dreams in a separate experience from Help cases.</p>
+            </div>
+            <Button onClick={() => navigate({ to: "/dreams" })} className="shrink-0 rounded-xl bg-teal-700 font-bold hover:bg-teal-800">Explore Dreams <ChevronRight className="ml-2 h-4 w-4" /></Button>
+          </div>
+        </section>
 
         {/* NOTE: WhatsApp Section has been moved below KindnessWall as requested */}
 
