@@ -1,0 +1,2425 @@
+// src/frontend/worker.js
+var PUBLIC_ORIGIN = "https://givethra.org";
+var PUBLIC_ORIGINS = /* @__PURE__ */ new Set([PUBLIC_ORIGIN, "https://www.givethra.org"]);
+var ADMIN_EMAILS = /* @__PURE__ */ new Set([
+  "shoaibugti@gmail.com",
+  "shoaibahmedbugti5@gmail.com"
+]);
+function googleClientId(env) {
+  return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || "").trim();
+}
+function corsHeaders(origin) {
+  const allowOrigin = PUBLIC_ORIGINS.has(origin) ? origin : PUBLIC_ORIGIN;
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin"
+  };
+}
+function json(data, status = 200, origin = "") {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      ...corsHeaders(origin)
+    }
+  });
+}
+function now() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+async function ensureUserCoreRows(env, user) {
+  if (!env.DB || !user?.user_id) return { kyc_status: user?.kyc_status || "none" };
+  const timestamp = now();
+  let effectiveKycStatus = String(user.kyc_status || "none").toLowerCase();
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO profiles (user_id, full_name, avatar_url, preferred_language, created_at, updated_at)
+     VALUES (?, ?, ?, 'en', ?, ?)`
+  ).bind(String(user.user_id), user.full_name || null, user.avatar_url || null, timestamp, timestamp).run();
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO wallets (user_id, balance, updated_at)
+     VALUES (?, ?, ?)`
+  ).bind(String(user.user_id), Number(user.balance || 0), timestamp).run();
+  const kyc = await env.DB.prepare(
+    `SELECT lower(status) AS status
+     FROM kyc_submissions
+     WHERE user_id = ? AND COALESCE(is_current, 1) = 1
+     ORDER BY CASE lower(COALESCE(status, ''))
+       WHEN 'approved' THEN 1 WHEN 'pending' THEN 2 WHEN 'rejected' THEN 3 ELSE 4 END,
+       submitted_at DESC, rowid DESC LIMIT 1`
+  ).bind(String(user.user_id)).first();
+  if (kyc?.status) {
+    effectiveKycStatus = String(kyc.status).toLowerCase();
+    if (effectiveKycStatus !== String(user.kyc_status || "").toLowerCase()) {
+      await env.DB.prepare(
+        `UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?`
+      ).bind(effectiveKycStatus, timestamp, String(user.user_id)).run();
+    }
+  }
+  return { kyc_status: effectiveKycStatus };
+}
+async function syncUserCaseCounters(env, userId) {
+  if (!env.DB || !userId) return;
+  await env.DB.prepare(
+    `UPDATE users SET
+       total_cases = (SELECT COUNT(*) FROM case_submissions WHERE user_id = ?),
+       pending_cases = (SELECT COUNT(*) FROM case_submissions WHERE user_id = ? AND lower(COALESCE(status, '')) = 'pending'),
+       active_or_completed_cases = (SELECT COUNT(*) FROM case_submissions WHERE user_id = ? AND lower(COALESCE(status, '')) IN ('approved', 'published', 'active', 'open', 'in_progress', 'completed')),
+       rejected_cases = (SELECT COUNT(*) FROM case_submissions WHERE user_id = ? AND lower(COALESCE(status, '')) = 'rejected'),
+       updated_at = ?
+     WHERE user_id = ?`
+  ).bind(userId, userId, userId, userId, now(), userId).run();
+}
+async function sendNotification(env, userId, type, title, message, link = null) {
+  const notificationId = id();
+  const createdAt = now();
+  await env.DB.prepare(
+    `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
+  ).bind(notificationId, String(userId), String(type), String(title), String(message), link, createdAt).run();
+  return { id: notificationId, user_id: String(userId), type, title, message, link, is_read: 0, created_at: createdAt };
+}
+function id() {
+  return crypto.randomUUID();
+}
+function base64UrlEncode(value) {
+  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+function base64UrlDecode(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+async function signSession(user, secret) {
+  if (!secret) return null;
+  const payload = base64UrlEncode(JSON.stringify({
+    user_id: user.user_id,
+    email: user.email,
+    exp: Math.floor(Date.now() / 1e3) + 60 * 60 * 24 * 30
+  }));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return `v2.${payload}.${base64UrlEncode(signature)}`;
+}
+async function verifySession(token, secret) {
+  if (!secret || !token?.startsWith("v2.")) return null;
+  try {
+    const [, payload, encodedSignature] = token.split(".");
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    const valid = await crypto.subtle.verify("HMAC", key, base64UrlDecode(encodedSignature), new TextEncoder().encode(payload));
+    if (!valid) return null;
+    const data = JSON.parse(new TextDecoder().decode(base64UrlDecode(payload)));
+    if (!data.user_id || !data.email || !Number.isFinite(data.exp) || data.exp <= Math.floor(Date.now() / 1e3)) return null;
+    return { user_id: String(data.user_id), email: String(data.email).toLowerCase(), full_name: data.full_name || data.email, avatar_url: data.avatar_url || "", role: isAdmin(data) ? "admin" : null };
+  } catch {
+    return null;
+  }
+}
+function isAdmin(user) {
+  return Boolean(user && ADMIN_EMAILS.has(String(user.email).toLowerCase()));
+}
+function bearer(request) {
+  const value = request.headers.get("Authorization") || "";
+  return value.replace(/^Bearer\s+/i, "").trim();
+}
+async function verifyGoogleCredential(credential, clientId) {
+  if (credential && credential.length > 100 && !credential.startsWith("eyJhbGciOi")) {
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1e4);
+  let response;
+  try {
+    response = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+      { signal: controller.signal }
+    );
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!response.ok) return null;
+  const payload = await response.json();
+  const audience = String(payload.aud || "").trim();
+  const issuer = String(payload.iss || "").trim();
+  const verified = payload.email_verified === true || payload.email_verified === "true";
+  const trustedIssuer = issuer === "accounts.google.com" || issuer === "https://accounts.google.com";
+  if (!clientId || !payload.sub || !payload.email || audience !== clientId || !trustedIssuer || !verified) return null;
+  return {
+    google_id: String(payload.sub),
+    email: String(payload.email).toLowerCase(),
+    full_name: payload.name || "User",
+    avatar_url: payload.picture || ""
+  };
+}
+async function findOrCreateUser(env, identity) {
+  if (!env.DB) return { ...identity, user_id: id() };
+  const selectExisting = () => env.DB.prepare(
+    `SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases,
+            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit,
+            onboarding_completed
+     FROM users WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1`
+  ).bind(identity.email).first();
+  const existing = await selectExisting();
+  if (existing) {
+    const ensured = await ensureUserCoreRows(env, {
+      user_id: String(existing.user_id),
+      full_name: existing.full_name || identity.full_name,
+      avatar_url: existing.avatar_url || identity.avatar_url,
+      balance: existing.balance,
+      kyc_status: existing.kyc_status
+    });
+    return {
+      user_id: String(existing.user_id),
+      email: String(existing.email || identity.email).toLowerCase(),
+      full_name: existing.full_name || identity.full_name,
+      avatar_url: existing.avatar_url || identity.avatar_url,
+      kyc_status: ensured?.kyc_status || existing.kyc_status || "none",
+      role: isAdmin(existing) || isAdmin(identity) ? "admin" : null,
+      last_community_visit: existing.last_community_visit || null,
+      onboarding_completed: existing.onboarding_completed === 1
+    };
+  }
+  const timestamp = now();
+  const userId = id();
+  try {
+    await env.DB.prepare(
+      `INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at, onboarding_completed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
+    ).bind(userId, identity.email, identity.full_name, identity.avatar_url, timestamp, timestamp, timestamp).run();
+    await env.DB.prepare(
+      `INSERT INTO profiles (user_id, full_name, avatar_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(userId, identity.full_name, identity.avatar_url, timestamp, timestamp).run();
+  } catch (error) {
+    const raced = await selectExisting();
+    if (!raced) throw error;
+    return {
+      user_id: String(raced.user_id),
+      email: String(raced.email || identity.email).toLowerCase(),
+      full_name: raced.full_name || identity.full_name,
+      avatar_url: raced.avatar_url || identity.avatar_url,
+      kyc_status: raced.kyc_status || "none",
+      role: isAdmin(raced) || isAdmin(identity) ? "admin" : null,
+      last_community_visit: raced.last_community_visit || null,
+      onboarding_completed: raced.onboarding_completed === 1
+    };
+  }
+  await ensureUserCoreRows(env, {
+    user_id: userId,
+    full_name: identity.full_name,
+    avatar_url: identity.avatar_url,
+    balance: 0,
+    kyc_status: "none"
+  });
+  return {
+    user_id: userId,
+    email: identity.email,
+    full_name: identity.full_name,
+    avatar_url: identity.avatar_url,
+    kyc_status: "none",
+    role: isAdmin(identity) ? "admin" : null,
+    last_community_visit: timestamp,
+    onboarding_completed: false
+  };
+}
+async function hydrateAuthenticatedUser(env, session) {
+  if (!env.DB || !session?.user_id) return session;
+  try {
+    const row = await env.DB.prepare(
+      `SELECT u.user_id, u.email, u.full_name, u.avatar_url,
+              COALESCE((SELECT lower(k.status) FROM kyc_submissions k
+                WHERE k.user_id = u.user_id AND COALESCE(k.is_current, 1) = 1
+                ORDER BY CASE lower(COALESCE(k.status, ''))
+                  WHEN 'approved' THEN 1 WHEN 'pending' THEN 2 WHEN 'rejected' THEN 3 ELSE 4 END,
+                  k.submitted_at DESC, k.rowid DESC LIMIT 1), u.kyc_status, 'none') AS kyc_status,
+              u.total_cases, u.pending_cases, u.active_or_completed_cases, u.rejected_cases,
+              COALESCE(w.balance, u.balance, 0) AS balance, u.last_community_visit, u.onboarding_completed,
+              p.full_name AS profile_full_name, p.avatar_url AS profile_avatar_url
+       FROM users u
+       LEFT JOIN profiles p ON p.user_id = u.user_id
+       LEFT JOIN wallets w ON w.user_id = u.user_id
+       WHERE u.user_id = ? LIMIT 1`
+    ).bind(session.user_id).first();
+    if (!row) return session;
+    const candidateName = String(row.profile_full_name || row.full_name || session.full_name || "").trim();
+    const fullName = candidateName && !candidateName.includes("@") ? candidateName : "User";
+    return {
+      ...session,
+      user_id: String(row.user_id || session.user_id),
+      email: String(row.email || session.email).toLowerCase(),
+      full_name: fullName,
+      avatar_url: row.profile_avatar_url || row.avatar_url || session.avatar_url || "",
+      kyc_status: row.kyc_status || session.kyc_status || "none",
+      total_cases: row.total_cases,
+      pending_cases: row.pending_cases,
+      active_or_completed_cases: row.active_or_completed_cases,
+      rejected_cases: row.rejected_cases,
+      balance: row.balance,
+      last_community_visit: row.last_community_visit,
+      onboarding_completed: row.onboarding_completed === 1,
+      role: isAdmin(row) ? "admin" : session.role || null
+    };
+  } catch {
+    return session;
+  }
+}
+async function authenticate(request, env, clientId, createUser = false) {
+  const credential = bearer(request);
+  if (!credential) return null;
+  const session = await verifySession(credential, env.JWT_SECRET);
+  if (session) return hydrateAuthenticatedUser(env, session);
+  const identity = await verifyGoogleCredential(credential, clientId);
+  if (!identity) return null;
+  if (createUser) return findOrCreateUser(env, identity);
+  if (!env.DB) return { ...identity, user_id: identity.google_id };
+  const existing = await env.DB.prepare(
+    `SELECT user_id, email, full_name, avatar_url, kyc_status, total_cases,
+            pending_cases, active_or_completed_cases, rejected_cases, balance, last_community_visit,
+            onboarding_completed
+     FROM users WHERE lower(trim(email)) = lower(trim(?)) LIMIT 1`
+  ).bind(identity.email).first();
+  return hydrateAuthenticatedUser(env, {
+    user_id: existing?.user_id || identity.google_id,
+    email: identity.email,
+    full_name: existing?.full_name || identity.full_name,
+    avatar_url: existing?.avatar_url || identity.avatar_url,
+    kyc_status: existing?.kyc_status || "none",
+    role: isAdmin(identity) ? "admin" : null,
+    last_community_visit: existing?.last_community_visit || null,
+    onboarding_completed: existing?.onboarding_completed === 1
+  });
+}
+function pathParts(url) {
+  return url.pathname.split("/").filter(Boolean);
+}
+function requestedUserId(url) {
+  return url.searchParams.get("user_id") || "";
+}
+function canAccessUser(user, userId) {
+  return isAdmin(user) || !userId || user.user_id === userId;
+}
+async function maybeAutoSuspendForMissingFeedback(env, userId) {
+  try {
+    const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+    const overdue = await env.DB.prepare(
+      `SELECT c.id FROM case_submissions c
+       WHERE c.user_id = ? AND lower(COALESCE(c.status,'')) = 'completed'
+         AND c.feedback_deadline IS NOT NULL AND c.feedback_deadline < ?
+         AND NOT EXISTS (
+           SELECT 1 FROM feedbacks f
+           WHERE f.case_id = c.id AND f.user_id = c.user_id
+             AND lower(COALESCE(f.status,'')) IN ('approved','pending_review')
+         )
+       LIMIT 1`
+    ).bind(userId, nowIso).all();
+    if (!overdue?.results?.length) return;
+    await env.DB.prepare(
+      `INSERT INTO user_suspensions (user_id, suspension_count, is_active, suspended_at, rejection_count_at_suspension, credits_used_to_unlock)
+       VALUES (?, 1, 1, ?, 0, 0)
+       ON CONFLICT(user_id) DO UPDATE SET
+         is_active = 1,
+         suspension_count = user_suspensions.suspension_count + 1,
+         suspended_at = excluded.suspended_at`
+    ).bind(userId, nowIso).run();
+    await env.DB.prepare(
+      `UPDATE profiles SET is_suspended = 1, suspended_reason = ?, suspended_at = ? WHERE user_id = ?`
+    ).bind("Missing 24-hour gratitude feedback after case completion.", nowIso, userId).run();
+  } catch (err) {
+  }
+}
+async function getActiveSuspension(env, userId) {
+  if (!env.DB || !userId) return null;
+  await maybeAutoSuspendForMissingFeedback(env, userId);
+  const row = await env.DB.prepare(
+    `SELECT u.user_id, s.is_active, s.suspension_count, s.suspended_at,
+            s.rejection_count_at_suspension, s.credits_used_to_unlock,
+            p.is_suspended AS profile_is_suspended, p.suspended_reason
+     FROM users u
+     LEFT JOIN user_suspensions s ON s.user_id = u.user_id
+     LEFT JOIN profiles p ON p.user_id = u.user_id
+     WHERE u.user_id = ? LIMIT 1`
+  ).bind(userId).first();
+  const active = [1, "1", true, "true"].includes(row?.is_active) || [1, "1", true, "true"].includes(row?.profile_is_suspended);
+  return active ? row : null;
+}
+function suspendedActionResponse(origin, suspension) {
+  return json({
+    error: "Your account is suspended. You cannot submit a case or provide help until the account is reactivated.",
+    code: "ACCOUNT_SUSPENDED",
+    required_credits: 5,
+    suspension
+  }, 403, origin);
+}
+async function readJson(request) {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+function pick(body, fields) {
+  return Object.fromEntries(fields.filter((field) => body && body[field] !== void 0).map((field) => [field, body[field]]));
+}
+async function getWalletBalance(env, userId) {
+  const row = await env.DB.prepare(
+    "SELECT balance FROM wallets WHERE user_id = ?"
+  ).bind(userId).first();
+  return Number(row?.balance || 0);
+}
+async function addTransaction(env, userId, amount, type, description, referenceId = null) {
+  const txId = id();
+  const timestamp = now();
+  await env.DB.prepare(
+    `INSERT INTO credit_transactions (id, user_id, amount, type, description, reference_id, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'completed', ?, ?)`
+  ).bind(txId, userId, amount, type, description, referenceId, timestamp, timestamp).run();
+  return txId;
+}
+async function deductCredits(env, userId, amount, type, description, referenceId = null) {
+  const balance = await getWalletBalance(env, userId);
+  if (balance < amount) {
+    throw new Error(`Insufficient credits. Required: ${amount}, Available: ${balance}`);
+  }
+  await env.DB.prepare(
+    "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?"
+  ).bind(amount, now(), userId, amount).run();
+  await addTransaction(env, userId, -amount, type, description, referenceId);
+}
+async function addCredits(env, userId, amount, type, description, referenceId = null) {
+  if (!["deposit", "support_to_credit", "dream_participation"].includes(type)) throw new Error("Credits can only come from an approved deposit or Support conversion");
+  await env.DB.prepare(
+    "INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = balance + excluded.balance, updated_at = excluded.updated_at"
+  ).bind(userId, amount, now()).run();
+  await addTransaction(env, userId, amount, type, description, referenceId);
+}
+function hasBioContactInfo(value) {
+  return /\d|@|https?:\/\/|www\.|whats?app|e[- ]?mail|email|phone|contact|telegram|signal|wechat|imo/i.test(String(value || ""));
+}
+function withoutPrivateContact(value) {
+  if (!value || typeof value !== "object") return value;
+  const safe = { ...value };
+  delete safe.phone_number;
+  delete safe.email;
+  delete safe.phone;
+  delete safe.mobile;
+  delete safe.contact;
+  return safe;
+}
+async function getProfileSupportData(env, userId) {
+  const empty = { supports_count: 0, supports_given: 0, eligibility_supports: 0, earnings_eligible: 0, eligible_at: null, support_earnings_usd: 0 };
+  try {
+    const [profile, received, given, ledger] = await Promise.all([
+      env.DB.prepare("SELECT COALESCE(earnings_eligible, 0) AS earnings_eligible, eligible_at, COALESCE(support_earnings_usd, 0) AS stored_earnings_usd FROM users WHERE user_id = ?").bind(userId).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE user_id = ?").bind(userId).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(userId).first(),
+      env.DB.prepare("SELECT COALESCE(SUM(amount_usd), 0) AS earnings_usd FROM support_earnings WHERE user_id = ?").bind(userId).first()
+    ]);
+    const supportsReceived = Number(received?.count || 0);
+    const supportsGiven = Number(given?.count || 0);
+    const ledgerEarnings = Number(ledger?.earnings_usd || 0);
+    return {
+      supports_count: supportsReceived,
+      supports_given: supportsGiven,
+      eligibility_supports: supportsReceived + supportsGiven,
+      earnings_eligible: Number(profile?.earnings_eligible || 0),
+      eligible_at: profile?.eligible_at || null,
+      // Keep the established stored value when an older database has no ledger rows.
+      support_earnings_usd: ledgerEarnings > 0 ? ledgerEarnings : Number(profile?.stored_earnings_usd || 0)
+    };
+  } catch {
+    try {
+      return await env.DB.prepare(
+        "SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(supports_given, 0) AS supports_given, COALESCE(eligibility_supports, 0) AS eligibility_supports, COALESCE(earnings_eligible, 0) AS earnings_eligible, eligible_at, COALESCE(support_earnings_usd, 0) AS support_earnings_usd FROM users WHERE user_id = ?"
+      ).bind(userId).first() || empty;
+    } catch {
+      return empty;
+    }
+  }
+}
+function withdrawalWindow(date = /* @__PURE__ */ new Date()) {
+  const day = date.getUTCDate();
+  return day >= 30 || day <= 3;
+}
+function nextWithdrawalDate(date = /* @__PURE__ */ new Date()) {
+  const next = new Date(date);
+  if (date.getUTCDate() <= 3) next.setUTCDate(3);
+  else next.setUTCMonth(next.getUTCMonth() + 1, 30);
+  return next.toISOString().slice(0, 10);
+}
+async function getEarningsSummary(env, userId) {
+  const profile = await getProfileSupportData(env, userId);
+  const wallet = await env.DB.prepare("SELECT COALESCE(balance_pkr, 0) AS balance FROM earnings_wallets WHERE user_id = ?").bind(userId).first();
+  const rows = await env.DB.prepare("SELECT * FROM support_earnings WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").bind(userId).all();
+  const withdrawals = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE user_id = ? ORDER BY requested_at DESC LIMIT 50").bind(userId).all();
+  return { ...profile, wallet_pkr: Number(wallet?.balance || 0), earnings_usd: Number(profile?.support_earnings_usd || 0), posts: rows.results || [], withdrawals: withdrawals.results || [], withdrawal_open: withdrawalWindow(), next_withdrawal_date: nextWithdrawalDate() };
+}
+async function handleProfile(request, env, user, parts, origin) {
+  const userId = String(parts[2] || user.user_id || "");
+  if (!userId || request.method !== "GET" && !canAccessUser(user, userId)) return json({ error: "Forbidden" }, 403, origin);
+  const queryRole = String(new URL(request.url).searchParams.get("profile_role") || "").toLowerCase();
+  const profileRole = queryRole === "hero" || queryRole === "requester" ? queryRole : user?.role === "hero" ? "hero" : "requester";
+  const allowedFields = ["full_name", "phone_number", "country", "city", "bio", "preferred_language", "avatar_url", "cover_url"];
+  if (request.method === "GET") {
+    try {
+      const variant = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
+      if (variant) {
+        const counts2 = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId, userId).first();
+        const posts2 = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
+        const following2 = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id, userId).first() : null;
+        const supportData2 = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
+        const profileData2 = user?.user_id === userId ? variant : withoutPrivateContact(variant);
+        return json({ ...profileData2, user_id: userId, profile_role: profileRole, followers_count: Number(counts2?.followers || 0), following_count: Number(counts2?.following || 0), heroes_count: Number(counts2?.followers || 0), supports_count: Number(supportData2?.supports_count || 0), credits_from_supports: Number(supportData2?.credits_from_supports || 0), is_following: Boolean(following2), posts: posts2.results || [] }, 200, origin);
+      }
+    } catch {
+    }
+    const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
+    const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId, userId).first();
+    const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
+    const activeCase = profileRole === "requester" ? await env.DB.prepare("SELECT * FROM case_submissions WHERE user_id=? AND lower(COALESCE(status,'')) IN ('approved','open','in_progress') ORDER BY submitted_at DESC LIMIT 1").bind(userId).first() : null;
+    const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id, userId).first() : null;
+    const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
+    const profileData = user?.user_id === userId ? profile || {} : withoutPrivateContact(profile || {});
+    const safeCase = user?.user_id === userId ? activeCase : withoutPrivateContact(activeCase);
+    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count: Number(counts?.followers || 0), following_count: Number(counts?.following || 0), heroes_count: Number(counts?.followers || 0), supports_count: Number(supportData?.supports_count || 0), credits_from_supports: Number(supportData?.credits_from_supports || 0), is_following: Boolean(following), posts: posts.results || [], active_case: safeCase || null }, 200, origin);
+  }
+  if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
+  const body = await readJson(request);
+  const values = pick(body, allowedFields);
+  if (Object.keys(values).length === 0) return json({ error: "No valid fields to update" }, 400, origin);
+  if (Object.prototype.hasOwnProperty.call(values, "bio") && hasBioContactInfo(values.bio)) {
+    return json({ error: "Bio cannot contain phone numbers, email addresses, @ symbols, or contact information." }, 422, origin);
+  }
+  const timestamp = now();
+  try {
+    const current2 = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
+    const merged2 = { ...current2 || {}, ...values };
+    await env.DB.prepare(
+      `INSERT INTO profile_variants
+        (id, user_id, profile_role, full_name, phone_number, country, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id, profile_role) DO UPDATE SET
+        full_name = excluded.full_name, phone_number = excluded.phone_number, country = excluded.country,
+        city = excluded.city, bio = excluded.bio, preferred_language = excluded.preferred_language,
+        avatar_url = excluded.avatar_url, cover_url = excluded.cover_url, updated_at = excluded.updated_at`
+    ).bind(
+      current2?.id || id(),
+      userId,
+      profileRole,
+      merged2.full_name || null,
+      merged2.phone_number || null,
+      merged2.country || null,
+      merged2.city || null,
+      merged2.bio || null,
+      merged2.preferred_language || "en",
+      merged2.avatar_url || null,
+      merged2.cover_url || null,
+      current2?.created_at || timestamp,
+      timestamp
+    ).run();
+    const saved = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
+    if (saved) {
+      await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?").bind(saved.full_name || user.full_name || null, saved.avatar_url || user.avatar_url || null, timestamp, userId).run();
+      return json({ ...saved, profile_role: profileRole }, 200, origin);
+    }
+  } catch {
+  }
+  const current = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
+  const merged = { ...current || {}, ...values, user_id: userId, created_at: current?.created_at || timestamp, updated_at: timestamp };
+  await env.DB.prepare(
+    `INSERT INTO profiles (user_id, full_name, phone_number, country, city, bio, preferred_language, avatar_url, cover_url, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET full_name = excluded.full_name, phone_number = excluded.phone_number,
+      country = excluded.country, city = excluded.city, bio = excluded.bio, preferred_language = excluded.preferred_language,
+      avatar_url = excluded.avatar_url, cover_url = excluded.cover_url, updated_at = excluded.updated_at`
+  ).bind(
+    userId,
+    merged.full_name || null,
+    merged.phone_number || null,
+    merged.country || null,
+    merged.city || null,
+    merged.bio || null,
+    merged.preferred_language || "en",
+    merged.avatar_url || null,
+    merged.cover_url || null,
+    merged.created_at,
+    merged.updated_at
+  ).run();
+  await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?").bind(merged.full_name || user.full_name || null, merged.avatar_url || user.avatar_url || null, timestamp, userId).run();
+  return json({ ...merged, profile_role: profileRole }, 200, origin);
+}
+async function handleKyc(request, env, user, url, parts, origin) {
+  const queryUser = requestedUserId(url);
+  const target = queryUser || user.user_id;
+  if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+  if (request.method === "GET") {
+    const rows = await env.DB.prepare(
+      "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC, rowid DESC LIMIT ?"
+    ).bind(target, Number(url.searchParams.get("limit") || 50)).all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const record = pick(body, ["full_name", "date_of_birth", "address", "cnic_number", "cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url", "document_type"]);
+    const existing = await env.DB.prepare(
+      "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC, rowid DESC LIMIT 1"
+    ).bind(user.user_id).first();
+    if (existing && ["pending", "approved"].includes(String(existing.status || "").toLowerCase())) {
+      return json({
+        error: existing.status === "approved" ? "KYC is already approved for this user" : "KYC is already under review for this user",
+        code: existing.status === "approved" ? "KYC_ALREADY_APPROVED" : "KYC_ALREADY_PENDING",
+        submission: existing
+      }, 409, origin);
+    }
+    if (existing && String(existing.status || "").toLowerCase() === "rejected") {
+      await env.DB.prepare(
+        "UPDATE kyc_submissions SET full_name = ?, date_of_birth = ?, address = ?, cnic_number = ?, cnic_front_url = ?, cnic_back_url = ?, selfie_url = ?, passport_url = ?, face_video_url = ?, document_type = ?, status = 'pending', rejection_reason = NULL, reviewed_at = NULL, reviewed_by = NULL, submitted_at = ? WHERE id = ? AND user_id = ?"
+      ).bind(record.full_name || null, record.date_of_birth || null, record.address || null, record.cnic_number || null, record.cnic_front_url || null, record.cnic_back_url || null, record.selfie_url || null, record.passport_url || null, record.face_video_url || null, record.document_type || null, now(), existing.id, user.user_id).run();
+      await env.DB.prepare("UPDATE users SET kyc_status = 'pending', updated_at = ? WHERE user_id = ?").bind(now(), user.user_id).run();
+      return json({ id: existing.id, user_id: user.user_id, ...record, status: "pending" }, 200, origin);
+    }
+    const submissionId = body?.id || id();
+    await env.DB.prepare(
+      "INSERT INTO kyc_submissions (id, user_id, full_name, date_of_birth, address, cnic_number, cnic_front_url, cnic_back_url, selfie_url, passport_url, face_video_url, document_type, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+    ).bind(submissionId, user.user_id, record.full_name || null, record.date_of_birth || null, record.address || null, record.cnic_number || null, record.cnic_front_url || null, record.cnic_back_url || null, record.selfie_url || null, record.passport_url || null, record.face_video_url || null, record.document_type || null, now()).run();
+    await env.DB.prepare("UPDATE users SET kyc_status = 'pending', updated_at = ? WHERE user_id = ?").bind(now(), user.user_id).run();
+    return json({ id: submissionId, user_id: user.user_id, ...record, status: "pending" }, 201, origin);
+  }
+  if (request.method === "PUT" && parts[2]) {
+    const existing = await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(parts[2]).first();
+    if (!existing) return json({ error: "KYC submission not found" }, 404, origin);
+    if (isAdmin(user)) {
+      const body2 = await readJson(request);
+      const values = pick(body2, ["status", "rejection_reason", "reviewed_at", "reviewed_by"]);
+      const allowed = ["status", "rejection_reason", "reviewed_at", "reviewed_by"];
+      const assignments = allowed.filter((field) => values[field] !== void 0).map((field) => `${field} = ?`);
+      const params = allowed.filter((field) => values[field] !== void 0).map((field) => values[field]);
+      if (assignments.length) {
+        await env.DB.prepare(`UPDATE kyc_submissions SET ${assignments.join(", ")} WHERE id = ?`).bind(...params, parts[2]).run();
+      }
+      return json(await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(parts[2]).first(), 200, origin);
+    }
+    if (existing.user_id !== user.user_id) return json({ error: "Forbidden" }, 403, origin);
+    if (String(existing.status || "").toLowerCase() !== "rejected") {
+      return json({ error: "Only a rejected KYC submission can be resubmitted" }, 409, origin);
+    }
+    const body = await readJson(request);
+    const record = pick(body, ["full_name", "date_of_birth", "address", "cnic_number", "cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url", "document_type"]);
+    await env.DB.prepare(
+      "UPDATE kyc_submissions SET full_name = ?, date_of_birth = ?, address = ?, cnic_number = ?, cnic_front_url = ?, cnic_back_url = ?, selfie_url = ?, passport_url = ?, face_video_url = ?, document_type = ?, status = 'pending', rejection_reason = NULL, reviewed_at = NULL, reviewed_by = NULL, submitted_at = ? WHERE id = ? AND user_id = ?"
+    ).bind(record.full_name || null, record.date_of_birth || null, record.address || null, record.cnic_number || null, record.cnic_front_url || null, record.cnic_back_url || null, record.selfie_url || null, record.passport_url || null, record.face_video_url || null, record.document_type || null, now(), parts[2], user.user_id).run();
+    await env.DB.prepare("UPDATE users SET kyc_status = 'pending', updated_at = ? WHERE user_id = ?").bind(now(), user.user_id).run();
+    return json(await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(parts[2]).first(), 200, origin);
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+function decodeCaseRow(row) {
+  if (!row) return row;
+  const result = { ...row };
+  for (const field of ["photo_urls", "category_details"]) {
+    if (typeof result[field] === "string" && result[field]) {
+      try {
+        result[field] = JSON.parse(result[field]);
+      } catch {
+      }
+    }
+  }
+  return result;
+}
+async function handleCases(request, env, user, url, parts, origin) {
+  if (request.method === "GET") {
+    if (parts[2] === "approved") {
+      const rows2 = await env.DB.prepare("SELECT * FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') ORDER BY submitted_at DESC").all();
+      return json((rows2.results || []).map(decodeCaseRow), 200, origin);
+    }
+    if (parts[2] === "by-ids") {
+      const ids = String(url.searchParams.get("ids") || "").split(",").map((value) => value.trim()).filter(Boolean).slice(0, 100);
+      if (!ids.length) return json([], 200, origin);
+      const placeholders = ids.map(() => "?").join(", ");
+      const publicVisitor = !user;
+      const visibility = isAdmin(user) || publicVisitor ? " AND lower(status) IN ('approved', 'published', 'active', 'completed')" : " AND (user_id = ? OR lower(status) IN ('approved', 'published', 'active', 'completed'))";
+      const params = isAdmin(user) || publicVisitor ? ids : [...ids, user.user_id];
+      const rows2 = await env.DB.prepare(`SELECT * FROM case_submissions WHERE id IN (${placeholders})${visibility}`).bind(...params).all();
+      const found = new Map((rows2.results || []).map((row) => [row.id, decodeCaseRow(row)]));
+      return json(ids.map((value) => found.get(value)).filter(Boolean), 200, origin);
+    }
+    if (parts[2] && parts[2] !== "counts" && parts[2] !== "category-counts") {
+      const publicRow = await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(parts[2]).first();
+      const publicStatus = String(publicRow?.status || "").toLowerCase();
+      if (publicRow && ["approved", "published", "active"].includes(publicStatus)) {
+        return json(decodeCaseRow(publicRow), 200, origin);
+      }
+    }
+    const target = requestedUserId(url);
+    if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+    if (parts[2] && parts[2] !== "approved" && parts[2] !== "counts" && parts[2] !== "category-counts") {
+      const row = await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(parts[2]).first();
+      if (!row) return json({ error: "Not found" }, 404, origin);
+      const status = String(row.status || "").toLowerCase();
+      let allowed = isAdmin(user) || row.user_id === user.user_id || ["approved", "published", "active"].includes(status);
+      if (!allowed && status === "completed" && user?.user_id) {
+        const access = await env.DB.prepare(
+          `SELECT 1 AS allowed FROM case_unlocks WHERE case_id = ? AND hero_id = ?
+           UNION ALL
+           SELECT 1 AS allowed FROM case_resolutions WHERE case_id = ? AND hero_id = ?
+           LIMIT 1`
+        ).bind(parts[2], user.user_id, parts[2], user.user_id).first();
+        allowed = Boolean(access);
+      }
+      if (!allowed) return json({ error: "Not found" }, 404, origin);
+      return json(decodeCaseRow(row), 200, origin);
+    }
+    if (parts[2] === "counts") {
+      const countUserId = target || user?.user_id;
+      if (!countUserId) {
+        return json({ total: 0, pending: 0, active_or_completed: 0, rejected: 0 }, 200, origin);
+      }
+      const row = await env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN lower(COALESCE(status, '')) = 'pending' THEN 1 ELSE 0 END) AS pending, SUM(CASE WHEN lower(COALESCE(status, '')) IN ('approved','published','active','completed') THEN 1 ELSE 0 END) AS active_or_completed, SUM(CASE WHEN lower(COALESCE(status, '')) = 'rejected' THEN 1 ELSE 0 END) AS rejected FROM case_submissions WHERE user_id = ?").bind(countUserId).first();
+      return json(row || {}, 200, origin);
+    }
+    if (parts[2] === "category-counts") {
+      const rows2 = await env.DB.prepare("SELECT category, COUNT(*) AS count FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') GROUP BY category").all();
+      const counts = Object.fromEntries((rows2.results || []).filter((row) => row.category).map((row) => [row.category, Number(row.count || 0)]));
+      return json(counts, 200, origin);
+    }
+    const sql = target ? "SELECT * FROM case_submissions WHERE user_id = ? ORDER BY submitted_at DESC" : "SELECT * FROM case_submissions ORDER BY submitted_at DESC";
+    const rows = target ? await env.DB.prepare(sql).bind(target).all() : await env.DB.prepare(sql).all();
+    return json((rows.results || []).map(decodeCaseRow), 200, origin);
+  }
+  if (request.method === "POST" && !parts[2]) {
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    if (!isAdmin(user)) {
+      const suspension = await getActiveSuspension(env, user.user_id);
+      if (suspension) return suspendedActionResponse(origin, suspension);
+    }
+    const body = await readJson(request);
+    const record = pick(body, ["category", "title", "short_description", "country", "city", "urgency", "description", "amount_needed", "currency", "why_help", "deadline", "institute_name", "institute_contact", "institute_address", "payment_method", "account_title", "account_number", "account_iban", "photo_urls", "selfie_url", "video_url", "category_details", "was_free"]);
+    const caseId = body?.id || id();
+    const photoUrls = Array.isArray(record.photo_urls) || record.photo_urls && typeof record.photo_urls === "object" ? JSON.stringify(record.photo_urls) : record.photo_urls || null;
+    const categoryDetails = Array.isArray(record.category_details) || record.category_details && typeof record.category_details === "object" ? JSON.stringify(record.category_details) : record.category_details || null;
+    const freeAttempts = await env.DB.prepare("SELECT was_free, status FROM case_submissions WHERE user_id = ? AND COALESCE(was_free, 0) = 1 ORDER BY submitted_at ASC").bind(user.user_id).all();
+    const freeHistory = freeAttempts.results || [];
+    const lastFreeWasRejected = freeHistory.length === 1 && String(freeHistory[0]?.status || "").toLowerCase() === "rejected";
+    const isFree = freeHistory.length < 2;
+    if (!isFree) {
+      const balance = await getWalletBalance(env, user.user_id);
+      if (balance < 1) {
+        return json({ error: "Insufficient credits. You need 1 credit to submit a case." }, 402, origin);
+      }
+    }
+    await env.DB.prepare(
+      "INSERT INTO case_submissions (id, user_id, category, title, short_description, country, city, urgency, description, amount_needed, currency, why_help, deadline, institute_name, institute_contact, institute_address, payment_method, account_title, account_number, account_iban, photo_urls, selfie_url, video_url, category_details, was_free, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+    ).bind(caseId, user.user_id, record.category || null, record.title || null, record.short_description || null, record.country || null, record.city || null, record.urgency || null, record.description || null, record.amount_needed || null, record.currency || "USD", record.why_help || null, record.deadline || null, record.institute_name || null, record.institute_contact || null, record.institute_address || null, record.payment_method || null, record.account_title || null, record.account_number || null, record.account_iban || null, photoUrls, record.selfie_url || null, record.video_url || null, categoryDetails, isFree ? 1 : 0, now()).run();
+    await syncUserCaseCounters(env, user.user_id);
+    if (!isFree) {
+      await deductCredits(env, user.user_id, 1, "case_submission", `Case "${record.title || caseId}" submission fee`, caseId);
+    }
+    return json({ id: caseId, user_id: user.user_id, ...record, was_free: isFree, credits_charged: isFree ? 0 : 1, free_reason: freeHistory.length === 0 ? "first_case" : isFree ? "second_free_case" : null, status: "pending" }, 201, origin);
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+async function handleHeroesWall(request, env, origin) {
+  if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
+  const url = new URL(request.url);
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 100);
+  const rows = await env.DB.prepare(
+    `SELECT c.id, c.user_id, c.title, c.category, c.currency, c.amount_needed,
+            c.amount_collected, c.submitted_at AS updated_at,
+            COALESCE(
+              NULLIF(c.amount_collected, 0),
+              (SELECT SUM(COALESCE(r.amount_paid, 0)) FROM case_resolutions r
+               WHERE r.case_id = c.id
+                 AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
+                 AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')),
+              c.amount_needed, 0
+            ) AS verified_amount,
+            COALESCE(
+              (SELECT MAX(COALESCE(r.completed_at, r.admin_confirmed_at, r.submitted_at))
+               FROM case_resolutions r
+               WHERE r.case_id = c.id
+                 AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
+                 AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')),
+              c.submitted_at
+            ) AS completed_at
+     FROM case_submissions c
+     WHERE lower(COALESCE(c.status, '')) = 'completed'
+        OR EXISTS (
+          SELECT 1 FROM case_resolutions r
+          WHERE r.case_id = c.id
+            AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
+            AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')
+        )
+     ORDER BY COALESCE(completed_at, c.submitted_at) DESC
+     LIMIT ?`
+  ).bind(limit).all();
+  const completedCases = (rows.results || []).map((row) => ({
+    ...row,
+    amount_collected: Number(row.verified_amount || row.amount_collected || row.amount_needed || 0)
+  }));
+  if (!completedCases.length) return json({ cases: [], metrics: { solved_cases: 0, total_amount: 0, currency: "PKR" } }, 200, origin);
+  for (const caseRow of completedCases) {
+    try {
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO community_posts (id, user_id, display_name, message, created_at)
+         VALUES (?, ?, 'Givethra Heroes', ?, ?)`
+      ).bind(`hero-${caseRow.id}`, caseRow.user_id || null, `Heroes helped complete: ${caseRow.title || "A Givethra case"}`, caseRow.completed_at || caseRow.updated_at || caseRow.submitted_at || now()).run();
+    } catch (error) {
+      console.error("Heroes Wall social post sync failed", error);
+    }
+  }
+  const wallCases = [];
+  for (const caseRow of completedCases) {
+    const postId = `hero-${caseRow.id}`;
+    let post = null;
+    let likes = null;
+    let comments = null;
+    try {
+      [post, likes, comments] = await Promise.all([
+        env.DB.prepare("SELECT id, message, created_at FROM community_posts WHERE id = ?").bind(postId).first(),
+        env.DB.prepare("SELECT COUNT(*) AS count FROM community_post_likes WHERE post_id = ?").bind(postId).first(),
+        env.DB.prepare("SELECT COUNT(*) AS count FROM community_post_comments WHERE post_id = ?").bind(postId).first()
+      ]);
+    } catch (error) {
+      console.error("Heroes Wall social counters unavailable", error);
+    }
+    wallCases.push({
+      ...caseRow,
+      post_id: postId,
+      post_message: post?.message || `Heroes helped complete: ${caseRow.title || "A Givethra case"}`,
+      post_created_at: post?.created_at || caseRow.completed_at || caseRow.updated_at || caseRow.submitted_at,
+      likes_count: Number(likes?.count || 0),
+      comments_count: Number(comments?.count || 0)
+    });
+  }
+  const totalAmount = completedCases.reduce((sum, caseRow) => sum + Math.max(Number(caseRow.verified_amount || caseRow.amount_collected || caseRow.amount_needed || 0), 0), 0);
+  return json({ cases: wallCases, metrics: { solved_cases: completedCases.length, total_amount: totalAmount, currency: completedCases[0]?.currency || "PKR" } }, 200, origin);
+}
+async function signSessionPayload(payload, secret) {
+  if (!secret) return null;
+  const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body = base64UrlEncode(JSON.stringify(payload));
+  const signingInput = `${header}.${body}`;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signingInput));
+  return `givethra.${header}.${body}.${base64UrlEncode(signature)}`;
+}
+async function verifySessionToken(token, secret) {
+  if (!secret || !token?.startsWith("givethra.")) return null;
+  try {
+    const [, header, body, encodedSignature] = token.split(".");
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    const valid = await crypto.subtle.verify("HMAC", key, base64UrlDecode(encodedSignature), new TextEncoder().encode(`${header}.${body}`));
+    if (!valid) return null;
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(body)));
+    if (!payload?.sub || !payload?.email || !Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1e3)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+async function handlePublicFeedback(request, env, user, origin) {
+  const body = await readJson(request);
+  const message = String(body?.message || "").trim();
+  if (!message) return json({ error: "Message is required" }, 400, origin);
+  const userId = user?.user_id || "public";
+  const firstName = user?.full_name?.trim() || "Public Visitor";
+  const feedbackId = id();
+  const createdAt = now();
+  await env.DB.prepare(
+    `INSERT INTO feedbacks (id, user_id, first_name, text_message, status, created_at)
+     VALUES (?, ?, ?, ?, 'approved', ?)`
+  ).bind(feedbackId, userId, firstName, message, createdAt).run();
+  return json({ id: feedbackId, user_id: userId, first_name: firstName, text_message: message, status: "approved", created_at: createdAt }, 201, origin);
+}
+function guestIdentity(request, body = null) {
+  const raw = request.headers.get("X-Guest-ID") || body?.guest_id || "";
+  const normalized = String(raw).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
+  if (!normalized) return null;
+  const suffix = normalized.replace(/[^0-9]/g, "").slice(-6) || normalized.slice(-6);
+  return { id: `guest:${normalized}`, name: `Guest ${suffix}` };
+}
+function publicDisplayName(value, fallback = "User") {
+  const name = String(value || "").trim();
+  if (!name || name.includes("@")) return fallback;
+  return name.slice(0, 120);
+}
+function queueCommunityNotification(ctx, task) {
+  const safeTask = Promise.resolve(task).catch((error) => console.error("Community notification failed:", error));
+  if (ctx?.waitUntil) ctx.waitUntil(safeTask);
+  else ;
+}
+async function insertCommunityNotification(env, ctx, recipientId, actorId, actorName, type, title, message) {
+  if (!recipientId || recipientId === actorId) return;
+  queueCommunityNotification(ctx, env.DB.prepare(
+    `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
+  ).bind(id(), recipientId, type, title, `${publicDisplayName(actorName, "A Givethra member")}: ${message}`, "/community", now()).run());
+}
+async function refreshSupportEligibility(env, userId) {
+  const received = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE user_id = ?").bind(userId).first();
+  const given = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE source_user_id = ?").bind(userId).first();
+  const supportsReceived = Number(received?.count || 0);
+  const supportsGiven = Number(given?.count || 0);
+  const eligibilitySupports = supportsReceived + supportsGiven;
+  const eligible = eligibilitySupports >= 5e3;
+  await env.DB.prepare(
+    "UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = CASE WHEN COALESCE(earnings_eligible, 0) = 1 OR ? >= 5000 THEN 1 ELSE 0 END, eligible_at = CASE WHEN eligible_at IS NULL AND ? >= 5000 THEN ? ELSE eligible_at END, updated_at = ? WHERE user_id = ?"
+  ).bind(supportsReceived, supportsGiven, eligibilitySupports, eligibilitySupports, eligibilitySupports, now(), now(), userId).run();
+  return { supportsReceived, supportsGiven, eligibilitySupports, eligible };
+}
+async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, postId, actorName) {
+  if (!originalUserId || !sourceUserId || originalUserId === sourceUserId) return { added: false, supports: 0, supportEarningsUsd: 0 };
+  const post = await env.DB.prepare("SELECT created_at FROM community_posts WHERE id = ? AND user_id = ?").bind(postId, originalUserId).first();
+  if (!post) return { added: false, supports: 0, supportEarningsUsd: 0, unavailable: true };
+  const existing = await env.DB.prepare("SELECT id FROM user_supports WHERE source_user_id = ? AND post_id = ? LIMIT 1").bind(sourceUserId, postId).first();
+  if (existing) {
+    const current2 = await refreshSupportEligibility(env, originalUserId);
+    return { added: false, supports: current2.supportsReceived, supportEarningsUsd: 0, alreadySupported: true };
+  }
+  const inserted = await env.DB.prepare(
+    "INSERT OR IGNORE INTO user_supports (id, user_id, source_user_id, post_id, created_at) VALUES (?, ?, ?, ?, ?)"
+  ).bind(id(), originalUserId, sourceUserId, postId, now()).run();
+  if (!Number(inserted?.meta?.changes || 0)) return { added: false, supports: 0, supportEarningsUsd: 0, alreadySupported: true };
+  const targetEligibility = await refreshSupportEligibility(env, originalUserId);
+  const supports = targetEligibility.supportsReceived;
+  const supportsGiven = targetEligibility.supportsGiven;
+  const eligibilitySupports = targetEligibility.eligibilitySupports;
+  const current = await env.DB.prepare("SELECT earnings_eligible, eligible_at FROM users WHERE user_id = ?").bind(originalUserId).first();
+  const eligible = Number(current?.earnings_eligible || 0) === 1 || targetEligibility.eligible;
+  const eligibleAt = Number(current?.earnings_eligible || 0) === 1 ? current?.eligible_at : eligible ? now() : null;
+  const postSupportRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE post_id = ? AND user_id = ?").bind(postId, originalUserId).first();
+  const postSupports = Number(postSupportRow?.count || 0);
+  const payableSupports = eligible ? Math.min(postSupports, 1e3) : 0;
+  const supportEarningsUsd = Number((payableSupports / 1e4).toFixed(4));
+  await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, earnings_eligible = ?, eligible_at = ?, support_earnings_usd = ?, updated_at = ? WHERE user_id = ?").bind(supports, supportsGiven, eligibilitySupports, eligible ? 1 : 0, eligibleAt, supportEarningsUsd, now(), originalUserId).run();
+  await refreshSupportEligibility(env, sourceUserId);
+  await insertCommunityNotification(env, ctx, originalUserId, sourceUserId, actorName, "new_support", "Someone supported your post", `You received Support. Total Supports: ${supports}`);
+  return { added: true, supports, supportsGiven, eligibilitySupports, earningsEligible: eligible, eligibleAt, supportEarningsUsd };
+}
+async function handleCommunityPosts(request, env, user, url, parts, origin, ctx) {
+  if (request.method === "GET" && parts.length === 3) {
+    const guest = user ? null : guestIdentity(request);
+    const actorId = user?.user_id || guest?.id || "";
+    const tab = url.searchParams.get("tab") || "for-you";
+    let filter = "";
+    const binds = [actorId, actorId, actorId];
+    if (tab === "my-heroes" && user) {
+      filter = "WHERE cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)";
+      binds.push(user.user_id);
+    }
+    if (tab === "my-posts" && user) {
+      filter = "WHERE cp.user_id = ?";
+      binds.push(user.user_id);
+    }
+    const engagementScore = "(COALESCE(lc.likes_count,0) + COALESCE(cc.comments_count,0) * 2 + COALESCE(rc.repost_count,0) * 3 + COALESCE(sc.support_count,0) * 3)";
+    const heroBoost = "(CASE WHEN cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 100 ELSE 0 END)";
+    const newCreatorBoost = "(CASE WHEN julianday('now') - julianday(COALESCE(u.signed_up_at, cp.created_at)) <= 30 THEN 30 ELSE 0 END)";
+    const freshnessBoost = "MAX(0, 20 - CAST((julianday('now') - julianday(cp.created_at)) * 2 AS INTEGER))";
+    const orderBy = tab === "latest" ? "cp.created_at DESC, cp.id DESC" : tab === "most-supported" ? "COALESCE(sc.support_count, 0) DESC, cp.created_at DESC, cp.id DESC" : tab === "my-posts" ? "cp.created_at DESC, cp.id DESC" : tab === "my-heroes" ? `${heroBoost} DESC, ${engagementScore} DESC, cp.created_at DESC` : `${engagementScore} + ${heroBoost} + ${newCreatorBoost} + ${freshnessBoost} DESC, cp.created_at DESC`;
+    if (tab === "for-you" || tab === "my-heroes") binds.push(user?.user_id || actorId);
+    const posts = await env.DB.prepare(
+      `WITH like_counts AS (SELECT post_id, COUNT(*) AS likes_count, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) AS is_liked FROM community_post_likes GROUP BY post_id),
+       comment_counts AS (SELECT post_id, COUNT(*) AS comments_count FROM community_post_comments GROUP BY post_id),
+       repost_counts AS (SELECT repost_id, COUNT(*) AS repost_count FROM community_posts WHERE repost_id IS NOT NULL GROUP BY repost_id),
+       support_counts AS (SELECT post_id, COUNT(*) AS support_count, MAX(CASE WHEN source_user_id = ? THEN 1 ELSE 0 END) AS supported_by_me FROM user_supports GROUP BY post_id)
+       SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, u.signed_up_at AS user_created_at, p.avatar_url,
+       COALESCE(lc.likes_count,0) AS likes_count, COALESCE(cc.comments_count,0) AS comments_count, COALESCE(lc.is_liked,0) AS is_liked,
+       COALESCE(rc.repost_count,0) AS repost_count,
+       COALESCE(sc.support_count,0) AS support_count, COALESCE(sc.supported_by_me,0) AS supported_by_me,
+       CASE WHEN cp.user_id IS NOT NULL AND cp.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 1 ELSE 0 END AS is_following
+       FROM community_posts cp LEFT JOIN users u ON cp.user_id=u.user_id LEFT JOIN profiles p ON p.user_id=cp.user_id
+       LEFT JOIN like_counts lc ON lc.post_id=cp.id LEFT JOIN comment_counts cc ON cc.post_id=cp.id LEFT JOIN repost_counts rc ON rc.repost_id=cp.id LEFT JOIN support_counts sc ON sc.post_id=cp.id
+       ${filter} ORDER BY ${orderBy} LIMIT 500`
+    ).bind(...binds).all();
+    return json((posts.results || []).map((post) => ({ ...post, is_guest: !post.user_id, display_name: publicDisplayName(post.user_name, publicDisplayName(post.display_name, "User")), is_verified: post.user_kyc_status === "approved", is_new_creator: Boolean(post.user_created_at && Date.now() - new Date(post.user_created_at).getTime() <= 30 * 864e5), likes_count: Number(post.likes_count || 0), comments_count: Number(post.comments_count || 0), repost_count: Number(post.repost_count || 0), is_liked: Boolean(post.is_liked), is_following: Boolean(post.is_following) })), 200, origin);
+  }
+  if (request.method === "POST" && parts.length === 3) {
+    const body = await readJson(request);
+    const message = String(body?.message || "").trim();
+    const repostId = body?.repost_id ? String(body.repost_id) : null;
+    if (!message && !repostId) return json({ error: "Message or repost ID required" }, 400, origin);
+    const guest = user ? null : guestIdentity(request, body);
+    if (!user && !guest) return json({ error: "Guest identity is required" }, 400, origin);
+    const postId = id();
+    const displayName = user ? publicDisplayName(user.full_name, "User") : guest.name;
+    let finalMessage = message;
+    if (repostId) {
+      const original = await env.DB.prepare("SELECT display_name, message FROM community_posts WHERE id = ?").bind(repostId).first();
+      if (!original) return json({ error: "Original post not found" }, 404, origin);
+      finalMessage = `${body?.repost_comment ? String(body.repost_comment).trim() + " \u2014 " : ""}Reposted from ${publicDisplayName(original.display_name, "User")}`;
+    }
+    await env.DB.prepare(`INSERT INTO community_posts (id,user_id,display_name,message,role,repost_id,repost_comment,created_at) VALUES (?,?,?,?,?,?,?,?)`).bind(postId, user?.user_id || guest.id, displayName, finalMessage, body?.role || null, repostId, body?.repost_comment || null, now()).run();
+    let supportResult = { added: false, supports: 0, creditsEarned: 0 };
+    if (repostId) {
+      const original = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(repostId).first();
+      if (original?.user_id) supportResult = await recordCommunitySupport(env, ctx, original.user_id, user?.user_id || guest.id, repostId, displayName);
+    }
+    return json({ id: postId, user_id: user?.user_id || guest.id, display_name: displayName, message: finalMessage, repost_id: repostId, is_guest: !user, likes_count: 0, comments_count: 0, repost_count: 0, support_added: supportResult.added, supports_received: supportResult.supports, credits_earned: supportResult.creditsEarned }, 201, origin);
+  }
+  if (request.method === "POST" && parts[3] === "pin") {
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    const body = await readJson(request);
+    const postId = body?.post_id;
+    const post = await env.DB.prepare("SELECT user_id, is_pinned FROM community_posts WHERE id = ?").bind(postId).first();
+    if (!post || post.user_id !== user.user_id) return json({ error: "You can only pin your own post" }, 403, origin);
+    const next = post.is_pinned ? 0 : 1;
+    await env.DB.prepare("UPDATE community_posts SET is_pinned = 0 WHERE user_id = ?").bind(user.user_id).run();
+    await env.DB.prepare("UPDATE community_posts SET is_pinned = ? WHERE id = ?").bind(next, postId).run();
+    return json({ success: true, is_pinned: Boolean(next) }, 200, origin);
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+async function handleCommunityLikes(request, env, user, url, parts, origin, ctx) {
+  const postId = parts[3];
+  if (!postId) return json({ error: "Post ID required" }, 400, origin);
+  if (request.method === "GET") {
+    const likes = await env.DB.prepare(
+      "SELECT * FROM community_post_likes WHERE post_id = ?"
+    ).bind(postId).all();
+    return json(likes.results || [], 200, origin);
+  }
+  if (request.method === "POST") {
+    const guest = user ? null : guestIdentity(request);
+    const actorId = user?.user_id || guest?.id;
+    if (!actorId) return json({ error: "Guest identity is required" }, 400, origin);
+    const post = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(postId).first();
+    const actorName = user ? publicDisplayName(user.full_name, "User") : guest.name;
+    const existing = await env.DB.prepare(
+      "SELECT id FROM community_post_likes WHERE post_id = ? AND user_id = ?"
+    ).bind(postId, actorId).first();
+    if (existing) {
+      await env.DB.prepare(
+        "DELETE FROM community_post_likes WHERE post_id = ? AND user_id = ?"
+      ).bind(postId, actorId).run();
+      return json({ liked: false, post_id: postId }, 200, origin);
+    } else {
+      const likeId = id();
+      await env.DB.prepare(
+        "INSERT INTO community_post_likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)"
+      ).bind(likeId, postId, actorId, now()).run();
+      await insertCommunityNotification(
+        env,
+        ctx,
+        post?.user_id,
+        actorId,
+        actorName,
+        "like",
+        "New Community Like",
+        "liked your post"
+      );
+      return json({ liked: true, post_id: postId, id: likeId }, 201, origin);
+    }
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+async function handleCommunityComments(request, env, user, url, parts, origin, ctx) {
+  const postId = parts[3];
+  if (!postId) return json({ error: "Post ID required" }, 400, origin);
+  if (request.method === "GET") {
+    const comments = await env.DB.prepare(
+      `SELECT cc.*,
+        CASE WHEN cc.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cc.user_id, 7) ELSE u.full_name END as user_name
+       FROM community_post_comments cc
+       LEFT JOIN users u ON cc.user_id = u.user_id
+       WHERE cc.post_id = ?
+       ORDER BY cc.created_at ASC`
+    ).bind(postId).all();
+    return json((comments.results || []).map((comment) => ({
+      ...comment,
+      user_name: publicDisplayName(comment.user_name, String(comment.user_id || "").startsWith("guest:") ? `Guest ${String(comment.user_id).slice(-6)}` : "User")
+    })), 200, origin);
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const guest = user ? null : guestIdentity(request, body);
+    const actorId = user?.user_id || guest?.id;
+    if (!actorId) return json({ error: "Guest identity is required" }, 400, origin);
+    const commentText = String(body?.comment || "").trim();
+    if (!commentText) return json({ error: "Comment is required" }, 400, origin);
+    const post = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(postId).first();
+    const actorName = user ? publicDisplayName(user.full_name, "User") : guest.name;
+    const commentId = id();
+    await env.DB.prepare(
+      "INSERT INTO community_post_comments (id, post_id, user_id, comment, created_at) VALUES (?, ?, ?, ?, ?)"
+    ).bind(commentId, postId, actorId, commentText, now()).run();
+    const newComment = await env.DB.prepare(
+      `SELECT cc.*,
+        CASE WHEN cc.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cc.user_id, 7) ELSE u.full_name END as user_name
+       FROM community_post_comments cc
+       LEFT JOIN users u ON cc.user_id = u.user_id
+       WHERE cc.id = ?`
+    ).bind(commentId).first();
+    await insertCommunityNotification(
+      env,
+      ctx,
+      post?.user_id,
+      actorId,
+      actorName,
+      "comment",
+      "New Community Comment",
+      `commented: "${commentText.slice(0, 80)}${commentText.length > 80 ? "..." : ""}"`
+    );
+    return json(newComment ? {
+      ...newComment,
+      user_name: publicDisplayName(newComment.user_name, guest ? guest.name : "User")
+    } : { id: commentId, post_id: postId, user_id: actorId, user_name: actorName, comment: commentText, created_at: now() }, 201, origin);
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+async function handleFollow(request, env, user, url, parts, origin, ctx) {
+  const body = await readJson(request).catch(() => ({}));
+  const targetId = body?.target_user_id || url.searchParams.get("target") || url.searchParams.get("user");
+  if (request.method === "GET" && parts[2] === "list") {
+    const userId = url.searchParams.get("user") || user?.user_id;
+    const type = url.searchParams.get("type") === "requesters" ? "requesters" : "heroes";
+    if (!userId) return json([], 200, origin);
+    const where = type === "requesters" ? "f.follower_id = ?" : "f.following_id = ?";
+    const selected = type === "requesters" ? "f.follower_id" : "f.following_id";
+    const rows = await env.DB.prepare(`SELECT f.created_at, u.user_id, COALESCE(p.full_name, u.full_name, u.email, 'User') AS full_name, p.avatar_url, u.kyc_status FROM follows f LEFT JOIN users u ON u.user_id = ${selected} LEFT JOIN profiles p ON p.user_id = ${selected} WHERE ${where} ORDER BY f.created_at DESC`).bind(userId).all();
+    return json((rows.results || []).map((row) => ({ ...row, is_verified: String(row.kyc_status || "").toLowerCase() === "approved" })), 200, origin);
+  }
+  if (!targetId) return json({ error: "Target user ID required" }, 400, origin);
+  if (request.method === "GET") {
+    if (parts[2] === "status") {
+      const row = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id, targetId).first() : null;
+      return json({ isFollowing: Boolean(row) }, 200, origin);
+    }
+    const followers = await env.DB.prepare("SELECT COUNT(*) AS count FROM follows WHERE following_id=?").bind(targetId).first();
+    const following = await env.DB.prepare("SELECT COUNT(*) AS count FROM follows WHERE follower_id=?").bind(targetId).first();
+    return json({ followers: Number(followers?.count || 0), following: Number(following?.count || 0) }, 200, origin);
+  }
+  if (!user) return json({ error: "Authentication required" }, 401, origin);
+  if (parts[2] === "requester" && request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM follows WHERE follower_id = ? AND following_id = ?").bind(targetId, user.user_id).run();
+    return json({ success: true, removed: targetId }, 200, origin);
+  }
+  if (targetId === user.user_id) return json({ error: "Cannot follow yourself" }, 400, origin);
+  if (request.method === "POST") {
+    await env.DB.prepare("INSERT OR IGNORE INTO follows (id,follower_id,following_id,created_at) VALUES (?,?,?,?)").bind(id(), user.user_id, targetId, now()).run();
+    await insertCommunityNotification(env, ctx, targetId, user.user_id, user.full_name, "new_follower", "New Hero", "became your Hero");
+    return json({ success: true, isFollowing: true }, 201, origin);
+  }
+  if (request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id, targetId).run();
+    return json({ success: true, isFollowing: false }, 200, origin);
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+async function handleNotifications(request, env, user, url, parts, origin) {
+  const requested = url.searchParams.get("user_id") || user?.user_id;
+  if (!requested || !canAccessUser(user, requested)) {
+    return json({ error: "Unauthorized" }, 403, origin);
+  }
+  if (parts[2] === "unread-count" && request.method === "GET") {
+    const row = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND (is_read = 0 OR is_read IS NULL)"
+    ).bind(requested).first();
+    return json({ count: Number(row?.count || 0) }, 200, origin);
+  }
+  if (request.method === "GET") {
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 100), 1), 500);
+    const rows = await env.DB.prepare(
+      "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?"
+    ).bind(requested, limit).all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const notification = pick(body, ["user_id", "type", "title", "message", "link", "is_read"]);
+    if (!notification.user_id || !notification.title) {
+      return json({ error: "user_id and title are required" }, 400, origin);
+    }
+    const nid = id();
+    await env.DB.prepare(
+      `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(nid, notification.user_id, notification.type || null, notification.title, notification.message || null, notification.link || null, notification.is_read ? 1 : 0, now()).run();
+    return json({ id: nid, ...notification, created_at: now() }, 201, origin);
+  }
+  if (parts[2] === "mark-read" && request.method === "PUT") {
+    await env.DB.prepare(
+      "UPDATE notifications SET is_read = 1 WHERE user_id = ?"
+    ).bind(requested).run();
+    return json({ updated: true, user_id: requested }, 200, origin);
+  }
+  if (parts[2] === "clear" && request.method === "DELETE") {
+    await env.DB.prepare(
+      "DELETE FROM notifications WHERE user_id = ?"
+    ).bind(requested).run();
+    return json({ deleted: true, user_id: requested }, 200, origin);
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+async function synchronizeCompletedCase(env, resolutionId) {
+  const resolution = await env.DB.prepare(
+    "SELECT r.case_id, r.hero_id, r.seeker_id, r.paid_to, r.status, r.admin_confirmed, c.title AS case_title FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id WHERE r.id = ?"
+  ).bind(resolutionId).first();
+  if (!resolution?.case_id) return null;
+  const normalizedStatus = String(resolution.status || "").trim().toLowerCase();
+  const isApproved = ["completed", "approved", "seeker_confirmed"].includes(normalizedStatus) && [1, "1", true, "true", "yes"].includes(resolution.admin_confirmed);
+  if (!isApproved) return null;
+  const totals = await env.DB.prepare(
+    `SELECT c.user_id, c.amount_needed, c.amount_collected,
+            COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0))
+                      FROM case_resolutions r
+                      WHERE r.case_id = c.id
+                        AND lower(COALESCE(r.status, '')) IN ('completed', 'approved', 'seeker_confirmed')
+                        AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true', 'yes')), 0) AS verified_total
+     FROM case_submissions c WHERE c.id = ?`
+  ).bind(resolution.case_id).first();
+  if (!totals) return null;
+  const verifiedTotal = Math.max(Number(totals.verified_total || 0), Number(totals.amount_collected || 0));
+  const directPayment = String(resolution.paid_to || "").toLowerCase() !== "givethra";
+  const goalReached = Number(totals.amount_needed || 0) <= 0 || verifiedTotal >= Number(totals.amount_needed || 0);
+  const nextStatus = directPayment && goalReached ? "completed" : void 0;
+  if (nextStatus) {
+    await env.DB.prepare(
+      "UPDATE case_submissions SET amount_collected = ?, status = ? WHERE id = ?"
+    ).bind(verifiedTotal, nextStatus, resolution.case_id).run();
+  } else {
+    await env.DB.prepare(
+      "UPDATE case_submissions SET amount_collected = ? WHERE id = ?"
+    ).bind(verifiedTotal, resolution.case_id).run();
+  }
+  if (totals.user_id) await syncUserCaseCounters(env, totals.user_id);
+  if (nextStatus === "completed") {
+    const title = resolution.case_title || "your case";
+    if (resolution.hero_id) {
+      await sendNotification(env, resolution.hero_id, "help_completed", "Your help was verified \u2705", `Your help for \u201C${title}\u201D was verified and completed.`, `/cases/${resolution.case_id}`);
+    }
+    if (totals.user_id && totals.user_id !== resolution.hero_id) {
+      await sendNotification(env, totals.user_id, "help_completed", "Your case is complete \u2705", `Your case \u201C${title}\u201D has received verified help and is now complete.`, `/cases/${resolution.case_id}`);
+    }
+  }
+  return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "open" };
+}
+async function handleRequest(request, env, ctx) {
+  const url = new URL(request.url);
+  const origin = url.origin;
+  const parts = pathParts(url);
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders(origin)
+    });
+  }
+  if (parts[0] === "health" && request.method === "GET") {
+    return json({ status: "ok", timestamp: now() }, 200, origin);
+  }
+  if (parts[0] === "auth" && parts[1] === "google" && request.method === "POST") {
+    try {
+      const body = await readJson(request);
+      const configuredClientId = googleClientId(env);
+      if (!configuredClientId) return json({ error: "Google authentication is not configured", code: "AUTH_NOT_CONFIGURED" }, 500, origin);
+      const identity = await verifyGoogleCredential(body?.credential || body?.id_token, configuredClientId);
+      if (!identity) return json({ error: "Google credential could not be verified for this website", code: "GOOGLE_CREDENTIAL_INVALID" }, 401, origin);
+      const account = await findOrCreateUser(env, identity);
+      const token = await signSession(account, env.JWT_SECRET);
+      if (!token) return json({ error: "Authentication is not configured", code: "AUTH_NOT_CONFIGURED" }, 500, origin);
+      return json({ token, user: account }, 200, origin);
+    } catch (error) {
+      console.error("Google authentication reconciliation failed", error);
+      return json({ error: "Authentication or database request failed", code: "AUTH_RECONCILIATION_FAILED" }, 500, origin);
+    }
+  }
+  if (parts[0] === "verify" && request.method === "GET") {
+    const user2 = await authenticate(request, env, googleClientId(env));
+    if (!user2) return json({ valid: false }, 401, origin);
+    return json({ valid: true, user: user2 }, 200, origin);
+  }
+  if (url.pathname.startsWith("/uploads/")) {
+    const key = url.pathname.slice(9);
+    try {
+      const object = await env.UPLOADS.get(key);
+      if (!object) return new Response("File not found", { status: 404 });
+      const headers = new Headers({
+        "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+        "Cache-Control": "public, max-age=31536000",
+        "X-Content-Type-Options": "nosniff"
+      });
+      if (url.searchParams.get("download") === "1") {
+        const fileName = decodeURIComponent(key.split("/").pop() || "download").replace(/[\\r\\n\\\"]+/g, "_").slice(0, 180) || "download";
+        headers.set("Content-Disposition", `attachment; filename="${fileName}"`);
+      }
+      return new Response(object.body, { headers });
+    } catch {
+      return new Response("File not found", { status: 404 });
+    }
+  }
+  if (env.ASSETS && parts[0] !== "api" && request.method === "GET") {
+    return env.ASSETS.fetch(request);
+  }
+  if (parts[0] === "api" && parts[1] === "dreams" && request.method === "GET") {
+    return handleDreams(request, env, null, url, parts, origin);
+  }
+  if (parts[0] === "api" && parts[1] === "dream-payment-accounts" && request.method === "GET") {
+    return handleDreamPaymentAccounts(request, env, null, parts, origin);
+  }
+  if (parts[0] === "api" && parts[1] === "heroes-wall") {
+    return handleHeroesWall(request, env, origin);
+  }
+  if (parts[0] === "api" && parts[1] === "feedbacks" && request.method === "GET" && !url.searchParams.get("case_id") && !url.searchParams.get("user_id")) {
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 50), 1), 500);
+    const rows = await env.DB.prepare(
+      "SELECT f.*, u.full_name as user_name, c.title as case_title, c.status as case_status FROM feedbacks f LEFT JOIN users u ON f.user_id = u.user_id LEFT JOIN case_submissions c ON c.id = f.case_id WHERE lower(COALESCE(c.status, '')) = 'completed' AND lower(COALESCE(f.status, '')) = 'approved' ORDER BY f.created_at DESC LIMIT ?"
+    ).bind(limit).all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (parts[0] === "api" && parts[1] === "feedback-likes" && request.method === "GET") {
+    const rows = await env.DB.prepare("SELECT * FROM feedback_likes").all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (parts[0] === "api" && parts[1] === "feedback-comments" && request.method === "GET") {
+    const rows = await env.DB.prepare("SELECT fc.*, u.full_name as user_name FROM feedback_comments fc LEFT JOIN users u ON fc.user_id = u.user_id").all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (parts[0] === "api" && parts[1] === "follow") {
+    const followUser = await authenticate(request, env, googleClientId(env));
+    return handleFollow(request, env, followUser, url, parts, origin, ctx);
+  }
+  if (parts[0] === "api" && parts[1] === "community") {
+    const user2 = await authenticate(request, env, googleClientId(env));
+    if (parts[2] === "mark-read" && request.method === "PUT") {
+      if (!user2) return json({ error: "Authentication required" }, 401, origin);
+      await env.DB.prepare(
+        "UPDATE users SET last_community_visit = ?, updated_at = ? WHERE user_id = ?"
+      ).bind(now(), now(), user2.user_id).run();
+      return json({ updated: true, user_id: user2.user_id }, 200, origin);
+    }
+    if (parts[2] === "posts" && parts.length === 3 && request.method === "GET") {
+      return handleCommunityPosts(request, env, user2, url, parts, origin, ctx);
+    }
+    if (parts[2] === "posts" && parts.length === 3 && request.method === "POST") {
+      return handleCommunityPosts(request, env, user2, url, parts, origin, ctx);
+    }
+    if (parts[2] === "posts" && parts[4] === "likes") {
+      return handleCommunityLikes(request, env, user2, url, parts, origin, ctx);
+    }
+    if (parts[2] === "posts" && parts[4] === "comments") {
+      return handleCommunityComments(request, env, user2, url, parts, origin, ctx);
+    }
+  }
+  const user = await authenticate(request, env, googleClientId(env));
+  if (!user && parts[0] !== "api") {
+    return json({ error: "Authentication required" }, 401, origin);
+  }
+  if (parts[0] === "api") {
+    if (parts[1] === "dream-participations" || parts[1] === "admin" && ["dreams", "dream-participations", "dream-payment-accounts"].includes(parts[2])) {
+      return handleDreams(request, env, user, url, parts, origin);
+    }
+    if (parts[1] === "earnings" && parts[2] === "me" && request.method === "GET") {
+      if (!user) return json({ error: "Authentication required" }, 401, origin);
+      return json(await getEarningsSummary(env, user.user_id), 200, origin);
+    }
+    if (parts[1] === "donations") {
+      if (request.method === "GET" && parts[2] === "summary") {
+        const target = user.user_id;
+        const totals = await env.DB.prepare(`SELECT
+          COALESCE((SELECT SUM(amount) FROM donations WHERE user_id = ? AND status IN ('approved','completed')), 0) AS total_contributed,
+          COALESCE((SELECT SUM(amount) FROM donations WHERE user_id = ? AND status = 'pending'), 0) AS pending_amount,
+          COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'debit'), 0) AS amount_used,
+          COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'credit'), 0) - COALESCE((SELECT SUM(amount) FROM contribution_ledger WHERE user_id = ? AND entry_type = 'debit'), 0) AS available_balance,
+          COALESCE((SELECT SUM(amount_paid) FROM case_resolutions WHERE hero_id = ? AND lower(COALESCE(status, '')) IN ('approved','completed') AND lower(COALESCE(paid_to, 'institute')) <> 'givethra'), 0) AS direct_help,
+          COALESCE((SELECT SUM(amount_paid) FROM case_resolutions WHERE hero_id = ? AND lower(COALESCE(status, '')) IN ('approved','completed') AND lower(COALESCE(paid_to, '')) = 'givethra'), 0) AS contribution_help`).bind(target, target, target, target, target, target, target).first();
+        return json({ total_contributed: Number(totals?.total_contributed || 0), pending_amount: Number(totals?.pending_amount || 0), amount_used: Number(totals?.amount_used || 0), available_balance: Math.max(0, Number(totals?.available_balance || 0)), direct_help: Number(totals?.direct_help || 0), contribution_help: Number(totals?.contribution_help || 0) }, 200, origin);
+      }
+      if (request.method === "GET") {
+        const rows = await env.DB.prepare("SELECT * FROM donations WHERE user_id = ? ORDER BY submitted_at DESC").bind(user.user_id).all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const amount = Number(body?.amount);
+        const frequency = String(body?.frequency || "once").toLowerCase();
+        const method = String(body?.payment_method || "").trim();
+        const reference = String(body?.payment_reference || "").trim();
+        if (!Number.isFinite(amount) || amount <= 0 || amount > 1e7) return json({ error: "Enter a valid contribution amount" }, 400, origin);
+        if (!["once", "monthly"].includes(frequency)) return json({ error: "Invalid contribution frequency" }, 400, origin);
+        if (!method || !reference) return json({ error: "Payment method and reference are required" }, 400, origin);
+        const donationId = id();
+        const submittedAt = now();
+        await env.DB.prepare(`INSERT INTO donations (id,user_id,amount,currency,frequency,payment_method,payment_reference,proof_url,status,submitted_at) VALUES (?,?,?,?,?,?,?,?, 'pending',?)`).bind(donationId, user.user_id, amount, String(body?.currency || "PKR"), frequency, method, reference, body?.proof_url || null, submittedAt).run();
+        await env.DB.prepare(`INSERT INTO contribution_status_history (id,donation_id,from_status,to_status,note,changed_at,changed_by) VALUES (?,?,?,?,?,?,?)`).bind(id(), donationId, null, "pending", "Contribution submitted for verification", submittedAt, user.user_id).run();
+        return json(await env.DB.prepare("SELECT * FROM donations WHERE id = ?").bind(donationId).first(), 201, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "admin" && parts[2] === "donations") {
+      if (!isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
+      if (request.method === "GET") {
+        const rows = await env.DB.prepare("SELECT d.*, COALESCE(p.full_name, u.full_name, u.email) AS donor_name, u.email AS donor_email FROM donations d LEFT JOIN users u ON u.user_id = d.user_id LEFT JOIN profiles p ON p.user_id = d.user_id ORDER BY CASE d.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, d.submitted_at DESC").all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "PUT" && parts[3]) {
+        const donation = await env.DB.prepare("SELECT * FROM donations WHERE id = ?").bind(parts[3]).first();
+        if (!donation) return json({ error: "Donation not found" }, 404, origin);
+        const body = await readJson(request);
+        const nextStatus = String(body?.status || "").toLowerCase();
+        if (!["approved", "rejected", "completed"].includes(nextStatus)) return json({ error: "Invalid donation status" }, 400, origin);
+        if (donation.status === "approved" && nextStatus === "rejected") return json({ error: "Approved contributions cannot be rejected" }, 409, origin);
+        const existingCredit = await env.DB.prepare("SELECT id FROM contribution_ledger WHERE donation_id = ? AND entry_type = 'credit' LIMIT 1").bind(donation.id).first();
+        if (!existingCredit && ["approved", "completed"].includes(nextStatus)) {
+          await env.DB.prepare("INSERT INTO contribution_ledger (id,donation_id,user_id,entry_type,amount,currency,note,created_at,created_by) VALUES (?,?,?,?,?,?,?,?,?)").bind(id(), donation.id, donation.user_id, "credit", Number(donation.amount), donation.currency, "Approved community contribution", now(), user.user_id).run();
+        }
+        const reviewedAt = now();
+        await env.DB.prepare("UPDATE donations SET status = ?, admin_notes = ?, rejection_reason = ?, reviewed_at = ?, reviewed_by = ?, completed_at = ? WHERE id = ?").bind(nextStatus, body?.admin_notes || null, nextStatus === "rejected" ? String(body?.rejection_reason || "Not approved") : null, reviewedAt, user.user_id, nextStatus === "completed" ? reviewedAt : donation.completed_at, donation.id).run();
+        await env.DB.prepare("INSERT INTO contribution_status_history (id,donation_id,from_status,to_status,note,changed_at,changed_by) VALUES (?,?,?,?,?,?,?)").bind(id(), donation.id, donation.status, nextStatus, body?.admin_notes || null, reviewedAt, user.user_id).run();
+        return json(await env.DB.prepare("SELECT * FROM donations WHERE id = ?").bind(donation.id).first(), 200, origin);
+      }
+    }
+    if (parts[1] === "admin" && parts[2] === "contribution-spending") {
+      if (!isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
+      if (request.method === "GET") {
+        const rows = await env.DB.prepare("SELECT s.*, c.title AS case_title, c.amount_needed, c.status AS case_status FROM contribution_spending s LEFT JOIN case_submissions c ON c.id = s.case_id ORDER BY s.created_at DESC").all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const caseId = String(body?.case_id || "").trim();
+        const amount = Number(body?.amount);
+        if (!caseId || !Number.isFinite(amount) || amount <= 0) return json({ error: "Case and a valid amount are required" }, 400, origin);
+        const approvedCase = await env.DB.prepare("SELECT id, title, status, amount_needed FROM case_submissions WHERE id = ? AND lower(status) IN ('approved','published','active','open','in_progress')").bind(caseId).first();
+        if (!approvedCase) return json({ error: "Only an approved active case can receive contribution funds" }, 409, origin);
+        const balanceRow = await env.DB.prepare("SELECT COALESCE(SUM(CASE WHEN entry_type='credit' THEN amount ELSE -amount END),0) AS balance FROM contribution_ledger").first();
+        const balance = Number(balanceRow?.balance || 0);
+        if (amount > balance) return json({ error: "Contribution balance is insufficient" }, 409, origin);
+        const spendId = id();
+        const timestamp = now();
+        await env.DB.batch([
+          env.DB.prepare("INSERT INTO contribution_ledger (id,case_id,entry_type,amount,currency,note,created_at,created_by) VALUES (?,?,?,?,?,?,?,?)").bind(id(), caseId, "debit", amount, "PKR", `Allocated to ${approvedCase.title || caseId}`, timestamp, user.user_id),
+          env.DB.prepare("INSERT INTO contribution_spending (id,case_id,amount,currency,status,admin_notes,created_at,created_by,completed_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(spendId, caseId, amount, "PKR", "completed", body?.admin_notes || null, timestamp, user.user_id, timestamp)
+        ]);
+        return json(await env.DB.prepare("SELECT * FROM contribution_spending WHERE id = ?").bind(spendId).first(), 201, origin);
+      }
+    }
+    if (parts[1] === "profiles") {
+      return handleProfile(request, env, user, parts, origin);
+    }
+    if (parts[1] === "kyc-submissions") {
+      return handleKyc(request, env, user, url, parts, origin);
+    }
+    if (parts[1] === "cases") {
+      return handleCases(request, env, user, url, parts, origin);
+    }
+    if (parts[1] === "notifications") {
+      return handleNotifications(request, env, user, url, parts, origin);
+    }
+    if (parts[1] === "user-supports" && parts[2] && request.method === "GET") {
+      const target = String(parts[2]);
+      if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+      const [userRow, receivedRow, givenRow] = await Promise.all([
+        env.DB.prepare("SELECT COALESCE(supports_count, 0) AS storedSupports, COALESCE(supports_given, 0) AS storedSupportsGiven, COALESCE(eligibility_supports, 0) AS storedEligibility, COALESCE(credits_from_supports, 0) AS storedCredits FROM users WHERE user_id = ?").bind(target).first(),
+        env.DB.prepare("SELECT COUNT(*) AS supports FROM user_supports WHERE user_id = ?").bind(target).first(),
+        env.DB.prepare("SELECT COUNT(*) AS supports FROM user_supports WHERE source_user_id = ?").bind(target).first()
+      ]);
+      const supports = Math.max(Number(userRow?.storedSupports || 0), Number(receivedRow?.supports || 0));
+      const creditsFromSupports = Math.max(Number(userRow?.storedCredits || 0), Math.floor(supports / 100));
+      const supportsGiven = Number(givenRow?.supports || 0);
+      const eligibilitySupports = supports + supportsGiven;
+      const earningsEligible = eligibilitySupports >= 5e3;
+      const supportEarningsPkr = earningsEligible ? Math.floor((eligibilitySupports - 5e3) / 1e3) * 100 : 0;
+      if (supports !== Number(userRow?.storedSupports || 0) || supportsGiven !== Number(userRow?.storedSupportsGiven || 0) || eligibilitySupports !== Number(userRow?.storedEligibility || 0) || creditsFromSupports !== Number(userRow?.storedCredits || 0)) {
+        await env.DB.prepare("UPDATE users SET supports_count = ?, supports_given = ?, eligibility_supports = ?, credits_from_supports = ?, earnings_eligible = CASE WHEN ? >= 5000 THEN 1 ELSE COALESCE(earnings_eligible, 0) END, updated_at = ? WHERE user_id = ?").bind(supports, supportsGiven, eligibilitySupports, creditsFromSupports, eligibilitySupports, now(), target).run();
+      }
+      return json({ user_id: target, supports, creditsFromSupports, supportsGiven, eligibilitySupports, earningsEligible, supportEarningsPkr }, 200, origin);
+    }
+    if (parts[1] === "wallets" && parts[2]) {
+      if (request.method === "GET") {
+        if (!canAccessUser(user, parts[2])) return json({ error: "Forbidden" }, 403, origin);
+        const wallet = await env.DB.prepare("SELECT * FROM wallets WHERE user_id = ?").bind(parts[2]).first();
+        return json(wallet || { user_id: parts[2], balance: 0 }, 200, origin);
+      }
+      if (request.method === "PUT") {
+        if (!user || !isAdmin(user)) return json({ error: "Only administrators can adjust wallet balances" }, 403, origin);
+        const body = await readJson(request);
+        const balance = Number(body?.balance || 0);
+        await env.DB.prepare(
+          "INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = excluded.balance, updated_at = excluded.updated_at"
+        ).bind(parts[2], balance, now()).run();
+        return json({ user_id: parts[2], balance }, 200, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "deposits") {
+      if (request.method === "GET") {
+        const target = url.searchParams.get("user_id") || user.user_id;
+        if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+        const rows = await env.DB.prepare("SELECT * FROM deposits WHERE user_id = ? ORDER BY submitted_at DESC").bind(target).all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const target = body?.user_id || user.user_id;
+        if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+        const amount = Number(body?.amount);
+        const transactionId = String(body?.transaction_id ?? body?.payment_reference ?? "").trim();
+        const proofUrl = String(body?.proof_url ?? "").trim();
+        if (!Number.isFinite(amount) || amount <= 0) return json({ error: "A valid deposit amount is required" }, 400, origin);
+        if (!transactionId) return json({ error: "Transaction ID or reference is required" }, 400, origin);
+        if (!proofUrl) return json({ error: "Payment proof is required" }, 400, origin);
+        const depositId = body?.id || id();
+        const submittedAt = body?.submitted_at || body?.deposit_date || now();
+        await env.DB.prepare(
+          `INSERT INTO deposits (id, user_id, method, amount, currency, transaction_id, proof_url, status, credits, submitted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+        ).bind(
+          depositId,
+          target,
+          body?.method || body?.payment_method || null,
+          amount,
+          body?.currency || "USD",
+          transactionId,
+          proofUrl,
+          Number.isFinite(Number(body?.credits)) ? Number(body.credits) : amount,
+          submittedAt
+        ).run();
+        const created = await env.DB.prepare("SELECT * FROM deposits WHERE id = ?").bind(depositId).first();
+        return json(created || { id: depositId, user_id: target, amount, currency: body?.currency || "USD", transaction_id: transactionId, proof_url: proofUrl, status: "pending", credits: amount, submitted_at: submittedAt }, 201, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "feedbacks") {
+      if (request.method === "GET") {
+        const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 50), 1), 500);
+        const caseId = url.searchParams.get("case_id");
+        const feedbackUserId = url.searchParams.get("user_id");
+        if (caseId && feedbackUserId) {
+          const row = await env.DB.prepare(
+            "SELECT f.*, c.title as case_title, c.status as case_status FROM feedbacks f LEFT JOIN case_submissions c ON c.id = f.case_id WHERE f.case_id = ? AND f.user_id = ? ORDER BY f.created_at DESC LIMIT 1"
+          ).bind(caseId, feedbackUserId).first();
+          return json(row ? [row] : [], 200, origin);
+        }
+        const rows = await env.DB.prepare(
+          "SELECT f.*, u.full_name as user_name, c.title as case_title, c.status as case_status FROM feedbacks f LEFT JOIN users u ON f.user_id = u.user_id LEFT JOIN case_submissions c ON c.id = f.case_id WHERE lower(COALESCE(c.status, '')) = 'completed' AND lower(COALESCE(f.status, '')) = 'approved' ORDER BY f.created_at DESC LIMIT ?"
+        ).bind(limit).all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const feedbackUserId = String(user?.user_id || body?.user_id || "").trim();
+        if (!user || !feedbackUserId) return json({ error: "Authentication required" }, 401, origin);
+        const caseRow = await env.DB.prepare(
+          "SELECT id, user_id, status FROM case_submissions WHERE id = ?"
+        ).bind(body?.case_id).first();
+        const verifiedCompletion = caseRow ? await env.DB.prepare(
+          `SELECT id FROM case_resolutions
+               WHERE case_id = ?
+                 AND lower(COALESCE(status, '')) IN ('approved', 'completed')
+                 AND COALESCE(admin_confirmed, 0) IN (1, '1', 'true')
+               LIMIT 1`
+        ).bind(body?.case_id).first() : null;
+        const caseIsCompleted = String(caseRow?.status || "").toLowerCase() === "completed" || Boolean(verifiedCompletion?.id);
+        if (!caseRow || String(caseRow.user_id) !== feedbackUserId || !caseIsCompleted) {
+          return json({ error: "Feedback is available only for your completed case" }, 400, origin);
+        }
+        if (!String(body?.text_message ?? body?.comment ?? "").trim()) {
+          return json({ error: "Feedback caption is required" }, 400, origin);
+        }
+        let feedbackDeadline = null;
+        try {
+          const dn = await env.DB.prepare("SELECT feedback_deadline FROM case_submissions WHERE id = ?").bind(body?.case_id).first();
+          feedbackDeadline = dn?.feedback_deadline || null;
+        } catch {
+        }
+        if (feedbackDeadline && String(feedbackDeadline) < (/* @__PURE__ */ new Date()).toISOString()) {
+          return json({ error: "The 24-hour feedback window has passed. Your account is suspended; reactivate with 5 credits.", code: "FEEDBACK_WINDOW_EXPIRED", required_credits: 5 }, 403, origin);
+        }
+        const fbId = body?.id || id();
+        await env.DB.prepare(
+          `INSERT INTO feedbacks (id, case_id, user_id, rating, text_message, video_url, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(fbId, body.case_id, feedbackUserId, body.rating || null, body.text_message ?? body.comment ?? null, body.video_url || null, "pending_review", now()).run();
+        const created = await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(fbId).first();
+        return json(created || { id: fbId, ...body, user_id: feedbackUserId, created_at: now() }, 201, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "feedback-likes") {
+      if (request.method === "GET") {
+        const rows = await env.DB.prepare("SELECT * FROM feedback_likes").all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const likeId = body?.id || id();
+        await env.DB.prepare(
+          "INSERT INTO feedback_likes (id, feedback_id, user_id, created_at) VALUES (?, ?, ?, ?)"
+        ).bind(likeId, body.feedback_id, body.user_id, now()).run();
+        return json({ id: likeId, ...body, created_at: now() }, 201, origin);
+      }
+      if (request.method === "DELETE" && parts[2]) {
+        await env.DB.prepare("DELETE FROM feedback_likes WHERE id = ?").bind(parts[2]).run();
+        return json({ deleted: true, id: parts[2] }, 200, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "feedback-comments") {
+      if (request.method === "GET") {
+        const rows = await env.DB.prepare("SELECT fc.*, u.full_name as user_name FROM feedback_comments fc LEFT JOIN users u ON fc.user_id = u.user_id").all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const commentId = body?.id || id();
+        await env.DB.prepare(
+          "INSERT INTO feedback_comments (id, feedback_id, user_id, comment, created_at) VALUES (?, ?, ?, ?, ?)"
+        ).bind(commentId, body.feedback_id, body.user_id, body.comment, now()).run();
+        return json({ id: commentId, ...body, created_at: now() }, 201, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "support") {
+      if (request.method === "POST" && !parts[2]) {
+        const body = await readJson(request);
+        const postId = String(body?.post_id || "").trim();
+        const guest = user ? null : guestIdentity(request, body);
+        const actorId = user?.user_id || guest?.id;
+        if (!actorId) return json({ error: "Authentication required" }, 401, origin);
+        if (!postId) return json({ error: "Post ID is required" }, 400, origin);
+        const post = await env.DB.prepare("SELECT user_id, display_name FROM community_posts WHERE id = ?").bind(postId).first();
+        if (!post?.user_id) return json({ error: "Post not found" }, 404, origin);
+        const result = await recordCommunitySupport(env, ctx, post.user_id, actorId, postId, user?.full_name || guest?.name || "A Givethra member");
+        const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_supports WHERE post_id = ?").bind(postId).first();
+        return json({ ...result, post_id: postId, support_count: Number(count?.count || 0), alreadySupported: Boolean(result.alreadySupported) }, result.added ? 201 : 200, origin);
+      }
+      if (parts[2] === "messages") {
+        if (request.method === "GET") {
+          const target = url.searchParams.get("user_id") || user.user_id;
+          if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+          const rows = await env.DB.prepare(
+            "SELECT * FROM support_messages WHERE user_id = ? ORDER BY created_at ASC"
+          ).bind(target).all();
+          return json(rows.results || [], 200, origin);
+        }
+        if (request.method === "POST") {
+          const body = await readJson(request);
+          const target = body?.user_id || user.user_id;
+          if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+          if (!String(body?.message || "").trim() && !body?.attachment_url) {
+            return json({ error: "A message or attachment is required" }, 400, origin);
+          }
+          const msgId = body?.id || id();
+          await env.DB.prepare(
+            `INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at)
+             VALUES (?, ?, 'user', ?, ?, ?, 0, ?)`
+          ).bind(msgId, target, body.message ? String(body.message).trim() : null, body.attachment_url || null, body.language || "en", now()).run();
+          const created = await env.DB.prepare("SELECT * FROM support_messages WHERE id = ?").bind(msgId).first();
+          return json(created || { id: msgId, user_id: target, sender: "user", message: body.message || null, attachment_url: body.attachment_url || null, is_read: 0 }, 201, origin);
+        }
+      }
+      if (parts[2] === "mark-read" && request.method === "PUT") {
+        const body = await readJson(request);
+        const target = body?.user_id || user.user_id;
+        if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+        const result = await env.DB.prepare(
+          "UPDATE support_messages SET is_read = 1 WHERE user_id = ? AND sender = 'admin' AND (is_read = 0 OR is_read IS NULL)"
+        ).bind(target).run();
+        return json({ updated: Number(result?.meta?.changes || 0) }, 200, origin);
+      }
+      if (parts[2] === "unread-count" && request.method === "GET") {
+        const target = url.searchParams.get("user_id") || user.user_id;
+        if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+        const row = await env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM support_messages WHERE user_id = ? AND sender = 'admin' AND (is_read = 0 OR is_read IS NULL)"
+        ).bind(target).first();
+        return json({ count: Number(row?.count || 0) }, 200, origin);
+      }
+      return json({ error: "Not found" }, 404, origin);
+    }
+    if (parts[1] === "user-settings") {
+      if (request.method === "GET") {
+        const target = parts[2] || user.user_id;
+        if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+        const settings = await env.DB.prepare("SELECT * FROM user_settings WHERE user_id = ?").bind(target).first();
+        return json(settings || { user_id: target }, 200, origin);
+      }
+      if (request.method === "PUT") {
+        const target = parts[2] || user.user_id;
+        if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+        const body = await readJson(request);
+        const fields = [
+          "language",
+          "theme",
+          "currency",
+          "timezone",
+          "email_notifications",
+          "inapp_notifications",
+          "weekly_digest",
+          "high_contrast",
+          "larger_text",
+          "reduced_animations"
+        ];
+        const existing = await env.DB.prepare("SELECT * FROM user_settings WHERE user_id = ?").bind(target).first();
+        const values = { ...existing, ...pick(body, fields) };
+        const bool = (value, fallback) => value === void 0 || value === null ? fallback : value ? 1 : 0;
+        const updatedAt = now();
+        await env.DB.prepare(
+          `INSERT INTO user_settings (user_id, language, theme, currency, timezone, email_notifications, inapp_notifications, weekly_digest, high_contrast, larger_text, reduced_animations, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET language = excluded.language, theme = excluded.theme, currency = excluded.currency, timezone = excluded.timezone, email_notifications = excluded.email_notifications, inapp_notifications = excluded.inapp_notifications, weekly_digest = excluded.weekly_digest, high_contrast = excluded.high_contrast, larger_text = excluded.larger_text, reduced_animations = excluded.reduced_animations, updated_at = excluded.updated_at`
+        ).bind(
+          target,
+          values.language || "en",
+          values.theme || "light",
+          values.currency || "USD",
+          values.timezone || "UTC",
+          bool(values.email_notifications, 1),
+          bool(values.inapp_notifications, 1),
+          bool(values.weekly_digest, 0),
+          bool(values.high_contrast, 0),
+          bool(values.larger_text, 0),
+          bool(values.reduced_animations, 0),
+          updatedAt
+        ).run();
+        const saved = await env.DB.prepare("SELECT * FROM user_settings WHERE user_id = ?").bind(target).first();
+        return json(saved || { user_id: target, ...values, updated_at: updatedAt }, 200, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "upload" && request.method === "POST") {
+      const formData = await request.formData();
+      const file = formData.get("file");
+      const path = formData.get("path");
+      if (!file || !path) return json({ error: "File and path required" }, 400, origin);
+      try {
+        const key = String(path);
+        const arrayBuffer = await file.arrayBuffer();
+        await env.UPLOADS.put(key, arrayBuffer, {
+          httpMetadata: {
+            contentType: file.type || "application/octet-stream"
+          }
+        });
+        const url2 = `${PUBLIC_ORIGIN}/uploads/${key}`;
+        return json({ url: url2, key }, 200, origin);
+      } catch (err) {
+        return json({ error: "Upload failed: " + err.message }, 500, origin);
+      }
+    }
+    if (parts[1] === "admin") {
+      if (!isAdmin(user)) return json({ error: "Admin access required" }, 403, origin);
+      if (parts[2] === "support" && parts[3] === "mark-read" && request.method === "PUT") {
+        const body = await readJson(request);
+        if (!body?.user_id) return json({ error: "User ID is required" }, 400, origin);
+        const result = await env.DB.prepare(
+          "UPDATE support_messages SET is_read = 1 WHERE user_id = ? AND sender = 'user' AND (is_read = 0 OR is_read IS NULL)"
+        ).bind(body.user_id).run();
+        return json({ updated: Number(result?.meta?.changes || 0) }, 200, origin);
+      }
+      if (parts[2] === "support" && parts[3] === "reply" && request.method === "POST") {
+        const body = await readJson(request);
+        if (!body?.user_id || !String(body.message || "").trim() && !body.attachment_url) {
+          return json({ error: "A reply message or attachment is required" }, 400, origin);
+        }
+        const msgId = body?.id || id();
+        await env.DB.batch([
+          env.DB.prepare(
+            `INSERT INTO support_messages (id, user_id, sender, message, attachment_url, language, is_read, created_at)
+             VALUES (?, ?, 'admin', ?, ?, ?, 1, ?)`
+          ).bind(msgId, body.user_id, body.message ? String(body.message).trim() : null, body.attachment_url || null, body.language || "en", now()),
+          env.DB.prepare(
+            `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+             VALUES (?, ?, 'support_reply', 'New message from Givethra', ?, '/support', 0, ?)`
+          ).bind(id(), body.user_id, body.message ? String(body.message).trim() : "A support attachment was sent.", now())
+        ]);
+        const created = await env.DB.prepare("SELECT * FROM support_messages WHERE id = ?").bind(msgId).first();
+        return json(created || { id: msgId, ...body, sender: "admin", is_read: 1 }, 201, origin);
+      }
+      if (parts[2] === "notifications" && parts[3] === "broadcast" && request.method === "POST") {
+        const body = await readJson(request);
+        const userIds = [...new Set((Array.isArray(body?.user_ids) ? body.user_ids : []).map((value) => String(value).trim()).filter(Boolean))].slice(0, 1e3);
+        const title = String(body?.title || "").trim();
+        const message = String(body?.message || "").trim();
+        if (!userIds.length || !title || !message) return json({ error: "Recipients, title, and message are required" }, 400, origin);
+        const type = String(body?.type || "admin_broadcast").slice(0, 80);
+        const link = String(body?.link || "/").slice(0, 500);
+        let sent = 0;
+        for (let start = 0; start < userIds.length; start += 50) {
+          const batch = userIds.slice(start, start + 50).map((target) => env.DB.prepare(
+            `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 0, ?)`
+          ).bind(id(), target, type, title, message, link, now()));
+          await env.DB.batch(batch);
+          sent += batch.length;
+        }
+        return json({ sent, failed: userIds.length - sent }, 201, origin);
+      }
+      if (parts[2] === "wallets") {
+        if (request.method === "GET") {
+          const target = url.searchParams.get("user_id");
+          const rows = target ? await env.DB.prepare("SELECT * FROM wallets WHERE user_id = ?").bind(target).all() : await env.DB.prepare("SELECT * FROM wallets ORDER BY updated_at DESC").all();
+          return json(rows.results || [], 200, origin);
+        }
+        if (request.method === "POST") {
+          const body = await readJson(request);
+          const target = String(body?.user_id || "").trim();
+          const balance = Number(body?.balance);
+          if (!target || !Number.isFinite(balance) || balance < 0) return json({ error: "A valid user and wallet balance are required" }, 400, origin);
+          const updatedAt = body?.updated_at || now();
+          await env.DB.prepare(
+            `INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?)
+             ON CONFLICT(user_id) DO UPDATE SET balance = excluded.balance, updated_at = excluded.updated_at`
+          ).bind(target, balance, updatedAt).run();
+          const saved = await env.DB.prepare("SELECT * FROM wallets WHERE user_id = ?").bind(target).first();
+          return json(saved || { user_id: target, balance, updated_at: updatedAt }, 200, origin);
+        }
+        return json({ error: "Method not allowed" }, 405, origin);
+      }
+      if (request.method === "GET") {
+        const tableMap = {
+          users: { table: "users", order: "updated_at" },
+          kyc: { table: "kyc_submissions", order: "submitted_at" },
+          cases: { table: "case_submissions", order: "submitted_at" },
+          resolutions: { table: "case_resolutions", order: "submitted_at" },
+          deposits: { table: "deposits", order: "submitted_at" },
+          profiles: { table: "profiles", order: "updated_at" },
+          wallets: { table: "wallets", order: "updated_at" },
+          unlocks: { table: "case_unlocks", order: "unlocked_at" },
+          "support-messages": { table: "support_messages", order: "created_at" },
+          feedbacks: { table: "feedbacks", order: "created_at" },
+          offers: { table: "category_offers", order: "updated_at" },
+          suspensions: { table: "user_suspensions", order: "suspended_at" }
+        };
+        const entry = tableMap[parts[2]];
+        if (entry) {
+          const rows = await env.DB.prepare(`SELECT * FROM ${entry.table} ORDER BY ${entry.order} DESC`).all();
+          return json(rows.results || [], 200, origin);
+        }
+      }
+      if (parts[2] === "user-suspension" && parts[3] && request.method === "GET") {
+        const row = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ? ORDER BY suspended_at DESC LIMIT 1").bind(parts[3]).first();
+        return json(row || null, 200, origin);
+      }
+      if (parts[2] === "user-suspension" && request.method === "POST") {
+        const body = await readJson(request);
+        const target = String(body?.user_id || "").trim();
+        if (!target) return json({ error: "User ID is required" }, 400, origin);
+        const existing = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ? ORDER BY suspended_at DESC LIMIT 1").bind(target).first();
+        const active = body?.is_active ? 1 : 0;
+        const suspensionCount = body?.suspension_count ?? existing?.suspension_count ?? 0;
+        const suspendedAt = body?.suspended_at ?? existing?.suspended_at ?? (active ? now() : null);
+        const unlockedAt = body?.unlocked_at ?? existing?.unlocked_at ?? null;
+        await env.DB.prepare(
+          `INSERT INTO user_suspensions (user_id, suspension_count, is_active, suspended_at, unlocked_at, rejection_count_at_suspension)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET suspension_count = excluded.suspension_count, is_active = excluded.is_active, suspended_at = excluded.suspended_at, unlocked_at = excluded.unlocked_at, rejection_count_at_suspension = excluded.rejection_count_at_suspension`
+        ).bind(target, suspensionCount, active, suspendedAt, unlockedAt, body?.rejection_count_at_suspension ?? existing?.rejection_count_at_suspension ?? 0).run();
+        return json(await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(target).first(), 200, origin);
+      }
+      if (request.method === "PUT") {
+        const recordId = parts[3];
+        if (parts[2] === "deposits" && recordId) {
+          const body = await readJson(request);
+          const current = await env.DB.prepare("SELECT * FROM deposits WHERE id = ?").bind(recordId).first();
+          if (!current) return json({ error: "Deposit not found" }, 404, origin);
+          const requestedStatus = body?.status === void 0 ? current.status : String(body.status);
+          if (!["pending", "approved", "rejected"].includes(requestedStatus)) return json({ error: "Invalid deposit status" }, 400, origin);
+          if (current.status === "approved" && requestedStatus === "rejected") return json({ error: "An approved deposit cannot be rejected" }, 409, origin);
+          const allowed = ["method", "amount", "currency", "transaction_id", "proof_url", "status", "credits", "reviewed_at", "reviewed_by", "rejection_reason"];
+          const values = pick(body, allowed);
+          values.status = requestedStatus;
+          if (requestedStatus === "approved") {
+            values.reviewed_at = values.reviewed_at ?? now();
+            values.reviewed_by = values.reviewed_by ?? user.email;
+            values.rejection_reason = null;
+          }
+          const fields = allowed.filter((field) => values[field] !== void 0);
+          const params = fields.map((field) => values[field]);
+          await env.DB.prepare(`UPDATE deposits SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...params, recordId).run();
+          if (requestedStatus === "approved" && current.status !== "approved") {
+            const credits = Number(values.credits ?? current.credits ?? current.amount ?? 0);
+            if (!Number.isFinite(credits) || credits < 0) return json({ error: "Invalid deposit credits" }, 400, origin);
+            await addCredits(env, current.user_id, credits, "deposit", `Deposit #${recordId} approved`, recordId);
+          }
+          return json(await env.DB.prepare("SELECT * FROM deposits WHERE id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "profiles" && recordId) {
+          const body = await readJson(request);
+          const allowed = ["full_name", "phone_number", "country", "city", "bio", "preferred_language", "avatar_url", "cover_url", "is_suspended", "suspended_reason", "suspended_at"];
+          const values = pick(body, allowed);
+          const fields = allowed.filter((field) => values[field] !== void 0);
+          if (!fields.length) return json({ error: "No profile fields to update" }, 400, origin);
+          const existing = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(recordId).first();
+          if (existing) {
+            await env.DB.prepare(`UPDATE profiles SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE user_id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          } else {
+            const profileFields = ["user_id", ...fields, "created_at", "updated_at"];
+            await env.DB.prepare(`INSERT INTO profiles (${profileFields.join(", ")}) VALUES (${profileFields.map(() => "?").join(", ")})`).bind(recordId, ...fields.map((field) => values[field]), now(), now()).run();
+          }
+          if (values.full_name !== void 0 || values.avatar_url !== void 0) {
+            await env.DB.prepare("UPDATE users SET full_name = COALESCE(?, full_name), avatar_url = COALESCE(?, avatar_url), updated_at = ? WHERE user_id = ?").bind(values.full_name ?? null, values.avatar_url ?? null, now(), recordId).run();
+          }
+          return json(await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "kyc" && recordId) {
+          const body = await readJson(request);
+          const current = await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(recordId).first();
+          if (!current) return json({ error: "KYC submission not found" }, 404, origin);
+          const allowed = ["status", "rejection_reason", "reviewed_at", "reviewed_by"];
+          const values = pick(body, allowed);
+          if (values.status !== void 0) {
+            values.status = String(values.status).trim().toLowerCase();
+            if (!["pending", "approved", "rejected"].includes(values.status)) {
+              return json({ error: "Invalid KYC status" }, 400, origin);
+            }
+          }
+          const fields = allowed.filter((field) => values[field] !== void 0);
+          if (!fields.length) return json({ error: "No KYC fields to update" }, 400, origin);
+          await env.DB.prepare(`UPDATE kyc_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          if (values.status !== void 0) {
+            const effectiveKyc = await env.DB.prepare(
+              `SELECT lower(status) AS status FROM kyc_submissions
+               WHERE user_id = ? AND COALESCE(is_current, 1) = 1
+               ORDER BY CASE lower(COALESCE(status, ''))
+                 WHEN 'approved' THEN 1 WHEN 'pending' THEN 2 WHEN 'rejected' THEN 3 ELSE 4 END,
+                 submitted_at DESC, rowid DESC LIMIT 1`
+            ).bind(current.user_id).first();
+            await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?").bind(String(effectiveKyc?.status || values.status).toLowerCase(), now(), current.user_id).run();
+            if (String(current.status || "").trim().toLowerCase() !== values.status) {
+              if (values.status === "approved") {
+                await sendNotification(
+                  env,
+                  current.user_id,
+                  "kyc_approved",
+                  "KYC Approved",
+                  "Your identity has been verified. Please complete the onboarding guide to get started.",
+                  "/onboarding"
+                );
+              } else if (values.status === "rejected") {
+                const reason = String(values.rejection_reason || "").trim();
+                await sendNotification(
+                  env,
+                  current.user_id,
+                  "kyc_rejected",
+                  "KYC Needs Attention",
+                  reason ? `Your KYC submission was rejected. Reason: ${reason}. Please update and resubmit your KYC.` : "Your KYC submission was rejected. Please update and resubmit your KYC.",
+                  "/kyc"
+                );
+              }
+            }
+          }
+          return json(await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "cases" && recordId) {
+          const body = await readJson(request);
+          const current = await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(recordId).first();
+          if (!current) return json({ error: "Case not found" }, 404, origin);
+          const allowed = ["status", "amount_collected", "reviewed_at", "reviewed_by", "rejection_reason"];
+          if (parts[4] === "close") allowed.push("closed_by_admin", "paid_receipt_url");
+          const values = pick(body, allowed);
+          const fields = allowed.filter((field) => values[field] !== void 0);
+          if (!fields.length) return json({ error: "No case fields to update" }, 400, origin);
+          await env.DB.prepare(`UPDATE case_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          await syncUserCaseCounters(env, current.user_id);
+          return json(await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "feedbacks" && recordId) {
+          const body = await readJson(request);
+          const requestedStatus = String(body?.status || "").toLowerCase();
+          if (requestedStatus === "rejected" && !String(body?.rejection_reason || "").trim()) {
+            return json({ error: "A rejection reason is required" }, 400, origin);
+          }
+          const allowed = ["status", "reviewed_at", "reviewed_by", "rejection_reason"];
+          const values = pick(body, allowed);
+          const fields = allowed.filter((field) => values[field] !== void 0);
+          if (!fields.length) return json({ error: "No feedback fields to update" }, 400, origin);
+          await env.DB.prepare(`UPDATE feedbacks SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          return json(await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(recordId).first(), 200, origin);
+        }
+        if (parts[2] === "resolutions" && recordId) {
+          const body = await readJson(request);
+          const allowed = ["status", "admin_confirmed", "admin_confirmed_at", "completed_at", "notes"];
+          const values = pick(body, allowed);
+          const fields = allowed.filter((field) => values[field] !== void 0);
+          if (!fields.length) return json({ error: "No resolution fields to update" }, 400, origin);
+          await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          const updated = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first();
+          if (updated && String(updated.status || "").toLowerCase() === "completed" && [1, "1", true, "true"].includes(updated.admin_confirmed)) {
+            await synchronizeCompletedCase(env, recordId);
+          }
+          return json(updated, 200, origin);
+        }
+      }
+      if (parts[2] === "offers" && request.method === "POST") {
+        const body = await readJson(request);
+        const category = String(body?.category || "").trim();
+        if (!category) return json({ error: "Category is required" }, 400, origin);
+        const allowed = ["is_active", "free_limit", "used_count", "label", "updated_at"];
+        const values = pick(body, allowed);
+        values.updated_at = values.updated_at ?? now();
+        const fields = ["category", ...allowed].filter((field) => field === "category" || values[field] !== void 0);
+        await env.DB.prepare(
+          `INSERT INTO category_offers (${fields.join(", ")}) VALUES (${fields.map(() => "?").join(", ")})
+           ON CONFLICT(category) DO UPDATE SET ${allowed.filter((field) => values[field] !== void 0).map((field) => `${field} = excluded.${field}`).join(", ")}`
+        ).bind(...fields.map((field) => field === "category" ? category : values[field])).run();
+        return json(await env.DB.prepare("SELECT * FROM category_offers WHERE category = ?").bind(category).first(), 200, origin);
+      }
+      if (parts[2] === "delete-files" && request.method === "POST") {
+        const body = await readJson(request);
+        const urls = Array.isArray(body?.urls) ? body.urls : [];
+        let deleted = 0;
+        for (const value of urls) {
+          try {
+            const parsed = new URL(String(value));
+            const marker = "/uploads/";
+            const index = parsed.pathname.indexOf(marker);
+            if (index < 0) continue;
+            const key = decodeURIComponent(parsed.pathname.slice(index + marker.length));
+            if (key) {
+              await env.UPLOADS.delete(key);
+              deleted += 1;
+            }
+          } catch {
+          }
+        }
+        return json({ deleted }, 200, origin);
+      }
+    }
+    if (parts[1] === "transactions" && parts[2]) {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
+      const target = parts[2];
+      if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
+      const rows = await env.DB.prepare(
+        "SELECT * FROM credit_transactions WHERE user_id = ? ORDER BY created_at DESC"
+      ).bind(target).all();
+      return json(rows.results || [], 200, origin);
+    }
+    if (parts[1] === "onboarding-status" && parts[2]) {
+      const target = parts[2];
+      if (!canAccessUser(user, target)) {
+        return json({ error: "Forbidden" }, 403, origin);
+      }
+      if (request.method === "GET") {
+        const row = await env.DB.prepare(
+          "SELECT onboarding_completed FROM users WHERE user_id = ?"
+        ).bind(target).first();
+        return json({ completed: row?.onboarding_completed === 1 }, 200, origin);
+      }
+      if (request.method === "PUT") {
+        const body = await readJson(request);
+        const completed = body?.completed === true ? 1 : 0;
+        await env.DB.prepare(
+          "UPDATE users SET onboarding_completed = ? WHERE user_id = ?"
+        ).bind(completed, target).run();
+        return json({ completed: completed === 1 }, 200, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "case-unlocks") {
+      if (parts[2] === "count" && request.method === "GET") {
+        const heroId = String(url.searchParams.get("hero_id") || "").trim();
+        if (!heroId) return json({ count: 0 }, 200, origin);
+        const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM case_unlocks WHERE hero_id = ? AND payment_type = 'partial'").bind(heroId).first();
+        return json({ count: Number(row?.count || 0) }, 200, origin);
+      }
+      if (request.method === "GET") {
+        const caseId = url.searchParams.get("case_id");
+        const heroId = url.searchParams.get("hero_id");
+        const requestedType = url.searchParams.get("payment_type");
+        const paymentType = requestedType === "full" || requestedType === "partial" || requestedType === "media" ? requestedType : null;
+        const filters = [];
+        const bind = [];
+        if (caseId) {
+          filters.push("case_id = ?");
+          bind.push(caseId);
+        }
+        if (heroId) {
+          filters.push("hero_id = ?");
+          bind.push(heroId);
+        }
+        if (paymentType) {
+          filters.push("payment_type = ?");
+          bind.push(paymentType);
+        }
+        const sql = `SELECT * FROM case_unlocks${filters.length ? ` WHERE ${filters.join(" AND ")}` : ""} ORDER BY unlocked_at DESC`;
+        const rows = await env.DB.prepare(sql).bind(...bind).all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const caseId = String(body?.case_id || "").trim();
+        const heroId = String(body?.hero_id || "").trim();
+        const paymentType = body?.payment_type === "full" ? "full" : body?.payment_type === "media" ? "media" : "partial";
+        if (!user || !caseId || !heroId || user.user_id !== heroId) return json({ error: "Unauthorized unlock request" }, 403, origin);
+        if (!isAdmin(user)) {
+          const suspension = await getActiveSuspension(env, user.user_id);
+          if (suspension) return suspendedActionResponse(origin, suspension);
+        }
+        const existing = await env.DB.prepare("SELECT * FROM case_unlocks WHERE case_id = ? AND hero_id = ? AND payment_type = ? ORDER BY unlocked_at DESC LIMIT 1").bind(caseId, heroId, paymentType).first();
+        if (existing) return json(existing, 200, origin);
+        const prior = await env.DB.prepare("SELECT COUNT(*) AS count FROM case_unlocks WHERE hero_id = ? AND payment_type = 'partial'").bind(heroId).first();
+        const isFreeContribution = paymentType === "partial" && Number(prior?.count || 0) < 3;
+        const creditsCharged = isFreeContribution ? 0 : 1;
+        const wallet = await env.DB.prepare("SELECT balance FROM wallets WHERE user_id = ?").bind(heroId).first();
+        const balance = Number(wallet?.balance || 0);
+        if (creditsCharged > 0 && balance < creditsCharged) return json({ error: "Insufficient credits", required: creditsCharged, balance }, 402, origin);
+        if (creditsCharged > 0) {
+          const deducted = await env.DB.prepare("UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?").bind(creditsCharged, now(), heroId, creditsCharged).run();
+          if (!Number(deducted?.meta?.changes || 0)) return json({ error: "Insufficient credits", required: creditsCharged, balance }, 402, origin);
+        }
+        const unlockId = body?.id || id();
+        try {
+          await env.DB.prepare(
+            `INSERT INTO case_unlocks (id, case_id, hero_id, pledged_amount, credits_charged, payment_type, unlocked_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(unlockId, caseId, heroId, body.pledged_amount ?? null, creditsCharged, paymentType, now()).run();
+        } catch (error) {
+          if (creditsCharged > 0) await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(creditsCharged, now(), heroId).run();
+          throw error;
+        }
+        if (creditsCharged > 0) {
+          const type = paymentType === "full" ? "direct_help" : "contribution";
+          const desc = paymentType === "full" ? `Direct help for case ${caseId}` : `Contribution to case ${caseId}`;
+          await addTransaction(env, heroId, -creditsCharged, type, desc, unlockId);
+        }
+        const saved = await env.DB.prepare("SELECT * FROM case_unlocks WHERE id = ?").bind(unlockId).first();
+        return json(saved || { id: unlockId, case_id: caseId, hero_id: heroId, pledged_amount: body.pledged_amount ?? null, credits_charged: creditsCharged, payment_type: paymentType, unlocked_at: now() }, 201, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "case-resolutions") {
+      if (request.method === "GET") {
+        const caseId = String(url.searchParams.get("case_id") || "").trim();
+        const heroId = String(url.searchParams.get("hero_id") || "").trim();
+        const filters = [];
+        const bind = [];
+        if (caseId) {
+          filters.push("r.case_id = ?");
+          bind.push(caseId);
+          if (!heroId && user) {
+            filters.push("(r.hero_id = ? OR lower(u.email) = lower(?) OR c.user_id = ?)");
+            bind.push(user.user_id, String(user.email || ""), user.user_id);
+          }
+        }
+        if (heroId) {
+          if (user?.user_id === heroId) {
+            filters.push("r.hero_id = ?");
+            bind.push(heroId);
+          } else if (String(user?.email || "").trim()) {
+            filters.push("lower(u.email) = lower(?)");
+            bind.push(String(user.email).trim());
+          } else {
+            return json({ error: "Forbidden" }, 403, origin);
+          }
+        }
+        if (!filters.length) return json({ error: "case_id or hero_id is required" }, 400, origin);
+        const sql = "SELECT r.*, c.status AS case_status, c.title AS case_title, c.category AS case_category, c.city AS case_city, c.country AS case_country, c.institute_name AS case_institute_name, c.payment_method AS case_payment_method, c.account_number AS case_account_number, c.account_iban AS case_account_iban, c.reference_number AS case_reference_number, COALESCE(p.full_name, u.full_name) AS hero_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.hero_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS hero_cnic_number, COALESCE(sp.full_name, su.full_name) AS seeker_name, (SELECT k.cnic_number FROM kyc_submissions k WHERE k.user_id = r.seeker_id AND lower(COALESCE(k.status, '')) = 'approved' ORDER BY k.reviewed_at DESC LIMIT 1) AS seeker_cnic_number FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id LEFT JOIN profiles p ON p.user_id = r.hero_id LEFT JOIN users u ON u.user_id = r.hero_id LEFT JOIN profiles sp ON sp.user_id = r.seeker_id LEFT JOIN users su ON su.user_id = r.seeker_id WHERE " + filters.join(" AND ") + " ORDER BY r.submitted_at DESC";
+        const rows = await env.DB.prepare(sql).bind(...bind).all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const resolutionId = body?.id || id();
+        const caseId = String(body?.case_id || "").trim();
+        const heroId = String(body?.hero_id || "").trim();
+        if (!user || !caseId || !heroId || user.user_id !== heroId) return json({ error: "Unauthorized help submission" }, 403, origin);
+        if (!isAdmin(user)) {
+          const suspension = await getActiveSuspension(env, user.user_id);
+          if (suspension) return suspendedActionResponse(origin, suspension);
+        }
+        const paidTo = body.paid_to === "givethra" ? "givethra" : "institute";
+        await env.DB.prepare(
+          `INSERT INTO case_resolutions
+            (id, case_id, hero_id, hero_email, seeker_id, resolution_type, amount_paid, transaction_id, receipt_url, notes, status, paid_to, submitted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          resolutionId,
+          caseId,
+          heroId,
+          body.hero_email || null,
+          body.seeker_id || null,
+          body.resolution_type || null,
+          body.amount_paid ?? body.amount ?? null,
+          body.transaction_id || null,
+          body.receipt_url || null,
+          body.notes || null,
+          body.status || "pending_confirmation",
+          paidTo,
+          now()
+        ).run();
+        const saved = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(resolutionId).first();
+        return json(saved || { id: resolutionId, ...body, status: body.status || "pending_confirmation", paid_to: paidTo, submitted_at: now() }, 201, origin);
+      }
+      if (request.method === "PUT" && parts[2]) {
+        const body = await readJson(request);
+        const allowed = ["status", "amount_paid", "seeker_confirmed_amount", "transaction_id", "receipt_url", "paid_to", "notes", "hero_confirmed", "seeker_confirmed", "completed_at", "admin_confirmed", "admin_confirmed_at"];
+        const values = pick(body, allowed);
+        const fields = allowed.filter((field) => values[field] !== void 0);
+        if (fields.length) {
+          const params = fields.map((field) => values[field]);
+          await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((f) => `${f} = ?`).join(", ")} WHERE id = ?`).bind(...params, parts[2]).run();
+          const updated = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(parts[2]).first();
+          if (updated && ["completed", "approved", "seeker_confirmed"].includes(String(updated.status || "").trim().toLowerCase()) && [1, "1", true, "true", "yes"].includes(updated.admin_confirmed)) {
+            await synchronizeCompletedCase(env, parts[2]);
+          }
+          return json(updated, 200, origin);
+        }
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "offers") {
+      if (request.method === "GET") {
+        const category = url.searchParams.get("category");
+        const sql = category ? "SELECT * FROM category_offers WHERE category = ?" : "SELECT * FROM category_offers";
+        const bind = category ? [category] : [];
+        const rows = await env.DB.prepare(sql).bind(...bind).all();
+        return json(rows.results || [], 200, origin);
+      }
+      if (parts[1] === "offers" && parts[2] === "usage" && request.method === "PUT") {
+        const body = await readJson(request);
+        await env.DB.prepare(
+          "UPDATE category_offers SET used_count = ? WHERE category = ?"
+        ).bind(body.used_count, body.category).run();
+        const updated = await env.DB.prepare("SELECT * FROM category_offers WHERE category = ?").bind(body.category).first();
+        return json(updated, 200, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "offer-claims") {
+      if (request.method === "GET" && parts[2] === "count") {
+        const userId = url.searchParams.get("user_id");
+        if (!userId) return json({ error: "user_id required" }, 400, origin);
+        const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM offer_claims WHERE user_id = ?").bind(userId).first();
+        return json({ count: Number(row?.count || 0) }, 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const claimId = body?.id || id();
+        await env.DB.prepare(
+          `INSERT INTO offer_claims (id, user_id, category, claimed_at)
+           VALUES (?, ?, ?, ?)`
+        ).bind(claimId, body.user_id, body.category, now()).run();
+        return json({ id: claimId, ...body, claimed_at: now() }, 201, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    if (parts[1] === "user-suspension" && parts[2]) {
+      if (request.method === "GET") {
+        const row = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(parts[2]).first();
+        if (!row) return json({ error: "Not found" }, 404, origin);
+        return json(row, 200, origin);
+      }
+      if (request.method === "POST") {
+        const body = await readJson(request);
+        const userId = parts[2];
+        if (!user || !isAdmin(user) && user.user_id !== userId) return json({ error: "Forbidden" }, 403, origin);
+        const existing = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(userId).first();
+        if (body.is_active === false) {
+          if (!existing?.is_active) {
+            await env.DB.prepare("UPDATE profiles SET is_suspended = 0, suspended_reason = NULL, suspended_at = NULL WHERE user_id = ?").bind(userId).run();
+            return json(existing || { user_id: userId, is_active: false }, 200, origin);
+          }
+          const unlockCost = 5;
+          const wallet = await env.DB.prepare("SELECT balance FROM wallets WHERE user_id = ?").bind(userId).first();
+          const balance = Number(wallet?.balance || 0);
+          if (balance < unlockCost) {
+            return json({ error: `Insufficient credits. ${unlockCost} credits are required to unlock this account.`, required: unlockCost, balance }, 402, origin);
+          }
+          const charged = await env.DB.prepare(
+            "UPDATE wallets SET balance = balance - ?, updated_at = ? WHERE user_id = ? AND balance >= ?"
+          ).bind(unlockCost, now(), userId, unlockCost).run();
+          if (!Number(charged?.meta?.changes || 0)) {
+            return json({ error: `Insufficient credits. ${unlockCost} credits are required to unlock this account.`, required: unlockCost, balance }, 402, origin);
+          }
+          await addTransaction(env, userId, -unlockCost, "suspension_unlock", "Account suspension unlock (5 credits)", userId);
+          try {
+            const unlocked = await env.DB.prepare(
+              "UPDATE user_suspensions SET is_active = 0, unlocked_at = ?, credits_used_to_unlock = COALESCE(credits_used_to_unlock, 0) + ? WHERE user_id = ? AND is_active = 1"
+            ).bind(now(), unlockCost, userId).run();
+            if (!Number(unlocked?.meta?.changes || 0)) throw new Error("Suspension could not be updated");
+            await env.DB.prepare("UPDATE profiles SET is_suspended = 0, suspended_reason = NULL, suspended_at = NULL WHERE user_id = ?").bind(userId).run();
+          } catch (error) {
+            await env.DB.prepare("UPDATE wallets SET balance = balance + ?, updated_at = ? WHERE user_id = ?").bind(unlockCost, now(), userId).run();
+            throw error;
+          }
+        } else {
+          await env.DB.prepare(
+            "INSERT INTO user_suspensions (user_id, is_active, suspension_count, suspended_at, rejection_count_at_suspension, unlocked_at, credits_used_to_unlock) VALUES (?, 1, ?, ?, ?, NULL, 0) ON CONFLICT(user_id) DO UPDATE SET is_active = 1, suspension_count = excluded.suspension_count, suspended_at = excluded.suspended_at, rejection_count_at_suspension = excluded.rejection_count_at_suspension"
+          ).bind(userId, body.suspension_count || 1, body.suspended_at || now(), body.rejection_count_at_suspension || 0).run();
+        }
+        const updated = await env.DB.prepare("SELECT * FROM user_suspensions WHERE user_id = ?").bind(userId).first();
+        return json(updated, 201, origin);
+      }
+      return json({ error: "Method not allowed" }, 405, origin);
+    }
+    return json({ error: "API route not found" }, 404, origin);
+  }
+  return new Response("Not found", { status: 404 });
+}
+var worker_default = {
+  async fetch(request, env, ctx) {
+    try {
+      return await handleRequest(request, env, ctx);
+    } catch (err) {
+      console.error(err);
+      return json({ error: "Authentication or database request failed", code: "INTERNAL_ERROR" }, 500, "https://givethra.org");
+    }
+  }
+};
+async function handleDreamPaymentAccounts(request, env, user, parts, origin) {
+  if (!env.DB) return json([], 200, origin);
+  if (parts[1] === "admin" && !isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
+  if (request.method === "GET") {
+    const rows = await env.DB.prepare(`SELECT id,label,method,account_title,account_number,instructions,is_active FROM dream_payment_accounts ${parts[1] === "admin" ? "" : "WHERE is_active=1"} ORDER BY created_at ASC`).all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (parts[1] !== "admin") return json({ error: "Method not allowed" }, 405, origin);
+  const body = await readJson(request);
+  const timestamp = now();
+  const values = [String(body?.label || "").trim(), String(body?.method || "").trim(), body?.account_title ? String(body.account_title).trim() : null, String(body?.account_number || "").trim(), body?.instructions ? String(body.instructions).trim() : null, body?.is_active === false ? 0 : 1];
+  if (!values[0] || !values[1] || !values[3]) return json({ error: "Label, payment method and account number are required" }, 400, origin);
+  if (request.method === "POST") {
+    const accountId = id();
+    await env.DB.prepare("INSERT INTO dream_payment_accounts (id,label,method,account_title,account_number,instructions,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(accountId, ...values, timestamp, timestamp).run();
+    return json({ id: accountId, ...body }, 201, origin);
+  }
+  if (request.method === "PUT" && parts[3]) {
+    await env.DB.prepare("UPDATE dream_payment_accounts SET label=?,method=?,account_title=?,account_number=?,instructions=?,is_active=?,updated_at=? WHERE id=?").bind(...values, timestamp, parts[3]).run();
+    return json({ id: parts[3], ...body }, 200, origin);
+  }
+  return json({ error: "Method not allowed" }, 405, origin);
+}
+async function handleDreams(request, env, user, url, parts, origin) {
+  if (!env.DB) return json([], 200, origin);
+  const isAdminRequest = parts[1] === "admin";
+  if (isAdminRequest && !isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
+  if (isAdminRequest && parts[2] === "dreams" && parts[4] === "winner" && request.method === "PUT") {
+    const dreamId2 = parts[3];
+    const body2 = await readJson(request);
+    const participationId2 = String(body2?.participation_id || "").trim();
+    if (!dreamId2 || !participationId2) return json({ error: "Dream and winner participation are required" }, 400, origin);
+    const participation = await env.DB.prepare("SELECT p.*, d.name AS dream_name FROM dream_participations p JOIN dreams d ON d.id=p.dream_id WHERE p.id=? AND p.dream_id=? LIMIT 1").bind(participationId2, dreamId2).first();
+    if (!participation) return json({ error: "Participation not found for this Dream" }, 404, origin);
+    if (!["approved", "active"].includes(String(participation.status || "").toLowerCase())) return json({ error: "Only an approved or active participant can be selected" }, 409, origin);
+    const timestamp2 = now();
+    await env.DB.prepare("UPDATE dreams SET winner_participation_id=?,status='completed',completed_at=?,updated_at=? WHERE id=?").bind(participationId2, timestamp2, timestamp2, dreamId2).run();
+    await env.DB.prepare("UPDATE dream_participations SET status='completed',updated_at=? WHERE id=?").bind(timestamp2, participationId2).run();
+    await env.DB.prepare("UPDATE dream_participations SET status='closed',updated_at=? WHERE dream_id=? AND id<>? AND lower(status) IN ('approved','active','pending_approval')").bind(timestamp2, dreamId2, participationId2).run();
+    const others = await env.DB.prepare("SELECT user_id FROM dream_participations WHERE dream_id=? AND id<>? AND lower(status) IN ('closed','approved','active','pending_approval')").bind(dreamId2, participationId2).all();
+    await sendNotification(env, participation.user_id, "dream", "Your Dream has been completed", `Congratulations! You were selected as the winner of ${participation.dream_name}. Keep pursuing your Dreams with Givethra.`, `/dreams/${dreamId2}`);
+    for (const other of others.results || []) await sendNotification(env, other.user_id, "dream", "Dream winner announced", `${participation.dream_name} has been completed and its winner has been selected. Best of luck \u2014 you can keep pursuing your Dreams by joining another listed product.`, "/dreams");
+    return json({ success: true, winner_participation_id: participationId2, status: "completed" }, 200, origin);
+  }
+  if (isAdminRequest && parts[2] === "dreams") {
+    if (request.method === "GET") {
+      const rows = await env.DB.prepare(`SELECT d.*,
+        COALESCE(SUM(CASE WHEN lower(COALESCE(p.status,'')) IN ('approved','active','completed') THEN p.contribution_amount ELSE 0 END),0) AS funded_amount,
+        COALESCE(SUM(CASE WHEN lower(COALESCE(p.status,'')) IN ('approved','active','completed') THEN 1 ELSE 0 END),0) AS approved_participants,
+        COALESCE(SUM(CASE WHEN lower(COALESCE(p.status,'')) = 'pending_approval' THEN 1 ELSE 0 END),0) AS pending_participants
+        FROM dreams d LEFT JOIN dream_participations p ON p.dream_id=d.id GROUP BY d.id ORDER BY d.created_at DESC`).all();
+      return json(rows.results || [], 200, origin);
+    }
+    const body2 = await readJson(request);
+    const timestamp2 = now();
+    const dreamId2 = String(body2?.id || id()).trim();
+    const values = {
+      name: String(body2?.name || "").trim(),
+      category: String(body2?.category || "").trim(),
+      description: String(body2?.description || "").trim(),
+      contribution_amount: Math.max(0, Number(body2?.contribution_amount || 0)),
+      image_url: body2?.image_url ? String(body2.image_url).slice(0, 2e3) : null,
+      dream_price: Number(body2?.dream_price || 0),
+      actual_market_price: body2?.actual_market_price === "" || body2?.actual_market_price == null ? null : Number(body2.actual_market_price),
+      participant_capacity: Math.max(0, Math.floor(Number(body2?.participant_capacity || 0))),
+      internal_percentage_unit: body2?.internal_percentage_unit === "" || body2?.internal_percentage_unit == null ? null : Number(body2.internal_percentage_unit),
+      credit_award: Math.max(0, Number(body2?.credit_award || 0)),
+      announcement_at: body2?.announcement_at || null,
+      status: String(body2?.status || "open"),
+      publication_status: String(body2?.publication_status || "draft")
+    };
+    if (!values.name || !values.category || !values.description || !Number.isFinite(values.dream_price) || values.dream_price <= 0) return json({ error: "Name, category, description and Dream Price are required" }, 400, origin);
+    if (request.method === "POST") {
+      await env.DB.prepare(`INSERT INTO dreams (id,name,category,description,image_url,dream_price,contribution_amount,actual_market_price,participant_capacity,internal_percentage_unit,credit_award,announcement_at,status,publication_status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(dreamId2, values.name, values.category, values.description, values.image_url, values.dream_price, values.contribution_amount, values.actual_market_price, values.participant_capacity, values.internal_percentage_unit, values.credit_award, values.announcement_at, values.status, values.publication_status, timestamp2, timestamp2).run();
+      return json({ id: dreamId2, ...values }, 201, origin);
+    }
+    if (request.method === "PUT" && parts[3]) {
+      await env.DB.prepare(`UPDATE dreams SET name=?,category=?,description=?,image_url=?,dream_price=?,contribution_amount=?,actual_market_price=?,participant_capacity=?,internal_percentage_unit=?,credit_award=?,announcement_at=?,status=?,publication_status=?,updated_at=? WHERE id=?`).bind(values.name, values.category, values.description, values.image_url, values.dream_price, values.contribution_amount, values.actual_market_price, values.participant_capacity, values.internal_percentage_unit, values.credit_award, values.announcement_at, values.status, values.publication_status, timestamp2, parts[3]).run();
+      return json({ id: parts[3], ...values }, 200, origin);
+    }
+    if (request.method === "DELETE" && parts[3]) {
+      const existing2 = await env.DB.prepare("SELECT id FROM dreams WHERE id=? LIMIT 1").bind(parts[3]).first();
+      if (!existing2) return json({ error: "Dream not found" }, 404, origin);
+      const active = await env.DB.prepare("SELECT COUNT(*) AS count FROM dream_participations WHERE dream_id=? AND lower(status) NOT IN ('rejected','cancelled')").bind(parts[3]).first();
+      if (Number(active?.count || 0) > 0) return json({ error: "This Dream has participation records and cannot be deleted. Close it instead." }, 409, origin);
+      await env.DB.prepare("DELETE FROM dreams WHERE id=?").bind(parts[3]).run();
+      return json({ deleted: true, id: parts[3] }, 200, origin);
+    }
+  }
+  if (isAdminRequest && parts[2] === "dream-participations") {
+    if (request.method === "GET") {
+      const where = parts[3] ? "WHERE p.dream_id = ?" : "";
+      const query = `SELECT p.*, d.name AS dream_name, d.dream_price, u.email, COALESCE(pr.full_name,u.full_name,u.email) AS user_name FROM dream_participations p JOIN dreams d ON d.id=p.dream_id LEFT JOIN users u ON u.user_id=p.user_id LEFT JOIN profiles pr ON pr.user_id=p.user_id ${where} ORDER BY CASE p.status WHEN 'pending_approval' THEN 0 ELSE 1 END, p.created_at DESC`;
+      const rows = parts[3] ? await env.DB.prepare(query).bind(parts[3]).all() : await env.DB.prepare(query).all();
+      return json(rows.results || [], 200, origin);
+    }
+    if (request.method === "PUT" && parts[3]) {
+      const participation = await env.DB.prepare("SELECT p.*, d.name AS dream_name, d.credit_award FROM dream_participations p JOIN dreams d ON d.id=p.dream_id WHERE p.id=?").bind(parts[3]).first();
+      if (!participation) return json({ error: "Participation not found" }, 404, origin);
+      const body2 = await readJson(request);
+      const next = String(body2?.status || "").toLowerCase();
+      if (!["approved", "rejected", "completed", "cancelled"].includes(next)) return json({ error: "Invalid status" }, 400, origin);
+      if (next === "approved" && String(participation.status).toLowerCase() !== "approved") {
+        const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM dream_participations WHERE dream_id=? AND lower(status) IN ('approved','active','completed')").bind(participation.dream_id).first();
+        const dream2 = await env.DB.prepare("SELECT dream_price,participant_capacity FROM dreams WHERE id=?").bind(participation.dream_id).first();
+        if (Number(count?.count || 0) >= Number(dream2?.participant_capacity || 0)) return json({ error: "Participant capacity has been reached" }, 409, origin);
+        const registration = `GT-DREAM-${String(Date.now()).slice(-6)}${Math.floor(Math.random() * 10)}`;
+        await env.DB.prepare("UPDATE dream_participations SET status='approved',registration_number=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(registration, user.user_id, now(), now(), parts[3]).run();
+        if (Number(participation.credit_award || 0) > 0) await addCredits(env, participation.user_id, Number(participation.credit_award), "dream_participation", `Givethra Credit for ${participation.dream_name}`, parts[3]);
+        await sendNotification(env, participation.user_id, "dream", "Dream Approved", "Your Dream participation is now active and your Givethra Credit has been credited.", "/dreams");
+      } else if (next === "rejected") {
+        await env.DB.prepare("UPDATE dream_participations SET status='rejected',rejection_reason=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(String(body2?.rejection_reason || "Payment proof was not approved").slice(0, 2e3), user.user_id, now(), now(), parts[3]).run();
+        await sendNotification(env, participation.user_id, "dream", "Dream Submission Update", String(body2?.rejection_reason || "Your Dream submission was not approved."), "/dreams");
+      } else {
+        await env.DB.prepare("UPDATE dream_participations SET status=?,updated_at=? WHERE id=?").bind(next, now(), parts[3]).run();
+      }
+      return json(await env.DB.prepare("SELECT * FROM dream_participations WHERE id=?").bind(parts[3]).first(), 200, origin);
+    }
+  }
+  if (request.method === "GET") {
+    const base = `SELECT d.id, d.name, d.category, d.description, d.image_url, d.dream_price, d.participant_capacity, d.contribution_amount, d.status, d.announcement_at, d.completed_at,
+      COALESCE(SUM(CASE WHEN lower(COALESCE(p.status, '')) IN ('approved','active','completed') THEN p.contribution_amount ELSE 0 END), 0) AS funded_amount,
+      COALESCE(SUM(CASE WHEN lower(COALESCE(p.status, '')) IN ('approved','active','completed') THEN 1 ELSE 0 END), 0) AS approved_participants
+      FROM dreams d LEFT JOIN dream_participations p ON p.dream_id = d.id WHERE lower(COALESCE(d.publication_status, '')) = 'published'`;
+    if (parts[2]) {
+      const row = await env.DB.prepare(`${base} AND d.id = ? GROUP BY d.id LIMIT 1`).bind(parts[2]).first();
+      return row ? json(row, 200, origin) : json({ error: "Dream not found" }, 404, origin);
+    }
+    const rows = await env.DB.prepare(`${base} AND lower(COALESCE(d.status, '')) IN ('open','active') GROUP BY d.id ORDER BY d.created_at DESC`).all();
+    return json(rows.results || [], 200, origin);
+  }
+  if (parts[0] !== "api" || parts[1] !== "dream-participations" || request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
+  if (!user) return json({ error: "Authentication required" }, 401, origin);
+  const body = await readJson(request);
+  const dreamId = String(body?.dream_id || "").trim();
+  const requestedAmount = Number(body?.contribution_amount || 0);
+  const transactionId = String(body?.transaction_id || "").trim();
+  if (!dreamId || !Number.isFinite(requestedAmount) || requestedAmount <= 0 || !transactionId) return json({ error: "Dream, amount and transaction ID are required" }, 400, origin);
+  const dream = await env.DB.prepare("SELECT id,name,status,participant_capacity,contribution_amount FROM dreams WHERE id=? AND lower(COALESCE(publication_status,''))='published'").bind(dreamId).first();
+  if (!dream || !["open", "active"].includes(String(dream.status || "").toLowerCase())) return json({ error: "This Dream is not open" }, 409, origin);
+  const amount = Number(dream.contribution_amount || 0);
+  if (!amount || requestedAmount !== amount) return json({ error: `This Dream requires a fixed contribution of PKR ${amount.toLocaleString()}.` }, 400, origin);
+  const existing = await env.DB.prepare("SELECT id,status FROM dream_participations WHERE dream_id=? AND user_id=? AND lower(status) NOT IN ('rejected','cancelled') LIMIT 1").bind(dreamId, user.user_id).first();
+  if (existing) return json({ error: "You are already part of this Dream", participation: existing }, 409, origin);
+  const activeOther = await env.DB.prepare("SELECT id FROM dream_participations WHERE user_id=? AND lower(status) IN ('pending_approval','approved','active') AND dream_id<>? LIMIT 1").bind(user.user_id, dreamId).first();
+  if (activeOther) return json({ error: "You already have an active Dream. Complete your current Dream journey before joining another Dream." }, 409);
+  const funding = await env.DB.prepare("SELECT dream_price, COALESCE((SELECT SUM(contribution_amount) FROM dream_participations WHERE dream_id=? AND lower(status) IN ('approved','active','completed')),0) AS funded FROM dreams WHERE id=?").bind(dreamId, dreamId).first();
+  if (Number(funding?.funded || 0) >= Number(funding?.dream_price || 0) || Number(funding?.funded || 0) + amount > Number(funding?.dream_price || 0)) return json({ error: "This Dream has reached its funding target or the contribution exceeds the remaining amount." }, 409);
+  const timestamp = now();
+  const participationId = id();
+  await env.DB.prepare(`INSERT INTO dream_participations (id,dream_id,user_id,full_name,father_husband_name,cnic_number,mobile_number,payment_method,contribution_amount,transaction_id,proof_url,note,province,city,address,postal_code,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending_approval',?,?)`).bind(participationId, dreamId, user.user_id, body?.full_name || user.full_name || null, body?.father_husband_name || null, body?.cnic_number || null, body?.mobile_number || null, body?.payment_method || null, amount, transactionId, body?.proof_url || null, body?.note || null, body?.province || null, body?.city || null, body?.address || null, body?.postal_code || null, timestamp, timestamp).run();
+  await sendNotification(env, user.user_id, "dream", "Dream Submitted", "Your Dream participation has been submitted and is awaiting verification.", `/dreams/${dreamId}`);
+  return json({ id: participationId, dream_id: dreamId, status: "pending_approval", message: "Dream submission received for admin verification" }, 201, origin);
+}
+export {
+  worker_default as default,
+  handlePublicFeedback,
+  signSessionPayload,
+  synchronizeCompletedCase,
+  verifySessionToken
+};
