@@ -2416,10 +2416,4 @@ async function handleDreams(request, env, user, url, parts, origin) {
   await sendNotification(env, user.user_id, "dream", "Dream Submitted", "Your Dream participation has been submitted and is awaiting verification.", `/dreams/${dreamId}`);
   return json({ id: participationId, dream_id: dreamId, status: "pending_approval", message: "Dream submission received for admin verification" }, 201, origin);
 }
-export {
-  worker_default as default,
-  handlePublicFeedback,
-  signSessionPayload,
-  synchronizeCompletedCase,
-  verifySessionToken
-};
+export default worker_default;
