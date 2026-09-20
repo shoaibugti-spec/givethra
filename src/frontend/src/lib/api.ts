@@ -1056,6 +1056,11 @@ export async function getDreams() {
 
 export async function getDream(id: string) {
   const res = await fetchWithAuth(`${WORKER_URL}/api/dreams/${encodeURIComponent(id)}`, { headers: headers() });
+  if (res.ok) return readApiResponse(res);
+  // Some older Worker versions did not expose the detail route consistently; use the public list as a safe fallback.
+  const list = await getDreams();
+  const match = list.find((dream: any) => String(dream.id) === String(id));
+  if (match) return match;
   return readApiResponse(res);
 }
 
@@ -1099,5 +1104,10 @@ export async function adminGetDreamPaymentAccounts() {
 }
 export async function adminSaveDreamPaymentAccount(data: any, id?: string) {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dream-payment-accounts${id ? `/${encodeURIComponent(id)}` : ""}`, { method: id ? "PUT" : "POST", headers: headers(), body: JSON.stringify(data) });
+  return readApiResponse(res);
+}
+
+export async function adminSelectDreamWinner(dreamId: string, participationId: string) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dreams/${encodeURIComponent(dreamId)}/winner`, { method: "PUT", headers: headers(), body: JSON.stringify({ participation_id: participationId }) });
   return readApiResponse(res);
 }
