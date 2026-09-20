@@ -1067,3 +1067,23 @@ export async function createDreamParticipation(data: Record<string, unknown>) {
   });
   return readApiResponse(res);
 }
+
+
+// ---------- DREAMS ----------
+export async function adminGetDreams() {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dreams`, { headers: headers(), cache: "no-store" });
+  return readApiResponse<any[]>(res);
+}
+export async function adminSaveDream(data: any, id?: string) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dreams${id ? `/${encodeURIComponent(id)}` : ""}`, { method: id ? "PUT" : "POST", headers: headers(), body: JSON.stringify(data) });
+  return readApiResponse(res);
+}
+export async function adminGetDreamParticipations(dreamId?: string) {
+  const path = dreamId ? `/api/admin/dream-participations/${encodeURIComponent(dreamId)}` : "/api/admin/dream-participations";
+  const res = await fetchWithAuth(`${WORKER_URL}${path}`, { headers: headers(), cache: "no-store" });
+  return readApiResponse<any[]>(res);
+}
+export async function adminReviewDreamParticipation(id: string, data: { status: string; rejection_reason?: string }) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dream-participations/${encodeURIComponent(id)}`, { method: "PUT", headers: headers(), body: JSON.stringify(data) });
+  return readApiResponse(res);
+}

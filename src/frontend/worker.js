@@ -434,7 +434,7 @@ async function deductCredits(env, userId, amount, type, description, referenceId
 }
 
 async function addCredits(env, userId, amount, type, description, referenceId = null) {
-  if (!["deposit", "support_to_credit"].includes(type)) throw new Error("Credits can only come from an approved deposit or Support conversion");
+  if (!["deposit", "support_to_credit", "dream_participation"].includes(type)) throw new Error("Credits can only come from an approved deposit or Support conversion");
   await env.DB.prepare(
     "INSERT INTO wallets (user_id, balance, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = balance + excluded.balance, updated_at = excluded.updated_at"
   ).bind(userId, amount, now()).run();
@@ -1214,7 +1214,7 @@ async function handleNotifications(request, env, user, url, parts, origin) {
     }
     const nid = id();
     await env.DB.prepare(
-      `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at) 
+      `INSERT INTO notifications (id, user_id, type, title, message, link, is_read, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(nid, notification.user_id, notification.type || null, notification.title, notification.message || null, notification.link || null, notification.is_read ? 1 : 0, now()).run();
     return json({ id: nid, ...notification, created_at: now() }, 201, origin);
@@ -1246,7 +1246,7 @@ async function synchronizeCompletedCase(env, resolutionId) {
     "SELECT r.case_id, r.hero_id, r.seeker_id, r.paid_to, r.status, r.admin_confirmed, c.title AS case_title FROM case_resolutions r LEFT JOIN case_submissions c ON c.id = r.case_id WHERE r.id = ?"
   ).bind(resolutionId).first();
   if (!resolution?.case_id) return null;
-  
+
   const normalizedStatus = String(resolution.status || "").trim().toLowerCase();
   const isApproved = ["completed", "approved", "seeker_confirmed"].includes(normalizedStatus) &&
                       [1, "1", true, "true", "yes"].includes(resolution.admin_confirmed);
@@ -1255,7 +1255,7 @@ async function synchronizeCompletedCase(env, resolutionId) {
   // Sum all approved resolutions for this case
   const totals = await env.DB.prepare(
     `SELECT c.user_id, c.amount_needed, c.amount_collected,
-            COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0)) 
+            COALESCE((SELECT SUM(COALESCE(r.amount_paid, 0))
                       FROM case_resolutions r
                       WHERE r.case_id = c.id
                         AND lower(COALESCE(r.status, '')) IN ('completed', 'approved', 'seeker_confirmed')
@@ -1401,7 +1401,7 @@ async function handleRequest(request, env, ctx) {
       ).bind(now(), now(), user.user_id).run();
       return json({ updated: true, user_id: user.user_id }, 200, origin);
     }
-    
+
     if (parts[2] === "posts" && parts.length === 3 && request.method === "GET") {
       return handleCommunityPosts(request, env, user, url, parts, origin, ctx);
     }
@@ -1425,7 +1425,7 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
-    if (parts[1] === "dream-participations") {
+    if (parts[1] === "dream-participations" || (parts[1] === "admin" && ["dreams", "dream-participations"].includes(parts[2]))) {
       return handleDreams(request, env, user, url, parts, origin);
     }
     // COMMUNITY CONTRIBUTIONS: deliberately separate from the Credits Wallet.
@@ -2426,35 +2426,85 @@ export default {
 // ============================================================
 async function handleDreams(request, env, user, url, parts, origin) {
   if (!env.DB) return json([], 200, origin);
+  const isAdminRequest = parts[1] === "admin";
+  if (isAdminRequest && !isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
+
+  // Admin product catalogue: actual price and internal unit never leave this branch.
+  if (isAdminRequest && parts[2] === "dreams") {
+    if (request.method === "GET") {
+      const rows = await env.DB.prepare(`SELECT d.*,
+        COALESCE(SUM(CASE WHEN lower(COALESCE(p.status,'')) IN ('approved','active','completed') THEN p.contribution_amount ELSE 0 END),0) AS funded_amount,
+        COALESCE(SUM(CASE WHEN lower(COALESCE(p.status,'')) IN ('approved','active','completed') THEN 1 ELSE 0 END),0) AS approved_participants,
+        COALESCE(SUM(CASE WHEN lower(COALESCE(p.status,'')) = 'pending_approval' THEN 1 ELSE 0 END),0) AS pending_participants
+        FROM dreams d LEFT JOIN dream_participations p ON p.dream_id=d.id GROUP BY d.id ORDER BY d.created_at DESC`).all();
+      return json(rows.results || [], 200, origin);
+    }
+    const body = await readJson(request); const timestamp = now();
+    const dreamId = String(body?.id || id()).trim();
+    const values = {
+      name: String(body?.name || '').trim(), category: String(body?.category || '').trim(), description: String(body?.description || '').trim(),
+      image_url: body?.image_url ? String(body.image_url).slice(0,2000) : null, dream_price: Number(body?.dream_price || 0), actual_market_price: body?.actual_market_price === '' || body?.actual_market_price == null ? null : Number(body.actual_market_price),
+      participant_capacity: Math.max(0, Math.floor(Number(body?.participant_capacity || 0))), internal_percentage_unit: body?.internal_percentage_unit === '' || body?.internal_percentage_unit == null ? null : Number(body.internal_percentage_unit), credit_award: Math.max(0, Number(body?.credit_award || 0)), announcement_at: body?.announcement_at || null, status: String(body?.status || 'open'), publication_status: String(body?.publication_status || 'draft')
+    };
+    if (!values.name || !values.category || !values.description || !Number.isFinite(values.dream_price) || values.dream_price <= 0) return json({ error: "Name, category, description and Dream Price are required" }, 400, origin);
+    if (request.method === "POST") {
+      await env.DB.prepare(`INSERT INTO dreams (id,name,category,description,image_url,dream_price,actual_market_price,participant_capacity,internal_percentage_unit,credit_award,announcement_at,status,publication_status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(dreamId, values.name, values.category, values.description, values.image_url, values.dream_price, values.actual_market_price, values.participant_capacity, values.internal_percentage_unit, values.credit_award, values.announcement_at, values.status, values.publication_status, timestamp, timestamp).run();
+      return json({ id: dreamId, ...values }, 201, origin);
+    }
+    if (request.method === "PUT" && parts[3]) {
+      await env.DB.prepare(`UPDATE dreams SET name=?,category=?,description=?,image_url=?,dream_price=?,actual_market_price=?,participant_capacity=?,internal_percentage_unit=?,credit_award=?,announcement_at=?,status=?,publication_status=?,updated_at=? WHERE id=?`).bind(values.name,values.category,values.description,values.image_url,values.dream_price,values.actual_market_price,values.participant_capacity,values.internal_percentage_unit,values.credit_award,values.announcement_at,values.status,values.publication_status,timestamp,parts[3]).run();
+      return json({ id: parts[3], ...values }, 200, origin);
+    }
+  }
+
+  if (isAdminRequest && parts[2] === "dream-participations") {
+    if (request.method === "GET") {
+      const where = parts[3] ? "WHERE p.dream_id = ?" : "";
+      const query = `SELECT p.*, d.name AS dream_name, d.dream_price, u.email, COALESCE(pr.full_name,u.full_name,u.email) AS user_name FROM dream_participations p JOIN dreams d ON d.id=p.dream_id LEFT JOIN users u ON u.user_id=p.user_id LEFT JOIN profiles pr ON pr.user_id=p.user_id ${where} ORDER BY CASE p.status WHEN 'pending_approval' THEN 0 ELSE 1 END, p.created_at DESC`;
+      const rows = parts[3] ? await env.DB.prepare(query).bind(parts[3]).all() : await env.DB.prepare(query).all();
+      return json(rows.results || [], 200, origin);
+    }
+    if (request.method === "PUT" && parts[3]) {
+      const participation = await env.DB.prepare("SELECT p.*, d.name AS dream_name, d.credit_award FROM dream_participations p JOIN dreams d ON d.id=p.dream_id WHERE p.id=?").bind(parts[3]).first();
+      if (!participation) return json({ error: "Participation not found" }, 404, origin);
+      const body = await readJson(request); const next = String(body?.status || '').toLowerCase();
+      if (!["approved","rejected","completed","cancelled"].includes(next)) return json({ error: "Invalid status" }, 400, origin);
+      if (next === "approved" && String(participation.status).toLowerCase() !== "approved") {
+        const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM dream_participations WHERE dream_id=? AND lower(status) IN ('approved','active','completed')").bind(participation.dream_id).first();
+        const dream = await env.DB.prepare("SELECT dream_price,participant_capacity FROM dreams WHERE id=?").bind(participation.dream_id).first();
+        if (Number(count?.count || 0) >= Number(dream?.participant_capacity || 0)) return json({ error: "Participant capacity has been reached" }, 409, origin);
+        const registration = `GT-DREAM-${String(Date.now()).slice(-6)}${Math.floor(Math.random()*10)}`;
+        await env.DB.prepare("UPDATE dream_participations SET status='approved',registration_number=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(registration,user.user_id,now(),now(),parts[3]).run();
+        if (Number(participation.credit_award || 0) > 0) await addCredits(env, participation.user_id, Number(participation.credit_award), "dream_participation", `Givethra Credit for ${participation.dream_name}`, parts[3]);
+        await sendNotification(env, participation.user_id, "dream", "Dream Approved", "Your Dream participation is now active and your Givethra Credit has been credited.", "/dreams");
+      } else if (next === "rejected") {
+        await env.DB.prepare("UPDATE dream_participations SET status='rejected',rejection_reason=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(String(body?.rejection_reason || "Payment proof was not approved").slice(0,2000),user.user_id,now(),now(),parts[3]).run();
+        await sendNotification(env, participation.user_id, "dream", "Dream Submission Update", String(body?.rejection_reason || "Your Dream submission was not approved."), "/dreams");
+      } else {
+        await env.DB.prepare("UPDATE dream_participations SET status=?,updated_at=? WHERE id=?").bind(next,now(),parts[3]).run();
+      }
+      return json(await env.DB.prepare("SELECT * FROM dream_participations WHERE id=?").bind(parts[3]).first(), 200, origin);
+    }
+  }
+
   if (request.method === "GET") {
-    const base = `SELECT d.id, d.name, d.category, d.description, d.image_url, d.dream_price,
-      d.participant_capacity, d.status, d.announcement_at,
+    const base = `SELECT d.id, d.name, d.category, d.description, d.image_url, d.dream_price, d.participant_capacity, d.status, d.announcement_at,
       COALESCE(SUM(CASE WHEN lower(COALESCE(p.status, '')) IN ('approved','active','completed') THEN p.contribution_amount ELSE 0 END), 0) AS funded_amount,
       COALESCE(SUM(CASE WHEN lower(COALESCE(p.status, '')) IN ('approved','active','completed') THEN 1 ELSE 0 END), 0) AS approved_participants
-      FROM dreams d LEFT JOIN dream_participations p ON p.dream_id = d.id
-      WHERE lower(COALESCE(d.publication_status, '')) = 'published'`;
-    if (parts[2]) {
-      const row = await env.DB.prepare(`${base} AND d.id = ? GROUP BY d.id LIMIT 1`).bind(parts[2]).first();
-      return row ? json(row, 200, origin) : json({ error: "Dream not found" }, 404, origin);
-    }
-    const rows = await env.DB.prepare(`${base} AND lower(COALESCE(d.status, '')) IN ('open','active') GROUP BY d.id ORDER BY d.created_at DESC`).all();
-    return json(rows.results || [], 200, origin);
+      FROM dreams d LEFT JOIN dream_participations p ON p.dream_id = d.id WHERE lower(COALESCE(d.publication_status, '')) = 'published'`;
+    if (parts[2]) { const row = await env.DB.prepare(`${base} AND d.id = ? GROUP BY d.id LIMIT 1`).bind(parts[2]).first(); return row ? json(row, 200, origin) : json({ error: "Dream not found" }, 404, origin); }
+    const rows = await env.DB.prepare(`${base} AND lower(COALESCE(d.status, '')) IN ('open','active') GROUP BY d.id ORDER BY d.created_at DESC`).all(); return json(rows.results || [], 200, origin);
   }
-  if (parts[0] !== "api" || parts[1] !== "dream-participations" || request.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405, origin);
-  }
+  if (parts[0] !== "api" || parts[1] !== "dream-participations" || request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
   if (!user) return json({ error: "Authentication required" }, 401, origin);
-  const body = await readJson(request);
-  const dreamId = String(body?.dream_id || "").trim();
-  const amount = Number(body?.contribution_amount || 0);
-  const transactionId = String(body?.transaction_id || "").trim();
+  const body = await readJson(request); const dreamId = String(body?.dream_id || '').trim(); const amount = Number(body?.contribution_amount || 0); const transactionId = String(body?.transaction_id || '').trim();
   if (!dreamId || !Number.isFinite(amount) || amount <= 0 || !transactionId) return json({ error: "Dream, amount and transaction ID are required" }, 400, origin);
-  const dream = await env.DB.prepare("SELECT id, name, status, participant_capacity FROM dreams WHERE id = ? AND lower(COALESCE(publication_status, '')) = 'published'").bind(dreamId).first();
-  if (!dream || !['open', 'active'].includes(String(dream.status || '').toLowerCase())) return json({ error: "This Dream is not open" }, 409, origin);
-  const existing = await env.DB.prepare("SELECT id, status FROM dream_participations WHERE dream_id = ? AND user_id = ? AND lower(status) NOT IN ('rejected','cancelled') LIMIT 1").bind(dreamId, user.user_id).first();
+  const dream = await env.DB.prepare("SELECT id,name,status,participant_capacity FROM dreams WHERE id=? AND lower(COALESCE(publication_status,''))='published'").bind(dreamId).first();
+  if (!dream || !['open','active'].includes(String(dream.status || '').toLowerCase())) return json({ error: "This Dream is not open" }, 409, origin);
+  const existing = await env.DB.prepare("SELECT id,status FROM dream_participations WHERE dream_id=? AND user_id=? AND lower(status) NOT IN ('rejected','cancelled') LIMIT 1").bind(dreamId,user.user_id).first();
   if (existing) return json({ error: "You are already part of this Dream", participation: existing }, 409, origin);
-  const timestamp = now();
-  const participationId = id();
-  await env.DB.prepare(`INSERT INTO dream_participations (id, dream_id, user_id, contribution_amount, transaction_id, proof_url, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_approval', ?, ?)`).bind(participationId, dreamId, user.user_id, amount, transactionId, body?.proof_url ? String(body.proof_url).slice(0, 2000) : null, body?.note ? String(body.note).slice(0, 2000) : null, timestamp, timestamp).run();
-  return json({ id: participationId, dream_id: dreamId, status: "pending_approval", message: "Dream submission received for admin verification" }, 201, origin);
+  const timestamp = now(); const participationId = id();
+  await env.DB.prepare(`INSERT INTO dream_participations (id,dream_id,user_id,full_name,father_husband_name,cnic_number,mobile_number,payment_method,contribution_amount,transaction_id,proof_url,note,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'pending_approval',?,?)`).bind(participationId,dreamId,user.user_id,body?.full_name || user.full_name || null,body?.father_husband_name || null,body?.cnic_number || null,body?.mobile_number || null,body?.payment_method || null,amount,transactionId,body?.proof_url || null,body?.note || null,timestamp,timestamp).run();
+  await sendNotification(env,user.user_id,"dream","Dream Submitted","Your Dream participation has been submitted and is awaiting verification.",`/dreams/${dreamId}`);
+  return json({ id: participationId,dream_id:dreamId,status:"pending_approval",message:"Dream submission received for admin verification" },201,origin);
 }
