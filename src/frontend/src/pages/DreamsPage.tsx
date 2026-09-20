@@ -26,13 +26,13 @@ export default function DreamsPage() {
   const categories = useMemo(() => ["All", ...Array.from(new Set(dreams.map((d) => d.category)))], [dreams]);
   const visible = useMemo(() => dreams.filter((d) => `${d.name} ${d.category} ${d.description}`.toLowerCase().includes(query.toLowerCase()) && (category === "All" || d.category === category)), [dreams, query, category]);
   return <Layout><main className="min-h-screen bg-gradient-to-b from-teal-50/70 via-background to-background pb-24 md:pb-10">
-    <section className="relative isolate overflow-hidden border-b border-teal-100 bg-gradient-to-br from-[#075e69] via-[#0b8795] to-[#32b6a6] text-white">
-      <img src="/dreams-hero-products.png" alt="Cars, motorcycle, washing machine, air conditioner, television, refrigerator and home products" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover object-[68%_center] opacity-95 mix-blend-screen" />
-      <div className="absolute inset-0 -z-0 bg-gradient-to-r from-[#075e69] via-[#087f8b]/90 to-[#0b8795]/35" />
+    <section className="relative isolate overflow-hidden border-b border-teal-100 bg-[#075e69] text-white">
+      <img src="/dreams-hero-products.png" alt="Cars, motorcycle, washing machine, air conditioner, television, refrigerator and home products" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover object-[68%_center] opacity-100" />
+      <div className="absolute inset-0 -z-0 bg-gradient-to-r from-[#075e69]/88 via-[#087f8b]/35 to-transparent" />
       <div className="absolute -right-24 -top-28 z-0 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 md:px-8 md:py-16">
         <div className="max-w-2xl">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em]"><Sparkles className="h-3.5 w-3.5" /> Givethra Dreams</div>
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/35 bg-[#075e69]/80 px-4 py-2 text-sm font-black uppercase tracking-[0.18em] shadow-lg shadow-black/15"><Sparkles className="h-4 w-4" /> <span>Givethra Dreams</span></div>
           <h1 className="font-display text-4xl font-black tracking-tight md:text-6xl">A meaningful step toward something you dream of.</h1>
           <p className="mt-5 max-w-xl text-base leading-7 text-white/90 md:text-lg">Explore products listed by Givethra, see the real funding progress, and contribute an amount that works for you.</p>
         </div>
