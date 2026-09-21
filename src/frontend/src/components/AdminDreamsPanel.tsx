@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { adminDeleteDream, adminGetDreamParticipations, adminGetDreamPaymentAccounts, adminGetDreams, adminReviewDreamParticipation, adminSaveDream, adminSaveDreamPaymentAccount, adminSelectDreamWinner, uploadFileToStorage } from "@/lib/api";
 
-const emptyForm = { name: "", category: "Car", description: "", image_url: "", actual_market_price: "", dream_price: "", contribution_amount: "", participant_capacity: "100", internal_percentage_unit: "", credit_award: "0", announcement_at: "", status: "open", publication_status: "published" };
+const emptyForm = { name: "", category: "Car", description: "", image_url: "", actual_market_price: "", dream_price: "", contribution_amount: "", quantity: "1", participant_capacity: "100", internal_percentage_unit: "", credit_award: "0", announcement_at: "", status: "open", publication_status: "published" };
 const emptyAccount = { label: "", method: "Bank Transfer", account_title: "", account_number: "", instructions: "", is_active: true };
 const money = (v: any) => `PKR ${Number(v || 0).toLocaleString()}`;
 
@@ -40,7 +40,7 @@ export default function AdminDreamsPanel() {
     e.preventDefault();
     setBusy(true);
     try {
-      await adminSaveDream({ ...form, dream_price: Number(form.dream_price), contribution_amount: Number(form.contribution_amount || 0), actual_market_price: form.actual_market_price === "" ? null : Number(form.actual_market_price), participant_capacity: Number(form.participant_capacity), internal_percentage_unit: form.internal_percentage_unit === "" ? null : Number(form.internal_percentage_unit), credit_award: Number(form.credit_award || 0) }, editing);
+      await adminSaveDream({ ...form, dream_price: Number(form.dream_price), contribution_amount: Number(form.contribution_amount || 0), actual_market_price: form.actual_market_price === "" ? null : Number(form.actual_market_price), quantity: Number(form.quantity || 0), participant_capacity: Number(form.participant_capacity), internal_percentage_unit: form.internal_percentage_unit === "" ? null : Number(form.internal_percentage_unit), credit_award: Number(form.credit_award || 0) }, editing);
       toast.success(editing ? "Dream updated" : "Dream created");
       setForm(emptyForm);
       setEditing(undefined);
@@ -143,6 +143,7 @@ export default function AdminDreamsPanel() {
             <Input placeholder="Market value — user ko dikhta hai (e.g. 5000)" inputMode="numeric" value={form.actual_market_price} onChange={e => set("actual_market_price", e.target.value)} />
             <Input placeholder="Funding goal — asli target (e.g. 7000)" inputMode="numeric" value={form.dream_price} onChange={e => set("dream_price", e.target.value)} required />
             <Input placeholder="Suggested contribution per participant" inputMode="numeric" value={form.contribution_amount} onChange={e => set("contribution_amount", e.target.value)} />
+            <Input placeholder="Product quantity (e.g. 1, 2, 5)" inputMode="numeric" value={form.quantity} onChange={e => set("quantity", e.target.value)} required />
             <div className="grid grid-cols-2 gap-2">
               <Input placeholder="Participant capacity" inputMode="numeric" value={form.participant_capacity} onChange={e => set("participant_capacity", e.target.value)} />
               <Input placeholder="Credit award" inputMode="numeric" value={form.credit_award} onChange={e => set("credit_award", e.target.value)} />
@@ -212,7 +213,7 @@ export default function AdminDreamsPanel() {
                     </div>
                   </div>
                   <div className="mt-3 flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => { setEditing(d.id); setForm({ ...emptyForm, ...d, actual_market_price: d.actual_market_price ?? "", dream_price: d.dream_price ?? "", contribution_amount: d.contribution_amount ?? "", participant_capacity: d.participant_capacity ?? "", internal_percentage_unit: d.internal_percentage_unit ?? "", credit_award: d.credit_award ?? "" }); }}>Edit details</Button>
+                    <Button size="sm" variant="outline" onClick={() => { setEditing(d.id); setForm({ ...emptyForm, ...d, actual_market_price: d.actual_market_price ?? "", dream_price: d.dream_price ?? "", contribution_amount: d.contribution_amount ?? "", quantity: d.quantity ?? "", participant_capacity: d.participant_capacity ?? "", internal_percentage_unit: d.internal_percentage_unit ?? "", credit_award: d.credit_award ?? "" }); }}>Edit details</Button>
                     <Button size="sm" variant="outline" className="text-red-600" onClick={() => void removeDream(d)}>Delete</Button>
                   </div>
                 </div>
