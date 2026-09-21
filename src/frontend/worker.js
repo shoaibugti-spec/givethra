@@ -1428,7 +1428,10 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
-    if (parts[1] === "dream-participations" || (parts[1] === "admin" && ["dreams", "dream-participations", "dream-payment-accounts"].includes(parts[2]))) {
+    if (parts[1] === "dream-payment-accounts" || (parts[1] === "admin" && parts[2] === "dream-payment-accounts")) {
+      return handleDreamPaymentAccounts(request, env, user, parts, origin);
+    }
+    if (parts[1] === "dream-participations" || (parts[1] === "admin" && ["dreams", "dream-participations"].includes(parts[2]))) {
       return handleDreams(request, env, user, url, parts, origin);
     }
     // COMMUNITY CONTRIBUTIONS: deliberately separate from the Credits Wallet.
