@@ -203,7 +203,7 @@ export default function DreamDetailPage() {
                     </div>
                     <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground md:text-xs">
                       <span>{money(dream.funded_amount)} raised</span>
-                      <span>{money(left)} left</span>
+                      <span>Target {money(mv)} · {money(left)} left</span>
                     </div>
                   </div>
 
