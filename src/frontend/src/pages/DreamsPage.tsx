@@ -308,9 +308,9 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
             </div>
           </div>
           <div className="mt-2"><ProgressBar percent={percent} /></div>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
             <span><Users className="mr-1 inline h-3.5 w-3.5" />{dream.approved_participants} joined · {spotsLeft} left</span>
-            <span>{money(left)} still needed</span>
+            <span>Target {money(mv)} · {money(left)} still needed</span>
           </div>
           <div className="mt-3">
             <Link to="/dreams/$id" params={{ id: dream.id }}>
