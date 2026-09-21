@@ -2486,7 +2486,7 @@ async function handleDreams(request, env, user, url, parts, origin) {
       name: String(body?.name || '').trim(), category: String(body?.category || '').trim(), description: String(body?.description || '').trim(),
       contribution_amount: Math.max(0, Number(body?.contribution_amount || 0)),
       image_url: body?.image_url ? String(body.image_url).slice(0,2000) : null, dream_price: Number(body?.dream_price || 0), actual_market_price: body?.actual_market_price === '' || body?.actual_market_price == null ? null : Number(body.actual_market_price),
-      participant_capacity: Math.max(0, Math.floor(Number(body?.participant_capacity || 0))), internal_percentage_unit: body?.internal_percentage_unit === '' || body?.internal_percentage_unit == null ? null : Number(body.internal_percentage_unit), credit_award: Math.max(0, Number(body?.credit_award || 0)), announcement_at: body?.announcement_at || null, status: String(body?.status || 'open'), publication_status: String(body?.publication_status || 'draft')
+      participant_capacity: Math.max(0, Math.floor(Number(body?.participant_capacity || 0))), internal_percentage_unit: body?.internal_percentage_unit === '' || body?.internal_percentage_unit == null ? null : Number(body.internal_percentage_unit), credit_award: Math.max(0, Number(body?.credit_award || 0)), announcement_at: body?.announcement_at || null, status: String(body?.status || 'open'), publication_status: String(body?.publication_status || 'published')
     };
     if (!values.name || !values.category || !values.description || !Number.isFinite(values.dream_price) || values.dream_price <= 0) return json({ error: "Name, category, description and Dream Price are required" }, 400, origin);
     if (request.method === "POST") {

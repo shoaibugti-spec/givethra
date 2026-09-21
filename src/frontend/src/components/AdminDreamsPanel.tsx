@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { adminDeleteDream, adminGetDreamParticipations, adminGetDreamPaymentAccounts, adminGetDreams, adminReviewDreamParticipation, adminSaveDream, adminSaveDreamPaymentAccount, adminSelectDreamWinner, uploadFileToStorage } from "@/lib/api";
-const emptyForm = { name: "", category: "Car", description: "", image_url: "", actual_market_price: "", dream_price: "", contribution_amount: "", participant_capacity: "100", internal_percentage_unit: "", credit_award: "0", announcement_at: "", status: "open", publication_status: "draft" };
+const emptyForm = { name: "", category: "Car", description: "", image_url: "", actual_market_price: "", dream_price: "", contribution_amount: "", participant_capacity: "100", internal_percentage_unit: "", credit_award: "0", announcement_at: "", status: "open", publication_status: "published" };
 const emptyAccount = { label: "", method: "Bank Transfer", account_title: "", account_number: "", instructions: "", is_active: true };
 const money = (v: any) => `PKR ${Number(v || 0).toLocaleString()}`;
 export default function AdminDreamsPanel() {
