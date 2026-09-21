@@ -89,38 +89,38 @@ export default function DreamDetailPage() {
 
   return (
     <Layout>
-      <main className="min-h-screen bg-[#f7fafb] pb-28 md:pb-12">
+      {/* pb-36 leaves room for mobile sticky CTA + bottom nav */}
+      <main className="min-h-screen bg-[#f7fafb] pb-36 md:pb-12">
         {/* BREADCRUMB */}
         <div className="border-b border-border bg-white">
-          <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 text-xs text-muted-foreground md:px-8">
-            <Link to="/" className="hover:text-teal-700">Home</Link>
-            <ChevronRight className="h-3 w-3" />
-            <Link to="/dreams" className="hover:text-teal-700">Dreams</Link>
-            <ChevronRight className="h-3 w-3" />
+          <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-hidden px-4 py-2.5 text-[11px] text-muted-foreground md:px-8 md:text-xs">
+            <Link to="/" className="shrink-0 hover:text-teal-700">Home</Link>
+            <ChevronRight className="h-3 w-3 shrink-0" />
+            <Link to="/dreams" className="shrink-0 hover:text-teal-700">Dreams</Link>
+            <ChevronRight className="h-3 w-3 shrink-0" />
             <span className="truncate font-semibold text-foreground">{dream.name}</span>
           </div>
         </div>
 
         {/* PRODUCT HERO */}
-        <section className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-8">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-            {/* LEFT: image + tabs */}
-            <div className="space-y-6">
-              <div className="overflow-hidden rounded-3xl border border-border bg-white p-3 shadow-sm">
-                <div className="relative flex min-h-[340px] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-teal-50 via-white to-amber-50 md:min-h-[420px]">
+        <section className="mx-auto max-w-7xl px-4 py-4 md:px-8 md:py-8">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
+            <div className="min-w-0 space-y-5 md:space-y-6">
+              <div className="overflow-hidden rounded-2xl border border-border bg-white p-2.5 shadow-sm md:rounded-3xl md:p-3">
+                <div className="relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-teal-50 via-white to-amber-50 md:min-h-[420px] md:rounded-2xl">
                   {dream.image_url ? (
-                    <img src={dream.image_url} alt={dream.name} className="h-full max-h-[520px] w-full object-contain" />
+                    <img src={dream.image_url} alt={dream.name} className="h-full max-h-[480px] w-full object-contain" />
                   ) : (
                     <span className="text-sm font-semibold text-teal-700">Product image coming soon</span>
                   )}
-                  <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-teal-700 shadow">{dream.category}</span>
-                  <span className="absolute right-4 top-4 rounded-full bg-emerald-500 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white shadow">{dream.status}</span>
+                  <span className="absolute left-2 top-2 max-w-[calc(100%-100px)] truncate rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-teal-700 shadow md:left-4 md:top-4 md:max-w-[60%] md:px-3 md:py-1.5 md:text-[11px]">{dream.category}</span>
+                  <span className="absolute right-2 top-2 shrink-0 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow md:right-4 md:top-4 md:px-3 md:py-1.5 md:text-[11px]">{dream.status}</span>
                 </div>
               </div>
 
               {/* TABS */}
-              <div className="rounded-3xl border border-border bg-white shadow-sm">
-                <div className="flex overflow-x-auto border-b border-border">
+              <div className="rounded-2xl border border-border bg-white shadow-sm md:rounded-3xl">
+                <div className="flex overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {[
                     { k: "story", label: "Product story" },
                     { k: "how", label: "How it works" },
@@ -129,13 +129,13 @@ export default function DreamDetailPage() {
                     <button
                       key={t.k}
                       onClick={() => setTab(t.k as any)}
-                      className={`whitespace-nowrap px-5 py-3 text-sm font-bold transition ${tab === t.k ? "border-b-2 border-teal-600 text-teal-700" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`shrink-0 whitespace-nowrap px-4 py-3 text-xs font-bold transition md:px-5 md:text-sm ${tab === t.k ? "border-b-2 border-teal-600 text-teal-700" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       {t.label}
                     </button>
                   ))}
                 </div>
-                <div className="p-6 text-sm leading-7 text-muted-foreground">
+                <div className="p-4 text-sm leading-7 text-muted-foreground md:p-6">
                   {tab === "story" && <p>{dream.description}</p>}
                   {tab === "how" && (
                     <ol className="space-y-3">
@@ -153,10 +153,10 @@ export default function DreamDetailPage() {
                     </ol>
                   )}
                   {tab === "trust" && (
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="rounded-2xl border bg-muted/40 p-4"><ShieldCheck className="h-5 w-5 text-teal-700" /><p className="mt-2 font-bold text-foreground">Manual verification</p><p className="text-xs">Every payment is checked by our team.</p></div>
-                      <div className="rounded-2xl border bg-muted/40 p-4"><FileCheck2 className="h-5 w-5 text-teal-700" /><p className="mt-2 font-bold text-foreground">Proof required</p><p className="text-xs">Receipt screenshot is mandatory.</p></div>
-                      <div className="rounded-2xl border bg-muted/40 p-4"><Lock className="h-5 w-5 text-teal-700" /><p className="mt-2 font-bold text-foreground">Secure data</p><p className="text-xs">Your information is stored safely.</p></div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border bg-muted/40 p-3 md:p-4"><ShieldCheck className="h-5 w-5 text-teal-700" /><p className="mt-2 text-sm font-bold text-foreground">Manual verification</p><p className="text-xs">Every payment is checked by our team.</p></div>
+                      <div className="rounded-2xl border bg-muted/40 p-3 md:p-4"><FileCheck2 className="h-5 w-5 text-teal-700" /><p className="mt-2 text-sm font-bold text-foreground">Proof required</p><p className="text-xs">Receipt screenshot is mandatory.</p></div>
+                      <div className="rounded-2xl border bg-muted/40 p-3 md:p-4"><Lock className="h-5 w-5 text-teal-700" /><p className="mt-2 text-sm font-bold text-foreground">Secure data</p><p className="text-xs">Your information is stored safely.</p></div>
                     </div>
                   )}
                 </div>
@@ -164,69 +164,69 @@ export default function DreamDetailPage() {
             </div>
 
             {/* RIGHT: sticky buy card */}
-            <aside className="lg:sticky lg:top-24 lg:self-start">
-              <div className="space-y-4">
-                <div className="rounded-3xl border border-border bg-white p-5 shadow-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">{dream.status}</span>
-                    <span className="rounded-full bg-teal-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-teal-700">{dream.category}</span>
+            <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+              <div className="space-y-3 md:space-y-4">
+                <div className="rounded-2xl border border-border bg-white p-4 shadow-sm md:rounded-3xl md:p-5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">{dream.status}</span>
+                    <span className="max-w-[60%] truncate rounded-full bg-teal-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-700">{dream.category}</span>
                   </div>
-                  <h1 className="mt-3 font-display text-2xl font-black leading-tight">{dream.name}</h1>
-                  <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{dream.description}</p>
+                  <h1 className="mt-2.5 font-display text-xl font-black leading-tight md:text-2xl">{dream.name}</h1>
+                  <p className="mt-1.5 line-clamp-3 text-xs text-muted-foreground md:text-sm">{dream.description}</p>
 
                   {/* PRICE BLOCK */}
-                  <div className="mt-5 rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-4">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-teal-800">Your contribution</span>
-                      <span className="text-xs font-semibold text-muted-foreground line-through">{money(dream.dream_price)}</span>
+                  <div className="mt-4 rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-3.5 md:p-4">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 md:text-[11px]">Your contribution</span>
+                      <span className="shrink-0 text-[10px] font-semibold text-muted-foreground line-through md:text-xs">{money(dream.dream_price)}</span>
                     </div>
-                    <p className="mt-1 font-display text-4xl font-black text-teal-700">{money(contribution)}</p>
-                    <p className="mt-1 text-[11px] text-teal-800/80">One fixed amount — same for every participant.</p>
+                    <p className="mt-1 font-display text-3xl font-black text-teal-700 md:text-4xl">{money(contribution)}</p>
+                    <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">One fixed amount — same for every participant.</p>
                   </div>
 
                   {/* FUNDING */}
-                  <div className="mt-5">
-                    <div className="flex items-center justify-between text-sm">
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-xs md:text-sm">
                       <span className="font-bold">Funding progress</span>
                       <span className="font-black text-amber-600">{percent}%</span>
                     </div>
                     <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-teal-100">
                       <div className="h-full rounded-full bg-gradient-to-r from-teal-500 to-amber-400" style={{ width: `${percent}%` }} />
                     </div>
-                    <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                    <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground md:text-xs">
                       <span>{money(dream.funded_amount)} raised</span>
                       <span>{money(left)} left</span>
                     </div>
                   </div>
 
                   {/* META */}
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-                    <div className="rounded-xl border bg-muted/30 p-3">
+                  <div className="mt-3 grid grid-cols-2 gap-2 md:mt-4 md:gap-3">
+                    <div className="rounded-xl border bg-muted/30 p-2.5 md:p-3">
                       <Users className="h-4 w-4 text-teal-700" />
-                      <p className="mt-1 font-bold text-foreground">{dream.approved_participants} joined</p>
-                      <p className="text-muted-foreground">{spotsLeft} spots left</p>
+                      <p className="mt-1 text-xs font-bold text-foreground md:text-sm">{dream.approved_participants} joined</p>
+                      <p className="text-[10px] text-muted-foreground md:text-xs">{spotsLeft} spots left</p>
                     </div>
-                    <div className="rounded-xl border bg-muted/30 p-3">
+                    <div className="rounded-xl border bg-muted/30 p-2.5 md:p-3">
                       <TrendingUp className="h-4 w-4 text-teal-700" />
-                      <p className="mt-1 font-bold text-foreground">{dream.participant_capacity} total</p>
-                      <p className="text-muted-foreground">capacity</p>
+                      <p className="mt-1 text-xs font-bold text-foreground md:text-sm">{dream.participant_capacity} total</p>
+                      <p className="text-[10px] text-muted-foreground md:text-xs">capacity</p>
                     </div>
                   </div>
 
-                  <a href="#participate" className="mt-5 block">
+                  <a href="#participate" className="mt-4 hidden md:block">
                     <Button disabled={!contribution || submitted} className="h-12 w-full rounded-xl bg-teal-700 text-base font-bold hover:bg-teal-800">
                       {submitted ? "Submission received" : "Participate Now"}
                     </Button>
                   </a>
 
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-semibold text-muted-foreground">
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[9px] font-semibold text-muted-foreground md:mt-4 md:text-[10px]">
                     <div><Shield className="mx-auto h-4 w-4 text-teal-700" /><p className="mt-1">Verified</p></div>
                     <div><Clock3 className="mx-auto h-4 w-4 text-teal-700" /><p className="mt-1">Reviewed</p></div>
                     <div><FileCheck2 className="mx-auto h-4 w-4 text-teal-700" /><p className="mt-1">Proof needed</p></div>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-900 md:text-xs">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>Dreams are separate from Givethra Help cases and do not change your existing Credit wallet rules.</p>
                 </div>
@@ -238,9 +238,9 @@ export default function DreamDetailPage() {
         {/* PARTICIPATION FORM */}
         <section id="participate" className="mx-auto max-w-7xl px-4 md:px-8">
           {submitted ? (
-            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-8 text-center shadow-sm">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center shadow-sm md:rounded-3xl md:p-8">
               <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
-              <h2 className="mt-4 font-display text-2xl font-bold text-emerald-900">Submission received</h2>
+              <h2 className="mt-4 font-display text-xl font-bold text-emerald-900 md:text-2xl">Submission received</h2>
               <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-emerald-800">
                 Your payment proof is with the Givethra review team. A registration number will be generated after approval.
               </p>
@@ -249,21 +249,21 @@ export default function DreamDetailPage() {
               </Link>
             </div>
           ) : (
-            <div className="rounded-3xl border border-border bg-white shadow-sm">
-              <div className="border-b border-border p-5 md:p-6">
+            <div className="rounded-2xl border border-border bg-white shadow-sm md:rounded-3xl">
+              <div className="border-b border-border p-4 md:p-6">
                 <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-teal-700">
                   <Sparkles className="h-3.5 w-3.5" /> Participation form
                 </div>
-                <h2 className="mt-2 font-display text-2xl font-black">Reserve your spot in this Dream</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Fill in your identity and payment details. Our team verifies every submission manually.</p>
+                <h2 className="mt-2 font-display text-xl font-black md:text-2xl">Reserve your spot in this Dream</h2>
+                <p className="mt-1 text-xs text-muted-foreground md:text-sm">Fill in your identity and payment details. Our team verifies every submission manually.</p>
               </div>
 
-              <form onSubmit={submit} className="grid gap-6 p-5 md:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="space-y-6">
+              <form onSubmit={submit} className="grid gap-5 p-4 md:gap-6 md:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="min-w-0 space-y-5 md:space-y-6">
                   {/* IDENTITY */}
-                  <fieldset className="space-y-4">
+                  <fieldset className="space-y-3.5 md:space-y-4">
                     <legend className="flex items-center gap-2 text-sm font-bold text-foreground"><User className="h-4 w-4 text-teal-700" /> Identity</legend>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-3.5 sm:grid-cols-2 md:gap-4">
                       <Field label="Full Name" required value={form.full_name} onChange={(v) => update("full_name", v)} />
                       <Field label="Father / Husband Name" required value={form.father_husband_name} onChange={(v) => update("father_husband_name", v)} />
                       <Field label="CNIC Number" required placeholder="00000-0000000-0" value={form.cnic_number} onChange={(v) => update("cnic_number", v)} />
@@ -272,9 +272,9 @@ export default function DreamDetailPage() {
                   </fieldset>
 
                   {/* ADDRESS */}
-                  <fieldset className="space-y-4 border-t pt-6">
+                  <fieldset className="space-y-3.5 border-t pt-5 md:space-y-4 md:pt-6">
                     <legend className="flex items-center gap-2 text-sm font-bold text-foreground"><MapPin className="h-4 w-4 text-teal-700" /> Address</legend>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-3.5 sm:grid-cols-2 md:gap-4">
                       <div>
                         <Label>Province *</Label>
                         <select value={form.province} onChange={(e) => update("province", e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border bg-background px-3 text-sm" required>
@@ -289,40 +289,52 @@ export default function DreamDetailPage() {
                   </fieldset>
 
                   {/* PAYMENT */}
-                  <fieldset className="space-y-4 border-t pt-6">
+                  <fieldset className="space-y-3.5 border-t pt-5 md:space-y-4 md:pt-6">
                     <legend className="flex items-center gap-2 text-sm font-bold text-foreground"><Wallet className="h-4 w-4 text-teal-700" /> Payment details</legend>
 
                     {accounts.length > 0 && (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                        <p className="text-sm font-bold text-amber-900">
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 md:p-4">
+                        <p className="text-xs font-bold text-amber-900 md:text-sm">
                           Send <span className="text-teal-700">{money(contribution)}</span> to any Givethra account
                         </p>
-                        <div className="mt-3 space-y-3">
+
+                        {/* FIXED: boxes fit inside, no overflow */}
+                        <div className="mt-3 space-y-2.5">
                           {accounts.map((a) => (
-                            <div key={a.id} className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-white/70 p-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="text-sm">
-                                <p className="font-bold text-foreground">{a.label} · <span className="text-teal-700">{a.method}</span></p>
-                                <p className="text-xs text-muted-foreground">Title: {a.account_title || "—"}</p>
-                                <p className="font-mono text-sm font-bold text-foreground">{a.account_number}</p>
-                                {a.instructions && <p className="mt-1 text-xs text-muted-foreground">{a.instructions}</p>}
+                            <div key={a.id} className="rounded-xl border border-amber-200 bg-white/80 p-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-bold text-foreground">{a.label}</p>
+                                  <p className="truncate text-xs font-semibold text-teal-700">{a.method}</p>
+                                  {a.account_title && (
+                                    <p className="mt-1 truncate text-[11px] text-muted-foreground">Title: {a.account_title}</p>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => copyAccount(a.account_number)}
+                                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[10px] font-bold text-amber-900 hover:bg-amber-100"
+                                >
+                                  <Copy className="h-3 w-3" /> Copy
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => copyAccount(a.account_number)}
-                                className="inline-flex items-center gap-1 self-start rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 sm:self-auto"
-                              >
-                                <Copy className="h-3.5 w-3.5" /> Copy
-                              </button>
+                              {/* break-all keeps long account numbers inside the box */}
+                              <p className="mt-2 break-all rounded-lg bg-amber-50 px-2 py-1.5 font-mono text-xs font-bold text-foreground md:text-sm">
+                                {a.account_number}
+                              </p>
+                              {a.instructions && (
+                                <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">{a.instructions}</p>
+                              )}
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
+                    <div className="grid gap-3.5 sm:grid-cols-2 md:gap-4">
+                      <div className="min-w-0">
                         <Label>Payment method *</Label>
-                        <select value={form.payment_method} onChange={(e) => update("payment_method", e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border bg-background px-3 text-sm" required>
+                        <select value={form.payment_method} onChange={(e) => update("payment_method", e.target.value)} className="mt-1.5 h-11 w-full truncate rounded-xl border bg-background px-3 text-sm" required>
                           <option value="">Select account</option>
                           {accounts.map((a) => <option key={a.id} value={`${a.method} · ${a.account_number}`}>{a.label} — {a.account_number}</option>)}
                         </select>
@@ -332,9 +344,11 @@ export default function DreamDetailPage() {
 
                     <div>
                       <Label>Payment proof / receipt screenshot *</Label>
-                      <label className="mt-1.5 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/40 p-5 text-sm font-semibold text-teal-700 transition hover:bg-teal-50">
-                        <Upload className="h-4 w-4" />
-                        {uploading ? "Uploading receipt…" : form.proof_url ? "Receipt uploaded — replace" : "Attach payment screenshot"}
+                      <label className="mt-1.5 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/40 p-4 text-center text-xs font-semibold text-teal-700 transition hover:bg-teal-50 md:p-5 md:text-sm">
+                        <Upload className="h-4 w-4 shrink-0" />
+                        <span className="truncate">
+                          {uploading ? "Uploading receipt…" : form.proof_url ? "Receipt uploaded — replace" : "Attach payment screenshot"}
+                        </span>
                         <input type="file" accept="image/*,.pdf" capture="environment" className="hidden" onChange={(e) => void uploadProof(e.target.files?.[0] || null)} />
                       </label>
                       {form.proof_url && (
@@ -351,8 +365,8 @@ export default function DreamDetailPage() {
                   </fieldset>
                 </div>
 
-                {/* STICKY SUMMARY */}
-                <aside className="lg:sticky lg:top-24 lg:self-start">
+                {/* STICKY SUMMARY (desktop only) */}
+                <aside className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
                   <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-teal-800">Order summary</p>
                     <p className="mt-2 font-display text-lg font-bold">{dream.name}</p>
@@ -378,20 +392,32 @@ export default function DreamDetailPage() {
                     </ul>
                   </div>
                 </aside>
+
+                {/* MOBILE submit button (in-flow, right after form fields) */}
+                <div className="lg:hidden">
+                  <Button
+                    type="submit"
+                    disabled={busy || uploading || !accounts.length || !contribution}
+                    className="h-12 w-full rounded-xl bg-teal-700 text-base font-bold hover:bg-teal-800"
+                  >
+                    {busy ? "Submitting…" : "Submit Dream Participation"}
+                  </Button>
+                  {!accounts.length && <p className="mt-2 text-center text-[11px] text-rose-700">Payment accounts are not configured yet.</p>}
+                </div>
               </form>
             </div>
           )}
         </section>
 
-        {/* MOBILE STICKY CTA */}
+        {/* MOBILE STICKY CTA — placed above the app's bottom nav */}
         {!submitted && (
-          <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-white p-3 shadow-lg md:hidden">
+          <div className="fixed inset-x-0 bottom-16 z-40 border-t border-border bg-white/95 p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:hidden">
             <div className="mx-auto flex max-w-7xl items-center gap-3">
-              <div className="flex-1">
+              <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Your contribution</p>
-                <p className="text-xl font-black text-teal-700">{money(contribution)}</p>
+                <p className="truncate text-lg font-black text-teal-700">{money(contribution)}</p>
               </div>
-              <a href="#participate">
+              <a href="#participate" className="shrink-0">
                 <Button className="h-11 rounded-xl bg-teal-700 px-5 font-bold">Participate</Button>
               </a>
             </div>
@@ -406,7 +432,7 @@ function Field({
   label, value, onChange, placeholder, required,
 }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean }) {
   return (
-    <div>
+    <div className="min-w-0">
       <Label>{label}{required ? " *" : ""}</Label>
       <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} className="mt-1.5 h-11 rounded-xl" />
     </div>
