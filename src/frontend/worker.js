@@ -2497,6 +2497,14 @@ async function handleDreams(request, env, user, url, parts, origin) {
       await env.DB.prepare(`UPDATE dreams SET name=?,category=?,description=?,image_url=?,dream_price=?,contribution_amount=?,actual_market_price=?,participant_capacity=?,internal_percentage_unit=?,credit_award=?,announcement_at=?,status=?,publication_status=?,updated_at=? WHERE id=?`).bind(values.name,values.category,values.description,values.image_url,values.dream_price,values.contribution_amount,values.actual_market_price,values.participant_capacity,values.internal_percentage_unit,values.credit_award,values.announcement_at,values.status,values.publication_status,timestamp,parts[3]).run();
       return json({ id: parts[3], ...values }, 200, origin);
     }
+    if (request.method === "DELETE" && parts[3]) {
+      const existing = await env.DB.prepare("SELECT id FROM dreams WHERE id=? LIMIT 1").bind(parts[3]).first();
+      if (!existing) return json({ error: "Dream not found" }, 404, origin);
+      const active = await env.DB.prepare("SELECT COUNT(*) AS count FROM dream_participations WHERE dream_id=? AND lower(status) NOT IN ('rejected','cancelled')").bind(parts[3]).first();
+      if (Number(active?.count || 0) > 0) return json({ error: "This Dream has participation records and cannot be deleted. Close it instead." }, 409, origin);
+      await env.DB.prepare("DELETE FROM dreams WHERE id=?").bind(parts[3]).run();
+      return json({ deleted: true, id: parts[3] }, 200, origin);
+    }
   }
 
   if (isAdminRequest && parts[2] === "dream-participations") {

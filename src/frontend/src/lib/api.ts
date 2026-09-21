@@ -1111,3 +1111,8 @@ export async function adminSelectDreamWinner(dreamId: string, participationId: s
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dreams/${encodeURIComponent(dreamId)}/winner`, { method: "PUT", headers: headers(), body: JSON.stringify({ participation_id: participationId }) });
   return readApiResponse(res);
 }
+
+export async function adminDeleteDream(id: string) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/admin/dreams/${encodeURIComponent(id)}`, { method: "DELETE", headers: headers() });
+  return readApiResponse(res);
+}
