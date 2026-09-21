@@ -948,14 +948,26 @@ export default function HomePage() {
             
             {/* SMART BUTTONS ABOVE SLIDER */}
             <div className="flex w-full max-w-6xl flex-col gap-3 mb-2">
-              <Button
-                size="lg"
+              <button
+                type="button"
+                aria-label="Shop Dream Now — Givethra Dreams"
                 onClick={() => navigate({ to: "/dreams" })}
-                className="h-14 w-full rounded-2xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-500 font-bold text-base text-white shadow-sm shadow-teal-200 transition-all hover:scale-[1.01] hover:from-teal-800 hover:to-emerald-600 active:scale-[0.99] sm:text-lg"
+                className="group relative h-20 w-full overflow-hidden rounded-2xl bg-teal-800 text-left shadow-md shadow-teal-200 transition-all hover:scale-[1.01] active:scale-[0.99] sm:h-24"
               >
-                <img src="/dreams-products-banner.jpg" alt="Dream products" className="mr-3 h-10 w-28 rounded-lg object-cover shadow-sm" /> Shop Dream Now · Givethra Dreams
-                <ChevronRight className="ml-auto h-5 w-5" />
-              </Button>
+                <img
+                  src="/dreams-products-banner.jpg"
+                  alt="Shop Dream Now — Givethra Dreams"
+                  className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.03]"
+                />
+                <span className="absolute inset-0 bg-gradient-to-r from-teal-950/60 via-teal-900/15 to-teal-950/35" />
+                <span className="absolute inset-y-0 left-4 flex items-center gap-2 text-lg font-extrabold text-white drop-shadow sm:left-7 sm:text-2xl">
+                  <Sparkles className="h-6 w-6 shrink-0 sm:h-7 sm:w-7" />
+                  <span>Shop Dream Now</span>
+                </span>
+                <span className="absolute bottom-2 right-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-extrabold text-teal-800 shadow sm:bottom-3 sm:right-5 sm:px-3 sm:text-xs">
+                  Givethra Dreams <ChevronRight className="ml-0.5 inline h-3.5 w-3.5" />
+                </span>
+              </button>
               <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 size="lg"
@@ -1077,13 +1089,31 @@ export default function HomePage() {
         {/* --- END OF UPDATED HERO & CATEGORY SECTION --- */}
 
         <section className="border-b border-teal-100 bg-gradient-to-r from-teal-50 via-white to-amber-50 px-4 py-7">
-          <div className="mx-auto flex max-w-6xl flex-col gap-4 rounded-3xl border border-teal-100 bg-white/80 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Givethra Dreams</p>
-              <h2 className="mt-1 font-display text-2xl font-bold text-foreground">Take a step toward something meaningful.</h2>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Explore cars, appliances and other community-funded Dreams in a separate experience from Help cases.</p>
+          <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl border border-teal-100 bg-white shadow-md">
+            <button
+              type="button"
+              aria-label="Shop Givethra Dreams now"
+              onClick={() => navigate({ to: "/dreams" })}
+              className="group relative block h-[136px] w-full overflow-hidden bg-teal-800 text-left sm:h-[170px] md:h-[210px]"
+            >
+              <img
+                src="/dream-shop-banner.jpg"
+                alt="Shop Dream Now — cars, appliances, electronics and lifestyle products"
+                className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.02]"
+              />
+              <span className="absolute inset-0 bg-gradient-to-r from-teal-950/25 via-transparent to-teal-950/20" />
+              <span className="absolute bottom-3 right-3 inline-flex items-center rounded-full bg-white/95 px-3 py-1.5 text-xs font-extrabold text-teal-800 shadow-lg sm:bottom-5 sm:right-5 sm:px-5 sm:py-2.5 sm:text-sm">
+                Explore Givethra Dreams <ChevronRight className="ml-1 h-4 w-4" />
+              </span>
+            </button>
+            <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Givethra Dreams</p>
+                <h2 className="mt-1 font-display text-xl font-bold text-foreground sm:text-2xl">A meaningful step toward something you dream of.</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Browse real products, see funding progress, and contribute the fixed amount set by Givethra.</p>
+              </div>
+              <Button onClick={() => navigate({ to: "/dreams" })} className="shrink-0 rounded-xl bg-teal-700 font-bold hover:bg-teal-800">Shop Dreams <ChevronRight className="ml-2 h-4 w-4" /></Button>
             </div>
-            <Button onClick={() => navigate({ to: "/dreams" })} className="shrink-0 rounded-xl bg-teal-700 font-bold hover:bg-teal-800">Explore Dreams <ChevronRight className="ml-2 h-4 w-4" /></Button>
           </div>
         </section>
 
