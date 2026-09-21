@@ -5,14 +5,14 @@ import { Label } from "@/components/ui/label";
 import { Link, useParams } from "@tanstack/react-router";
 import {
   CheckCircle2, ChevronRight, Clock3, Copy, FileCheck2, Info, Lock,
-  MapPin, Shield, ShieldCheck, Sparkles, TrendingUp, Upload, User, Users, Wallet,
+  MapPin, Shield, ShieldCheck, Sparkles, Upload, User, Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   createDreamParticipation, getDream, getDreamPaymentAccounts, uploadFileToStorage,
 } from "@/lib/api";
-import { Dream, money, marketValue, fundingPercent, fundingLeft } from "@/pages/DreamsPage";
+import { Dream, money, marketValue } from "@/pages/DreamsPage";
 
 type Account = { id: string; label: string; method: string; account_title?: string; account_number: string; instructions?: string };
 const PROVINCES = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad Capital Territory", "Gilgit-Baltistan", "Azad Jammu and Kashmir"];
@@ -45,11 +45,8 @@ export default function DreamDetailPage() {
     return <Layout><main className="mx-auto max-w-4xl p-10 text-center">Dream product not found or is not published yet.</main></Layout>;
   }
 
-  const percent = fundingPercent(dream);
-  const left = fundingLeft(dream);
   const mv = marketValue(dream);
   const contribution = Number(dream.contribution_amount || 0);
-  const spotsLeft = Math.max(0, Number(dream.participant_capacity || 0) - Number(dream.approved_participants || 0));
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -188,37 +185,13 @@ export default function DreamDetailPage() {
                     {mv > 0 ? (
                       <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">Market value {money(mv)} — you pay a fixed share.</p>
                     ) : (
-                      <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">One fixed amount — same for every participant.</p>
+                      <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">One fixed amount — same for every contribution.</p>
                     )}
                   </div>
 
-                  {/* FUNDING */}
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-xs md:text-sm">
-                      <span className="font-bold">Funding progress</span>
-                      <span className="font-black text-amber-600">{percent}%</span>
-                    </div>
-                    <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-teal-100">
-                      <div className="h-full rounded-full bg-gradient-to-r from-teal-500 to-amber-400" style={{ width: `${percent}%` }} />
-                    </div>
-                    <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground md:text-xs">
-                      <span>{money(dream.funded_amount)} raised</span>
-                      <span>Target {money(mv)} · {money(left)} left</span>
-                    </div>
-                  </div>
-
-                  {/* META */}
-                  <div className="mt-3 grid grid-cols-2 gap-2 md:mt-4 md:gap-3">
-                    <div className="rounded-xl border bg-muted/30 p-2.5 md:p-3">
-                      <Users className="h-4 w-4 text-teal-700" />
-                      <p className="mt-1 text-xs font-bold text-foreground md:text-sm">{dream.approved_participants} joined</p>
-                      <p className="text-[10px] text-muted-foreground md:text-xs">{spotsLeft} spots left</p>
-                    </div>
-                    <div className="rounded-xl border bg-muted/30 p-2.5 md:p-3">
-                      <TrendingUp className="h-4 w-4 text-teal-700" />
-                      <p className="mt-1 text-xs font-bold text-foreground md:text-sm">{dream.participant_capacity} total</p>
-                      <p className="text-[10px] text-muted-foreground md:text-xs">capacity</p>
-                    </div>
+                  <div className="mt-3 rounded-xl border bg-muted/30 p-2.5 md:p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quantity</p>
+                    <p className="mt-1 text-sm font-bold text-foreground md:text-base">{dream.participant_capacity}</p>
                   </div>
 
                   <a href="#participate" className="mt-4 hidden md:block">
@@ -375,11 +348,10 @@ export default function DreamDetailPage() {
                   <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-teal-800">Order summary</p>
                     <p className="mt-2 font-display text-lg font-bold">{dream.name}</p>
-                    <div className="mt-3 space-y-1.5 text-sm">
-                      {mv > 0 && <Row label="Market value" value={money(mv)} muted />}
-                      <Row label="Your contribution" value={money(contribution)} strong />
-                      <Row label="Funding progress" value={`${percent}%`} />
-                    </div>
+                      <div className="mt-3 space-y-1.5 text-sm">
+                        {mv > 0 && <Row label="Market value" value={money(mv)} muted />}
+                        <Row label="Your contribution" value={money(contribution)} strong />
+                      </div>
                     <div className="mt-4 border-t border-teal-200 pt-4">
                       <Button
                         type="submit"
