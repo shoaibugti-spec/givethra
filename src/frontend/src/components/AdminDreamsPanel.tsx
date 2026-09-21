@@ -194,8 +194,6 @@ export default function AdminDreamsPanel() {
                         ) : (
                           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">⚠ Not set</span>
                         )}
-                        <span className="text-muted-foreground">· Funding goal:</span>
-                        <span className="font-bold text-teal-700">{money(d.dream_price)}</span>
                         <span className="text-muted-foreground">· Join with:</span>
                         <span className="font-semibold">{money(d.contribution_amount)}</span>
                       </div>
@@ -203,7 +201,7 @@ export default function AdminDreamsPanel() {
                       {/* Warning below if market value missing */}
                       {!hasMarketValue && (
                         <p className="mt-1 rounded-md bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] font-semibold text-amber-800">
-                          ⚠ Is Dream mein Market Value set nahi hai — user ko sirf funding goal nazar aayega. "Edit details" mein ja kar Market Value daalein.
+                          ⚠ Is Dream mein Market Value set nahi hai. "Edit details" mein ja kar Market Value daalein.
                         </p>
                       )}
 
