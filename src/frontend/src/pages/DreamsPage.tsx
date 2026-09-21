@@ -9,12 +9,53 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { getDreams } from "@/lib/api";
 
+// ==================================================================
+// TYPES
+// ==================================================================
 export type Dream = {
-  id: string; name: string; category: string; description: string; image_url?: string | null;
-  dream_price: number; contribution_amount?: number; funded_amount: number; participant_capacity: number;
-  approved_participants: number; status: string; announcement_at?: string | null;
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  image_url?: string | null;
+
+  // 💰 Pricing
+  dream_price: number;                 // Funding Goal (e.g. 7,000)
+  actual_market_price?: number | null; // Market Value (e.g. 5,000) — user ko dikhta
+  contribution_amount?: number;        // Fixed contribution (e.g. 500)
+
+  // 📊 Funding
+  funded_amount: number;               // Kitna jama hua (API se aata hai)
+  participant_capacity: number;
+  approved_participants: number;
+
+  // 🏷️ Meta
+  status: string;
+  publication_status?: string;
+  announcement_at?: string | null;
+  created_at?: string;
 };
+
+// ==================================================================
+// HELPERS — ek hi jagah, poori app mein same calculation
+// ==================================================================
 export const money = (value: number) => `PKR ${Math.round(Number(value || 0)).toLocaleString()}`;
+
+/** Market value jo user ko dikhta hai (strikethrough ke saath). */
+export const marketValue = (d: { actual_market_price?: number | null; dream_price: number }) =>
+  Number(d.actual_market_price || d.dream_price || 0);
+
+/** Funding goal — progress iss ke against calculate hoti hai. */
+export const fundingGoal = (d: { dream_price: number }) =>
+  Number(d.dream_price || 0);
+
+/** Progress percentage (0–100). */
+export const fundingPercent = (d: { dream_price: number; funded_amount: number }) =>
+  Math.min(100, Math.round((Number(d.funded_amount || 0) / Math.max(1, fundingGoal(d))) * 100));
+
+/** Kitna baqi hai (funding goal ke hisaab se). */
+export const fundingLeft = (d: { dream_price: number; funded_amount: number }) =>
+  Math.max(0, fundingGoal(d) - Number(d.funded_amount || 0));
 
 const SORTS = [
   { value: "featured", label: "Featured" },
@@ -24,6 +65,9 @@ const SORTS = [
   { value: "contribution_high", label: "Contribution: High → Low" },
 ];
 
+// ==================================================================
+// SUB-COMPONENTS
+// ==================================================================
 function ProductImage({ dream, className = "" }: { dream: Dream; className?: string }) {
   return (
     <div className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-teal-50 via-white to-amber-50 ${className}`}>
@@ -46,6 +90,9 @@ function ProgressBar({ percent }: { percent: number }) {
   );
 }
 
+// ==================================================================
+// MAIN PAGE
+// ==================================================================
 export default function DreamsPage() {
   const [dreams, setDreams] = useState<Dream[]>([]);
   const [query, setQuery] = useState("");
@@ -72,10 +119,9 @@ export default function DreamsPage() {
         `${d.name} ${d.category} ${d.description}`.toLowerCase().includes(query.trim().toLowerCase()) &&
         (category === "All" || d.category === category),
     );
-    const pct = (d: Dream) => Number(d.funded_amount || 0) / Math.max(1, Number(d.dream_price || 1));
     switch (sort) {
       case "newest": list = [...list].sort((a, b) => (a.id < b.id ? 1 : -1)); break;
-      case "funded": list = [...list].sort((a, b) => pct(b) - pct(a)); break;
+      case "funded": list = [...list].sort((a, b) => fundingPercent(b) - fundingPercent(a)); break;
       case "contribution_low": list = [...list].sort((a, b) => Number(a.contribution_amount || 0) - Number(b.contribution_amount || 0)); break;
       case "contribution_high": list = [...list].sort((a, b) => Number(b.contribution_amount || 0) - Number(a.contribution_amount || 0)); break;
     }
@@ -87,7 +133,7 @@ export default function DreamsPage() {
   return (
     <Layout>
       <main className="min-h-screen bg-[#f7fafb] pb-28 md:pb-12">
-        {/* HERO — no search here, only title + tags */}
+        {/* HERO */}
         <section className="relative isolate overflow-hidden border-b border-teal-100 bg-[#075e69] text-white">
           <img src="/dreams-hero-products.png" alt="" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover object-[68%_center]" />
           <div className="absolute inset-0 -z-0 bg-gradient-to-r from-[#075e69]/92 via-[#087f8b]/60 to-transparent" />
@@ -111,10 +157,9 @@ export default function DreamsPage() {
           </div>
         </section>
 
-        {/* STICKY BAR — single search + chips + sort */}
+        {/* STICKY FILTER BAR */}
         <div className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
           <div className="mx-auto max-w-7xl px-4 md:px-8">
-            {/* Row 1: search + sort + view */}
             <div className="flex items-center gap-2 py-2.5">
               <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -153,7 +198,6 @@ export default function DreamsPage() {
               </div>
             </div>
 
-            {/* Row 2: category chips */}
             <div className="flex items-center gap-2 overflow-x-auto pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {categories.map((c) => {
                 const count = c === "All" ? dreams.length : categoryCounts.get(c) || 0;
@@ -175,7 +219,6 @@ export default function DreamsPage() {
               })}
             </div>
 
-            {/* Row 3: count + clear (only if active) */}
             {filtersActive > 0 && (
               <div className="flex items-center justify-between gap-3 border-t border-border py-2 text-[11px]">
                 <p className="truncate text-muted-foreground">
@@ -227,11 +270,15 @@ export default function DreamsPage() {
   );
 }
 
+// ==================================================================
+// CARD
+// ==================================================================
 function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
-  const percent = Math.min(100, Math.round((Number(dream.funded_amount || 0) / Math.max(1, Number(dream.dream_price || 1))) * 100));
-  const left = Math.max(0, Number(dream.dream_price || 0) - Number(dream.funded_amount || 0));
-  const spotsLeft = Math.max(0, Number(dream.participant_capacity || 0) - Number(dream.approved_participants || 0));
+  const percent = fundingPercent(dream);
+  const left = fundingLeft(dream);
+  const mv = marketValue(dream);                         // 5,000 — user ko dikhega
   const contribution = Number(dream.contribution_amount || 0);
+  const spotsLeft = Math.max(0, Number(dream.participant_capacity || 0) - Number(dream.approved_participants || 0));
 
   if (view === "list") {
     return (
@@ -247,7 +294,7 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Market value</p>
-              <p className="text-xs font-semibold text-muted-foreground line-through">{money(dream.dream_price)}</p>
+              <p className="text-xs font-semibold text-muted-foreground line-through">{money(mv)}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Your contribution</p>
@@ -279,11 +326,9 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition hover:-translate-y-1 hover:border-teal-200 hover:shadow-lg">
       <div className="relative">
         <ProductImage dream={dream} className="h-40 w-full sm:h-44" />
-        {/* Category label — truncated, safe max-width */}
         <span className="absolute left-2 top-2 max-w-[calc(100%-88px)] truncate rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-teal-700 shadow-sm sm:max-w-[55%]">
           {dream.category}
         </span>
-        {/* Status badge — always right, always fits */}
         <span className="absolute right-2 top-2 shrink-0 rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm">
           {dream.status}
         </span>
@@ -302,11 +347,11 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
         </div>
         <div className="mt-1.5"><ProgressBar percent={percent} /></div>
 
-        {/* HIGHLIGHTED PRICE BLOCK */}
+        {/* PRICE BLOCK — market value strikethrough + contribution big */}
         <div className="mt-3 rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-2.5">
           <div className="flex items-baseline justify-between gap-2">
             <p className="text-[9px] font-bold uppercase tracking-wider text-teal-800">Your contribution</p>
-            <p className="shrink-0 text-[9px] font-semibold text-muted-foreground line-through">{money(dream.dream_price)}</p>
+            <p className="shrink-0 text-[9px] font-semibold text-muted-foreground line-through">{money(mv)}</p>
           </div>
           <p className="mt-0.5 font-display text-xl font-black text-teal-700">{money(contribution)}</p>
           <p className="text-[9px] font-medium text-teal-800/80">Fixed amount to join this Dream</p>
