@@ -23,6 +23,7 @@ export type Dream = {
   dream_price: number;                 // Funding Goal (e.g. 8000)
   actual_market_price?: number | null; // Market Value (e.g. 5000)
   contribution_amount?: number;        // Fixed contribution (e.g. 110)
+  quantity: number;                    // Product quantity set by admin
 
   // 📊 Funding
   funded_amount: number;
@@ -289,11 +290,11 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
             </div>
             <div className="ml-auto text-right">
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quantity</p>
-              <p className="text-base font-black text-teal-700">{dream.participant_capacity}</p>
+              <p className="text-base font-black text-teal-700">{dream.quantity}</p>
             </div>
           </div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
-            <span>Quantity available: {dream.participant_capacity}</span>
+            <span>Quantity available: {dream.quantity}</span>
           </div>
           <div className="mt-3">
             <Link to="/dreams/$id" params={{ id: dream.id }}>
@@ -341,7 +342,7 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
             <p className="text-[9px] font-medium text-teal-800/80">Fixed amount to join this Dream</p>
           )}
         </div>
-        <p className="mt-2 text-[10px] font-semibold text-muted-foreground">Quantity: {dream.participant_capacity}</p>
+        <p className="mt-2 text-[10px] font-semibold text-muted-foreground">Quantity: {dream.quantity}</p>
 
         <div className="mt-auto pt-3">
           <Link to="/dreams/$id" params={{ id: dream.id }}>
