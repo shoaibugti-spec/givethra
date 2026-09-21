@@ -82,52 +82,79 @@ export default function DreamsPage() {
     return list;
   }, [dreams, query, category, sort]);
 
-  const filtersActive = (category !== "All" ? 1 : 0) + (query ? 1 : 0);
+  const filtersActive = (category !== "All" ? 1 : 0) + (query.trim() ? 1 : 0);
 
   return (
     <Layout>
-      <main className="min-h-screen bg-[#f7fafb] pb-24 md:pb-12">
-        {/* HERO */}
+      <main className="min-h-screen bg-[#f7fafb] pb-28 md:pb-12">
+        {/* HERO — no search here, only title + tags */}
         <section className="relative isolate overflow-hidden border-b border-teal-100 bg-[#075e69] text-white">
           <img src="/dreams-hero-products.png" alt="" className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover object-[68%_center]" />
           <div className="absolute inset-0 -z-0 bg-gradient-to-r from-[#075e69]/92 via-[#087f8b]/60 to-transparent" />
-          <div className="relative z-10 mx-auto max-w-7xl px-4 py-10 md:px-8 md:py-14">
+          <div className="relative z-10 mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-14">
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.2em] backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5" /> Givethra Dreams
               </div>
-              <h1 className="mt-4 font-display text-3xl font-black leading-tight tracking-tight md:text-5xl">
+              <h1 className="mt-4 font-display text-2xl font-black leading-tight tracking-tight md:text-5xl">
                 Products you can truly call yours — with a small, fixed contribution.
               </h1>
-              <p className="mt-4 max-w-xl text-sm leading-6 text-white/85 md:text-base">
-                Browse listed products, see real funding progress, and reserve your spot with one clear contribution amount.
+              <p className="mt-3 max-w-xl text-sm leading-6 text-white/85 md:text-base">
+                Browse listed products, see real funding progress, and reserve your spot with one clear contribution.
               </p>
-            </div>
-
-            {/* SEARCH */}
-            <div className="mt-7 max-w-2xl">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search products, e.g. motorcycle, washing machine, car…"
-                  className="h-14 rounded-full border-none bg-white pl-12 pr-4 text-base shadow-lg shadow-black/10"
-                />
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-white/85">
+              <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-semibold text-white/90 md:text-xs">
                 <span className="rounded-full bg-white/10 px-3 py-1"><WalletCards className="mr-1.5 inline h-3.5 w-3.5" />Separate from Help cases</span>
-                <span className="rounded-full bg-white/10 px-3 py-1"><ShieldCheck className="mr-1.5 inline h-3.5 w-3.5" />Manually verified payment</span>
-                <span className="rounded-full bg-white/10 px-3 py-1"><Users className="mr-1.5 inline h-3.5 w-3.5" />Limited spots per product</span>
+                <span className="rounded-full bg-white/10 px-3 py-1"><ShieldCheck className="mr-1.5 inline h-3.5 w-3.5" />Manually verified</span>
+                <span className="rounded-full bg-white/10 px-3 py-1"><Users className="mr-1.5 inline h-3.5 w-3.5" />Limited spots</span>
               </div>
             </div>
           </div>
         </section>
 
-        {/* STICKY FILTER BAR */}
-        <div className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
+        {/* STICKY BAR — single search + chips + sort */}
+        <div className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
           <div className="mx-auto max-w-7xl px-4 md:px-8">
-            <div className="flex items-center gap-2 overflow-x-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {/* Row 1: search + sort + view */}
+            <div className="flex items-center gap-2 py-2.5">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search products, e.g. motorcycle, washing machine…"
+                  className="h-10 rounded-full border-border bg-white pl-9 pr-9 text-sm"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    aria-label="Clear search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="relative shrink-0">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                  className="h-10 max-w-[130px] appearance-none truncate rounded-full border border-border bg-white pl-3 pr-7 text-xs font-semibold text-foreground sm:max-w-none"
+                >
+                  {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              </div>
+
+              <div className="hidden items-center rounded-full border border-border p-0.5 sm:flex">
+                <button onClick={() => setView("grid")} className={`rounded-full p-1.5 ${view === "grid" ? "bg-teal-600 text-white" : "text-muted-foreground"}`} aria-label="Grid view"><Grid3X3 className="h-4 w-4" /></button>
+                <button onClick={() => setView("list")} className={`rounded-full p-1.5 ${view === "list" ? "bg-teal-600 text-white" : "text-muted-foreground"}`} aria-label="List view"><List className="h-4 w-4" /></button>
+              </div>
+            </div>
+
+            {/* Row 2: category chips */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {categories.map((c) => {
                 const count = c === "All" ? dreams.length : categoryCounts.get(c) || 0;
                 const active = c === category;
@@ -135,61 +162,45 @@ export default function DreamsPage() {
                   <button
                     key={c}
                     onClick={() => setCategory(c)}
-                    className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-bold transition ${
+                    className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
                       active
                         ? "border-teal-600 bg-teal-600 text-white shadow-sm"
                         : "border-border bg-white text-muted-foreground hover:border-teal-300 hover:text-teal-700"
                     }`}
                   >
-                    {c} <span className={`ml-1 ${active ? "text-white/70" : "text-muted-foreground/70"}`}>{count}</span>
+                    <span className="inline-block max-w-[160px] truncate align-middle">{c}</span>
+                    <span className={`ml-1 ${active ? "text-white/70" : "text-muted-foreground/70"}`}>{count}</span>
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
-              <p className="text-xs text-muted-foreground">
-                <strong className="text-foreground">{visible.length}</strong> {visible.length === 1 ? "Dream" : "Dreams"}
-                {category !== "All" && <> in <strong className="text-foreground">{category}</strong></>}
-                {query && <> for "<strong className="text-foreground">{query}</strong>"</>}
-              </p>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value)}
-                    className="h-9 appearance-none rounded-full border border-border bg-white pl-3 pr-8 text-xs font-semibold text-foreground"
-                  >
-                    {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                </div>
-
-                <div className="hidden items-center rounded-full border border-border p-0.5 sm:flex">
-                  <button onClick={() => setView("grid")} className={`rounded-full p-1.5 ${view === "grid" ? "bg-teal-600 text-white" : "text-muted-foreground"}`} aria-label="Grid view"><Grid3X3 className="h-4 w-4" /></button>
-                  <button onClick={() => setView("list")} className={`rounded-full p-1.5 ${view === "list" ? "bg-teal-600 text-white" : "text-muted-foreground"}`} aria-label="List view"><List className="h-4 w-4" /></button>
-                </div>
-
-                {filtersActive > 0 && (
-                  <button
-                    onClick={() => { setCategory("All"); setQuery(""); }}
-                    className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700"
-                  >
-                    <X className="h-3.5 w-3.5" /> Clear
-                  </button>
-                )}
+            {/* Row 3: count + clear (only if active) */}
+            {filtersActive > 0 && (
+              <div className="flex items-center justify-between gap-3 border-t border-border py-2 text-[11px]">
+                <p className="truncate text-muted-foreground">
+                  <strong className="text-foreground">{visible.length}</strong> {visible.length === 1 ? "Dream" : "Dreams"}
+                  {category !== "All" && <> in <strong className="text-foreground">{category}</strong></>}
+                  {query && <> for "<strong className="text-foreground">{query}</strong>"</>}
+                </p>
+                <button
+                  onClick={() => { setCategory("All"); setQuery(""); }}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700"
+                >
+                  <X className="h-3 w-3" /> Clear
+                </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
         {/* GRID */}
-        <section className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-8">
+        <section className="mx-auto max-w-7xl px-4 py-5 md:px-8 md:py-8">
           {loading ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="overflow-hidden rounded-2xl border border-border bg-white">
-                  <div className="h-48 animate-pulse bg-muted" />
+                  <div className="h-44 animate-pulse bg-muted" />
                   <div className="space-y-3 p-4">
                     <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
                     <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
@@ -199,14 +210,14 @@ export default function DreamsPage() {
               ))}
             </div>
           ) : visible.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-border bg-white p-12 text-center">
+            <div className="rounded-3xl border border-dashed border-border bg-white p-10 text-center">
               <Search className="mx-auto h-10 w-10 text-muted-foreground/50" />
-              <h3 className="mt-4 font-display text-xl font-bold">No Dreams match your view</h3>
+              <h3 className="mt-4 font-display text-lg font-bold">No Dreams match your view</h3>
               <p className="mt-2 text-sm text-muted-foreground">Try adjusting your filters or search keywords.</p>
               <Button onClick={() => { setCategory("All"); setQuery(""); }} variant="outline" className="mt-5 rounded-full">Reset filters</Button>
             </div>
           ) : (
-            <div className={view === "grid" ? "grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "flex flex-col gap-4"}>
+            <div className={view === "grid" ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "flex flex-col gap-4"}>
               {visible.map((dream) => <DreamCard key={dream.id} dream={dream} view={view} />)}
             </div>
           )}
@@ -226,35 +237,35 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
     return (
       <article className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition hover:shadow-md sm:flex-row">
         <div className="relative w-full shrink-0 sm:w-64">
-          <ProductImage dream={dream} className="h-48 w-full" />
-          <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-teal-700 shadow-sm">{dream.category}</span>
-          <span className="absolute right-3 top-3 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">{dream.status}</span>
+          <ProductImage dream={dream} className="h-44 w-full sm:h-full sm:min-h-[200px]" />
+          <span className="absolute right-3 top-3 max-w-[calc(100%-24px)] truncate rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">{dream.status}</span>
         </div>
-        <div className="flex flex-1 flex-col p-5">
-          <h3 className="font-display text-xl font-bold leading-tight">{dream.name}</h3>
-          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{dream.description}</p>
-          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+          <p className="truncate text-[10px] font-bold uppercase tracking-wider text-teal-700">{dream.category}</p>
+          <h3 className="mt-1 line-clamp-2 font-display text-lg font-bold leading-tight">{dream.name}</h3>
+          <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{dream.description}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Market value</p>
-              <p className="text-sm font-semibold text-muted-foreground line-through">{money(dream.dream_price)}</p>
+              <p className="text-xs font-semibold text-muted-foreground line-through">{money(dream.dream_price)}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Your contribution</p>
-              <p className="text-2xl font-black text-teal-700">{money(contribution)}</p>
+              <p className="text-xl font-black text-teal-700">{money(contribution)}</p>
             </div>
             <div className="ml-auto text-right">
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Funded</p>
-              <p className="text-lg font-black text-amber-600">{percent}%</p>
+              <p className="text-base font-black text-amber-600">{percent}%</p>
             </div>
           </div>
-          <div className="mt-3"><ProgressBar percent={percent} /></div>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span><Users className="mr-1 inline h-3.5 w-3.5" />{dream.approved_participants} joined · {spotsLeft} spots left</span>
+          <div className="mt-2"><ProgressBar percent={percent} /></div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <span><Users className="mr-1 inline h-3.5 w-3.5" />{dream.approved_participants} joined · {spotsLeft} left</span>
             <span>{money(left)} still needed</span>
           </div>
-          <div className="mt-4">
+          <div className="mt-3">
             <Link to="/dreams/$id" params={{ id: dream.id }}>
-              <Button className="h-11 w-full rounded-xl bg-teal-700 font-bold hover:bg-teal-800 sm:w-auto sm:px-6">
+              <Button className="h-10 w-full rounded-xl bg-teal-700 font-bold hover:bg-teal-800 sm:w-auto sm:px-6">
                 Participate Now <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
@@ -267,37 +278,43 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition hover:-translate-y-1 hover:border-teal-200 hover:shadow-lg">
       <div className="relative">
-        <ProductImage dream={dream} className="h-48 w-full" />
-        <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-teal-700 shadow-sm">{dream.category}</span>
-        <span className="absolute right-3 top-3 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">{dream.status}</span>
-        <button aria-label="Save" className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-muted-foreground shadow-sm transition hover:text-rose-600">
-          <Heart className="h-4 w-4" />
+        <ProductImage dream={dream} className="h-40 w-full sm:h-44" />
+        {/* Category label — truncated, safe max-width */}
+        <span className="absolute left-2 top-2 max-w-[calc(100%-88px)] truncate rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-teal-700 shadow-sm sm:max-w-[55%]">
+          {dream.category}
+        </span>
+        {/* Status badge — always right, always fits */}
+        <span className="absolute right-2 top-2 shrink-0 rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm">
+          {dream.status}
+        </span>
+        <button aria-label="Save" className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-white/95 text-muted-foreground shadow-sm transition hover:text-rose-600">
+          <Heart className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
-        <h3 className="line-clamp-2 font-display text-base font-bold leading-snug">{dream.name}</h3>
-        <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground">{dream.description}</p>
+      <div className="flex flex-1 flex-col p-3.5">
+        <h3 className="line-clamp-2 font-display text-sm font-bold leading-snug">{dream.name}</h3>
+        <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-muted-foreground">{dream.description}</p>
 
-        <div className="mt-3 flex items-center justify-between text-[11px]">
-          <span className="inline-flex items-center gap-1 font-semibold text-teal-700"><TrendingUp className="h-3.5 w-3.5" />{percent}% funded</span>
+        <div className="mt-2.5 flex items-center justify-between text-[10px]">
+          <span className="inline-flex items-center gap-1 font-semibold text-teal-700"><TrendingUp className="h-3 w-3" />{percent}% funded</span>
           <span className="text-muted-foreground">{spotsLeft} spots left</span>
         </div>
-        <div className="mt-2"><ProgressBar percent={percent} /></div>
+        <div className="mt-1.5"><ProgressBar percent={percent} /></div>
 
         {/* HIGHLIGHTED PRICE BLOCK */}
-        <div className="mt-4 rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-3">
-          <div className="flex items-baseline justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-teal-800">Your contribution</p>
-            <p className="text-[10px] font-semibold text-muted-foreground line-through">{money(dream.dream_price)}</p>
+        <div className="mt-3 rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-2.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-teal-800">Your contribution</p>
+            <p className="shrink-0 text-[9px] font-semibold text-muted-foreground line-through">{money(dream.dream_price)}</p>
           </div>
-          <p className="mt-0.5 font-display text-2xl font-black text-teal-700">{money(contribution)}</p>
-          <p className="text-[10px] font-medium text-teal-800/80">Fixed amount to join this Dream</p>
+          <p className="mt-0.5 font-display text-xl font-black text-teal-700">{money(contribution)}</p>
+          <p className="text-[9px] font-medium text-teal-800/80">Fixed amount to join this Dream</p>
         </div>
 
-        <div className="mt-auto pt-4">
+        <div className="mt-auto pt-3">
           <Link to="/dreams/$id" params={{ id: dream.id }}>
-            <Button className="h-11 w-full rounded-xl bg-teal-700 font-bold hover:bg-teal-800">
+            <Button className="h-10 w-full rounded-xl bg-teal-700 text-sm font-bold hover:bg-teal-800">
               Participate Now <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
