@@ -191,7 +191,7 @@ export default function DreamDetailPage() {
 
                   <div className="mt-3 rounded-xl border bg-muted/30 p-2.5 md:p-3">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quantity</p>
-                    <p className="mt-1 text-sm font-bold text-foreground md:text-base">{dream.participant_capacity}</p>
+                    <p className="mt-1 text-sm font-bold text-foreground md:text-base">{dream.quantity}</p>
                   </div>
 
                   <a href="#participate" className="mt-4 hidden md:block">
