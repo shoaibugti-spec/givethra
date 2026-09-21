@@ -20,12 +20,12 @@ export type Dream = {
   image_url?: string | null;
 
   // 💰 Pricing
-  dream_price: number;                 // Funding Goal (e.g. 7,000)
-  actual_market_price?: number | null; // Market Value (e.g. 5,000) — user ko dikhta
-  contribution_amount?: number;        // Fixed contribution (e.g. 500)
+  dream_price: number;                 // Funding Goal (e.g. 8000)
+  actual_market_price?: number | null; // Market Value (e.g. 5000)
+  contribution_amount?: number;        // Fixed contribution (e.g. 110)
 
   // 📊 Funding
-  funded_amount: number;               // Kitna jama hua (API se aata hai)
+  funded_amount: number;
   participant_capacity: number;
   approved_participants: number;
 
@@ -41,19 +41,19 @@ export type Dream = {
 // ==================================================================
 export const money = (value: number) => `PKR ${Math.round(Number(value || 0)).toLocaleString()}`;
 
-/** Market value jo user ko dikhta hai (strikethrough ke saath). */
-export const marketValue = (d: { actual_market_price?: number | null; dream_price: number }) =>
-  Number(d.actual_market_price || d.dream_price || 0);
+/** Market value — admin ne jo daali. Koi fallback nahi. */
+export const marketValue = (d: { actual_market_price?: number | null }) =>
+  Number(d.actual_market_price || 0);
 
-/** Funding goal — progress iss ke against calculate hoti hai. */
+/** Funding goal — progress iss ke against. */
 export const fundingGoal = (d: { dream_price: number }) =>
   Number(d.dream_price || 0);
 
-/** Progress percentage (0–100). */
+/** Progress % (0–100). */
 export const fundingPercent = (d: { dream_price: number; funded_amount: number }) =>
   Math.min(100, Math.round((Number(d.funded_amount || 0) / Math.max(1, fundingGoal(d))) * 100));
 
-/** Kitna baqi hai (funding goal ke hisaab se). */
+/** Kitna baqi. */
 export const fundingLeft = (d: { dream_price: number; funded_amount: number }) =>
   Math.max(0, fundingGoal(d) - Number(d.funded_amount || 0));
 
@@ -157,7 +157,7 @@ export default function DreamsPage() {
           </div>
         </section>
 
-        {/* STICKY FILTER BAR */}
+        {/* STICKY BAR */}
         <div className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
           <div className="mx-auto max-w-7xl px-4 md:px-8">
             <div className="flex items-center gap-2 py-2.5">
@@ -276,7 +276,7 @@ export default function DreamsPage() {
 function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
   const percent = fundingPercent(dream);
   const left = fundingLeft(dream);
-  const mv = marketValue(dream);                         // 5,000 — user ko dikhega
+  const mv = marketValue(dream);   // 0 agar admin ne set nahi ki (koi fallback nahi)
   const contribution = Number(dream.contribution_amount || 0);
   const spotsLeft = Math.max(0, Number(dream.participant_capacity || 0) - Number(dream.approved_participants || 0));
 
@@ -292,10 +292,12 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
           <h3 className="mt-1 line-clamp-2 font-display text-lg font-bold leading-tight">{dream.name}</h3>
           <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{dream.description}</p>
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Market value</p>
-              <p className="text-xs font-semibold text-muted-foreground line-through">{money(mv)}</p>
-            </div>
+            {mv > 0 && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Market value</p>
+                <p className="text-xs font-semibold text-muted-foreground line-through">{money(mv)}</p>
+              </div>
+            )}
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Your contribution</p>
               <p className="text-xl font-black text-teal-700">{money(contribution)}</p>
@@ -347,14 +349,20 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
         </div>
         <div className="mt-1.5"><ProgressBar percent={percent} /></div>
 
-        {/* PRICE BLOCK — market value strikethrough + contribution big */}
+        {/* PRICE BLOCK */}
         <div className="mt-3 rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-2.5">
           <div className="flex items-baseline justify-between gap-2">
             <p className="text-[9px] font-bold uppercase tracking-wider text-teal-800">Your contribution</p>
-            <p className="shrink-0 text-[9px] font-semibold text-muted-foreground line-through">{money(mv)}</p>
+            {mv > 0 && (
+              <p className="shrink-0 text-[9px] font-semibold text-muted-foreground line-through">{money(mv)}</p>
+            )}
           </div>
           <p className="mt-0.5 font-display text-xl font-black text-teal-700">{money(contribution)}</p>
-          <p className="text-[9px] font-medium text-teal-800/80">Fixed amount to join this Dream</p>
+          {mv > 0 ? (
+            <p className="text-[9px] font-medium text-teal-800/80">Market value {money(mv)} — you pay a fixed share</p>
+          ) : (
+            <p className="text-[9px] font-medium text-teal-800/80">Fixed amount to join this Dream</p>
+          )}
         </div>
 
         <div className="mt-auto pt-3">
