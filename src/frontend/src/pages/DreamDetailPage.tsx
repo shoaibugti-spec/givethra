@@ -9,8 +9,10 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { createDreamParticipation, getDream, getDreamPaymentAccounts, uploadFileToStorage } from "@/lib/api";
-import { Dream, money } from "@/pages/DreamsPage";
+import {
+  createDreamParticipation, getDream, getDreamPaymentAccounts, uploadFileToStorage,
+} from "@/lib/api";
+import { Dream, money, marketValue, fundingPercent, fundingLeft } from "@/pages/DreamsPage";
 
 type Account = { id: string; label: string; method: string; account_title?: string; account_number: string; instructions?: string };
 const PROVINCES = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad Capital Territory", "Gilgit-Baltistan", "Azad Jammu and Kashmir"];
@@ -43,10 +45,11 @@ export default function DreamDetailPage() {
     return <Layout><main className="mx-auto max-w-4xl p-10 text-center">Dream product not found or is not published yet.</main></Layout>;
   }
 
-  const percent = Math.min(100, Math.round((Number(dream.funded_amount || 0) / Math.max(1, Number(dream.dream_price || 1))) * 100));
-  const left = Math.max(0, Number(dream.dream_price || 0) - Number(dream.funded_amount || 0));
-  const spotsLeft = Math.max(0, Number(dream.participant_capacity || 0) - Number(dream.approved_participants || 0));
+  const percent = fundingPercent(dream);
+  const left = fundingLeft(dream);
+  const mv = marketValue(dream);
   const contribution = Number(dream.contribution_amount || 0);
+  const spotsLeft = Math.max(0, Number(dream.participant_capacity || 0) - Number(dream.approved_participants || 0));
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -89,7 +92,6 @@ export default function DreamDetailPage() {
 
   return (
     <Layout>
-      {/* pb-36 leaves room for mobile sticky CTA + bottom nav */}
       <main className="min-h-screen bg-[#f7fafb] pb-36 md:pb-12">
         {/* BREADCRUMB */}
         <div className="border-b border-border bg-white">
@@ -102,7 +104,7 @@ export default function DreamDetailPage() {
           </div>
         </div>
 
-        {/* PRODUCT HERO */}
+        {/* HERO */}
         <section className="mx-auto max-w-7xl px-4 py-4 md:px-8 md:py-8">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
             <div className="min-w-0 space-y-5 md:space-y-6">
@@ -163,7 +165,7 @@ export default function DreamDetailPage() {
               </div>
             </div>
 
-            {/* RIGHT: sticky buy card */}
+            {/* RIGHT STICKY CARD */}
             <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
               <div className="space-y-3 md:space-y-4">
                 <div className="rounded-2xl border border-border bg-white p-4 shadow-sm md:rounded-3xl md:p-5">
@@ -178,7 +180,7 @@ export default function DreamDetailPage() {
                   <div className="mt-4 rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-3.5 md:p-4">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 md:text-[11px]">Your contribution</span>
-                      <span className="shrink-0 text-[10px] font-semibold text-muted-foreground line-through md:text-xs">{money(dream.dream_price)}</span>
+                      <span className="shrink-0 text-[10px] font-semibold text-muted-foreground line-through md:text-xs">{money(mv)}</span>
                     </div>
                     <p className="mt-1 font-display text-3xl font-black text-teal-700 md:text-4xl">{money(contribution)}</p>
                     <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">One fixed amount — same for every participant.</p>
@@ -235,7 +237,7 @@ export default function DreamDetailPage() {
           </div>
         </section>
 
-        {/* PARTICIPATION FORM */}
+        {/* FORM */}
         <section id="participate" className="mx-auto max-w-7xl px-4 md:px-8">
           {submitted ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center shadow-sm md:rounded-3xl md:p-8">
@@ -297,8 +299,6 @@ export default function DreamDetailPage() {
                         <p className="text-xs font-bold text-amber-900 md:text-sm">
                           Send <span className="text-teal-700">{money(contribution)}</span> to any Givethra account
                         </p>
-
-                        {/* FIXED: boxes fit inside, no overflow */}
                         <div className="mt-3 space-y-2.5">
                           {accounts.map((a) => (
                             <div key={a.id} className="rounded-xl border border-amber-200 bg-white/80 p-3">
@@ -318,7 +318,6 @@ export default function DreamDetailPage() {
                                   <Copy className="h-3 w-3" /> Copy
                                 </button>
                               </div>
-                              {/* break-all keeps long account numbers inside the box */}
                               <p className="mt-2 break-all rounded-lg bg-amber-50 px-2 py-1.5 font-mono text-xs font-bold text-foreground md:text-sm">
                                 {a.account_number}
                               </p>
@@ -365,13 +364,13 @@ export default function DreamDetailPage() {
                   </fieldset>
                 </div>
 
-                {/* STICKY SUMMARY (desktop only) */}
+                {/* STICKY SUMMARY (desktop) */}
                 <aside className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
                   <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-teal-800">Order summary</p>
                     <p className="mt-2 font-display text-lg font-bold">{dream.name}</p>
                     <div className="mt-3 space-y-1.5 text-sm">
-                      <Row label="Market value" value={money(dream.dream_price)} muted />
+                      <Row label="Market value" value={money(mv)} muted />
                       <Row label="Your contribution" value={money(contribution)} strong />
                       <Row label="Funding progress" value={`${percent}%`} />
                     </div>
@@ -393,7 +392,7 @@ export default function DreamDetailPage() {
                   </div>
                 </aside>
 
-                {/* MOBILE submit button (in-flow, right after form fields) */}
+                {/* MOBILE submit */}
                 <div className="lg:hidden">
                   <Button
                     type="submit"
@@ -409,7 +408,7 @@ export default function DreamDetailPage() {
           )}
         </section>
 
-        {/* MOBILE STICKY CTA — placed above the app's bottom nav */}
+        {/* MOBILE STICKY CTA */}
         {!submitted && (
           <div className="fixed inset-x-0 bottom-16 z-40 border-t border-border bg-white/95 p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:hidden">
             <div className="mx-auto flex max-w-7xl items-center gap-3">
