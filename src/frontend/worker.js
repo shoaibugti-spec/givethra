@@ -2543,7 +2543,7 @@ async function handleDreams(request, env, user, url, parts, origin) {
       COALESCE(SUM(CASE WHEN lower(COALESCE(p.status, '')) IN ('approved','active','completed') THEN 1 ELSE 0 END), 0) AS approved_participants
       FROM dreams d LEFT JOIN dream_participations p ON p.dream_id = d.id WHERE lower(COALESCE(d.publication_status, '')) = 'published'`;
     if (parts[2]) { const row = await env.DB.prepare(`${base} AND d.id = ? GROUP BY d.id LIMIT 1`).bind(parts[2]).first(); return row ? json(row, 200, origin) : json({ error: "Dream not found" }, 404, origin); }
-    const rows = await env.DB.prepare(`${base} AND lower(COALESCE(d.status, '')) IN ('open','active') GROUP BY d.id ORDER BY d.created_at DESC`).all(); return json(rows.results || [], 200, origin);
+    const rows = await env.DB.prepare(`${base} AND lower(COALESCE(d.status, '')) IN ('open','active') GROUP BY d.id ORDER BY CASE lower(COALESCE(d.status,'')) WHEN 'active' THEN 0 ELSE 1 END, d.created_at DESC`).all(); return json(rows.results || [], 200, origin);
   }
   if (parts[0] !== "api" || parts[1] !== "dream-participations" || request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
   if (!user) return json({ error: "Authentication required" }, 401, origin);
