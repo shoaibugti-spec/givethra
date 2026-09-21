@@ -9,7 +9,14 @@ const emptyAccount = { label: "", method: "Bank Transfer", account_title: "", ac
 const money = (v: any) => `PKR ${Number(v || 0).toLocaleString()}`;
 export default function AdminDreamsPanel() {
   const [dreams, setDreams] = useState<any[]>([]); const [participations, setParticipations] = useState<any[]>([]); const [accounts, setAccounts] = useState<any[]>([]); const [form, setForm] = useState<any>(emptyForm); const [account, setAccount] = useState<any>(emptyAccount); const [editing, setEditing] = useState<string>(); const [editingAccount, setEditingAccount] = useState<string>(); const [uploading, setUploading] = useState(false); const [busy, setBusy] = useState(false); const [tab, setTab] = useState<"products" | "submissions" | "accounts">("products");
-  const load = async () => { try { const [d, p, a] = await Promise.all([adminGetDreams(), adminGetDreamParticipations(), adminGetDreamPaymentAccounts()]); setDreams(d); setParticipations(p); setAccounts(a); } catch (e: any) { toast.error(e?.message || "Dreams could not be loaded"); } };
+  const load = async () => {
+    const [dreamResult, participationResult, accountResult] = await Promise.allSettled([adminGetDreams(), adminGetDreamParticipations(), adminGetDreamPaymentAccounts()]);
+    if (dreamResult.status === "fulfilled") setDreams(dreamResult.value);
+    if (participationResult.status === "fulfilled") setParticipations(participationResult.value);
+    if (accountResult.status === "fulfilled") setAccounts(accountResult.value);
+    const failed = [dreamResult, participationResult, accountResult].find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") toast.error(failed.reason?.message || "One Dreams section could not be loaded");
+  };
   useEffect(() => { void load(); }, []);
   const pending = useMemo(() => participations.filter((p) => p.status === "pending_approval"), [participations]); const set = (key: string, value: any) => setForm((f: any) => ({ ...f, [key]: value })); const setA = (key: string, value: any) => setAccount((f: any) => ({ ...f, [key]: value }));
   async function save(e: React.FormEvent) { e.preventDefault(); setBusy(true); try { await adminSaveDream({ ...form, dream_price: Number(form.dream_price), contribution_amount: Number(form.contribution_amount || 0), actual_market_price: form.actual_market_price === "" ? null : Number(form.actual_market_price), participant_capacity: Number(form.participant_capacity), internal_percentage_unit: form.internal_percentage_unit === "" ? null : Number(form.internal_percentage_unit), credit_award: Number(form.credit_award || 0) }, editing); toast.success(editing ? "Dream updated" : "Dream created"); setForm(emptyForm); setEditing(undefined); await load(); } catch (e: any) { toast.error(e?.message || "Could not save Dream"); } finally { setBusy(false); } }
