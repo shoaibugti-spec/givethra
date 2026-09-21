@@ -53,10 +53,6 @@ export const fundingGoal = (d: { dream_price: number }) =>
 export const fundingPercent = (d: { dream_price: number; funded_amount: number }) =>
   Math.min(100, Math.round((Number(d.funded_amount || 0) / Math.max(1, fundingGoal(d))) * 100));
 
-/** Kitna baqi. */
-export const fundingLeft = (d: { actual_market_price?: number | null; funded_amount: number }) =>
-  Math.max(0, marketValue(d) - Number(d.funded_amount || 0));
-
 const SORTS = [
   { value: "featured", label: "Featured" },
   { value: "newest", label: "Newest first" },
@@ -78,14 +74,6 @@ function ProductImage({ dream, className = "" }: { dream: Dream; className?: str
       ) : (
         <div className="relative px-5 text-center text-sm font-semibold text-teal-700">Product image coming soon</div>
       )}
-    </div>
-  );
-}
-
-function ProgressBar({ percent }: { percent: number }) {
-  return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-teal-100">
-      <div className="h-full rounded-full bg-gradient-to-r from-teal-500 to-amber-400 transition-all" style={{ width: `${percent}%` }} />
     </div>
   );
 }
@@ -274,11 +262,8 @@ export default function DreamsPage() {
 // CARD
 // ==================================================================
 function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
-  const percent = fundingPercent(dream);
-  const left = fundingLeft(dream);
   const mv = marketValue(dream);   // 0 agar admin ne set nahi ki (koi fallback nahi)
   const contribution = Number(dream.contribution_amount || 0);
-  const spotsLeft = Math.max(0, Number(dream.participant_capacity || 0) - Number(dream.approved_participants || 0));
 
   if (view === "list") {
     return (
@@ -303,14 +288,12 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
               <p className="text-xl font-black text-teal-700">{money(contribution)}</p>
             </div>
             <div className="ml-auto text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Funded</p>
-              <p className="text-base font-black text-amber-600">{percent}%</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quantity</p>
+              <p className="text-base font-black text-teal-700">{dream.participant_capacity}</p>
             </div>
           </div>
-          <div className="mt-2"><ProgressBar percent={percent} /></div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
-            <span><Users className="mr-1 inline h-3.5 w-3.5" />{dream.approved_participants} joined · {spotsLeft} left</span>
-            <span>Target {money(mv)} · {money(left)} still needed</span>
+            <span>Quantity available: {dream.participant_capacity}</span>
           </div>
           <div className="mt-3">
             <Link to="/dreams/$id" params={{ id: dream.id }}>
@@ -343,12 +326,6 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
         <h3 className="line-clamp-2 font-display text-sm font-bold leading-snug">{dream.name}</h3>
         <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-muted-foreground">{dream.description}</p>
 
-        <div className="mt-2.5 flex items-center justify-between text-[10px]">
-          <span className="inline-flex items-center gap-1 font-semibold text-teal-700"><TrendingUp className="h-3 w-3" />{percent}% funded</span>
-          <span className="text-muted-foreground">{spotsLeft} spots left</span>
-        </div>
-        <div className="mt-1.5"><ProgressBar percent={percent} /></div>
-
         {/* PRICE BLOCK */}
         <div className="mt-3 rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-2.5">
           <div className="flex items-baseline justify-between gap-2">
@@ -364,6 +341,7 @@ function DreamCard({ dream, view }: { dream: Dream; view: "grid" | "list" }) {
             <p className="text-[9px] font-medium text-teal-800/80">Fixed amount to join this Dream</p>
           )}
         </div>
+        <p className="mt-2 text-[10px] font-semibold text-muted-foreground">Quantity: {dream.participant_capacity}</p>
 
         <div className="mt-auto pt-3">
           <Link to="/dreams/$id" params={{ id: dream.id }}>
