@@ -948,14 +948,26 @@ export default function HomePage() {
             
             {/* SMART BUTTONS ABOVE SLIDER */}
             <div className="flex w-full max-w-6xl flex-col gap-3 mb-2">
-              <Button
-                size="lg"
+              <button
+                type="button"
+                aria-label="Shop Dream Now — Givethra Dreams"
                 onClick={() => navigate({ to: "/dreams" })}
-                className="h-14 w-full rounded-2xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-500 font-bold text-base text-white shadow-sm shadow-teal-200 transition-all hover:scale-[1.01] hover:from-teal-800 hover:to-emerald-600 active:scale-[0.99] sm:text-lg"
+                className="group relative h-20 w-full overflow-hidden rounded-2xl bg-teal-800 text-left shadow-md shadow-teal-200 transition-all hover:scale-[1.01] active:scale-[0.99] sm:h-24"
               >
-                <Sparkles className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> Make This My Dream
-                <ChevronRight className="ml-auto h-5 w-5" />
-              </Button>
+                <img
+                  src="/dream-shop-banner.jpg"
+                  alt="Shop Dream Now — Givethra Dreams"
+                  className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.03]"
+                />
+                <span className="absolute inset-0 bg-gradient-to-r from-teal-950/60 via-teal-900/15 to-teal-950/35" />
+                <span className="absolute inset-y-0 left-4 flex items-center gap-2 text-lg font-extrabold text-white drop-shadow sm:left-7 sm:text-2xl">
+                  <Sparkles className="h-6 w-6 shrink-0 sm:h-7 sm:w-7" />
+                  <span>Shop Dream Now</span>
+                </span>
+                <span className="absolute bottom-2 right-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-extrabold text-teal-800 shadow sm:bottom-3 sm:right-5 sm:px-3 sm:text-xs">
+                  Givethra Dreams <ChevronRight className="ml-0.5 inline h-3.5 w-3.5" />
+                </span>
+              </button>
               <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 size="lg"
