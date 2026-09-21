@@ -165,7 +165,7 @@ export default function DreamDetailPage() {
               </div>
             </div>
 
-            {/* RIGHT STICKY CARD */}
+            {/* RIGHT STICKY */}
             <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
               <div className="space-y-3 md:space-y-4">
                 <div className="rounded-2xl border border-border bg-white p-4 shadow-sm md:rounded-3xl md:p-5">
@@ -180,10 +180,16 @@ export default function DreamDetailPage() {
                   <div className="mt-4 rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-3.5 md:p-4">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 md:text-[11px]">Your contribution</span>
-                      <span className="shrink-0 text-[10px] font-semibold text-muted-foreground line-through md:text-xs">{money(mv)}</span>
+                      {mv > 0 && (
+                        <span className="shrink-0 text-[10px] font-semibold text-muted-foreground line-through md:text-xs">{money(mv)}</span>
+                      )}
                     </div>
                     <p className="mt-1 font-display text-3xl font-black text-teal-700 md:text-4xl">{money(contribution)}</p>
-                    <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">One fixed amount — same for every participant.</p>
+                    {mv > 0 ? (
+                      <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">Market value {money(mv)} — you pay a fixed share.</p>
+                    ) : (
+                      <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">One fixed amount — same for every participant.</p>
+                    )}
                   </div>
 
                   {/* FUNDING */}
@@ -364,13 +370,13 @@ export default function DreamDetailPage() {
                   </fieldset>
                 </div>
 
-                {/* STICKY SUMMARY (desktop) */}
+                {/* DESKTOP STICKY SUMMARY */}
                 <aside className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
                   <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-teal-800">Order summary</p>
                     <p className="mt-2 font-display text-lg font-bold">{dream.name}</p>
                     <div className="mt-3 space-y-1.5 text-sm">
-                      <Row label="Market value" value={money(mv)} muted />
+                      {mv > 0 && <Row label="Market value" value={money(mv)} muted />}
                       <Row label="Your contribution" value={money(contribution)} strong />
                       <Row label="Funding progress" value={`${percent}%`} />
                     </div>
