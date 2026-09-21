@@ -54,8 +54,8 @@ export const fundingPercent = (d: { dream_price: number; funded_amount: number }
   Math.min(100, Math.round((Number(d.funded_amount || 0) / Math.max(1, fundingGoal(d))) * 100));
 
 /** Kitna baqi. */
-export const fundingLeft = (d: { dream_price: number; funded_amount: number }) =>
-  Math.max(0, fundingGoal(d) - Number(d.funded_amount || 0));
+export const fundingLeft = (d: { actual_market_price?: number | null; funded_amount: number }) =>
+  Math.max(0, marketValue(d) - Number(d.funded_amount || 0));
 
 const SORTS = [
   { value: "featured", label: "Featured" },
