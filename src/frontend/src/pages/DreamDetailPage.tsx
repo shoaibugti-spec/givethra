@@ -4,8 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useParams } from "@tanstack/react-router";
 import {
-  CheckCircle2, ChevronRight, Clock3, Copy, FileCheck2, Info, Lock,
-  MapPin, Shield, ShieldCheck, Sparkles, Upload, User, Wallet,
+  CheckCircle2, ChevronRight, Clock3, Copy, FileCheck2, Info, Link2, Lock,
+  MapPin, Share2, Shield, ShieldCheck, Sparkles, Upload, User, Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -85,6 +85,25 @@ export default function DreamDetailPage() {
   const copyAccount = (value: string) => {
     navigator.clipboard?.writeText(value);
     toast.success("Account number copied");
+  };
+
+  const shareProduct = async () => {
+    const shareUrl = new URL(`/dreams/${dream.id}`, window.location.origin).toString();
+    const shareData = {
+      title: `${dream.name} | Givethra Dreams`,
+      text: `${dream.name} — fixed contribution ${money(contribution)}. View this product on Givethra.`,
+      url: shareUrl,
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Product link copied — share it anywhere");
+    } catch (error: any) {
+      if (error?.name !== "AbortError") toast.error("Could not share this product");
+    }
   };
 
   return (
@@ -172,6 +191,17 @@ export default function DreamDetailPage() {
                   </div>
                   <h1 className="mt-2.5 font-display text-xl font-black leading-tight md:text-2xl">{dream.name}</h1>
                   <p className="mt-1.5 line-clamp-3 text-xs text-muted-foreground md:text-sm">{dream.description}</p>
+
+                  <button
+                    type="button"
+                    onClick={shareProduct}
+                    className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 text-sm font-bold text-teal-800 transition hover:border-teal-300 hover:bg-teal-100 active:scale-[0.98]"
+                    aria-label={`Share ${dream.name}`}
+                  >
+                    <Share2 className="h-4 w-4" />
+                    Share this product
+                    <Link2 className="h-3.5 w-3.5 opacity-60" />
+                  </button>
 
                   {/* PRICE BLOCK */}
                   <div className="mt-4 rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-3.5 md:p-4">

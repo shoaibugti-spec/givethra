@@ -1335,6 +1335,16 @@ async function handleRequest(request, env, ctx) {
     return json({ valid: true, user }, 200, origin);
   }
 
+  // Public product pages get product-specific Open Graph/Twitter metadata.
+  if (parts[0] === "dreams" && parts[1] && request.method === "GET") {
+    try {
+      const preview = await productShareDocument(request, env, url, parts);
+      if (preview) return preview;
+    } catch (error) {
+      console.error("Dream share metadata failed", error);
+    }
+  }
+
   // Public static assets
   if (url.pathname.startsWith("/uploads/")) {
     const key = url.pathname.slice(9);
@@ -2414,6 +2424,46 @@ async function handleRequest(request, env, ctx) {
 }
 
 export { signSessionPayload, verifySessionToken, handlePublicFeedback, synchronizeCompletedCase };
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "'": "&#39;",
+    '"': "&quot;",
+  })[character]);
+}
+
+async function productShareDocument(request, env, url, parts) {
+  if (!env.ASSETS || request.method !== "GET" || parts[0] !== "dreams" || !parts[1]) return null;
+  const dream = await env.DB.prepare(
+    "SELECT name, category, description, image_url, contribution_amount FROM dreams WHERE id = ? AND lower(COALESCE(publication_status, '')) = 'published' LIMIT 1"
+  ).bind(parts[1]).first();
+  if (!dream) return null;
+  const documentResponse = await env.ASSETS.fetch(request);
+  const document = await documentResponse.text();
+  const title = `${dream.name} | Givethra Dreams`;
+  const description = `${dream.category || "Product"}: ${String(dream.description || "").replace(/\s+/g, " ").trim().slice(0, 180)} Fixed contribution PKR ${Math.round(Number(dream.contribution_amount || 0)).toLocaleString()}.`;
+  const image = dream.image_url ? new URL(dream.image_url, url.origin).toString() : `${url.origin}/dreams-products-banner.jpg`;
+  const pageUrl = new URL(`/dreams/${parts[1]}`, url.origin).toString();
+  let html = document.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
+  const replacements = [
+    ["description", description], ["og:title", title], ["og:description", description],
+    ["og:type", "product"], ["og:url", pageUrl], ["og:image", image], ["og:image:alt", dream.name],
+    ["twitter:title", title], ["twitter:description", description], ["twitter:image", image],
+  ];
+  for (const [property, value] of replacements) {
+    const attribute = property.startsWith("og:") ? `property="${property}"` : `name="${property}"`;
+    const tag = `<meta ${attribute} content="${escapeHtml(value)}">`;
+    const pattern = new RegExp(`<meta ${attribute}[^>]*>`, "i");
+    html = pattern.test(html) ? html.replace(pattern, tag) : html.replace(/<\/head>/i, `  ${tag}\n</head>`);
+  }
+  const headers = new Headers(documentResponse.headers);
+  headers.set("content-type", "text/html; charset=UTF-8");
+  headers.set("cache-control", "public, max-age=300, s-maxage=900");
+  return new Response(html, { status: documentResponse.status, headers });
+}
 
 export default {
   async fetch(request, env, ctx) {
