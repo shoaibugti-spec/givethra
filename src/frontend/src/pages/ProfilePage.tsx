@@ -1,14 +1,6 @@
 // src/frontend/src/pages/ProfilePage.tsx
-// Givethra - Complete Profile Page with Corrected, Professional Layout
-// 🔥 FIXED: Promise.allSettled for resilience (Fix #6)
-// 🔥 FIXED: Badge now shows correctly using isTrulyCompletedHelp (Fix #5)
-// 🔥 FIXED: Edit button separated from name/badge to avoid layout collision (Fix #7)
-// 🔥 FIXED: Profile loading stuck - now shows page even if profile is null (Fix #8)
-// 🔥 FIXED: "/profile/me" now uses actual logged-in user id (Critical fix)
-// 🔥 FIXED (NEW): Removed the duplicate text "Edit Profile" button below the name/badge row.
-//                 Only the pencil icon button on top of the avatar photo remains as the
-//                 single way to edit the profile — this frees up vertical space and avoids
-//                 the two edit controls competing for the same job.
+// Givethra - Role-based Profile Page
+// Shows different data for Hero vs Requester
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -23,13 +15,11 @@ import {
   CheckCircle2,
   ChevronRight,
   Circle,
-  Gift,
   KeyRound,
   Lock,
   LogOut,
   Mail,
   MapPin,
-  MessageCircle,
   Pencil,
   Phone,
   Settings,
@@ -38,15 +28,15 @@ import {
   HandCoins,
   HeartHandshake,
   Unlock,
-  Users,
   XCircle,
   Award,
   Trophy,
   Sparkles,
+  TrendingUp,
+  TrendingDown,
   Info,
-  MoreHorizontal,
-  Pin,
-  AlertCircle, // ✅ added for error state
+  HelpCircle,
+  Users, MoreHorizontal, Pin,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -60,8 +50,11 @@ import {
 } from "@/components/ui/dialog";
 import {
   getKycSubmission,
-  getProfile,
-  getProfileStats,
+  getCasesByUser,
+  getFullProfile,
+  getUserSupports,
+  getCaseResolutionsByHero,
+  getCaseUnlocksByHero,
   getFollowList,
   followUser,
   unfollowUser,
@@ -73,54 +66,56 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { isTrulyCompletedHelp } from "@/lib/resolutionStatus";
-import { computeHeroStats, computeRequesterStats, type HeroStats, type RequesterStats } from "@/lib/profileStats";
 
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
+// Helper: Check if a resolution is approved
+function isApprovedResolution(resolution: any): boolean {
+  if (!resolution) return false;
+  const status = String(resolution?.status || "").trim().toLowerCase();
+  if (["completed", "approved", "verified", "confirmed", "seeker_confirmed"].includes(status)) return true;
+  if ([1, true, "1", "true", "yes"].includes(resolution?.admin_confirmed)) return true;
+  if (resolution?.admin_approved_at || resolution?.approved_at || resolution?.verified_at || resolution?.completed_at || resolution?.admin_confirmed_at) return true;
+  return false;
+}
 
-const SUPPORTS_PER_DOLLAR = 10000;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
+// Helper to get badge based on hero stats
 function getBadge(unlockCount: number, contributionCount: number, directHelpCount: number) {
-  if (contributionCount >= 3 && directHelpCount >= 3 || contributionCount + directHelpCount >= 10) {
+  if (directHelpCount > 0 && contributionCount > 0 && unlockCount > 0) {
     return {
       title: "Super Hero",
       emoji: "🌟",
       description: "You have unlocked cases, contributed, and provided direct help. You are the ultimate Hero!",
-      icon: <Trophy className="h-4 w-4 text-yellow-500" />,
+      icon: <Trophy className="h-6 w-6 text-yellow-500" />,
       color: "bg-gradient-to-r from-yellow-400 to-orange-500 text-white",
     };
   }
-  if (directHelpCount > 0 || contributionCount > 0) {
+  if (directHelpCount > 0) {
     return {
       title: "Hero",
       emoji: "🦸",
       description: "You paid directly for someone's need. You are a true Hero!",
-      icon: <Award className="h-4 w-4 text-blue-500" />,
+      icon: <Award className="h-6 w-6 text-blue-500" />,
       color: "bg-gradient-to-r from-blue-400 to-indigo-500 text-white",
+    };
+  }
+  if (contributionCount > 0) {
+    return {
+      title: "Young Hero",
+      emoji: "⭐",
+      description: "You contributed to a fundraising pool. Every contribution counts! Keep going to become a full Hero.",
+      icon: <Sparkles className="h-6 w-6 text-green-500" />,
+      color: "bg-gradient-to-r from-green-400 to-emerald-500 text-white",
     };
   }
   if (unlockCount > 0) {
     return {
-      title: "Young Hero",
-      emoji: "⭐",
-      description: "You unlocked a case. Complete a contribution or direct help to become a full Hero.",
-      icon: <Sparkles className="h-4 w-4 text-green-500" />,
-      color: "bg-gradient-to-r from-green-400 to-emerald-500 text-white",
+      title: "Newborn Hero",
+      emoji: "🆕",
+      description: "You unlocked a case. Take the next step to become a full Hero!",
+      icon: <Sparkles className="h-6 w-6 text-purple-500" />,
+      color: "bg-gradient-to-r from-purple-400 to-pink-500 text-white",
     };
   }
-  return {
-    title: "Newborn Hero",
-    emoji: "🆕",
-    description: "Your Hero journey is ready to begin.",
-    icon: <Sparkles className="h-4 w-4 text-purple-500" />,
-    color: "bg-gradient-to-r from-purple-400 to-pink-500 text-white",
-  };
+  return null;
 }
 
 function getTrustLevel(rejected: number, approved: number, expired: number) {
@@ -131,37 +126,17 @@ function getTrustLevel(rejected: number, approved: number, expired: number) {
   return Math.max(0, Math.min(100, trust));
 }
 
-function getCaseStatusStyle(status: string) {
-  const s = String(status || "").toLowerCase();
-  if (s === "completed") return "bg-blue-50 text-blue-700 border-blue-200";
-  if (s === "active" || s === "approved" || s === "live") return "bg-teal-50 text-teal-700 border-teal-200";
-  if (s === "rejected") return "bg-red-50 text-red-700 border-red-200";
-  if (s === "expired") return "bg-amber-50 text-amber-700 border-amber-200";
-  return "bg-muted text-muted-foreground border-border";
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export default function ProfilePage() {
   const { isAuthenticated, user, logout } = useAuth();
   const { role } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
-
-  // 🔥 CRITICAL FIX: Treat "me" as the logged-in user's ID
-  const rawParam = location.pathname.match(/^\/profile\/([^/]+)/)?.[1];
-  const profileUserId = (!rawParam || rawParam === "me") ? (user?.id || "") : rawParam;
-
+  const profileUserId = location.pathname.match(/^\/profile\/([^/]+)/)?.[1] || user?.id || "";
   const isOwnProfile = Boolean(user?.id && profileUserId === user.id);
   const [kycData, setKycData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [cases, setCases] = useState<any[]>([]);
   const [showLogout, setShowLogout] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [profileView, setProfileView] = useState<"overview" | "help" | "cases">("overview");
   const [profileLoading, setProfileLoading] = useState(true);
   const [isMyHero, setIsMyHero] = useState(false);
   const [heroUpdating, setHeroUpdating] = useState(false);
@@ -169,32 +144,34 @@ export default function ProfilePage() {
   const [heroesCount, setHeroesCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [supportsCount, setSupportsCount] = useState(0);
-  const [supportEarningsUsd, setSupportEarningsUsd] = useState(0);
   const [relationshipType, setRelationshipType] = useState<"heroes" | "requesters" | null>(null);
   const [relationshipUsers, setRelationshipUsers] = useState<any[]>([]);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
 
-  const [requesterStats, setRequesterStats] = useState<RequesterStats>({
-    totalSubmitted: 0,
-    totalApproved: 0,
-    totalRejected: 0,
-    totalCompleted: 0,
-    totalExpired: 0,
-    totalHelpReceived: 0,
+  // Stats for all users
+  const [caseStats, setCaseStats] = useState({
+    submitted: 0,
+    completed: 0,
+    rejected: 0,
+    expired: 0,
   });
-  const [heroStats, setHeroStats] = useState<HeroStats>({
-    totalUnlocks: 0,
-    directHelps: 0,
-    contributions: 0,
-    totalAmountHelped: 0,
-  });
-  const [helpedCases, setHelpedCases] = useState<any[]>([]);
+
+  // Hero specific stats
+  const [helpedCount, setHelpedCount] = useState(0);
+  const [directHelps, setDirectHelps] = useState(0);
+  const [contributions, setContributions] = useState(0);
+  const [unlockCount, setUnlockCount] = useState(0);
+  const [totalAmountSpent, setTotalAmountSpent] = useState(0);
+
+  // Requester specific stats
+  const [totalHelpReceived, setTotalHelpReceived] = useState(0);
   const [trustLevel, setTrustLevel] = useState(100);
+
+  // Badge
   const [badge, setBadge] = useState<{ title: string; emoji: string; description: string; icon: JSX.Element; color: string } | null>(null);
 
   useEffect(() => {
     setProfile(null);
-    setProfileError(null);
     setKycData(null);
     setProfileLoading(true);
     if (!profileUserId) {
@@ -202,72 +179,75 @@ export default function ProfilePage() {
       return;
     }
     loadData();
-  }, [isAuthenticated, location.pathname, profileUserId]);
+  }, [isAuthenticated, location.pathname, role, profileUserId]);
 
-  // 🔥 FIX #6: Use Promise.allSettled to prevent single failure from blocking everything
   async function loadData() {
     setProfileLoading(true);
-    setProfileError(null);
     try {
-      const results = await Promise.allSettled([
-        getKycSubmission(profileUserId),
-        getProfile(profileUserId, role),
-        getProfileStats(profileUserId),
+      const [kyc, cases, prof, resolutions, unlocks, supportData] = await Promise.all([
+        isOwnProfile && user ? getKycSubmission(user.id) : Promise.resolve(null),
+        isOwnProfile && user ? getCasesByUser(user.id) : Promise.resolve([]),
+        getFullProfile(profileUserId, role),
+        isOwnProfile && user ? getCaseResolutionsByHero(user.id) : Promise.resolve([]),
+        isOwnProfile && user ? getCaseUnlocksByHero(user.id) : Promise.resolve([]),
+        getUserSupports(profileUserId).catch(() => null),
       ]);
-
-      const [kycResult, profResult, statsResult] = results;
-
-      const kyc = kycResult.status === "fulfilled" ? kycResult.value : null;
-      const prof = profResult.status === "fulfilled" ? profResult.value : null;
-      const stats = statsResult.status === "fulfilled" ? statsResult.value : {};
-      const caseList = Array.isArray(stats.cases) ? stats.cases : [];
-      const resolutions = Array.isArray(stats.resolutions) ? stats.resolutions : [];
-      const unlocks = Array.isArray(stats.unlocks) ? stats.unlocks : [];
-
-      // Log any failures (but don't block the whole page)
-      if (kycResult.status === "rejected") {
-        console.warn("KYC submission fetch failed (may be permissions):", kycResult.reason);
-      }
-      if (profResult.status === "rejected") {
-        console.error("Profile fetch failed:", profResult.reason);
-        setProfileError("Could not load profile details. Please try again later.");
-        toast.error("Could not load profile details.");
-      } else {
-        setProfileError(null);
-      }
-      if (statsResult.status === "rejected") {
-        console.warn("Profile stats fetch failed:", statsResult.reason);
-      }
 
       setKycData(kyc);
       setProfile(prof);
       setHeroesCount(Number(prof?.heroes_count || prof?.followers_count || 0));
       setFollowingCount(Number(prof?.following_count || 0));
-      setSupportsCount(Number(prof?.supports_count || 0));
-      setSupportEarningsUsd(Number(prof?.support_earnings_usd || 0));
+      setSupportsCount(Number(supportData?.supports || prof?.supports_count || 0));
       setIsMyHero(Boolean(prof?.is_following));
 
-      const list = Array.isArray(caseList) ? caseList : [];
+      // --- Requester Stats (for everyone) ---
+      const caseList = Array.isArray(cases) ? cases : [];
+      const submitted = caseList.length;
+      const completed = caseList.filter((c: any) => c.status === "completed").length;
+      const rejected = caseList.filter((c: any) => c.status === "rejected").length;
+      const expired = caseList.filter((c: any) => c.status === "expired").length;
+      setCaseStats({ submitted, completed, rejected, expired });
+
+      // Total Help Received (sum of amount_collected from completed cases)
+      const totalReceived = caseList
+        .filter((c: any) => c.status === "completed")
+        .reduce((sum: number, c: any) => sum + (Number(c.amount_collected) || 0), 0);
+      setTotalHelpReceived(totalReceived);
+
+      // Trust Level (for requester)
+      const trust = getTrustLevel(rejected, completed, expired);
+      setTrustLevel(trust);
+
+      // --- Hero Stats ---
       const resolutionList = Array.isArray(resolutions) ? resolutions : [];
+      const validResolutions = resolutionList.filter((r: any) => isApprovedResolution(r));
+      setHelpedCount(validResolutions.length);
+
+      const direct = validResolutions.filter(
+        (r: any) => String(r.paid_to || "").toLowerCase() !== "givethra"
+      );
+      const contrib = validResolutions.filter(
+        (r: any) => String(r.paid_to || "").toLowerCase() === "givethra"
+      );
+      setDirectHelps(direct.length);
+      setContributions(contrib.length);
+
+      const totalSpent = validResolutions.reduce(
+        (sum: number, r: any) => sum + (Number(r.seeker_confirmed_amount ?? r.amount_paid) || 0),
+        0
+      );
+      setTotalAmountSpent(totalSpent);
+
       const unlockList = Array.isArray(unlocks) ? unlocks : [];
-      const nextRequesterStats = stats.requester || computeRequesterStats(list);
-      const nextHeroStats = stats.hero || computeHeroStats(unlockList, resolutionList);
+      setUnlockCount(unlockList.length);
 
-      setCases(list);
-      setRequesterStats(nextRequesterStats);
-      setHeroStats(nextHeroStats);
-      setTrustLevel(getTrustLevel(nextRequesterStats.totalRejected, nextRequesterStats.totalCompleted, nextRequesterStats.totalExpired));
+      // --- Badge (only for Hero) ---
+      const badgeInfo = getBadge(unlockList.length, contrib.length, direct.length);
+      setBadge(badgeInfo);
 
-      const validResolutions = resolutionList.filter(isTrulyCompletedHelp);
-      setHelpedCases(validResolutions.slice(0, 5));
-      setBadge(getBadge(nextHeroStats.totalUnlocks, nextHeroStats.contributions, nextHeroStats.directHelps));
     } catch (err) {
-      // This outer catch should rarely be hit, but just in case
-      console.error("Unexpected error in loadData:", err);
-      setProfileError("An unexpected error occurred while loading the profile.");
-      toast.error("An unexpected error occurred while loading the profile.");
+      console.error("Failed to load profile data:", err);
     } finally {
-      // 🔥 FIX #8: Ensure loading always stops
       setProfileLoading(false);
     }
   }
@@ -330,23 +310,16 @@ export default function ProfilePage() {
   const coverUrl = profile?.cover_url || null;
 
   const verificationBadges = [
-    { label: "Email Verified", icon: <Mail className="h-3 w-3" />, active: isOwnProfile ? !!user?.email : !!profile?.email_verified },
+    { label: "Email Verified", icon: <Mail className="h-3 w-3" />, active: !!user?.email },
     { label: "Mobile Verified", icon: <Phone className="h-3 w-3" />, active: !!profile?.phone_number },
     { label: "Identity Verified", icon: <ShieldCheck className="h-3 w-3" />, active: kycApproved },
     { label: "Institution Verified", icon: <Building2 className="h-3 w-3" />, active: false },
   ];
 
   const menuItems = [
-    { icon: <Pencil className="h-5 w-5" />, label: "Edit Profile", to: "/edit-profile" },
-    { icon: <MessageCircle className="h-5 w-5" />, label: "Community", to: "/community" },
-    { icon: <HeartHandshake className="h-5 w-5" />, label: "My Help Dashboard", to: "/my-help" },
-    { icon: <Briefcase className="h-5 w-5" />, label: "My Cases Dashboard", to: "/my-cases" },
-    { icon: <Bell className="h-5 w-5" />, label: "Notifications", to: "/notifications" },
-    { icon: <Wallet className="h-5 w-5" />, label: "Wallet", to: "/wallet" },
-    { icon: <ShieldCheck className="h-5 w-5" />, label: "Security", to: "/security" },
-    { icon: <KeyRound className="h-5 w-5" />, label: "Google Account Security", to: "/security" },
-    { icon: <Lock className="h-5 w-5" />, label: "Privacy", to: "/account-privacy" },
     { icon: <Settings className="h-5 w-5" />, label: "Settings", to: "/settings" },
+    { icon: <Lock className="h-5 w-5" />, label: "Privacy", to: "/privacy" },
+    { icon: <ShieldCheck className="h-5 w-5" />, label: "Security", to: "/security" },
   ];
 
   const initials =
@@ -356,54 +329,18 @@ export default function ProfilePage() {
       .join("")
       .toUpperCase()
       .slice(0, 2) || "G";
-
-  // 🔥 FIX #8: Show page even if profile is null — just show an error message
-  const profileReady = !profileLoading;
-  const showProfileError = profileError || (!profile && !profileLoading);
+  const profileReady = !profileLoading && profile && String(profile.user_id || "") === String(profileUserId);
 
   if (!profileReady) {
-    return (
-      <Layout>
-        <div className="max-w-xl mx-auto px-4 pt-8 pb-24">
-          <div className="rounded-3xl border border-border bg-card p-8 text-center">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted animate-pulse" />
-            <div className="mx-auto h-5 w-40 rounded bg-muted animate-pulse" />
-            <p className="mt-4 text-sm text-muted-foreground">Loading profile...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // 🔥 FIX #8: If profile is null (failed to load), show error state
-  if (!profile) {
-    return (
-      <Layout>
-        <div className="max-w-xl mx-auto px-4 pt-8 pb-24">
-          <div className="rounded-3xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-8 text-center">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <AlertCircle className="h-8 w-8 text-red-500" />
-            </div>
-            <h1 className="text-xl font-bold text-red-700 dark:text-red-300">Profile Not Available</h1>
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-              {profileError || "We could not load this profile. Please try again later."}
-            </p>
-            <Button className="mt-4" onClick={() => loadData()}>
-              Retry
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
+    return <Layout><div className="max-w-xl mx-auto px-4 pt-8 pb-24"><div className="rounded-3xl border border-border bg-card p-8 text-center"><div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted animate-pulse" /><div className="mx-auto h-5 w-40 rounded bg-muted animate-pulse" /><p className="mt-4 text-sm text-muted-foreground">Loading profile...</p></div></div></Layout>;
   }
 
   return (
     <Layout>
       <div className="max-w-xl mx-auto px-4 pt-0 pb-24 space-y-4">
-        {/* ============================= Header Card ============================= */}
-        <div className="rounded-b-3xl bg-card border border-border shadow-sm overflow-hidden">
-          {/* Cover */}
-          <div className="h-32 relative bg-gradient-to-br from-primary via-primary/80 to-primary/40">
+        {/* Cover & Avatar */}
+        <div className="rounded-b-3xl bg-card border border-border shadow-sm">
+          <div className="h-32 relative rounded-t-3xl overflow-hidden bg-gradient-to-br from-primary via-primary/80 to-primary/40">
             {coverUrl ? (
               <img src={coverUrl} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
@@ -412,105 +349,73 @@ export default function ProfilePage() {
                 <div className="absolute bottom-0 left-8 h-12 w-12 rounded-full bg-white/10 blur-lg" />
               </div>
             )}
-
-            {isOwnProfile && (
-              <button
-                aria-label="Profile menu"
-                className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/25 backdrop-blur-sm flex items-center justify-center hover:bg-black/35 transition-colors"
-                onClick={() => setShowMenu(true)}
-              >
-                <MoreHorizontal className="h-4 w-4 text-white" />
-              </button>
-            )}
           </div>
 
+          {/* Avatar & Name */}
           <div className="px-5 pb-5">
-            {/* Avatar row — the ONLY edit control is the pencil icon on the photo itself */}
-            <div className="flex items-end justify-between -mt-12 mb-3">
-              <div className="relative shrink-0">
-                <div className="h-24 w-24 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-white font-bold text-2xl">{initials}</span>
-                  )}
-                </div>
-                {isOwnProfile && (
-                  <button
-                    type="button"
-                    onClick={() => navigate({ to: "/edit-profile" })}
-                    title="Edit Profile"
-                    aria-label="Edit Profile"
-                    className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full border-2 border-card bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
+            <div className="flex items-end justify-between -mt-14 mb-3">
+              <div className="h-28 w-28 rounded-3xl border-4 border-card ring-1 ring-border flex items-center justify-center shadow-xl overflow-hidden bg-primary relative z-10">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-white font-bold text-3xl">{initials}</span>
                 )}
               </div>
-
-              {!isOwnProfile && (
-                <Button
-                  type="button"
-                  onClick={toggleHero}
-                  disabled={heroUpdating}
-                  className={`rounded-full px-4 h-9 font-semibold shadow-sm shrink-0 ${
-                    isMyHero
-                      ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15"
-                      : "bg-primary text-primary-foreground hover:bg-primary/90"
-                  }`}
-                >
-                  <HeartHandshake className="h-4 w-4 mr-1.5" />
-                  {heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
-                </Button>
-              )}
-            </div>
-
-            {/* ================================================================
-                🔥 FIX (NEW): Name + Badge row only. The duplicate "Edit Profile"
-                text button that used to sit below this row has been removed —
-                the pencil icon on the avatar photo above is now the single,
-                only way to edit the profile. This frees up the vertical space
-                that button used to take.
-                ================================================================ */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-foreground break-words">{displayName}</h1>
-              {badge && (
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
-                    {badge.icon}
-                    {badge.title}
-                  </span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => setBadgeInfoOpen(true)}
-                          className="text-muted-foreground hover:text-primary transition-colors"
-                        >
-                          <Info className="h-4 w-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs text-xs">{badge.description}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+              <div className="flex min-w-0 flex-1 flex-col items-end gap-3 pt-14">
+                <div className="flex items-center gap-2">
+                  {!isOwnProfile && <Button type="button" onClick={toggleHero} disabled={heroUpdating} className={`rounded-full px-4 h-9 font-semibold shadow-sm ${isMyHero ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                    <HeartHandshake className="h-4 w-4 mr-1.5" />{heroUpdating ? "Updating..." : isMyHero ? "My Hero" : "Hero"}
+                  </Button>}
+                  {isOwnProfile && <button aria-label="Profile menu" className="h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" onClick={() => setShowMenu(true)}><MoreHorizontal className="h-4 w-4" /></button>}
                 </div>
-              )}
+                <div className="flex items-center gap-5 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 shadow-sm">
+                  <button onClick={() => openRelationshipList("requesters")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Requesters"><span className="block text-xl font-bold text-primary">{heroesCount}</span><span className="text-xs text-muted-foreground">Requesters</span></button>
+                  <button onClick={() => openRelationshipList("heroes")} className="text-center hover:opacity-70 transition-opacity" aria-label="View Heroes"><span className="block text-xl font-bold text-foreground">{followingCount}</span><span className="text-xs text-muted-foreground">Heroes</span></button>
+                  <div className="text-center"><span className="block text-xl font-bold text-amber-600">{supportsCount.toLocaleString()}</span><span className="text-xs text-muted-foreground">Supports</span></div>
+                </div>
+              </div>
             </div>
 
-            {/* Location, Member Since, KYC, Bio */}
-            <div className="space-y-1 mt-1">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap min-w-0">
+                  <h1 className="text-xl font-bold text-foreground truncate">{displayName}</h1>
+                {badge && role === "hero" && (
+                  <div className="flex items-center gap-1">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${badge.color}`}>
+                      {badge.icon}
+                      {badge.title}
+                    </span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setBadgeInfoOpen(true)}
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                          >
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-xs">{badge.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
+                </div>
+                {isOwnProfile && <button type="button" onClick={() => navigate({ to: "/edit-profile" })} title="Edit Profile" className="h-9 w-9 shrink-0 rounded-full border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors" aria-label="Edit Profile"><Pencil className="h-4 w-4 text-muted-foreground" /></button>}
+              </div>
               {(profile?.city || profile?.country) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
+                  <MapPin className="h-3 w-3" />{" "}
                   {[profile?.city, profile?.country].filter(Boolean).join(", ")}
                 </p>
               )}
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" /> Member since {profile?.member_since || 2026}
+                  <Calendar className="h-3 w-3" /> Member since 2026
                 </span>
                 {kycApproved && (
                   <span className="flex items-center gap-1 text-teal-600 font-medium">
@@ -518,244 +423,161 @@ export default function ProfilePage() {
                   </span>
                 )}
               </div>
-              {profile?.bio && <p className="text-sm text-muted-foreground italic pt-1">{profile.bio}</p>}
+              {profile?.bio && (
+                <p className="text-sm text-muted-foreground italic pt-1">{profile.bio}</p>
+              )}
             </div>
 
-            {/* Stats row */}
-            <div className="grid grid-cols-3 gap-2 mt-4 rounded-2xl border border-border/70 bg-background/70 px-2 py-3 shadow-sm">
-              <button
-                onClick={() => openRelationshipList("requesters")}
-                className="flex flex-col items-center gap-0.5 hover:opacity-70 transition-opacity"
-                aria-label="View Requesters"
-              >
-                <Users className="h-3.5 w-3.5 text-primary" />
-                <span className="text-lg font-bold text-primary leading-tight">{heroesCount}</span>
-                <span className="text-[11px] text-muted-foreground">Requesters</span>
-              </button>
-              <button
-                onClick={() => openRelationshipList("heroes")}
-                className="flex flex-col items-center gap-0.5 hover:opacity-70 transition-opacity border-x border-border/60"
-                aria-label="View Heroes"
-              >
-                <HeartHandshake className="h-3.5 w-3.5 text-foreground" />
-                <span className="text-lg font-bold text-foreground leading-tight">{followingCount}</span>
-                <span className="text-[11px] text-muted-foreground">Heroes</span>
-              </button>
-              <div className="flex flex-col items-center gap-0.5">
-                <Gift className="h-3.5 w-3.5 text-amber-600" />
-                <span className="text-lg font-bold text-amber-600 leading-tight">{supportsCount.toLocaleString()}</span>
-                <span className="text-[11px] text-muted-foreground">Supports</span>
-              </div>
-            </div>
-
-            {isOwnProfile && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => setProfileView("help")} className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${profileView === "help" ? "border-primary bg-primary text-primary-foreground" : "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10"}`}>
-                  <HeartHandshake className="h-4 w-4" /> My Help
-                </button>
-                <button type="button" onClick={() => setProfileView("cases")} className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${profileView === "cases" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-muted"}`}>
-                  <Briefcase className="h-4 w-4" /> My Cases
-                </button>
-              </div>
-            )}
-
-            {isOwnProfile && profileView !== "overview" && (
-              <div className="mt-3 rounded-2xl border border-primary/15 bg-primary/5 p-4">
-                {profileView === "help" ? <>
-                  <div className="mb-3 flex items-center gap-2 font-semibold text-primary"><HeartHandshake className="h-4 w-4" /> My Help</div>
-                  <div className="grid grid-cols-2 gap-2 text-center">
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.totalUnlocks}</strong><span className="text-[10px] text-muted-foreground">Total Unlocks</span></div>
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.directHelps}</strong><span className="text-[10px] text-muted-foreground">Direct Helps</span></div>
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.contributions}</strong><span className="text-[10px] text-muted-foreground">Contributions</span></div>
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.totalAmountHelped}</strong><span className="text-[10px] text-muted-foreground">Total Amount Helped</span></div>
-                  </div>
-                </> : <>
-                  <div className="mb-3 flex items-center gap-2 font-semibold text-primary"><Briefcase className="h-4 w-4" /> My Cases</div>
-                  <div className="grid grid-cols-2 gap-2 text-center">
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalSubmitted}</strong><span className="text-[10px] text-muted-foreground">Submitted</span></div>
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalApproved}</strong><span className="text-[10px] text-muted-foreground">Approved</span></div>
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalRejected}</strong><span className="text-[10px] text-muted-foreground">Rejected</span></div>
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalCompleted}</strong><span className="text-[10px] text-muted-foreground">Completed</span></div>
-                    <div className="col-span-2 rounded-xl bg-card p-3"><strong className="block text-xl text-green-600">{requesterStats.totalHelpReceived}</strong><span className="text-[10px] text-muted-foreground">Total Help Received</span></div>
-                  </div>
-                </>}
-              </div>
-            )}
-
-            {/* Verification Badges */}
             <div className="mt-3 flex flex-wrap gap-2">
-              {verificationBadges.map((b) => (
+              {verificationBadges.map((badge) => (
                 <span
-                  key={b.label}
+                  key={badge.label}
                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                    b.active
+                    badge.active
                       ? "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800"
                       : "bg-muted text-muted-foreground border-border"
                   }`}
                 >
-                  {b.active ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
-                  {b.label}
+                  {badge.active ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                  {badge.label}
                 </span>
               ))}
             </div>
           </div>
         </div>
 
-        {/* ============================= Trust Level ============================= */}
-        <div className="rounded-2xl bg-card border border-border p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Trust Level</span>
-            <span className="text-sm font-bold text-primary">{trustLevel}%</span>
-          </div>
-          <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-            <div
-              className={`h-3 rounded-full transition-all ${
-                trustLevel >= 70 ? "bg-green-500" : trustLevel >= 40 ? "bg-amber-500" : "bg-red-500"
-              }`}
-              style={{ width: `${trustLevel}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>Based on case history</span>
-            <span>
-              +{requesterStats.totalCompleted * 5} approvals · -{requesterStats.totalRejected * 10} rejections · -{requesterStats.totalExpired * 5} expired
-            </span>
-          </div>
-        </div>
-
-        {/* ============================= Support earnings (separate from wallet credits) ============================= */}
-        <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <HandCoins className="h-4 w-4 text-amber-600" />
-              <span className="text-sm font-semibold">Support earnings</span>
+        {/* Role-based Stats */}
+        {role === "hero" ? (
+          // ----- HERO STATS -----
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{totalAmountSpent > 0 ? `$${totalAmountSpent.toFixed(2)}` : "—"}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HandCoins className="h-3 w-3" /> Total Spent
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{helpedCount}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HeartHandshake className="h-3 w-3" /> Helped
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{directHelps}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Building2 className="h-3 w-3" /> Direct Helps
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{contributions}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HandCoins className="h-3 w-3" /> Contributions
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
+                <div className="text-2xl font-bold text-foreground">{unlockCount}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Unlock className="h-3 w-3" /> Total Unlocks
+                </div>
+              </div>
             </div>
-            <span className="text-lg font-bold text-amber-600">${supportEarningsUsd.toFixed(2)}</span>
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            {supportsCount.toLocaleString()} Supports received · {SUPPORTS_PER_DOLLAR.toLocaleString()} Supports = $1.00
-          </p>
-          <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
-            <span>Withdrawal eligibility will be announced soon.</span>
-            <span className="font-semibold whitespace-nowrap">Coming soon</span>
-          </div>
-        </div>
-
-        {/* ============================= Cases List ============================= */}
-        {cases.length > 0 && (
-          <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold flex items-center gap-1.5">
-                <Briefcase className="h-4 w-4 text-primary" /> Cases
-              </h2>
-              {isOwnProfile && (
-                <button
-                  onClick={() => navigate({ to: "/my-cases" })}
-                  className="text-xs text-primary font-medium flex items-center hover:underline"
-                >
-                  View all <ChevronRight className="h-3 w-3" />
-                </button>
-              )}
+          </>
+        ) : (
+          // ----- REQUESTER STATS -----
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{caseStats.submitted}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Briefcase className="h-3 w-3" /> Submitted
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{caseStats.completed}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-blue-600" /> Completed
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{caseStats.rejected}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <XCircle className="h-3 w-3 text-red-600" /> Rejected
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm">
+                <div className="text-2xl font-bold text-foreground">{caseStats.expired}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <Calendar className="h-3 w-3 text-amber-600" /> Expired
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-3 flex flex-col items-center text-center shadow-sm col-span-2">
+                <div className="text-2xl font-bold text-green-600">
+                  {totalHelpReceived > 0 ? `$${totalHelpReceived.toFixed(2)}` : "—"}
+                </div>
+                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-1">
+                  <HeartHandshake className="h-3 w-3" /> Total Help Received
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              {cases.slice(0, 5).map((c: any) => (
+
+            {/* Trust Level for Requester */}
+            <div className="rounded-2xl bg-card border border-border p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Trust Level</span>
+                <span className="text-sm font-bold text-primary">{trustLevel}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
                 <div
-                  key={c.id}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-border p-3"
-                >
-                  <span className="text-sm font-medium truncate">{c.title || `Case #${c.id}`}</span>
-                  <span
-                    className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border capitalize ${getCaseStatusStyle(c.status)}`}
-                  >
-                    {c.status || "pending"}
-                  </span>
-                </div>
-              ))}
+                  className={`h-3 rounded-full transition-all ${
+                    trustLevel >= 70 ? "bg-green-500" : trustLevel >= 40 ? "bg-amber-500" : "bg-red-500"
+                  }`}
+                  style={{ width: `${trustLevel}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>Based on your case history</span>
+                <span>
+                  +{caseStats.completed * 5} approvals · -{caseStats.rejected * 10} rejections · -{caseStats.expired * 5} expired
+                </span>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
-        {/* ============================= Helped Cases (Hero view) ============================= */}
-        {role === "hero" && helpedCases.length > 0 && (
-          <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
-            <h2 className="font-semibold flex items-center gap-1.5">
-              <HeartHandshake className="h-4 w-4 text-primary" /> Cases You Helped
-            </h2>
-            <div className="space-y-2">
-              {helpedCases.map((r: any) => (
-                <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-border p-3">
-                  <span className="text-sm font-medium truncate">{r.case_title || `Case #${r.case_id ?? r.id}`}</span>
-                  <span className="shrink-0 text-xs font-semibold text-green-600">
-                    {r.seeker_confirmed_amount ?? r.amount_paid ? Number(r.seeker_confirmed_amount ?? r.amount_paid).toFixed(2) : ""}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* ============================= Community Posts ============================= */}
         {Array.isArray(profile?.posts) && profile.posts.length > 0 && (
           <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold flex items-center gap-1.5">
-                <MessageCircle className="h-4 w-4 text-primary" /> Community Posts
-              </h2>
-              <span className="text-xs text-muted-foreground">{profile.posts.length} posts</span>
-            </div>
-            {profile.posts.map((post: any) => (
-              <article key={post.id} className="rounded-xl border border-border p-3">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {post.is_pinned ? <Pin className="h-3 w-3 text-primary" /> : null}
-                  <span>{post.is_pinned ? "Pinned" : "Community post"}</span>
-                </div>
-                <p className="mt-2 text-sm whitespace-pre-wrap">{post.message}</p>
-              </article>
-            ))}
+            <div className="flex items-center justify-between"><h2 className="font-semibold">Community Posts</h2><span className="text-xs text-muted-foreground">{profile.posts.length} posts</span></div>
+            {profile.posts.map((post: any) => <article key={post.id} className="rounded-xl border border-border p-3"><div className="flex items-center gap-2 text-xs text-muted-foreground">{post.is_pinned ? <Pin className="h-3 w-3 text-primary" /> : null}<span>{post.is_pinned ? "Pinned" : "Community post"}</span></div><p className="mt-2 text-sm whitespace-pre-wrap">{post.message}</p></article>)}
           </div>
         )}
 
-        {/* Sandwich Menu Dialog */}
         <Dialog open={showMenu} onOpenChange={setShowMenu}>
           <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Account Menu</DialogTitle>
-              <DialogDescription>Manage your profile and account settings.</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Account menu</DialogTitle><DialogDescription>Manage your profile and account settings.</DialogDescription></DialogHeader>
             <div className="rounded-2xl border border-border overflow-hidden">
               {menuItems.map((item, idx) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    setShowMenu(false);
-                    navigate({ to: item.to as "/" });
-                  }}
-                  className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors ${
-                    idx < menuItems.length - 1 ? "border-b border-border" : ""
-                  }`}
-                >
-                  <span className="text-primary">{item.icon}</span>
-                  <span className="flex-1 text-left">{item.label}</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <button key={item.label} type="button" onClick={() => { setShowMenu(false); navigate({ to: item.to as "/" }); }} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors ${idx < menuItems.length - 1 ? "border-b border-border" : ""}`}>
+                  <span className="text-primary">{item.icon}</span><span className="flex-1 text-left">{item.label}</span><ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </button>
               ))}
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Logout Button */}
-        {isOwnProfile && (
-          <button
-            type="button"
-            onClick={() => setShowLogout(true)}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/20 font-medium text-sm transition-colors"
-          >
-            <LogOut className="h-4 w-4" /> Logout
-          </button>
-        )}
+        {/* Logout */}
+        <button
+          type="button"
+          onClick={() => setShowLogout(true)}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/20 font-medium text-sm transition-colors"
+        >
+          <LogOut className="h-4 w-4" /> Logout
+        </button>
 
-        <p className="text-center text-xs text-muted-foreground pb-2">Givethra v2.0 · Built with ❤️</p>
+        <p className="text-center text-xs text-muted-foreground pb-2">
+          Givethra v2.0 · Built with ❤️
+        </p>
       </div>
 
       {/* Logout Dialog */}
@@ -793,7 +615,9 @@ export default function ProfilePage() {
             <DialogTitle className="flex items-center gap-2">
               <Info className="h-5 w-5 text-primary" /> Hero Badges
             </DialogTitle>
-            <DialogDescription>Understand what each badge means and how you earn them.</DialogDescription>
+            <DialogDescription>
+              Understand what each badge means and how you earn them.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/30">
@@ -830,65 +654,24 @@ export default function ProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Relationship List Dialog */}
       <Dialog open={relationshipType !== null} onOpenChange={(open) => !open && setRelationshipType(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{relationshipType === "heroes" ? "Your Heroes" : "Your Requesters"}</DialogTitle>
-            <DialogDescription>
-              {relationshipType === "heroes" ? "People you have chosen as Heroes." : "People who have chosen you as their Hero."}
-              {!relationshipLoading && relationshipUsers.length > 0 && (
-                <span className="block mt-0.5 text-xs font-medium text-foreground">{relationshipUsers.length} total</span>
-              )}
-            </DialogDescription>
+            <DialogDescription>{relationshipType === "heroes" ? "People you have chosen as Heroes." : "People who have chosen you as their Hero."}</DialogDescription>
           </DialogHeader>
-          <div className="max-h-[55vh] overflow-y-auto space-y-2 pr-1">
-            {relationshipLoading ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p>
-            ) : relationshipUsers.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">No {relationshipType} yet.</p>
-            ) : (
-              relationshipUsers.map((item, idx) => {
-                const userId = item.user_id ?? item.id ?? item.hero_id ?? item.requester_id ?? "";
-                const name = item.full_name ?? item.name ?? item.user_name ?? "Givethra User";
-                const initials2 = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
-                return (
-                  <div key={String(userId || idx)} className="flex items-center gap-3 rounded-xl border border-border p-3">
-                    <button
-                      onClick={() => {
-                        setRelationshipType(null);
-                        if (userId) navigate({ to: "/profile/$id", params: { id: String(userId) } });
-                      }}
-                      className="h-10 w-10 rounded-full overflow-hidden bg-primary text-white flex items-center justify-center font-semibold shrink-0"
-                    >
-                      {item.avatar_url ? (
-                        <img src={item.avatar_url} alt={name} className="h-full w-full object-cover" />
-                      ) : (
-                        initials2
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setRelationshipType(null);
-                        if (userId) navigate({ to: "/profile/$id", params: { id: String(userId) } });
-                      }}
-                      className="flex-1 text-left min-w-0"
-                    >
-                      <span className="font-medium truncate block">
-                        {name}
-                        {item.is_verified ? <span className="ml-1 text-teal-600">✓</span> : null}
-                      </span>
-                    </button>
-                    {isOwnProfile && (
-                      <Button variant="outline" size="sm" onClick={() => removeRelationship(String(userId))}>
-                        {relationshipType === "heroes" ? "Unhero" : "Remove"}
-                      </Button>
-                    )}
-                  </div>
-                );
-              })
-            )}
+          <div className="max-h-[55vh] overflow-y-auto space-y-2">
+            {relationshipLoading ? <p className="text-sm text-muted-foreground py-6 text-center">Loading...</p> : relationshipUsers.length === 0 ? <p className="text-sm text-muted-foreground py-6 text-center">No {relationshipType} yet.</p> : relationshipUsers.map((item) => {
+              const name = item.full_name || "User";
+              const initials = name.split(" ").map((part: string) => part[0]).join("").slice(0, 2).toUpperCase();
+              return <div key={item.user_id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <button onClick={() => { setRelationshipType(null); navigate({ to: "/profile/$id", params: { id: String(item.user_id) } }); }} className="h-10 w-10 rounded-full overflow-hidden bg-primary text-white flex items-center justify-center font-semibold shrink-0">
+                  {item.avatar_url ? <img src={item.avatar_url} alt={name} className="h-full w-full object-cover" /> : initials}
+                </button>
+                <button onClick={() => { setRelationshipType(null); navigate({ to: "/profile/$id", params: { id: String(item.user_id) } }); }} className="flex-1 text-left font-medium truncate">{name}{item.is_verified ? <span className="ml-1 text-teal-600">✓</span> : null}</button>
+                {isOwnProfile && <Button variant="outline" size="sm" onClick={() => removeRelationship(String(item.user_id))}>{relationshipType === "heroes" ? "Unhero" : "Remove"}</Button>}
+              </div>;
+            })}
           </div>
         </DialogContent>
       </Dialog>
