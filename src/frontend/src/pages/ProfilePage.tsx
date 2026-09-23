@@ -718,10 +718,16 @@ export default function ProfilePage() {
             <div className="space-y-2">
               {helpedCases.map((r: any) => (
                 <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl border border-border p-3">
-                  <span className="text-sm font-medium truncate">{r.case_title || `Case #${r.case_id ?? r.id}`}</span>
-                  <span className="shrink-0 text-xs font-semibold text-green-600">
-                    {r.seeker_confirmed_amount ?? r.amount_paid ? Number(r.seeker_confirmed_amount ?? r.amount_paid).toFixed(2) : ""}
-                  </span>
+                  <div className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{r.case_title || `Case #${r.case_id ?? r.id}`}</span>
+                    <span className="text-xs font-semibold text-green-600">
+                      {r.seeker_confirmed_amount ?? r.amount_paid ?? r.case_amount_collected ?? r.case_amount_needed ? Number(r.seeker_confirmed_amount ?? r.amount_paid ?? r.case_amount_collected ?? r.case_amount_needed).toFixed(2) : ""}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    {(r.receipt_url || r.case_paid_receipt_url) && <button type="button" className="rounded-md border border-primary/20 px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary/10" onClick={() => navigate({ to: "/payment-proof/$caseId", params: { caseId: String(r.case_id) } })}>Proof</button>}
+                    <button type="button" className="rounded-md border border-border px-2 py-1 text-[10px] font-semibold hover:bg-muted" onClick={() => navigate({ to: "/affidavit/$caseId", params: { caseId: String(r.case_id) } })}>Affidavit</button>
+                  </div>
                 </div>
               ))}
             </div>

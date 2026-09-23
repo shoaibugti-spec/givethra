@@ -37,6 +37,8 @@ export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): 
         resolution?.seeker_confirmed_amount ??
         resolution?.verified_amount ??
         resolution?.amount_paid ??
+        resolution?.case_amount_collected ??
+        resolution?.case_amount_needed ??
         resolution?.amount ??
         0
       ),
