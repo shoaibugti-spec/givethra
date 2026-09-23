@@ -265,7 +265,7 @@ export default function MyCasesPage() {
   const filteredMyCases = myCases.filter((c) => {
     const status = String(c.status || "").toLowerCase();
     if (myCaseStatusFilter === "approved") {
-      return status === "approved" || status === "published";
+      return ["approved", "published", "active", "open", "in_progress"].includes(status);
     }
     return status === myCaseStatusFilter;
   });

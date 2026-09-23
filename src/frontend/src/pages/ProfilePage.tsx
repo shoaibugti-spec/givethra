@@ -74,7 +74,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { isTrulyCompletedHelp } from "@/lib/resolutionStatus";
-import { computeHeroStats, computeRequesterStats, type HeroStats, type RequesterStats } from "@/lib/profileStats";
+import type { HeroStats, RequesterStats } from "@/lib/profileStats";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -222,7 +222,6 @@ export default function ProfilePage() {
       const stats = statsResult.status === "fulfilled" ? statsResult.value : {};
       const caseList = Array.isArray(stats.cases) ? stats.cases : [];
       const resolutions = Array.isArray(stats.resolutions) ? stats.resolutions : [];
-      const unlocks = Array.isArray(stats.unlocks) ? stats.unlocks : [];
 
       // Log any failures (but don't block the whole page)
       if (kycResult.status === "rejected") {
@@ -249,9 +248,20 @@ export default function ProfilePage() {
 
       const list = Array.isArray(caseList) ? caseList : [];
       const resolutionList = Array.isArray(resolutions) ? resolutions : [];
-      const unlockList = Array.isArray(unlocks) ? unlocks : [];
-      const nextRequesterStats = stats.requester || computeRequesterStats(list);
-      const nextHeroStats = stats.hero || computeHeroStats(unlockList, resolutionList);
+      const nextRequesterStats: RequesterStats = {
+        totalSubmitted: Number(stats.requester?.totalSubmitted || 0),
+        totalApproved: Number(stats.requester?.totalApproved || 0),
+        totalRejected: Number(stats.requester?.totalRejected || 0),
+        totalCompleted: Number(stats.requester?.totalCompleted || 0),
+        totalExpired: Number(stats.requester?.totalExpired || 0),
+        totalHelpReceived: Number(stats.requester?.totalHelpReceived || 0),
+      };
+      const nextHeroStats: HeroStats = {
+        totalUnlocks: Number(stats.hero?.totalUnlocks || 0),
+        directHelps: Number(stats.hero?.directHelps || 0),
+        contributions: Number(stats.hero?.contributions || 0),
+        totalAmountHelped: Number(stats.hero?.totalAmountHelped || 0),
+      };
 
       setCases(list);
       setRequesterStats(nextRequesterStats);

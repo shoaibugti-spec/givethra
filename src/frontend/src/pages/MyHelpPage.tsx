@@ -413,7 +413,7 @@ export default function MyHelpPage() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          {isCompleted && record.isApproved && !isUnlockOnly && (
+                          {isCompleted && !isUnlockOnly && (
                             <Button
                               size="sm"
                               className="gap-2 bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[120px]"
@@ -456,7 +456,7 @@ export default function MyHelpPage() {
                   }
 
                   // paid_completed (Payment Proof + Affidavit)
-                  if (record.type === "contribution" && isCompleted && record.isApproved) {
+                  if (record.type === "contribution" && isCompleted) {
                     return (
                       <div
                         key={record.id}
@@ -530,7 +530,7 @@ export default function MyHelpPage() {
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {isCompleted && record.isApproved && (
+                        {isCompleted && (
                           <Button
                             size="sm"
                             className="gap-2 bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[120px]"
