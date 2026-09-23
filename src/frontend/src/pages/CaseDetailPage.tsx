@@ -86,6 +86,7 @@ function isContributionResolution(resolution: any): boolean {
 
 function isApprovedCompletedResolution(resolution: any): boolean {
   const status = String(resolution?.status || "").trim().toLowerCase();
+  if (status === "completed" || String(resolution?.case_status || "").trim().toLowerCase() === "completed") return true;
   const adminConfirmed = [1, "1", true, "true", "yes"].includes(resolution?.admin_confirmed);
   return ["completed", "approved", "seeker_confirmed"].includes(status) && adminConfirmed;
 }
@@ -325,7 +326,7 @@ export default function CaseDetailPage() {
           getCaseUnlock(id, user.id, "partial"),
           getCaseUnlock(id, user.id, "media"),
           getUserUnlockCount(user.id),
-          getCaseResolutions(id, user.id), // equivalent authenticated lookup to: const res = await getCaseResolutions(id);
+          owner ? getCaseResolutions(id) : getCaseResolutions(id, user.id),
           getKycSubmission(data.user_id),
           getProfile(user.id),
         ]);
@@ -964,8 +965,8 @@ export default function CaseDetailPage() {
                     {(verifiedResolutions.length > 0 ? gratitude[isContributionResolution(verifiedResolutions[0]) ? "contribution" : "direct"] : gratitude.direct).replace("{amount}", `${sym} ${amountCollected} ${cur}`)}
                   </p>
                 </div>
-                {caseData.paid_receipt_url && (
-                  <a href={caseData.paid_receipt_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg bg-card border border-teal-300 p-3 text-sm text-teal-700 font-medium">
+                {(caseData.paid_receipt_url || caseData.payment_receipt_url || caseData.payment_proof_url || caseData.receipt_url || caseData.proof_url) && (
+                  <a href={caseData.paid_receipt_url || caseData.payment_receipt_url || caseData.payment_proof_url || caseData.receipt_url || caseData.proof_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg bg-card border border-teal-300 p-3 text-sm text-teal-700 font-medium">
                     <FileText className="h-4 w-4" /> View Payment Receipt
                   </a>
                 )}
@@ -974,9 +975,9 @@ export default function CaseDetailPage() {
                     <h3 className="font-semibold text-teal-700">Your verified help affidavits and receipts</h3>
                     {verifiedResolutions.map((resolution: any) => (
                       <div key={resolution.id} className="rounded-lg border border-border p-3 space-y-2">
-                        <div className="flex items-center justify-between gap-2 text-sm"><span>{isContributionResolution(resolution) ? "Contribution" : "Direct Help"}</span><span className="font-semibold">{sym} {resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? 0} {cur}</span></div>
-                        {resolution.transaction_id && <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{resolution.transaction_id}</span></p>}
-                        {resolution.receipt_url && <a href={resolution.receipt_url} target="_blank" rel="noopener noreferrer" className="block"><img src={resolution.receipt_url} alt="Payment proof" className="max-h-48 w-full rounded-lg border object-contain" /></a>}
+                        <div className="flex items-center justify-between gap-2 text-sm"><span>{isContributionResolution(resolution) ? "Contribution" : "Direct Help"}</span><span className="font-semibold">{sym} {resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? resolution.amount ?? caseData.amount_collected ?? caseData.amount_needed ?? 0} {cur}</span></div>
+                        {(resolution.transaction_id || resolution.txn_number || resolution.transaction_number || resolution.payment_reference || resolution.reference_number || caseData.reference_number || caseData.payment_transaction_id || caseData.paid_transaction_id) && <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{resolution.transaction_id || resolution.txn_number || resolution.transaction_number || resolution.payment_reference || resolution.reference_number || caseData.reference_number || caseData.payment_transaction_id || caseData.paid_transaction_id}</span></p>}
+                        {(resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url) && <a href={resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url} target="_blank" rel="noopener noreferrer" className="block"><img src={resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url} alt="Payment proof" className="max-h-48 w-full rounded-lg border object-contain" /></a>}
                         <Button size="sm" variant="outline" className="w-full gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, resolution, seekerKyc, resolution.hero_name || "Verified Hero")}><FileText className="h-3.5 w-3.5" /> View Affidavit</Button>
                       </div>
                     ))}
@@ -1105,7 +1106,7 @@ export default function CaseDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {!isOwner && unlockMode === "full" && (
+                {!isOwner && !isCompleted && unlockMode === "full" && (
                   <div className="order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
                     <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h2 className="font-semibold">Direct Payment Receiver Details</h2></div>
                     <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send the full amount {amountNeeded > 0 ? `(${sym} ${amountNeeded} ${cur})` : ""} to the verified receiver below. For bills, use the listed provider and consumer/reference number.</div>
@@ -1114,7 +1115,7 @@ export default function CaseDetailPage() {
                   </div>
                 )}
 
-                {!isOwner && unlockMode === "partial" && (
+                {!isOwner && !isCompleted && unlockMode === "partial" && (
                   <div className="order-2 min-w-0 overflow-hidden rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-2">
                     <div className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" /><h2 className="font-semibold">Contribute to Givethra Fundraising</h2></div>
                     <div className="rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs text-primary font-medium mb-1">Send your contribution to Givethra. We collect all contributions and pay the institute once the goal is reached. You can contribute as many times as you like until the case is complete.</div>
@@ -1127,7 +1128,7 @@ export default function CaseDetailPage() {
 
 
 
-                <div className="order-1 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-5 space-y-3">
+                {!isCompleted && <div className="order-1 min-w-0 overflow-hidden rounded-2xl bg-card border border-border p-5 space-y-3">
                   <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">🎥 Verification Media</h2>{mediaUnlocked && <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600">Unlocked</span>}</div>
                   {mediaUnlocked ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1140,7 +1141,7 @@ export default function CaseDetailPage() {
                       {isAuthenticated && !walletLoading && walletBalance < 1 ? <Button type="button" variant="outline" onClick={() => navigate({ to: "/wallet" })} className="w-full gap-2 border-amber-400 text-amber-800 dark:text-amber-300">Add 1 Credit in Wallet <ExternalLink className="h-3.5 w-3.5" /></Button> : <Button type="button" onClick={handleUnlockMedia} disabled={!isAuthenticated || mediaUnlocking || walletLoading} className="w-full gap-2">{mediaUnlocking ? "Unlocking..." : "Unlock Verification Media (1 credit)"}</Button>}
                     </div>
                   )}
-                </div>
+                </div>}
 
                 {!isOwner && myResolutions.length > 0 && (
                   <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
