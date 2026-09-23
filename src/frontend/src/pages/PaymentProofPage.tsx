@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCaseById, getCaseResolutions, getCasesByIds, getCaseUnlocksByHero } from "@/lib/api";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Download, FileCheck2, Copy, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, FileCheck2, Copy, Check, Loader2, ImageOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,14 +17,22 @@ export default function PaymentProofPage() {
   const [caseTitle, setCaseTitle] = useState("Payment proof");
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const caseId = useMemo(() => {
     const match = location.pathname.match(/^\/payment-proof\/([^/]+)/);
     return match ? decodeURIComponent(match[1]) : "";
   }, [location.pathname]);
 
-  // 🔥 Detect file type by extension
+  // Detect file type by extension (query params allowed)
   const isPdf = /\.pdf(\?.*)?$/i.test(proofUrl);
+
+  // Reset image states whenever URL changes
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+  }, [proofUrl]);
 
   useEffect(() => {
     let active = true;
@@ -95,7 +103,7 @@ export default function PaymentProofPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // 🔥 Download via fetch + blob — stays on same page, no new window
+  // Download via fetch + blob — stays on same page
   const handleDownload = async () => {
     if (!proofUrl || downloading) return;
     setDownloading(true);
@@ -123,7 +131,14 @@ export default function PaymentProofPage() {
   };
 
   if (!isAuthenticated) {
-    return <Layout><div className="mx-auto max-w-xl px-4 py-12 text-center"><h1 className="text-xl font-bold">Sign in required</h1><Button className="mt-5" onClick={() => navigate({ to: "/sign-in" })}>Sign in</Button></div></Layout>;
+    return (
+      <Layout>
+        <div className="mx-auto max-w-xl px-4 py-12 text-center">
+          <h1 className="text-xl font-bold">Sign in required</h1>
+          <Button className="mt-5" onClick={() => navigate({ to: "/sign-in" })}>Sign in</Button>
+        </div>
+      </Layout>
+    );
   }
 
   return (
@@ -165,22 +180,47 @@ export default function PaymentProofPage() {
           )}
 
           {loading ? (
-            <div className="py-20 text-center text-sm text-muted-foreground">Loading payment proof...</div>
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
           ) : proofUrl ? (
-            // 🔥 Show image inline (fits fully, no zoom) — PDF uses iframe
             isPdf ? (
-              <iframe
-                title="Verified payment proof"
-                src={proofUrl}
-                className="h-[75vh] w-full rounded-xl border bg-white"
-              />
-            ) : (
-              <div className="flex w-full items-center justify-center rounded-xl border bg-white p-2">
-                <img
+              // PDF: iframe, plus a fallback open button (mobile friendly)
+              <div className="space-y-2">
+                <iframe
+                  title="Verified payment proof"
                   src={proofUrl}
-                  alt="Verified payment proof"
-                  className="block max-h-[75vh] w-auto max-w-full rounded object-contain"
+                  className="h-[75vh] w-full rounded-xl border bg-white"
                 />
+                <p className="text-center text-[11px] text-muted-foreground">
+                  If the document does not load, tap Download above.
+                </p>
+              </div>
+            ) : (
+              // Image: centered, full visible, scales down on mobile
+              <div className="flex w-full items-center justify-center rounded-xl border bg-white p-2">
+                {imageError ? (
+                  <div className="flex flex-col items-center gap-2 py-20 text-sm text-muted-foreground">
+                    <ImageOff className="h-8 w-8" />
+                    <p>Image could not be loaded.</p>
+                    <Button size="sm" variant="outline" onClick={handleDownload}>Try Download</Button>
+                  </div>
+                ) : (
+                  <>
+                    {!imageLoaded && (
+                      <div className="flex items-center justify-center py-20">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    <img
+                      src={proofUrl}
+                      alt="Verified payment proof"
+                      onLoad={() => setImageLoaded(true)}
+                      onError={() => { setImageError(true); setImageLoaded(true); }}
+                      className={`block max-h-[75vh] w-auto max-w-full rounded object-contain ${imageLoaded ? "" : "hidden"}`}
+                    />
+                  </>
+                )}
               </div>
             )
           ) : (
@@ -188,7 +228,6 @@ export default function PaymentProofPage() {
               No payment proof is available for this record.
             </div>
           )}
-          {/* 🔥 "Open original proof" link REMOVED per user request */}
         </section>
       </main>
     </Layout>
