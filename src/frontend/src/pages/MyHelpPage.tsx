@@ -207,7 +207,7 @@ export default function MyHelpPage() {
           type: isContribution ? "contribution" : "direct",
           amount: Number(resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? 0),
           transactionId: resolution.transaction_id || caseRecord.payment_transaction_id || "",
-          receiptUrl: resolution.receipt_url || caseRecord.payment_receipt_url || null,
+          receiptUrl: resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url || caseRecord.receipt_url || caseRecord.paid_receipt_url || caseRecord.payment_receipt_url || caseRecord.payment_proof_url || caseRecord.proof_url || null,
           status: statusDisplay,
           completedAt: resolution.completed_at || resolution.admin_confirmed_at || resolution.submitted_at,
           caseId: caseId,
@@ -245,7 +245,7 @@ export default function MyHelpPage() {
         // Only a full/direct unlock may use that evidence; a contribution unlock
         // remains unlock-only until this hero submits their own proof.
         const adminTransactionId = caseRecord.reference_number || caseRecord.payment_transaction_id || "";
-        const adminReceiptUrl = caseRecord.paid_receipt_url || caseRecord.payment_receipt_url || null;
+        const adminReceiptUrl = caseRecord.receipt_url || caseRecord.paid_receipt_url || caseRecord.payment_receipt_url || caseRecord.payment_proof_url || caseRecord.proof_url || null;
         const hasVerifiedDirectPayment = isFullUnlock && caseIsCompleted && Boolean(adminTransactionId || adminReceiptUrl);
         const outcome = hasVerifiedDirectPayment ? "paid_completed" : caseIsCompleted ? "unlock_only_completed" : "unlock_only_pending";
 

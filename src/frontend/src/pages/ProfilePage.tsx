@@ -62,6 +62,9 @@ import {
   getKycSubmission,
   getProfile,
   getProfileStats,
+  getCasesByUser,
+  getCaseResolutionsByHero,
+  getCaseUnlocksByHero,
   getFollowList,
   followUser,
   unfollowUser,
@@ -74,7 +77,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { isTrulyCompletedHelp } from "@/lib/resolutionStatus";
-import type { HeroStats, RequesterStats } from "@/lib/profileStats";
+import { computeHeroStats, computeRequesterStats, type HeroStats, type RequesterStats } from "@/lib/profileStats";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -219,7 +222,27 @@ export default function ProfilePage() {
 
       const kyc = kycResult.status === "fulfilled" ? kycResult.value : null;
       const prof = profResult.status === "fulfilled" ? profResult.value : null;
-      const stats = statsResult.status === "fulfilled" ? statsResult.value : {};
+      let stats: any = statsResult.status === "fulfilled" ? statsResult.value : {};
+      if (statsResult.status === "rejected" && isOwnProfile) {
+        const fallback = await Promise.allSettled([
+          getCasesByUser(profileUserId),
+          getCaseResolutionsByHero(profileUserId),
+          getCaseUnlocksByHero(profileUserId),
+        ]);
+        const fallbackCases = fallback[0].status === "fulfilled" && Array.isArray(fallback[0].value) ? fallback[0].value : [];
+        const fallbackResolutions = fallback[1].status === "fulfilled" && Array.isArray(fallback[1].value) ? fallback[1].value : [];
+        const fallbackUnlocks = fallback[2].status === "fulfilled" && Array.isArray(fallback[2].value) ? fallback[2].value : [];
+        const computedRequester = computeRequesterStats(fallbackCases);
+        stats = {
+          cases: fallbackCases,
+          resolutions: fallbackResolutions,
+          hero: computeHeroStats(fallbackUnlocks, fallbackResolutions),
+          requester: {
+            ...computedRequester,
+            totalApproved: fallbackCases.filter((item: any) => ["approved", "published", "active", "open", "in_progress"].includes(String(item?.effective_status || item?.status || "").trim().toLowerCase())).length,
+          },
+        };
+      }
       const caseList = Array.isArray(stats.cases) ? stats.cases : [];
       const resolutions = Array.isArray(stats.resolutions) ? stats.resolutions : [];
 
