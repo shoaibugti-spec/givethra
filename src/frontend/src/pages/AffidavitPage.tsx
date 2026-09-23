@@ -61,8 +61,8 @@ export default function AffidavitPage() {
         const unlocks = results[2].status === "fulfilled" && Array.isArray(results[2].value) ? results[2].value : [];
         const userUnlock = unlocks.find((u: any) => String(u.case_id) === String(caseId));
         const completedList = resolutions.filter(isTrulyCompletedHelp);
-        let verified = completedList.find((r) => r.receipt_url || r.paid_receipt_url) || completedList[0] || null;
-        const adminReceipt = nextCase?.paid_receipt_url || nextCase?.payment_proof_url || nextCase?.receipt_url || null;
+        let verified = completedList.find((r) => r.receipt_url || r.paid_receipt_url || r.payment_proof_url || r.proof_url) || completedList[0] || null;
+        const adminReceipt = nextCase?.paid_receipt_url || nextCase?.payment_receipt_url || nextCase?.payment_proof_url || nextCase?.receipt_url || nextCase?.proof_url || null;
         const directUnlock = userUnlock && String(userUnlock.payment_type || "").toLowerCase() !== "partial";
         const caseCompleted = String(nextCase?.status || "").toLowerCase() === "completed";
         const ownContributionResolution = resolutions.find((r: any) =>
@@ -78,9 +78,9 @@ export default function AffidavitPage() {
             status: "completed",
             payment_type: "full",
             paid_to: "institute",
-            transaction_id: nextCase.reference_number || "",
+            transaction_id: nextCase.reference_number || nextCase.payment_transaction_id || nextCase.paid_transaction_id || nextCase.transaction_id || nextCase.txn_number || nextCase.payment_reference || "",
             receipt_url: adminReceipt,
-            amount_paid: nextCase.amount_collected || nextCase.amount_needed || 0,
+            amount_paid: nextCase.amount_collected || nextCase.verified_amount || nextCase.help_received_amount || nextCase.amount_received || nextCase.amount_paid || nextCase.amount_needed || 0,
             completed_at: nextCase.closed_at || nextCase.reviewed_at || null,
           };
         } else if (!verified && userUnlock && String(userUnlock.payment_type || "").toLowerCase() === "partial" && ownContributionResolution && caseCompleted) {
@@ -111,9 +111,9 @@ export default function AffidavitPage() {
   const title = caseData?.title || data.case_title || "Completed assistance";
   const category = caseData?.category || data.case_category || "Community assistance";
   const currency = caseData?.currency || data.currency || "USD";
-  const amount = data.seeker_confirmed_amount ?? data.amount_paid ?? data.amount ?? caseData?.amount_collected ?? caseData?.amount_needed ?? "Not recorded";
+  const amount = data.seeker_confirmed_amount ?? data.amount_paid ?? data.amount ?? caseData?.amount_collected ?? caseData?.verified_amount ?? caseData?.help_received_amount ?? caseData?.amount_received ?? caseData?.amount_needed ?? "Not recorded";
   const verificationCode = String(data.verification_security_code || data.security_code || data.id || caseId).slice(-16).toUpperCase();
-  const receiptUrl = data.receipt_url || data.paid_receipt_url || caseData?.paid_receipt_url || "";
+  const receiptUrl = data.receipt_url || data.paid_receipt_url || data.payment_proof_url || data.proof_url || caseData?.paid_receipt_url || caseData?.payment_receipt_url || caseData?.payment_proof_url || caseData?.receipt_url || caseData?.proof_url || "";
   const isContribution = isContributionResolution(data);
   // This route is opened by the helping user from My Help/View Case.
   const role = "Hero";
@@ -164,7 +164,7 @@ export default function AffidavitPage() {
               <div className="grid gap-3 rounded-2xl bg-muted/30 p-4 text-sm sm:grid-cols-2">
                 <p><span className="text-muted-foreground">Help type:</span> {data.paid_to === "givethra" ? "Contribution" : "Direct Help"}</p>
                 <p><span className="text-muted-foreground">Amount settled:</span> {amount} {currency}</p>
-                <p><span className="text-muted-foreground">Transaction:</span> <span className="font-mono">{data.transaction_id || "Not recorded"}</span></p>
+                <p><span className="text-muted-foreground">Transaction:</span> <span className="font-mono">{data.transaction_id || data.txn_number || data.transaction_number || data.payment_reference || data.reference_number || caseData?.reference_number || caseData?.payment_transaction_id || caseData?.paid_transaction_id || caseData?.transaction_id || caseData?.txn_number || caseData?.payment_reference || "Not recorded"}</span></p>
                 <p><span className="text-muted-foreground">Payment method:</span> {data.payment_method || caseData?.payment_method || "Not recorded"}</p>
                 <p><span className="text-muted-foreground">Verification date:</span> {formatDate(data.reviewed_at || data.admin_confirmed_at || data.completed_at || data.submitted_at)}</p>
                 <p><span className="text-muted-foreground">Account:</span> {maskAccount(caseData?.account_number || caseData?.account_iban)}</p>

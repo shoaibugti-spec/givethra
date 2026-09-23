@@ -240,6 +240,7 @@ export default function ProfilePage() {
           requester: {
             ...computedRequester,
             totalApproved: fallbackCases.filter((item: any) => ["approved", "published", "active", "open", "in_progress"].includes(String(item?.effective_status || item?.status || "").trim().toLowerCase())).length,
+            totalHelpReceived: fallbackCases.filter((item: any) => String(item?.effective_status || item?.status || "").trim().toLowerCase() === "completed").reduce((sum: number, item: any) => sum + Number(item?.amount_collected ?? item?.verified_amount ?? item?.help_received_amount ?? item?.amount_received ?? item?.amount_paid ?? item?.amount_needed ?? 0), 0),
           },
         };
       }

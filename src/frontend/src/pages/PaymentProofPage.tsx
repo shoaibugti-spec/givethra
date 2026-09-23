@@ -59,29 +59,29 @@ export default function PaymentProofPage() {
 
         // Source 1: caseData
         if (caseData) {
-          url = caseData.paid_receipt_url || caseData.payment_receipt_url || caseData.payment_proof_url || caseData.receipt_url || "";
-          txn = caseData.transaction_id || caseData.reference_number || caseData.consumer_no || caseData.payment_transaction_id || "";
+          url = caseData.paid_receipt_url || caseData.payment_receipt_url || caseData.payment_proof_url || caseData.receipt_url || caseData.proof_url || "";
+          txn = caseData.transaction_id || caseData.reference_number || caseData.consumer_no || caseData.payment_transaction_id || caseData.paid_transaction_id || caseData.txn_number || caseData.payment_reference || "";
         }
         // Source 2: casesByIds
         if (!url && casesByIds.length > 0) {
           const c = casesByIds[0];
-          url = c.payment_receipt_url || c.paid_receipt_url || c.payment_proof_url || c.receipt_url || "";
-          if (!txn) txn = c.payment_transaction_id || c.transaction_id || c.reference_number || "";
+          url = c.payment_receipt_url || c.paid_receipt_url || c.payment_proof_url || c.receipt_url || c.proof_url || "";
+          if (!txn) txn = c.payment_transaction_id || c.paid_transaction_id || c.transaction_id || c.reference_number || c.txn_number || c.payment_reference || "";
         }
         // Source 3: resolutions
         if (!url && resolutions.length > 0) {
-          const withReceipt = resolutions.find((r: any) => r.receipt_url || r.paid_receipt_url);
+          const withReceipt = resolutions.find((r: any) => r.receipt_url || r.paid_receipt_url || r.payment_proof_url || r.proof_url);
           if (withReceipt) {
-            url = withReceipt.receipt_url || withReceipt.paid_receipt_url || "";
-            if (!txn) txn = withReceipt.transaction_id || "";
+            url = withReceipt.receipt_url || withReceipt.paid_receipt_url || withReceipt.payment_proof_url || withReceipt.proof_url || "";
+            if (!txn) txn = withReceipt.transaction_id || withReceipt.txn_number || withReceipt.transaction_number || withReceipt.payment_reference || withReceipt.reference_number || "";
           }
         }
         // Source 4: unlocks
         if (!url) {
           const userUnlock = unlocks.find((u: any) => String(u.case_id) === String(caseId));
           if (userUnlock) {
-            url = userUnlock.receipt_url || userUnlock.paid_receipt_url || "";
-            if (!txn) txn = userUnlock.transaction_id || "";
+            url = userUnlock.receipt_url || userUnlock.paid_receipt_url || userUnlock.payment_proof_url || userUnlock.proof_url || "";
+            if (!txn) txn = userUnlock.transaction_id || userUnlock.txn_number || userUnlock.transaction_number || userUnlock.payment_reference || userUnlock.reference_number || "";
           }
         }
 

@@ -205,8 +205,8 @@ export default function MyHelpPage() {
         recordList.push({
           id: resolution.id,
           type: isContribution ? "contribution" : "direct",
-          amount: Number(resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? 0),
-          transactionId: resolution.transaction_id || caseRecord.payment_transaction_id || "",
+          amount: Number(resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? resolution.amount ?? caseRecord.amount_collected ?? caseRecord.amount_paid ?? 0),
+          transactionId: resolution.transaction_id || resolution.txn_number || resolution.transaction_number || resolution.payment_reference || resolution.reference_number || caseRecord.payment_transaction_id || caseRecord.paid_transaction_id || caseRecord.transaction_id || caseRecord.txn_number || caseRecord.payment_reference || caseRecord.reference_number || "",
           receiptUrl: resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url || caseRecord.receipt_url || caseRecord.paid_receipt_url || caseRecord.payment_receipt_url || caseRecord.payment_proof_url || caseRecord.proof_url || null,
           status: statusDisplay,
           completedAt: resolution.completed_at || resolution.admin_confirmed_at || resolution.submitted_at,
@@ -244,7 +244,7 @@ export default function MyHelpPage() {
         // on the case itself rather than creating/updating a resolution row.
         // Only a full/direct unlock may use that evidence; a contribution unlock
         // remains unlock-only until this hero submits their own proof.
-        const adminTransactionId = caseRecord.reference_number || caseRecord.payment_transaction_id || "";
+        const adminTransactionId = caseRecord.reference_number || caseRecord.payment_transaction_id || caseRecord.paid_transaction_id || caseRecord.transaction_id || caseRecord.txn_number || caseRecord.payment_reference || "";
         const adminReceiptUrl = caseRecord.receipt_url || caseRecord.paid_receipt_url || caseRecord.payment_receipt_url || caseRecord.payment_proof_url || caseRecord.proof_url || null;
         const hasVerifiedDirectPayment = isFullUnlock && caseIsCompleted && Boolean(adminTransactionId || adminReceiptUrl);
         const outcome = hasVerifiedDirectPayment ? "paid_completed" : caseIsCompleted ? "unlock_only_completed" : "unlock_only_pending";
