@@ -34,6 +34,7 @@ export function computeHeroStats(unlocks: any[] = [], resolutions: any[] = []): 
   const totalAmountHelped = completed.reduce(
     (sum, resolution) =>
       sum + Number(
+        resolution?.case_contribution_amount ??
         resolution?.seeker_confirmed_amount ??
         resolution?.verified_amount ??
         resolution?.amount_paid ??

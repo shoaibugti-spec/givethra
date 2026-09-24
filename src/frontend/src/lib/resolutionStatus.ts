@@ -24,6 +24,7 @@ export function isTrulyCompletedHelp(resolution: any): boolean {
 
 export function isContributionResolution(resolution: any): boolean {
   if (!resolution) return false;
+  if (resolution?.case_contribution_id || resolution?.case_contribution_amount != null) return true;
   const marker = String(
     resolution?.paid_to ?? resolution?.paidTo ?? resolution?.payment_type ?? resolution?.paymentType ?? ""
   ).trim().toLowerCase();
