@@ -3,6 +3,7 @@ import {
   PROPERTY_RELEVANT_CATS,
   isDebtCategory,
   getMaxLimit,
+  getMinAmount,
   PAYMENT_RECEIVER_CATS,
   EDUCATION_ADMISSION_FIELDS,
   EDUCATION_FEE_FIELDS,
@@ -170,6 +171,8 @@ export function validateStep(stepId: string, formData: any): string | null {
       if (isDebtCategory(formData.category)) return null;
       const value = Number(formData.amount);
       if (!Number.isFinite(value) || value <= 0) return "Please enter the amount needed";
+      const min = getMinAmount(formData.category);
+      if (min && value < min) return `Amount must be at least Rs ${min.toLocaleString()}`;
       const max = getMaxLimit(formData.category);
       return max && value > max ? `Amount cannot exceed Rs ${max.toLocaleString()}` : null;
     }

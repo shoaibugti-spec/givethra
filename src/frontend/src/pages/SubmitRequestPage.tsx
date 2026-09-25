@@ -81,6 +81,7 @@ const CATEGORY_LIMITS: Record<
   {
     type: "fixed" | "verified" | "max" | "debt_percentage";
     amount?: number;
+    minAmount?: number;
     maxAmount?: number;
     percentage?: number;
     label: string;
@@ -102,7 +103,7 @@ const CATEGORY_LIMITS: Record<
   "Home Repair": { type: "max", maxAmount: 18000, label: "Max Rs 18,000" },
   "Debt Relief": { type: "debt_percentage", percentage: 5, maxAmount: 25000, label: "5% of debt (max Rs 25,000)" },
   "Business / Work Help": { type: "max", maxAmount: 20000, label: "Rs 8,000–20,000" },
-  "Marriage Support": { type: "verified", label: "Verified Need" },
+  "Marriage Support": { type: "max", minAmount: 1000, maxAmount: 30000, label: "Rs 1,000–30,000 for one selected marriage item" },
   "Funeral Expenses": { type: "verified", label: "Verified Need" },
   "Livestock / Farming": { type: "verified", label: "Verified Need" },
   "Emergency Help": { type: "verified", label: "Verified Need" },
@@ -472,6 +473,10 @@ function getMaxAmount(category: string): number | null {
   if (limit?.type === "max") return limit.maxAmount || null;
   if (limit?.type === "debt_percentage") return limit.maxAmount || null;
   return null;
+}
+
+function getMinAmount(category: string): number | null {
+  return getCategoryLimit(category)?.minAmount || null;
 }
 
 function isDebtPercentageCategory(category: string): boolean {
@@ -1724,6 +1729,10 @@ export default function SubmitRequestPage() {
           }
         } else {
           if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter the amount needed.";
+          const minLimit = getMinAmount(category);
+          if (minLimit && parseFloat(amount) < minLimit) {
+            return `Amount must be at least Rs ${minLimit.toLocaleString()}. Please enter a valid amount.`;
+          }
           const maxLimit = getMaxLimit(category);
           if (maxLimit && parseFloat(amount) > maxLimit) {
             return `Amount cannot exceed Rs ${maxLimit.toLocaleString()}. Please enter a valid amount.`;
@@ -2122,6 +2131,27 @@ export default function SubmitRequestPage() {
                 }`}
               >
                 {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    if (f.choices) {
+      return (
+        <div key={f.key} className="space-y-2">
+          <Label>{f.label} {f.required && "*"}</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {f.choices.map((choice: string) => (
+              <button
+                key={choice}
+                type="button"
+                onClick={() => setCatFields((p) => ({ ...p, [f.key]: choice }))}
+                className={`px-2 py-2 rounded-lg border text-xs font-medium text-left ${
+                  catFields[f.key] === choice ? "bg-primary text-white border-primary" : "border-border"
+                }`}
+              >
+                {choice}
               </button>
             ))}
           </div>
@@ -3852,17 +3882,25 @@ export default function SubmitRequestPage() {
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground pointer-events-none">
                         {sym}
                       </span>
-                      <Input
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="e.g. 31000"
+                        <Input
+                          type="number"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          min={getMinAmount(category) ?? undefined}
+                          max={getMaxLimit(category) ?? undefined}
+                          placeholder="e.g. 31000"
                         className="pl-12"
                       />
                     </div>
                   </div>
                   {getMaxLimit(category) && (
                     <p className="text-xs text-amber-600">⚠️ Maximum allowed: Rs {getMaxLimit(category)?.toLocaleString()}</p>
+                  )}
+                  {getMinAmount(category) && (
+                    <p className="text-xs text-blue-600">ℹ️ Minimum allowed: Rs {getMinAmount(category)?.toLocaleString()}</p>
+                  )}
+                  {category === "Marriage Support" && (
+                    <p className="text-xs text-muted-foreground">💍 Request one selected item only; the amount must match its quotation.</p>
                   )}
                   {category === "Education, Books & Admission" && eduSubType === "admission" && (
                     <p className="text-xs text-muted-foreground">💡 Enter the admission fee / installment amount from your challan.</p>

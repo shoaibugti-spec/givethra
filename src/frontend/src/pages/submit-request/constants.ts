@@ -14,6 +14,7 @@ export const CATEGORY_LIMITS: Record<
   {
     type: "fixed" | "verified" | "max" | "debt_percentage";
     amount?: number;
+    minAmount?: number;
     maxAmount?: number;
     percentage?: number;
     label: string;
@@ -36,7 +37,7 @@ export const CATEGORY_LIMITS: Record<
   "Home Repair": { type: "max", maxAmount: 18000, label: "Max Rs 18,000" },
   "Debt Relief": { type: "debt_percentage", percentage: 5, maxAmount: 25000, label: "5% of debt (max Rs 25,000)" },
   "Business / Work Help": { type: "max", maxAmount: 20000, label: "Rs 8,000–20,000" },
-  "Marriage Support": { type: "verified", label: "Verified Need" },
+  "Marriage Support": { type: "max", minAmount: 1000, maxAmount: 30000, label: "Rs 1,000–30,000 for one selected marriage item" },
   "Funeral Expenses": { type: "verified", label: "Verified Need" },
 };
 
@@ -276,6 +277,24 @@ export const CHOICE_FIELDS: Record<string, string[]> = {
   pay_to_type: ["Shopkeeper", "Person", "Organization / Institute"],
 };
 
+export const MARRIAGE_ITEM_OPTIONS = [
+  "Sewing machine",
+  "Washing machine",
+  "Television",
+  "Charpai",
+  "Almirah",
+  "Dinner set",
+  "Electric stove",
+  "Grinder / juicer",
+  "Air cooler",
+  "Cosmetics / makeup set",
+  "Mirror",
+  "Dressing table",
+  "Sofa set",
+  "Five pairs of clothes",
+  "Five pairs of shoes",
+];
+
 export const YES_NO_FIELDS = new Set(["job_status", "wife_status"]);
 export const COUNTER_FIELDS = new Set(["sons", "daughters"]);
 
@@ -285,6 +304,7 @@ export function getCategoryLimit(category: string) { return CATEGORY_LIMITS[cate
 export function isFixedAmountCategory(category: string): boolean { const limit = getCategoryLimit(category); return limit?.type === "fixed"; }
 export function getFixedAmount(category: string): number | null { const limit = getCategoryLimit(category); return limit?.type === "fixed" ? limit.amount || null : null; }
 export function getMaxAmount(category: string): number | null { const limit = getCategoryLimit(category); if (limit?.type === "max") return limit.maxAmount || null; if (limit?.type === "debt_percentage") return limit.maxAmount || null; return null; }
+export function getMinAmount(category: string): number | null { return getCategoryLimit(category)?.minAmount || null; }
 export function isDebtPercentageCategory(category: string): boolean { const limit = getCategoryLimit(category); return limit?.type === "debt_percentage"; }
 
 export function calculateDebtAmount(debtTotal: number): number {

@@ -10,6 +10,9 @@ const amountStep = readFileSync(new URL("./steps/StepAmount.tsx", import.meta.ur
 const submitCase = readFileSync(new URL("./utils/SubmitCase.ts", import.meta.url), "utf8");
 const wizard = readFileSync(new URL("./SubmitRequestWizard.tsx", import.meta.url), "utf8");
 const worker = readFileSync(new URL("../../../worker.js", import.meta.url), "utf8");
+const marriageForm = readFileSync(new URL("./category-forms/MarriageSupportForm.tsx", import.meta.url), "utf8");
+const standalone = readFileSync(new URL("../SubmitRequestPage.tsx", import.meta.url), "utf8");
+const standaloneCategories = readFileSync(new URL("../../lib/categoryFields.ts", import.meta.url), "utf8");
 
 describe("Requester Visit submission audit", () => {
   it("uses medium 480p capture and bounded bitrate/size", () => {
@@ -23,7 +26,7 @@ describe("Requester Visit submission audit", () => {
   });
 
   it("keeps every public category represented by a dedicated form", () => {
-    const categories = [...constants.matchAll(/^  "([^"]+)"[,\s]*$/gm)].map((match) => match[1]);
+    const categories = [...constants.split("export const CATEGORIES")[0].matchAll(/^  "([^"]+)"[,\s]*$/gm)].map((match) => match[1]);
     for (const category of categories) {
       if (category === "PKR" || category === "USD") continue;
       expect(categoryStep).toContain(`"${category}":`);
@@ -53,7 +56,16 @@ describe("Requester Visit submission audit", () => {
     expect(amountStep).toContain("const fixedAmount = getFixedAmount(category);");
     expect(amountStep).toContain("readOnly={isFixed}");
     expect(submitCase).toContain("const fixedAmount = getFixedAmount(category);");
-    expect(worker).toContain('if (category === "Emergency Help") return 3000;');
-    expect(worker).toContain('if (category === "Livestock / Farming") return 8000;');
+    expect(worker).toContain('"Marriage Support amount must be between Rs 1,000 and Rs 30,000');
+  });
+
+  it("keeps Marriage Support limited to one selected item and Rs 1,000–30,000 in both flows and the Worker", () => {
+    expect(constantsSource).toContain('"Marriage Support": { type: "max", minAmount: 1000, maxAmount: 30000');
+    expect(marriageForm).toContain("MARRIAGE_ITEM_OPTIONS");
+    expect(marriageForm).toContain('catFields.marriage_item');
+    expect(standaloneCategories).toContain('key: "marriage_for"');
+    expect(standaloneCategories).toContain('key: "marriage_item"');
+    expect(standalone).toContain('minAmount: 1000, maxAmount: 30000');
+    expect(worker).toContain("Marriage Support amount must be between Rs 1,000 and Rs 30,000");
   });
 });

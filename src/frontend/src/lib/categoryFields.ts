@@ -4,6 +4,7 @@ export type FieldDef = {
   placeholder?: string;
   required?: boolean;
   type?: "text" | "number" | "textarea";
+  choices?: string[];
 };
 
 export type DocDef = {
@@ -381,6 +382,8 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
 
   "Marriage Support": {
     fields: [
+      { key: "marriage_for", label: "Who is this marriage support for?", choices: ["Myself", "My daughter", "My sister"], required: true },
+      { key: "marriage_item", label: "Which one item is needed?", choices: ["Sewing machine", "Washing machine", "Television", "Charpai", "Almirah", "Dinner set", "Electric stove", "Grinder / juicer", "Air cooler", "Cosmetics / makeup set", "Mirror", "Dressing table", "Sofa set", "Five pairs of clothes", "Five pairs of shoes"], required: true },
       { key: "bride_name", label: "Bride's Name", placeholder: "Full name of the bride", required: true },
       { key: "groom_name", label: "Groom's Name", placeholder: "Full name of the groom", required: true },
       { key: "marriage_date", label: "Marriage Date (expected)", placeholder: "e.g. 15 July 2026" },
@@ -391,13 +394,14 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     ],
     documents: [
       { key: "nikah_nama", label: "Nikah Nama (Marriage Certificate) or engagement proof", required: true, hint: "Proof that the marriage is genuine" },
-      { key: "expense_estimate", label: "Expense Estimate / Quotation", required: true, hint: "List of estimated expenses from vendors" },
+      { key: "expense_estimate", label: "Selected Item Expense Estimate / Quotation", required: true, hint: "Quotation must match the one selected item" },
       SALARY_DOC,
       STATEMENT_DOC,
     ],
     paymentNote: "The Hero pays the vendor/service provider directly.",
     guide: [
-      "Enter bride and groom names, marriage date, and a breakdown of expenses.",
+      "Select whether the support is for yourself, your daughter, or your sister, then choose one item only.",
+      "Enter bride and groom names, marriage date, and the selected item's verified cost.",
       "Upload the Nikah Nama or engagement proof and expense estimates.",
       "Answer the job question and attach income proof.",
       ...COMMON_GUIDE_TAIL,

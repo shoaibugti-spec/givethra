@@ -12,7 +12,7 @@ import {
 import { BaseCategoryForm } from "./BaseCategoryForm";
 import { DocBox } from "../shared/DocBox";
 import { StepGuide } from "../shared/StepGuide";
-import { CHOICE_FIELDS } from "../constants";
+import { CHOICE_FIELDS, MARRIAGE_ITEM_OPTIONS } from "../constants";
 
 export default function MarriageSupportForm({
   formData,
@@ -44,6 +44,7 @@ export default function MarriageSupportForm({
     return (
       !!catFields.relation &&
       !!catFields.person_name?.trim() &&
+      !!catFields.marriage_item &&
       !!catDocUrls.relation_proof &&
       !!catDocUrls.marriage_quotation
     );
@@ -64,7 +65,10 @@ export default function MarriageSupportForm({
           <Label>Relation *</Label>
           <Select
             value={catFields.relation || ""}
-            onValueChange={(v) => setField("relation", v)}
+            onValueChange={(v) => {
+              setField("relation", v);
+              setField("marriage_for", v);
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select relation" />
@@ -88,6 +92,26 @@ export default function MarriageSupportForm({
           />
         </div>
 
+        <div className="space-y-1">
+          <Label>What is the marriage support for? *</Label>
+          <Select
+            value={catFields.marriage_item || ""}
+            onValueChange={(v) => setField("marriage_item", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select one item only" />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              {MARRIAGE_ITEM_OPTIONS.map((item) => (
+                <SelectItem key={item} value={item}>
+                  {item}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Select only one item. The quotation should match this item.</p>
+        </div>
+
         <DocBox
           label="Relation proof"
           required
@@ -108,6 +132,7 @@ export default function MarriageSupportForm({
       <StepGuide
         lines={[
           "Upload clear relation proof and marriage cost quotation.",
+          "Select one marriage item and request only its verified cost.",
           "Vendor payment details will be asked in the payment receiver step.",
           "Only verified needs are approved.",
           "Documents must be readable and complete.",

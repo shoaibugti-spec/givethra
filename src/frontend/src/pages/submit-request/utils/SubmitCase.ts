@@ -1,7 +1,7 @@
 // src/frontend/src/pages/submit-request/utils/SubmitCase.ts
 import { insertCaseSubmission } from "@/lib/api";
 import { sendNotification } from "@/lib/notify";
-import { calculateDebtAmount, getFixedAmount } from "../constants";
+import { calculateDebtAmount, getFixedAmount, getMaxLimit, getMinAmount } from "../constants";
 
 export async function submitCase(formData: any, userId: string, isFree: boolean) {
   const requirePermanentUrl = (value: unknown, label: string): string => {
@@ -22,6 +22,15 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
     finalAmount = calculateDebtAmount(debt);
   } else {
     finalAmount = parseFloat(formData.amount) || 0;
+  }
+
+  const minAmount = getMinAmount(category);
+  const maxAmount = getMaxLimit(category);
+  if (minAmount && finalAmount < minAmount) {
+    throw new Error(`Amount must be at least Rs ${minAmount.toLocaleString()}.`);
+  }
+  if (maxAmount && finalAmount > maxAmount) {
+    throw new Error(`Amount cannot exceed Rs ${maxAmount.toLocaleString()}.`);
   }
 
   const catDocUrls = formData.catDocUrls || {};

@@ -8,6 +8,12 @@ const ADMIN_EMAILS = new Set([
   "shoaibugti@gmail.com",
   "shoaibahmedbugti5@gmail.com",
 ]);
+const MARRIAGE_SUPPORT_FOR = new Set(["Myself", "My daughter", "My sister"]);
+const MARRIAGE_SUPPORT_ITEMS = new Set([
+  "Sewing machine", "Washing machine", "Television", "Charpai", "Almirah", "Dinner set",
+  "Electric stove", "Grinder / juicer", "Air cooler", "Cosmetics / makeup set", "Mirror",
+  "Dressing table", "Sofa set", "Five pairs of clothes", "Five pairs of shoes",
+]);
 
 function googleClientId(env) {
   return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || "").trim();
@@ -748,6 +754,19 @@ async function handleCases(request, env, user, url, parts, origin) {
     }
     const body = await readJson(request);
     const record = pick(body, ["category", "title", "short_description", "country", "city", "urgency", "description", "amount_needed", "currency", "why_help", "deadline", "institute_name", "institute_contact", "institute_address", "payment_method", "account_title", "account_number", "account_iban", "photo_urls", "selfie_url", "video_url", "category_details", "was_free"]);
+    if (String(record.category || "") === "Marriage Support") {
+      const amount = Number(record.amount_needed);
+      if (!Number.isFinite(amount) || amount < 1000 || amount > 30000) {
+        return json({ error: "Marriage Support amount must be between Rs 1,000 and Rs 30,000 for one selected item." }, 400, origin);
+      }
+      let marriageDetails = record.category_details;
+      if (typeof marriageDetails === "string") {
+        try { marriageDetails = JSON.parse(marriageDetails); } catch { marriageDetails = null; }
+      }
+      if (!MARRIAGE_SUPPORT_FOR.has(String(marriageDetails?.marriage_for || "")) || !MARRIAGE_SUPPORT_ITEMS.has(String(marriageDetails?.marriage_item || ""))) {
+        return json({ error: "Select who the marriage support is for and exactly one approved marriage item." }, 400, origin);
+      }
+    }
     const caseId = body?.id || id();
     const photoUrls = Array.isArray(record.photo_urls) || (record.photo_urls && typeof record.photo_urls === "object") ? JSON.stringify(record.photo_urls) : (record.photo_urls || null);
     const categoryDetails = Array.isArray(record.category_details) || (record.category_details && typeof record.category_details === "object") ? JSON.stringify(record.category_details) : (record.category_details || null);

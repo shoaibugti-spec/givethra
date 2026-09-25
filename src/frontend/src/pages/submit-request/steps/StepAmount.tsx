@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { StepNavigation } from "../shared/StepNavigation";
 import { StepGuide } from "../shared/StepGuide";
-import { getMaxLimit, getCategoryLimit, getFixedAmount } from "../constants";
+import { getMaxLimit, getMinAmount, getCategoryLimit, getFixedAmount } from "../constants";
 
 export default function StepAmount({
   value,
@@ -16,12 +16,14 @@ export default function StepAmount({
 }: any) {
   const category = formData?.category || "";
   const maxLimit = getMaxLimit(category);
+  const minAmount = getMinAmount(category);
   const limitInfo = getCategoryLimit(category);
   const fixedAmount = getFixedAmount(category);
   const isFixed = fixedAmount != null;
   const amountNum = parseFloat(value) || 0;
   const overMax = maxLimit != null && amountNum > maxLimit;
-  const isValid = isFixed ? fixedAmount > 0 : amountNum > 0 && !overMax;
+  const underMin = minAmount != null && amountNum > 0 && amountNum < minAmount;
+  const isValid = isFixed ? fixedAmount > 0 : amountNum > 0 && !overMax && !underMin;
 
   return (
     <div className="space-y-6">
@@ -36,6 +38,8 @@ export default function StepAmount({
           type="number"
           value={isFixed ? fixedAmount : value || ""}
           onChange={isFixed ? undefined : (e) => onChange(e.target.value)}
+          min={minAmount ?? undefined}
+          max={maxLimit ?? undefined}
           readOnly={isFixed}
           aria-readonly={isFixed}
           placeholder={isFixed ? undefined : "Enter amount"}
@@ -46,6 +50,11 @@ export default function StepAmount({
         {overMax && (
           <p className="text-sm text-red-600">
             Amount cannot exceed Rs {maxLimit?.toLocaleString()}.
+          </p>
+        )}
+        {underMin && (
+          <p className="text-sm text-red-600">
+            Amount must be at least Rs {minAmount?.toLocaleString()}.
           </p>
         )}
       </div>
@@ -60,6 +69,7 @@ export default function StepAmount({
           maxLimit
             ? `Maximum allowed for this category is Rs ${maxLimit.toLocaleString()}.`
             : "Amount should match your documents and bill/estimate.",
+          minAmount ? `Minimum allowed for this category is Rs ${minAmount.toLocaleString()}.` : "",
           "Do not inflate the amount — mismatched amounts are rejected.",
           "Fixed-stipend categories are handled automatically and may skip this step.",
         ]}
