@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { adminMarkSupportMessagesAsRead, adminSendSupportReply, getCaseById, upsertUserSuspension } from "./api";
+import { adminMarkSupportMessagesAsRead, adminSendSupportReply, getCaseById, uploadFileToStorage, upsertUserSuspension } from "./api";
 
 describe("adminSendSupportReply", () => {
   const fetchMock = vi.fn();
@@ -115,5 +115,29 @@ describe("adminSendSupportReply", () => {
     await expect(
       adminSendSupportReply({ user_id: "recipient-1", message: "Your request has been reviewed." }),
     ).rejects.toThrow("Admin access required");
+  });
+
+  it("uploads payment proof with the current bearer token instead of a raw localStorage read", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ url: "https://givethra.org/uploads/dream-receipts/proof.png" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(uploadFileToStorage(new File(["proof"], "proof.png", { type: "image/png" }), "dream-receipts/proof.png"))
+      .resolves.toBe("https://givethra.org/uploads/dream-receipts/proof.png");
+
+    const request = fetchMock.mock.calls.at(-1)?.[1] as RequestInit;
+    expect(request.headers).toEqual({ Authorization: "Bearer verified-token" });
+    expect(request.credentials).toBe("include");
+    expect(request.body).toBeInstanceOf(FormData);
+  });
+
+  it("fails clearly before upload when there is no signed-in session", async () => {
+    vi.stubGlobal("localStorage", { getItem: vi.fn(() => null) });
+    await expect(uploadFileToStorage(new File(["proof"], "proof.png"), "dream-receipts/proof.png"))
+      .rejects.toThrow("Please sign in before uploading payment proof");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

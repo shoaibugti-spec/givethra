@@ -688,23 +688,22 @@ export async function updateUserSettings(userId: string, data: any) {
 
 // ---------- FILE UPLOAD ----------
 export async function uploadFileToStorage(file: File, path: string): Promise<string> {
+  const token = getAuthToken();
+  if (!token) throw new Error("Please sign in before uploading payment proof.");
   const formData = new FormData();
   formData.append("file", file);
   formData.append("path", path);
   const res = await fetchWithAuth(`${WORKER_URL}/api/upload`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
+  const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || "Upload failed");
+    throw new Error(typeof payload?.error === "string" ? payload.error : `Upload failed (HTTP ${res.status}).`);
   }
-  const data = await res.json();
-  if (!data.url) throw new Error("Upload failed – no URL returned");
-  return data.url;
+  if (!payload.url) throw new Error("Upload failed – no URL returned");
+  return payload.url;
 }
 
 // ---------- ADMIN APIs ----------

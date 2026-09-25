@@ -1834,6 +1834,7 @@ async function handleRequest(request, env, ctx) {
     }
 
     if (parts[1] === "upload" && request.method === "POST") {
+      if (!user) return json({ error: "Authentication required. Please sign in before uploading a file." }, 401, origin);
       const formData = await request.formData();
       const file = formData.get("file");
       const path = formData.get("path");
