@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  createDreamParticipation, getDream, getDreamPaymentAccounts, uploadFileToStorage,
+  createDreamParticipation, getDream, getDreamParticipationHistory, getDreamPaymentAccounts, uploadFileToStorage,
 } from "@/lib/api";
 import { Dream, money, marketValue } from "@/pages/DreamsPage";
 
@@ -19,7 +20,9 @@ const PROVINCES = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Isla
 
 export default function DreamDetailPage() {
   const { id } = useParams({ from: "/dreams/$id" });
+  const { user } = useAuth();
   const [dream, setDream] = useState<Dream | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [form, setForm] = useState({
     full_name: "", father_husband_name: "", cnic_number: "", province: "", city: "",
@@ -40,6 +43,14 @@ export default function DreamDetailPage() {
       .catch(() => setDream(null));
     getDreamPaymentAccounts().then(setAccounts).catch(() => setAccounts([]));
   }, [id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setHistory([]);
+      return;
+    }
+    getDreamParticipationHistory(id).then(setHistory).catch(() => setHistory([]));
+  }, [id, user?.id]);
 
   if (!dream) {
     return <Layout><main className="mx-auto max-w-4xl p-10 text-center">Dream product not found or is not published yet.</main></Layout>;
@@ -74,6 +85,7 @@ export default function DreamDetailPage() {
     try {
       await createDreamParticipation({ dream_id: dream.id, ...form, contribution_amount: Number(dream.contribution_amount || 0) });
       setSubmitted(true);
+      getDreamParticipationHistory(dream.id).then(setHistory).catch(() => undefined);
       toast.success("Dream submission received for Givethra review.");
     } catch (e: any) {
       toast.error(e?.message || "Dream submission failed");
@@ -415,6 +427,46 @@ export default function DreamDetailPage() {
             </div>
           )}
         </section>
+
+        {user?.id && (
+          <section className="mx-auto mt-5 max-w-7xl px-4 md:px-8">
+            <div className="rounded-2xl border border-border bg-white p-4 shadow-sm md:rounded-3xl md:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-display text-lg font-black md:text-xl">Your participation history</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">Submission, approval, rejection, and registration updates for this product.</p>
+                </div>
+                {history.length > 0 && <span className="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-bold text-teal-800">{history.length} update{history.length === 1 ? "" : "s"}</span>}
+              </div>
+              {history.length === 0 ? (
+                <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">You have not submitted a participation for this product yet.</p>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {history.map((entry) => {
+                    const status = String(entry.to_status || "").toLowerCase();
+                    const rejected = status === "rejected";
+                    const approved = ["approved", "active", "completed"].includes(status);
+                    return (
+                      <div key={entry.id} className={`rounded-xl border p-3 ${rejected ? "border-red-200 bg-red-50/60" : approved ? "border-emerald-200 bg-emerald-50/60" : "border-border bg-muted/20"}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className={`text-sm font-bold capitalize ${rejected ? "text-red-700" : approved ? "text-emerald-700" : "text-foreground"}`}>{status.replaceAll("_", " ")}</p>
+                          <time className="text-xs text-muted-foreground">{entry.changed_at ? new Date(entry.changed_at).toLocaleString() : "—"}</time>
+                        </div>
+                        {entry.note && <p className="mt-1 text-sm text-muted-foreground">{entry.note}</p>}
+                        {(entry.registration_number || entry.rejection_reason) && (
+                          <div className="mt-2 space-y-1 text-sm">
+                            {entry.registration_number && <p className="font-bold text-emerald-700">Registration number: {entry.registration_number}</p>}
+                            {entry.rejection_reason && <p className="font-semibold text-red-700">Rejection reason: {entry.rejection_reason}</p>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* MOBILE STICKY CTA */}
         {!submitted && (

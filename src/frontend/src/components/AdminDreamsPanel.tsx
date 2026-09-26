@@ -123,7 +123,7 @@ export default function AdminDreamsPanel() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant={tab === "products" ? "default" : "outline"} onClick={() => setTab("products")}>Products ({dreams.length})</Button>
-          <Button variant={tab === "submissions" ? "default" : "outline"} onClick={() => setTab("submissions")}>Payment submissions {pending.length > 0 && `(${pending.length})`}</Button>
+          <Button variant={tab === "submissions" ? "default" : "outline"} onClick={() => setTab("submissions")}>Payment submissions ({participations.length}) {pending.length > 0 && <span className="ml-1 text-amber-600">· {pending.length} pending</span>}</Button>
           <Button variant={tab === "accounts" ? "default" : "outline"} onClick={() => setTab("accounts")}>Payment accounts ({accounts.length})</Button>
         </div>
       </div>

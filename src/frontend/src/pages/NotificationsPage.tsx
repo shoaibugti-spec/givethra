@@ -48,6 +48,10 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   support: { icon: Repeat, color: "text-violet-500", bg: "bg-violet-500/10" },
   new_support: { icon: Repeat, color: "text-violet-500", bg: "bg-violet-500/10" },
   credit_earned: { icon: CreditCard, color: "text-amber-500", bg: "bg-amber-500/10" },
+  dream_submitted: { icon: FileText, color: "text-amber-500", bg: "bg-amber-500/10" },
+  dream_approved: { icon: CheckCheck, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  dream_rejected: { icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10" },
+  dream: { icon: Bell, color: "text-primary", bg: "bg-primary/10" },
 };
 
 function relativeTime(iso: string): string {

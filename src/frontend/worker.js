@@ -2528,6 +2528,21 @@ async function handleDreams(request, env, user, url, parts, origin) {
   const isAdminRequest = parts[1] === "admin";
   if (isAdminRequest && !isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
 
+  if (parts[1] === "dream-participations" && parts[2] === "mine" && request.method === "GET") {
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    const dreamId = String(url.searchParams.get("dream_id") || "").trim();
+    const where = dreamId ? "WHERE h.user_id = ? AND h.dream_id = ?" : "WHERE h.user_id = ?";
+    const params = dreamId ? [user.user_id, dreamId] : [user.user_id];
+    const rows = await env.DB.prepare(
+      `SELECT h.*, d.name AS dream_name, p.registration_number, p.rejection_reason
+       FROM dream_participation_history h
+       JOIN dreams d ON d.id = h.dream_id
+       LEFT JOIN dream_participations p ON p.id = h.participation_id
+       ${where} ORDER BY h.changed_at DESC`
+    ).bind(...params).all();
+    return json(rows.results || [], 200, origin);
+  }
+
   // Admin product catalogue: actual price and internal unit never leave this branch.
   if (isAdminRequest && parts[2] === "dreams" && parts[4] === "winner" && request.method === "PUT") {
     const dreamId = parts[3]; const body = await readJson(request); const participationId = String(body?.participation_id || '').trim();
@@ -2597,14 +2612,27 @@ async function handleDreams(request, env, user, url, parts, origin) {
         const dream = await env.DB.prepare("SELECT dream_price,participant_capacity FROM dreams WHERE id=?").bind(participation.dream_id).first();
         if (Number(count?.count || 0) >= Number(dream?.participant_capacity || 0)) return json({ error: "Participant capacity has been reached" }, 409, origin);
         const registration = `GT-DREAM-${String(Date.now()).slice(-6)}${Math.floor(Math.random()*10)}`;
-        await env.DB.prepare("UPDATE dream_participations SET status='approved',registration_number=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(registration,user.user_id,now(),now(),parts[3]).run();
+        const changedAt = now();
+        await env.DB.batch([
+          env.DB.prepare("UPDATE dream_participations SET status='approved',registration_number=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(registration,user.user_id,changedAt,changedAt,parts[3]),
+          env.DB.prepare("INSERT INTO dream_participation_history (id,participation_id,dream_id,user_id,from_status,to_status,note,registration_number,changed_by,changed_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id(),parts[3],participation.dream_id,participation.user_id,participation.status,"approved",`Participation approved. Registration number: ${registration}`,registration,user.user_id,changedAt),
+        ]);
         if (Number(participation.credit_award || 0) > 0) await addCredits(env, participation.user_id, Number(participation.credit_award), "dream_participation", `Givethra Credit for ${participation.dream_name}`, parts[3]);
-        await sendNotification(env, participation.user_id, "dream", "Dream Approved", "Your Dream participation is now active and your Givethra Credit has been credited.", "/dreams");
+        await sendNotification(env, participation.user_id, "dream_approved", "Dream Participation Approved", `Your participation in “${participation.dream_name}” is approved. Registration number: ${registration}. Your Givethra Credit has been credited.`, `/dreams/${participation.dream_id}`);
       } else if (next === "rejected") {
-        await env.DB.prepare("UPDATE dream_participations SET status='rejected',rejection_reason=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(String(body?.rejection_reason || "Payment proof was not approved").slice(0,2000),user.user_id,now(),now(),parts[3]).run();
-        await sendNotification(env, participation.user_id, "dream", "Dream Submission Update", String(body?.rejection_reason || "Your Dream submission was not approved."), "/dreams");
+        const reason = String(body?.rejection_reason || "Payment proof was not approved").trim().slice(0,2000);
+        const changedAt = now();
+        await env.DB.batch([
+          env.DB.prepare("UPDATE dream_participations SET status='rejected',rejection_reason=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(reason,user.user_id,changedAt,changedAt,parts[3]),
+          env.DB.prepare("INSERT INTO dream_participation_history (id,participation_id,dream_id,user_id,from_status,to_status,note,registration_number,changed_by,changed_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id(),parts[3],participation.dream_id,participation.user_id,participation.status,"rejected",`Participation rejected. Reason: ${reason}`,participation.registration_number || null,user.user_id,changedAt),
+        ]);
+        await sendNotification(env, participation.user_id, "dream_rejected", "Dream Participation Rejected", `Your participation in “${participation.dream_name}” was rejected. Reason: ${reason}`, `/dreams/${participation.dream_id}`);
       } else {
-        await env.DB.prepare("UPDATE dream_participations SET status=?,updated_at=? WHERE id=?").bind(next,now(),parts[3]).run();
+        const changedAt = now();
+        await env.DB.batch([
+          env.DB.prepare("UPDATE dream_participations SET status=?,updated_at=? WHERE id=?").bind(next,changedAt,parts[3]),
+          env.DB.prepare("INSERT INTO dream_participation_history (id,participation_id,dream_id,user_id,from_status,to_status,note,registration_number,changed_by,changed_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id(),parts[3],participation.dream_id,participation.user_id,participation.status,next,`Participation status changed to ${next}.`,participation.registration_number || null,user.user_id,changedAt),
+        ]);
       }
       return json(await env.DB.prepare("SELECT * FROM dream_participations WHERE id=?").bind(parts[3]).first(), 200, origin);
     }
@@ -2634,6 +2662,7 @@ async function handleDreams(request, env, user, url, parts, origin) {
   if (Number(funding?.funded || 0) >= Number(funding?.dream_price || 0) || Number(funding?.funded || 0) + amount > Number(funding?.dream_price || 0)) return json({ error: "This Dream has reached its funding target or the contribution exceeds the remaining amount." }, 409);
   const timestamp = now(); const participationId = id();
   await env.DB.prepare(`INSERT INTO dream_participations (id,dream_id,user_id,full_name,father_husband_name,cnic_number,mobile_number,payment_method,contribution_amount,transaction_id,proof_url,note,province,city,address,postal_code,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending_approval',?,?)`).bind(participationId,dreamId,user.user_id,body?.full_name || user.full_name || null,body?.father_husband_name || null,body?.cnic_number || null,body?.mobile_number || null,body?.payment_method || null,amount,transactionId,body?.proof_url || null,body?.note || null,body?.province || null,body?.city || null,body?.address || null,body?.postal_code || null,timestamp,timestamp).run();
-  await sendNotification(env,user.user_id,"dream","Dream Submitted","Your Dream participation has been submitted and is awaiting verification.",`/dreams/${dreamId}`);
+  await env.DB.prepare("INSERT INTO dream_participation_history (id,participation_id,dream_id,user_id,from_status,to_status,note,registration_number,changed_by,changed_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id(),participationId,dreamId,user.user_id,null,"pending_approval","Payment submission received and is awaiting admin verification.",null,user.user_id,timestamp).run();
+  await sendNotification(env,user.user_id,"dream_submitted","Dream Participation Submitted",`Your participation in “${dream.name}” was submitted and is awaiting verification.`, `/dreams/${dreamId}`);
   return json({ id: participationId,dream_id:dreamId,status:"pending_approval",message:"Dream submission received for admin verification" },201,origin);
 }

@@ -1072,6 +1072,11 @@ export async function createDreamParticipation(data: Record<string, unknown>) {
   return readApiResponse(res);
 }
 
+export async function getDreamParticipationHistory(dreamId: string) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/dream-participations/mine?dream_id=${encodeURIComponent(dreamId)}`, { headers: headers(), cache: "no-store" });
+  return readApiResponse<any[]>(res);
+}
+
 
 // ---------- DREAMS ----------
 export async function adminGetDreams() {
