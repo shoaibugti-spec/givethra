@@ -173,3 +173,21 @@ describe("homepage slider refinement", () => {
     expect(protectedPlayerSource).not.toContain("<video\n        controls");
   });
 });
+
+describe("homepage WhatsApp support and welcome popup", () => {
+  it("keeps the 24/7 floating support action on the existing support destination", () => {
+    expect(homePageSource).toContain('const SUPPORT_WHATSAPP_URL =');
+    expect(homePageSource).toContain('aria-label="Open 24/7 WhatsApp support"');
+    expect(homePageSource).toContain('title="24/7 WhatsApp Support"');
+    expect(homePageSource).toContain("href={SUPPORT_WHATSAPP_URL}");
+  });
+
+  it("shows the welcome popup at most once every 12 hours and links to the channel and Dreams", () => {
+    expect(homePageSource).toContain("WELCOME_POPUP_INTERVAL_MS = 12 * 60 * 60 * 1000");
+    expect(homePageSource).toContain("givethra_welcome_popup_last_seen");
+    expect(homePageSource).toContain('aria-labelledby="welcome-popup-title"');
+    expect(homePageSource).toContain('href={WHATSAPP_URL}');
+    expect(homePageSource).toContain('to="/dreams"');
+    expect(homePageSource).toContain("Shop Dreams under Rs 500");
+  });
+});
