@@ -37,6 +37,7 @@ const FACEBOOK_URL =
 const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
 const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
 const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
+const WHATSAPP_SUPPORT_URL = "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 
 export { NavLink };
 
@@ -497,6 +498,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+      <a
+        href={WHATSAPP_SUPPORT_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="24/7 WhatsApp Support"
+        className="fixed bottom-5 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-green-600/15 transition hover:bg-green-700 hover:shadow-xl md:bottom-6 md:right-6"
+      >
+        <MessageCircle className="h-5 w-5" />
+        <span className="hidden sm:inline">24/7 WhatsApp Support</span>
+        <span className="sm:hidden">Support</span>
+      </a>
     </div>
   );
 }

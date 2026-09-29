@@ -575,6 +575,7 @@ export default function HomePage() {
   const [slideIndex, setSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [homeMode, setHomeMode] = useState<"support" | "earning">(() => (localStorage.getItem("givethra_home_mode") === "earning" || localStorage.getItem("givethra_home_mode") === "wallet" ? "earning" : "support"));
+  const [showWhatsAppWelcome, setShowWhatsAppWelcome] = useState(false);
 
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -594,6 +595,23 @@ export default function HomePage() {
     window.addEventListener("givethra-home-panel-tab", onModeChange);
     return () => window.removeEventListener("givethra-home-panel-tab", onModeChange);
   }, []);
+
+  useEffect(() => {
+    const alreadyFollowed = window.localStorage.getItem("givethra_whatsapp_channel_followed") === "1";
+    const dismissedThisVisit = window.sessionStorage.getItem("givethra_whatsapp_welcome_seen") === "1";
+    if (!alreadyFollowed && !dismissedThisVisit) setShowWhatsAppWelcome(true);
+  }, []);
+
+  const closeWhatsAppWelcome = () => {
+    window.sessionStorage.setItem("givethra_whatsapp_welcome_seen", "1");
+    setShowWhatsAppWelcome(false);
+  };
+
+  const followWhatsAppChannel = () => {
+    window.localStorage.setItem("givethra_whatsapp_channel_followed", "1");
+    window.sessionStorage.setItem("givethra_whatsapp_welcome_seen", "1");
+    setShowWhatsAppWelcome(false);
+  };
 
   useEffect(() => {
     loadCases();
@@ -926,6 +944,18 @@ export default function HomePage() {
   return (
     <Layout>
       <div className="bg-background pb-20 md:pb-0">
+        {showWhatsAppWelcome && (
+          <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-4 sm:items-center">
+            <div role="dialog" aria-modal="true" aria-labelledby="whatsapp-welcome-title" className="relative w-full max-w-sm rounded-2xl border border-green-200 bg-card p-5 shadow-2xl dark:border-green-900">
+              <button type="button" onClick={closeWhatsAppWelcome} aria-label="Close WhatsApp welcome" className="absolute right-3 top-3 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-950/40"><MessageCircle className="h-6 w-6" /></div>
+              <h2 id="whatsapp-welcome-title" className="mt-4 text-xl font-bold">Stay updated with Givethra</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Follow our WhatsApp Channel for new updates, important announcements and community news.</p>
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" onClick={followWhatsAppChannel} className="mt-5 flex w-full items-center justify-center rounded-xl bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-green-700">Follow WhatsApp Channel</a>
+              <button type="button" onClick={closeWhatsAppWelcome} className="mt-2 w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted">Maybe later</button>
+            </div>
+          </div>
+        )}
         {homeMode === "support" && <>
         <InstallButton />
         <CompletionCooldownBanner />
