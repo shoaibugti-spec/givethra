@@ -1322,6 +1322,18 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     { label: "Owner Relation", value: catDetails?.owner_relation || "" },
   ].filter((d) => d.value);
 
+  const electricAppliances = catDetails?.appliances && typeof catDetails.appliances === "string"
+    ? parseObject(catDetails.appliances)
+    : catDetails?.appliances;
+  const electricApplianceText = electricAppliances && typeof electricAppliances === "object"
+    ? Object.entries(electricAppliances).filter(([, count]) => Number(count) > 0).map(([key, count]) => `${getDocLabel(key)}: ${count}`).join(", ")
+    : "";
+  const electricityDetails = c.category === "Electricity Bill" ? [
+    { label: "Monthly Units", value: catDetails?.monthly_units ? `${catDetails.monthly_units} kWh` : "—" },
+    { label: "Eligibility", value: Number(catDetails?.monthly_units) >= 1 && Number(catDetails?.monthly_units) <= 300 ? "Eligible (1–300 units)" : "Not eligible (above 300 units or missing)" },
+    { label: "Appliances", value: electricApplianceText || "None selected" },
+  ] : [];
+
   const fileEntries: { key: string; label: string; url: string }[] = [];
   
   function getFileNameFromUrl(url: string): string {
@@ -1557,6 +1569,13 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         <div className="rounded-lg bg-muted/40 border border-border p-3 space-y-1">
           <p className="text-xs font-semibold text-primary flex items-center gap-1"><User className="h-3 w-3" /> Personal Details</p>
           {personalDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+        </div>
+      )}
+
+      {electricityDetails.length > 0 && (
+        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 p-3 space-y-1">
+          <p className="text-xs font-semibold text-amber-700 flex items-center gap-1">⚡ Electricity Bill Details</p>
+          {electricityDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
         </div>
       )}
 

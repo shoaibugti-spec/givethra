@@ -39,6 +39,7 @@ import {
 } from "@/lib/api";
 import { sendNotification } from "@/lib/notify";
 import { getCategoryConfig } from "@/lib/categoryFields";
+import { ELECTRICITY_APPLIANCES, ELECTRICITY_MAX_ELIGIBLE_UNITS, normalizeElectricityAppliances } from "./submit-request/electricity";
 import {
   ELECTRICITY_COMPANIES,
   GAS_COMPANIES,
@@ -636,7 +637,7 @@ export default function SubmitRequestPage() {
 
   const [propertyOwnership, setPropertyOwnership] = useState<"owned" | "rented" | "">("");
 
-  const [catFields, setCatFields] = useState<Record<string, string>>({});
+  const [catFields, setCatFields] = useState<Record<string, any>>({});
   const [catDocUrls, setCatDocUrls] = useState<Record<string, string>>({});
   const [catDocNames, setCatDocNames] = useState<Record<string, string>>({});
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
@@ -1671,6 +1672,12 @@ export default function SubmitRequestPage() {
       if (utilCfg) {
         if (!refNumber.trim()) return `Please enter your ${selectedCompany?.ref ?? "Consumer/Reference Number"}.`;
         if (!(catFields.bill_owner_name || "").trim()) return "Please enter the bill owner name as it appears on the bill.";
+        if (category === "Electricity Bill") {
+          const units = Number(catFields.monthly_units);
+          if (!Number.isFinite(units) || units < 1) return "Please enter monthly electricity usage in units.";
+          if (units > ELECTRICITY_MAX_ELIGIBLE_UNITS) return "You are not eligible for this help request because usage is above 300 units.";
+          if (Object.keys(normalizeElectricityAppliances(catFields.appliances)).length === 0) return "Please select at least one appliance and its quantity.";
+        }
       }
       if (listCfg && !isEducationCategory) {
         for (const f of listCfg.personFields) {
@@ -3289,6 +3296,32 @@ export default function SubmitRequestPage() {
                       <p className="text-[11px] text-muted-foreground">
                         💡 Enter the name exactly as it appears on the bill.
                       </p>
+                    </div>
+                    <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                      <Label>Appliances used in the home *</Label>
+                      <p className="text-xs text-muted-foreground">Select each appliance and set its quantity.</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {ELECTRICITY_APPLIANCES.map(({ key, label }) => {
+                          const counts = normalizeElectricityAppliances(catFields.appliances);
+                          const count = counts[key] || 0;
+                          return (
+                            <div key={key} className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+                              <span className="text-sm">{label}</span>
+                              <div className="flex items-center gap-2">
+                                <button type="button" aria-label={`Decrease ${label}`} onClick={() => setCatFields((p) => ({ ...p, appliances: { ...counts, [key]: Math.max(0, count - 1) } }))} className="h-7 w-7 rounded-full border">−</button>
+                                <span className="w-5 text-center text-sm font-semibold">{count}</span>
+                                <button type="button" aria-label={`Increase ${label}`} onClick={() => setCatFields((p) => ({ ...p, appliances: { ...counts, [key]: count + 1 } }))} className="h-7 w-7 rounded-full border">+</button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Monthly electricity units (kWh) *</Label>
+                      <Input type="number" min={1} max={ELECTRICITY_MAX_ELIGIBLE_UNITS} value={catFields.monthly_units || ""} onChange={(e) => setCatFields((p) => ({ ...p, monthly_units: e.target.value }))} placeholder="1–300 units" />
+                      {Number(catFields.monthly_units) > ELECTRICITY_MAX_ELIGIBLE_UNITS && <p className="text-sm font-semibold text-destructive">You are not eligible for this help request because monthly usage is above 300 units.</p>}
+                      {Number(catFields.monthly_units) >= 1 && Number(catFields.monthly_units) <= ELECTRICITY_MAX_ELIGIBLE_UNITS && <p className="text-xs text-muted-foreground">Eligible range: 1–300 units.</p>}
                     </div>
                   </>
                 )}
