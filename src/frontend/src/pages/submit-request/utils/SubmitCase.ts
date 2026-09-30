@@ -39,6 +39,11 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
   const photoUrls = [
     ...Object.values(catDocUrls),
     ...Object.values(genderDocUrls),
+    formData.salarySlipUrl,
+    formData.statementUrl,
+    formData.businessProofUrl,
+    formData.professionProofUrl,
+    formData.supportDeclarationUrl,
   ].filter(Boolean) as string[];
 
   const isEarlyRequest = formData.isEarlyRequest === true;
@@ -78,6 +83,9 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
       disability_type: formData.disabilityType,
       salary_slip_url: formData.salarySlipUrl,
       statement_url: formData.statementUrl,
+      business_proof_url: formData.businessProofUrl,
+      profession_proof_url: formData.professionProofUrl,
+      support_declaration_url: formData.supportDeclarationUrl,
       rental_agreement_url: formData.rentalAgreementUrl,
       landlord_cnic_url: formData.landlordCnicUrl,
       owner_cnic_url: formData.ownerCnicUrl,

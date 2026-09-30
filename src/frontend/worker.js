@@ -767,6 +767,21 @@ async function handleCases(request, env, user, url, parts, origin) {
         return json({ error: "Select who the marriage support is for and exactly one approved marriage item." }, 400, origin);
       }
     }
+    if (String(record.category || "") === "Electricity Bill") {
+      let electricityDetails = record.category_details;
+      if (typeof electricityDetails === "string") {
+        try { electricityDetails = JSON.parse(electricityDetails); } catch { electricityDetails = null; }
+      }
+      const units = Number(electricityDetails?.monthly_units);
+      const appliances = electricityDetails?.appliances && typeof electricityDetails.appliances === "string"
+        ? (() => { try { return JSON.parse(electricityDetails.appliances); } catch { return null; } })()
+        : electricityDetails?.appliances;
+      if (!Number.isFinite(units) || units < 1) return json({ error: "Enter monthly electricity usage in units." }, 400, origin);
+      if (units > 300) return json({ error: "You are not eligible for this help request because usage is above 300 units." }, 400, origin);
+      if (!appliances || typeof appliances !== "object" || !Object.values(appliances).some((count) => Number(count) > 0)) {
+        return json({ error: "Select at least one appliance and its quantity." }, 400, origin);
+      }
+    }
     const caseId = body?.id || id();
     const photoUrls = Array.isArray(record.photo_urls) || (record.photo_urls && typeof record.photo_urls === "object") ? JSON.stringify(record.photo_urls) : (record.photo_urls || null);
     const categoryDetails = Array.isArray(record.category_details) || (record.category_details && typeof record.category_details === "object") ? JSON.stringify(record.category_details) : (record.category_details || null);

@@ -99,7 +99,7 @@ const INITIAL_FORM = {
   category: "", title: "", shortDesc: "", country: "", city: "",
   urgency: "", gender: "", maritalStatus: "", isOrphan: "", orphanParent: "",
   genderDocUrls: {}, seekerName: "", seekerContact: "", jobStatus: "",
-  salarySlipUrl: "", statementUrl: "", catFields: {}, catDocUrls: {},
+  salarySlipUrl: "", statementUrl: "", businessProofUrl: "", professionProofUrl: "", supportDeclarationUrl: "", catFields: {}, catDocUrls: {},
   propertyOwnership: "", rentalAgreementUrl: "", landlordCnicUrl: "",
   ownerCnicUrl: "", ownerRelation: "", receiverName: "", receiverContact: "",
   receiverBank: "", receiverAccount: "", receiverAddress: "", receiverShopName: "",

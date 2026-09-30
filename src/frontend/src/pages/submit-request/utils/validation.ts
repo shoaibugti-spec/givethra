@@ -10,6 +10,7 @@ import {
   getEducationDocs,
 } from "../constants";
 import { ELECTRICITY_MAX_ELIGIBLE_UNITS, normalizeElectricityAppliances } from "../electricity";
+import { getRequiredEmploymentDocumentKeys } from "../employment";
 
 const MIN_WHY_HELP_WORDS = 200;
 
@@ -152,8 +153,15 @@ export function validateStep(stepId: string, formData: any): string | null {
     case "seekerName": return !hasValue(formData.seekerName) ? "Please enter your full name" : null;
     case "seekerContact": return !hasValue(formData.seekerContact) ? "Please enter your contact number" : null;
     case "jobStatus": return !hasValue(formData.jobStatus) ? "Please select your employment status" : null;
-    case "jobDocuments": return formData.jobStatus === "Yes" && (!hasValue(formData.salarySlipUrl) || !hasValue(formData.statementUrl)) ? "Please upload your salary slip and bank statement" : null;
-    case "noJobDocument": return formData.jobStatus === "No" && !hasValue(formData.statementUrl) ? "Please upload your bank statement" : null;
+    case "jobDocuments": {
+      const employmentDocs = formData.catDocUrls || {};
+      const missing = getRequiredEmploymentDocumentKeys(formData.jobStatus).find((key) => {
+        const legacyKey = key === "salarySlipUrl" ? "salary_slip" : key === "statementUrl" ? "statement" : key.replace(/Url$/, "").replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+        return !hasValue(formData[key]) && !hasValue(employmentDocs[legacyKey]);
+      });
+      return missing ? "Please upload all required employment documents" : null;
+    }
+    case "noJobDocument": return null;
     case "categoryDetails": return validateCategoryDetails(formData);
     case "propertyOwnership": return PROPERTY_RELEVANT_CATS.has(formData.category) && !hasValue(formData.propertyOwnership) ? "Please select property ownership" : null;
     case "rentedDocuments": return formData.propertyOwnership === "rented" && (!hasValue(formData.rentalAgreementUrl) || !hasValue(formData.landlordCnicUrl)) ? "Please upload both rented property documents" : null;

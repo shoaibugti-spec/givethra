@@ -40,6 +40,7 @@ import {
 import { sendNotification } from "@/lib/notify";
 import { getCategoryConfig } from "@/lib/categoryFields";
 import { ELECTRICITY_APPLIANCES, ELECTRICITY_MAX_ELIGIBLE_UNITS, normalizeElectricityAppliances } from "./submit-request/electricity";
+import { EMPLOYMENT_OPTIONS } from "./submit-request/employment";
 import {
   ELECTRICITY_COMPANIES,
   GAS_COMPANIES,
@@ -598,7 +599,7 @@ export default function SubmitRequestPage() {
 
   const [refNumber, setRefNumber] = useState("");
 
-  const [jobStatus, setJobStatus] = useState<"Yes" | "No" | "">("");
+  const [jobStatus, setJobStatus] = useState<string>("");
   const [gender, setGender] = useState<"Male" | "Female" | "Child" | "">("");
   const [maritalStatus, setMaritalStatus] = useState<"Single" | "Married" | "Widow" | "Divorced" | "">("");
   const [isOrphan, setIsOrphan] = useState<"Yes" | "No" | "">("");
@@ -1548,10 +1549,17 @@ export default function SubmitRequestPage() {
   //  VALIDATE STEP 2
   // ============================================================
   function validateStep2(): string | null {
-    if (!jobStatus) return "Please answer: Do you have a job?";
-    if (jobStatus === "Yes" && !catDocUrls["salary_slip"]) return "Please attach your last 6 months salary slip.";
-    if (jobStatus === "Yes" && !catDocUrls["statement"]) return "Please attach your last 6 months bank statement.";
-    if (jobStatus === "No" && !catDocUrls["statement"]) return "Please attach your last 6 months bank statement.";
+    if (!jobStatus) return "Please select your current source of income.";
+    const employmentOption = EMPLOYMENT_OPTIONS.find((option) => option.value === jobStatus);
+    const employmentKeyMap: Record<string, string> = {
+      salarySlipUrl: "salary_slip",
+      statementUrl: "statement",
+      businessProofUrl: "business_proof",
+      professionProofUrl: "profession_proof",
+      supportDeclarationUrl: "support_declaration",
+    };
+    const missingEmploymentDoc = employmentOption?.documents.find((document) => document.required && !catDocUrls[employmentKeyMap[document.key]]);
+    if (missingEmploymentDoc) return `Please attach: ${missingEmploymentDoc.label}.`;
 
     if (!gender) return "Please select the gender (Male/Female/Child).";
     if (gender === "Male" || gender === "Female") {
@@ -1899,6 +1907,11 @@ export default function SubmitRequestPage() {
         rental_agreement_url: catDocUrls["rental_agreement"] || "",
         landlord_cnic_url: catDocUrls["landlord_cnic"] || "",
         job_status: jobStatus,
+        salary_slip_url: catDocUrls["salary_slip"] || "",
+        statement_url: catDocUrls["statement"] || "",
+        business_proof_url: catDocUrls["business_proof"] || "",
+        profession_proof_url: catDocUrls["profession_proof"] || "",
+        support_declaration_url: catDocUrls["support_declaration"] || "",
         gender: gender,
         marital_status: maritalStatus,
         is_orphan: isOrphan,
@@ -3097,35 +3110,36 @@ export default function SubmitRequestPage() {
 
             {/* JOB STATUS */}
             <div className="pt-2 space-y-3 border-t border-border">
-              <Label>Do you have a job? *</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {["Yes", "No"].map((opt) => (
+              <Label>What is your current source of income? *</Label>
+              <div className="grid gap-2">
+                {EMPLOYMENT_OPTIONS.map((opt) => (
                   <button
-                    key={opt}
+                    key={opt.value}
                     type="button"
-                    onClick={() => setJobStatus(opt as any)}
+                    onClick={() => setJobStatus(opt.value)}
                     className={`px-3 py-2.5 rounded-lg border text-sm font-medium ${
-                      jobStatus === opt ? "bg-primary text-white border-primary" : "border-border"
+                      jobStatus === opt.value ? "bg-primary text-white border-primary" : "border-border"
                     }`}
                   >
-                    {opt === "Yes" ? "✅ Yes, I have a job" : "❌ No job"}
+                    <span className="block">{opt.label}</span>
+                    <span className="block mt-1 text-xs font-normal opacity-80">{opt.description}</span>
                   </button>
                 ))}
               </div>
-              {jobStatus === "Yes" && (
+              {jobStatus && (
                 <div className="pt-2 space-y-2">
-                  <div className="rounded-xl border border-green-300 bg-green-50 dark:bg-green-950/20 p-3 space-y-2">
-                    <p className="text-xs font-medium text-green-700">📎 Required Documents (Job)</p>
-                    {docBox("salary_slip", "Last 6 Months Salary Slip", true)}
-                    {docBox("statement", "Last 6 Months Bank Statement", true, "Bank, EasyPaisa or JazzCash", ".pdf,image/*")}
-                  </div>
-                </div>
-              )}
-              {jobStatus === "No" && (
-                <div className="pt-2 space-y-2">
-                  <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
-                    <p className="text-xs font-medium text-amber-700">📎 Required Document (No Job)</p>
-                    {docBox("statement", "Last 6 Months Bank Statement", true, "Bank, EasyPaisa or JazzCash", ".pdf,image/*")}
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2">
+                    <p className="text-xs font-medium text-primary">📎 Required Documents</p>
+                    {(EMPLOYMENT_OPTIONS.find((opt) => opt.value === jobStatus)?.documents || []).map((document) => {
+                      const keyMap: Record<string, string> = {
+                        salarySlipUrl: "salary_slip",
+                        statementUrl: "statement",
+                        businessProofUrl: "business_proof",
+                        professionProofUrl: "profession_proof",
+                        supportDeclarationUrl: "support_declaration",
+                      };
+                      return docBox(keyMap[document.key], document.label, document.required, document.hint, ".pdf,image/*");
+                    })}
                   </div>
                 </div>
               )}

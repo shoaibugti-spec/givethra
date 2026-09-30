@@ -44,11 +44,7 @@ export function useVisibleSteps(formData: any): string[] {
     steps.push("seekerName", "seekerContact");
     steps.push("jobStatus");
 
-    if (jobStatus === "Yes") {
-      steps.push("jobDocuments");
-    } else if (jobStatus === "No") {
-      steps.push("noJobDocument");
-    }
+    if (jobStatus) steps.push("jobDocuments");
 
     steps.push("categoryDetails");
 
