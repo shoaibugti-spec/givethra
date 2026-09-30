@@ -13,6 +13,7 @@ import { BaseCategoryForm } from "./BaseCategoryForm";
 import { DocBox } from "../shared/DocBox";
 import { StepGuide } from "../shared/StepGuide";
 import { UTILITY_CATS } from "../constants";
+import { ELECTRICITY_MAX_ELIGIBLE_UNITS } from "../electricity";
 
 export default function WaterBillForm({
   formData,
@@ -27,6 +28,7 @@ export default function WaterBillForm({
   const catDocUrls = formData.catDocUrls || {};
   const instituteName = formData.instituteName || catFields.company || "";
   const refNumber = formData.refNumber || "";
+  const monthlyUnits = Number(catFields.monthly_units || 0);
 
   const setField = (key: string, value: string) => {
     setFormData((prev: any) => ({
@@ -59,9 +61,10 @@ export default function WaterBillForm({
       !!instituteName.trim() &&
       !!refNumber.trim() &&
       !!catFields.bill_owner_name?.trim() &&
+      monthlyUnits >= 1 && monthlyUnits <= ELECTRICITY_MAX_ELIGIBLE_UNITS &&
       !!catDocUrls.bill
     );
-  }, [instituteName, refNumber, catFields.bill_owner_name, catDocUrls.bill]);
+  }, [instituteName, refNumber, catFields.bill_owner_name, catDocUrls.bill, monthlyUnits]);
 
   return (
     <BaseCategoryForm
@@ -106,6 +109,13 @@ export default function WaterBillForm({
             onChange={(e) => setField("bill_owner_name", e.target.value)}
             placeholder="Name printed on the bill"
           />
+        </div>
+
+        <div className="space-y-1">
+          <Label>Monthly water units *</Label>
+          <Input type="number" min={1} max={ELECTRICITY_MAX_ELIGIBLE_UNITS} value={catFields.monthly_units || ""} onChange={(e) => setField("monthly_units", e.target.value)} placeholder="1–300 units" />
+          {monthlyUnits > ELECTRICITY_MAX_ELIGIBLE_UNITS && <p className="text-sm font-semibold text-destructive">Usage above 300 units is not eligible.</p>}
+          {monthlyUnits >= 1 && monthlyUnits <= ELECTRICITY_MAX_ELIGIBLE_UNITS && <p className="text-xs text-muted-foreground">Eligible range: 1–300 units.</p>}
         </div>
 
         <DocBox

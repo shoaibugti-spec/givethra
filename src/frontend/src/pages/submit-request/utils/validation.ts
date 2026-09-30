@@ -66,10 +66,12 @@ function validateCategoryDetails(formData: any): string | null {
     if (!hasValue(formData.instituteName || fields.company)) return "Please select the service provider";
     if (!hasValue(formData.refNumber)) return "Please enter the consumer reference number";
     if (!hasValue(fields.bill_owner_name)) return "Please enter the bill owner's name";
-    if (category === "Electricity Bill") {
+    if (["Electricity Bill", "Gas Bill", "Water Bill"].includes(category)) {
       const units = Number(fields.monthly_units);
-      if (!Number.isFinite(units) || units < 1) return "Please enter monthly electricity usage in units";
+      if (!Number.isFinite(units) || units < 1) return `Please enter monthly ${category === "Electricity Bill" ? "electricity" : category === "Gas Bill" ? "gas" : "water"} usage in units`;
       if (units > ELECTRICITY_MAX_ELIGIBLE_UNITS) return "You are not eligible for this help request because usage is above 300 units";
+    }
+    if (category === "Electricity Bill") {
       if (Object.keys(normalizeElectricityAppliances(fields.appliances)).length === 0) return "Please select at least one appliance and its quantity";
     }
     return requireDocs(["bill"], "Please upload the bill photo");

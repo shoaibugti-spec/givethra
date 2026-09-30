@@ -52,4 +52,20 @@ describe("submit request validation", () => {
     const form = { ...base, category: "Emergency Help", catFields: { emergency_type: "Fire", emergency_description: "Urgent help needed" }, catDocUrls: { emergency_proof: "https://files.test/proof.jpg" } };
     expect(validateStep("categoryDetails", form)).toBeNull();
   });
+
+  it("requires 1–300 units for Gas and Water without requiring appliances", () => {
+    for (const category of ["Gas Bill", "Water Bill"]) {
+      const fields = { monthly_units: "120", bill_owner_name: "Test User", company: "Utility Company" };
+      const valid = { ...base, category, instituteName: "Utility Company", refNumber: "REF-123", catFields: fields, catDocUrls: { bill: "https://files.test/bill.jpg" } };
+      expect(validateStep("categoryDetails", valid)).toBeNull();
+      expect(validateStep("categoryDetails", { ...valid, catFields: { ...fields, monthly_units: "" } })).toContain("usage in units");
+      expect(validateStep("categoryDetails", { ...valid, catFields: { ...fields, monthly_units: "301" } })).toContain("above 300");
+    }
+  });
+
+  it("keeps appliances exclusive to Electricity", () => {
+    const common = { ...base, instituteName: "Utility Company", refNumber: "REF-123", catDocUrls: { bill: "https://files.test/bill.jpg" } };
+    expect(validateStep("categoryDetails", { ...common, category: "Electricity Bill", catFields: { monthly_units: "120", bill_owner_name: "Test User", company: "Utility Company" } })).toContain("appliance");
+    expect(validateStep("categoryDetails", { ...common, category: "Electricity Bill", catFields: { monthly_units: "120", bill_owner_name: "Test User", company: "Utility Company", appliances: { fan: 1 } } })).toBeNull();
+  });
 });

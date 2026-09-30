@@ -1680,11 +1680,12 @@ export default function SubmitRequestPage() {
       if (utilCfg) {
         if (!refNumber.trim()) return `Please enter your ${selectedCompany?.ref ?? "Consumer/Reference Number"}.`;
         if (!(catFields.bill_owner_name || "").trim()) return "Please enter the bill owner name as it appears on the bill.";
-        if (category === "Electricity Bill") {
+        if (["Electricity Bill", "Gas Bill", "Water Bill"].includes(category)) {
           const units = Number(catFields.monthly_units);
-          if (!Number.isFinite(units) || units < 1) return "Please enter monthly electricity usage in units.";
+          const utilityName = category === "Electricity Bill" ? "electricity" : category === "Gas Bill" ? "gas" : "water";
+          if (!Number.isFinite(units) || units < 1) return `Please enter monthly ${utilityName} usage in units.`;
           if (units > ELECTRICITY_MAX_ELIGIBLE_UNITS) return "You are not eligible for this help request because usage is above 300 units.";
-          if (Object.keys(normalizeElectricityAppliances(catFields.appliances)).length === 0) return "Please select at least one appliance and its quantity.";
+          if (category === "Electricity Bill" && Object.keys(normalizeElectricityAppliances(catFields.appliances)).length === 0) return "Please select at least one appliance and its quantity.";
         }
       }
       if (listCfg && !isEducationCategory) {
@@ -3311,7 +3312,7 @@ export default function SubmitRequestPage() {
                         💡 Enter the name exactly as it appears on the bill.
                       </p>
                     </div>
-                    <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                    {category === "Electricity Bill" && <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
                       <Label>Appliances used in the home *</Label>
                       <p className="text-xs text-muted-foreground">Select each appliance and set its quantity.</p>
                       <div className="grid gap-2 sm:grid-cols-2">
@@ -3330,9 +3331,9 @@ export default function SubmitRequestPage() {
                           );
                         })}
                       </div>
-                    </div>
+                    </div>}
                     <div className="space-y-2">
-                      <Label>Monthly electricity units (kWh) *</Label>
+                      <Label>Monthly {category === "Electricity Bill" ? "electricity" : category === "Gas Bill" ? "gas" : "water"} units *</Label>
                       <Input type="number" min={1} max={ELECTRICITY_MAX_ELIGIBLE_UNITS} value={catFields.monthly_units || ""} onChange={(e) => setCatFields((p) => ({ ...p, monthly_units: e.target.value }))} placeholder="1–300 units" />
                       {Number(catFields.monthly_units) > ELECTRICITY_MAX_ELIGIBLE_UNITS && <p className="text-sm font-semibold text-destructive">You are not eligible for this help request because monthly usage is above 300 units.</p>}
                       {Number(catFields.monthly_units) >= 1 && Number(catFields.monthly_units) <= ELECTRICITY_MAX_ELIGIBLE_UNITS && <p className="text-xs text-muted-foreground">Eligible range: 1–300 units.</p>}

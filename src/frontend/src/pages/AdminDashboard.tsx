@@ -1332,10 +1332,10 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   const electricApplianceText = electricAppliances && typeof electricAppliances === "object"
     ? Object.entries(electricAppliances).filter(([, count]) => Number(count) > 0).map(([key, count]) => `${getDocLabel(key)}: ${count}`).join(", ")
     : "";
-  const electricityDetails = c.category === "Electricity Bill" ? [
-    { label: "Monthly Units", value: catDetails?.monthly_units ? `${catDetails.monthly_units} kWh` : "—" },
+  const utilityDetails = ["Electricity Bill", "Gas Bill", "Water Bill"].includes(c.category) ? [
+    { label: "Monthly Units", value: catDetails?.monthly_units ? `${catDetails.monthly_units} units` : "—" },
     { label: "Eligibility", value: Number(catDetails?.monthly_units) >= 1 && Number(catDetails?.monthly_units) <= 300 ? "Eligible (1–300 units)" : "Not eligible (above 300 units or missing)" },
-    { label: "Appliances", value: electricApplianceText || "None selected" },
+    ...(c.category === "Electricity Bill" ? [{ label: "Appliances", value: electricApplianceText || "None selected" }] : []),
   ] : [];
 
   const fileEntries: { key: string; label: string; url: string }[] = [];
@@ -1576,10 +1576,10 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
         </div>
       )}
 
-      {electricityDetails.length > 0 && (
+      {utilityDetails.length > 0 && (
         <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 p-3 space-y-1">
-          <p className="text-xs font-semibold text-amber-700 flex items-center gap-1">⚡ Electricity Bill Details</p>
-          {electricityDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
+          <p className="text-xs font-semibold text-amber-700 flex items-center gap-1">⚡ {c.category} Details</p>
+          {utilityDetails.map(({ label, value }) => <DetailRow key={label} label={label} value={value} />)}
         </div>
       )}
 
