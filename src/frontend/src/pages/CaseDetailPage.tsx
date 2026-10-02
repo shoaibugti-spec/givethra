@@ -804,12 +804,16 @@ export default function CaseDetailPage() {
             </div>
 
             <div className="bg-white dark:bg-amber-950/50 rounded-xl border-2 border-amber-200 dark:border-amber-800 p-6">
-              <p className="text-base text-amber-900 dark:text-amber-200 font-medium leading-relaxed">
-                Your case remained active until the deadline but no Hero stepped forward to help.
-                {caseData.was_free
-                  ? " Since this was your free case, you can submit a new case for FREE."
-                  : " The 1 credit you used has been refunded to your account."}
+                <p className="text-base text-amber-900 dark:text-amber-200 font-medium leading-relaxed">
+                {Number(caseData.amount_collected || 0) > 0
+                  ? `Your case reached its deadline with ${sym} ${caseData.amount_collected} in verified help. Givethra will complete the institute payment and close the case from the admin Pay & Close queue.`
+                  : `Your case remained active until the deadline but no Hero stepped forward to help. ${caseData.was_free ? "Since this was your free case, you can submit a new case for FREE." : "The 1 credit you used has been refunded to your account."}`}
               </p>
+              {Number(caseData.amount_collected || 0) > 0 && Number(caseData.amount_needed || 0) > 0 && (
+                <p className="text-sm text-amber-700 dark:text-amber-300 mt-3 border-t border-amber-100 dark:border-amber-800 pt-3">
+                  Verified help: {sym} {caseData.amount_collected} of {sym} {caseData.amount_needed}
+                </p>
+              )}
               {caseData.deadline && (
                 <p className="text-xs text-amber-400 dark:text-amber-500 mt-3 border-t border-amber-100 dark:border-amber-800 pt-2">
                   Expired on: {new Date(caseData.deadline).toLocaleDateString()}

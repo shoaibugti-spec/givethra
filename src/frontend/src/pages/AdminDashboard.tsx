@@ -701,7 +701,7 @@ export default function AdminPage() {
   const paidCases = caseList.filter((c) => !c.was_free);
 
   const readyToClose = caseList.filter((c) => {
-    if (c.status !== "approved") return false;
+    if (!['approved', 'expired'].includes(String(c.status || '').toLowerCase())) return false;
     const needed = Number(c.amount_needed ?? 0);
     const collected = Number(c.amount_collected ?? 0);
     return needed > 0 && collected >= needed && !c.closed_by_admin;
@@ -2126,17 +2126,18 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
   }
 
   const paidReceiptUrl = c.paid_receipt_url;
+  const isExpired = String(c.status || '').toLowerCase() === 'expired';
 
   return (
     <div className="rounded-xl border-2 border-teal-300 bg-card p-4 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">GOAL REACHED 🎉</span>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isExpired ? "bg-amber-100 text-amber-700" : "bg-teal-100 text-teal-700"}`}>{isExpired ? "DEADLINE PASSED — FUNDS READY" : "GOAL REACHED 🎉"}</span>
         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
         {c.closed_by_admin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">PAID</span>}
         {c.rejection_reason && c.status !== "completed" && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">REJECTED</span>}
       </div>
       <p className="font-semibold text-sm">{c.title}</p>
-      <p className="text-xs text-teal-600 font-medium">Raised: {s} {c.amount_collected} of {s} {c.amount_needed} ✅</p>
+      <p className="text-xs text-teal-600 font-medium">Raised: {s} {c.amount_collected} of {s} {c.amount_needed} ✅{isExpired ? " · Case deadline passed" : ""}</p>
 
       <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs space-y-0.5">
         <p className="font-semibold flex items-center gap-1"><Users className="h-3 w-3" /> Seeker</p>

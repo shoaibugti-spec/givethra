@@ -38,9 +38,9 @@ describe("Admin payment review queues", () => {
     expect(source).toContain("Rejection reason: {r.rejection_reason || r.notes || \"Not provided\"}");
   });
 
-  it("limits Pay & Close to approved fully funded cases that are not already closed", () => {
+  it("limits Pay & Close to approved or expired fully funded cases that are not already closed", () => {
     expect(source).toContain("const readyToClose = caseList.filter((c) => {");
-    expect(source).toContain('if (c.status !== "approved") return false;');
+    expect(source).toContain("['approved', 'expired'].includes(String(c.status || '').toLowerCase())");
     expect(source).toContain("needed > 0 && collected >= needed && !c.closed_by_admin");
   });
 

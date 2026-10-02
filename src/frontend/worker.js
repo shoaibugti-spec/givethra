@@ -669,6 +669,20 @@ async function handleKyc(request, env, user, url, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+async function expireDueCases(env) {
+  if (!env?.DB) return;
+  // Deadlines are stored as YYYY-MM-DD. Expire only still-open published cases;
+  // completed/closed cases must remain completed for payment and feedback history.
+  const today = new Date().toISOString().slice(0, 10);
+  await env.DB.prepare(
+    `UPDATE case_submissions
+     SET status = 'expired'
+     WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active')
+       AND deadline IS NOT NULL AND date(deadline) < date(?)
+       AND COALESCE(closed_by_admin, 0) = 0`
+  ).bind(today).run();
+}
+
 function decodeCaseRow(row) {
   if (!row) return row;
   const result = { ...row };
@@ -685,8 +699,9 @@ function decodeCaseRow(row) {
 // ============================================================
 async function handleCases(request, env, user, url, parts, origin) {
   if (request.method === "GET") {
+    await expireDueCases(env);
     if (parts[2] === "approved") {
-      const rows = await env.DB.prepare("SELECT * FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') ORDER BY submitted_at DESC").all();
+      const rows = await env.DB.prepare("SELECT * FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') AND (deadline IS NULL OR date(deadline) >= date('now')) ORDER BY submitted_at DESC").all();
       return json((rows.results || []).map(decodeCaseRow), 200, origin);
     }
     if (parts[2] === "by-ids") {
@@ -1950,6 +1965,7 @@ async function handleRequest(request, env, ctx) {
       }
 
       if (request.method === "GET") {
+        if (parts[2] === "cases") await expireDueCases(env);
         const tableMap = {
           users: { table: "users", order: "updated_at" },
           kyc: { table: "kyc_submissions", order: "submitted_at" },
