@@ -1397,6 +1397,16 @@ async function handleRequest(request, env, ctx) {
     }
   }
 
+  // Public case share links get case-specific Open Graph/Twitter metadata.
+  if (parts[0] === "share" && parts[1] === "cases" && parts[2] && request.method === "GET") {
+    try {
+      const preview = await caseShareDocument(request, env, url, parts);
+      if (preview) return preview;
+    } catch (error) {
+      console.error("Case share metadata failed", error);
+    }
+  }
+
   // Public static assets
   if (url.pathname.startsWith("/uploads/")) {
     const key = url.pathname.slice(9);
@@ -2506,6 +2516,61 @@ async function productShareDocument(request, env, url, parts) {
     ["description", description], ["og:title", title], ["og:description", description],
     ["og:type", "product"], ["og:url", pageUrl], ["og:image", image], ["og:image:alt", dream.name],
     ["twitter:title", title], ["twitter:description", description], ["twitter:image", image],
+  ];
+  for (const [property, value] of replacements) {
+    const attribute = property.startsWith("og:") ? `property="${property}"` : `name="${property}"`;
+    const tag = `<meta ${attribute} content="${escapeHtml(value)}">`;
+    const pattern = new RegExp(`<meta ${attribute}[^>]*>`, "i");
+    html = pattern.test(html) ? html.replace(pattern, tag) : html.replace(/<\/head>/i, `  ${tag}\n</head>`);
+  }
+  const headers = new Headers(documentResponse.headers);
+  headers.set("content-type", "text/html; charset=UTF-8");
+  headers.set("cache-control", "public, max-age=300, s-maxage=900");
+  return new Response(html, { status: documentResponse.status, headers });
+}
+
+function isSocialCrawler(request) {
+  const agent = String(request.headers.get("user-agent") || "").toLowerCase();
+  return /(facebookexternalhit|facebot|whatsapp|twitterbot|linkedinbot|pinterest|slackbot|discordbot|telegrambot|googlebot|bingbot)/i.test(agent);
+}
+
+async function caseShareDocument(request, env, url, parts) {
+  if (!env.ASSETS || request.method !== "GET" || parts[0] !== "share" || parts[1] !== "cases" || !parts[2]) return null;
+  const caseId = decodeURIComponent(parts[2]);
+  const caseRow = await env.DB.prepare(
+    `SELECT id, title, short_description, description, why_help, category,
+            amount_needed, amount_collected, currency, selfie_url, city, country,
+            status
+     FROM case_submissions
+     WHERE id = ? AND lower(COALESCE(status, '')) IN ('approved', 'published', 'active', 'completed')
+     LIMIT 1`
+  ).bind(caseId).first();
+  if (!caseRow) return null;
+
+  const pageUrl = new URL(`/cases/${encodeURIComponent(caseId)}`, url.origin).toString();
+  if (!isSocialCrawler(request)) return Response.redirect(pageUrl, 302);
+
+  const documentResponse = await env.ASSETS.fetch(new Request(new URL("/", url), request));
+  const document = await documentResponse.text();
+  const title = `Help: ${String(caseRow.title || "Verified Givethra help case").trim()}`;
+  const needed = Number(caseRow.amount_needed || 0);
+  const collected = Math.max(Number(caseRow.amount_collected || 0), 0);
+  const currency = String(caseRow.currency || "USD").toUpperCase();
+  const symbols = { USD: "$", PKR: "Rs", GBP: "£", EUR: "€", INR: "₹", AED: "AED", SAR: "SAR" };
+  const symbol = symbols[currency] || currency;
+  const story = String(caseRow.short_description || caseRow.why_help || caseRow.description || "Someone needs verified support today.")
+    .replace(/\s+/g, " ").trim().slice(0, 360);
+  const progress = needed > 0
+    ? `Contributed ${symbol} ${collected.toLocaleString()} of ${symbol} ${needed.toLocaleString()}; ${symbol} ${Math.max(needed - collected, 0).toLocaleString()} remains.`
+    : "Contributions are welcome.";
+  const description = `${story} ${progress} You can contribute any amount or pay the complete fee directly.`;
+  const image = caseRow.selfie_url ? new URL(String(caseRow.selfie_url), url.origin).toString() : `${url.origin}/1780969153797.png`;
+  let html = document.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
+  const replacements = [
+    ["description", description], ["og:title", title], ["og:description", description],
+    ["og:type", "article"], ["og:url", pageUrl], ["og:image", image], ["og:image:alt", "Verified requester selfie"],
+    ["og:image:width", "640"], ["og:image:height", "640"],
+    ["twitter:card", "summary_large_image"], ["twitter:title", title], ["twitter:description", description], ["twitter:image", image],
   ];
   for (const [property, value] of replacements) {
     const attribute = property.startsWith("og:") ? `property="${property}"` : `name="${property}"`;

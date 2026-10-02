@@ -5,6 +5,7 @@ import path from "node:path";
 
 const casesPageSource = fs.readFileSync(path.join(process.cwd(), "src/pages/CasesPage.tsx"), "utf8");
 const detailPageSource = fs.readFileSync(path.join(process.cwd(), "src/pages/CaseDetailPage.tsx"), "utf8");
+const workerSource = fs.readFileSync(path.join(process.cwd(), "worker.js"), "utf8");
 
 describe("case sharing", () => {
   it("builds a concise share payload with amount and direct case URL", () => {
@@ -13,13 +14,23 @@ describe("case sharing", () => {
       title: "Help to Pay Rent",
       short_description: "A family needs urgent support to keep their home.",
       amount_needed: 45000,
+      amount_collected: 12500,
       currency: "PKR",
+      selfie_url: "https://givethra.org/uploads/cases/rent-123/selfie.jpg",
     }, "https://givethra.org");
 
     expect(payload.title).toBe("Help: Help to Pay Rent");
     expect(payload.text).toContain("Help to Pay Rent");
-    expect(payload.text).toContain("Rs 45,000");
+    expect(payload.text).toContain("Contributed: Rs 12,500 of Rs 45,000");
+    expect(payload.text).toContain("You can contribute any amount or pay the complete fee directly.");
     expect(payload.url).toBe("https://givethra.org/share/cases/rent-123");
+  });
+
+  it("uses the crawler preview route so WhatsApp and social cards can read selfie metadata", () => {
+    expect(workerSource).toContain('parts[0] === "share" && parts[1] === "cases"');
+    expect(workerSource).toContain('"og:image", image');
+    expect(workerSource).toContain("Verified requester selfie");
+    expect(workerSource).toContain("isSocialCrawler");
   });
 
   it("keeps the published-case actions clear and compact", () => {
