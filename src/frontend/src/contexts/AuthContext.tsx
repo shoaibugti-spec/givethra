@@ -48,6 +48,48 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const ROLE_KEY = "givethra_role";
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
 const ASSISTANT_EMAIL = "shoaibugti@gmail.com";  // ✅ نیا
+let googleScriptPromise: Promise<void> | null = null;
+
+function ensureGoogleIdentityServices(timeoutMs = 20000): Promise<void> {
+  if (typeof window === "undefined") return Promise.reject(new Error("Google sign-in is only available in a browser."));
+  if ((window as any).google?.accounts?.id) return Promise.resolve();
+  if (googleScriptPromise) return googleScriptPromise;
+  googleScriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+    const script = existing || document.createElement("script");
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      if (error) {
+        googleScriptPromise = null;
+        reject(error);
+      } else {
+        resolve();
+      }
+    };
+    const timer = window.setTimeout(() => finish(new Error("Google sign-in is taking longer than expected. Please check your connection and try again.")), timeoutMs);
+    script.addEventListener("load", () => {
+      const waitForApi = () => {
+        if ((window as any).google?.accounts?.id) return finish();
+        window.setTimeout(() => {
+          if ((window as any).google?.accounts?.id) finish();
+          else if (!settled) waitForApi();
+        }, 100);
+      };
+      waitForApi();
+    }, { once: true });
+    script.addEventListener("error", () => finish(new Error("Google sign-in could not be loaded. Please try again.")), { once: true });
+    if (!existing) {
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  });
+  return googleScriptPromise;
+}
 
 function safeLocalGet(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -189,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoginError(null);
     try {
       let response: Response | null = null;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
           response = await fetchWithTimeout(`${WORKER_URL}/auth/google`, {
             method: "POST",
@@ -199,8 +241,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, 15000);
           break;
         } catch (error) {
-          if (attempt === 1) throw error;
-          await new Promise((resolve) => window.setTimeout(resolve, 700));
+          if (attempt === 2) throw error;
+          await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)));
         }
       }
       if (!response) throw new Error("Google sign-in verification did not return a response.");
@@ -252,15 +294,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     googlePromptRetryRef.current = 0;
     if (googlePromptTimerRef.current) window.clearTimeout(googlePromptTimerRef.current);
     if (googleLoginTimerRef.current) window.clearTimeout(googleLoginTimerRef.current);
-    const deadline = Date.now() + 5000;
-    while (!(window as any).google?.accounts?.id && Date.now() < deadline) {
-      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    if (!GOOGLE_CLIENT_ID) {
+      setLoginError("Google sign-in is temporarily unavailable. Please try again shortly.");
+      setIsLoggingIn(false);
+      return;
+    }
+    try {
+      await ensureGoogleIdentityServices();
+    } catch (error) {
+      console.error("Google Identity Services failed to load:", error);
+      setLoginError(error instanceof Error ? error.message : "Google sign-in could not be loaded. Please try again.");
+      setIsLoggingIn(false);
+      return;
     }
     const googleIdentity = (window as any).google;
-    if (!GOOGLE_CLIENT_ID || !googleIdentity?.accounts?.id) {
-      const message = "Google sign-in is not ready yet. Please wait a moment and try again.";
-      console.error(message);
-      setLoginError(message);
+    if (!googleIdentity?.accounts?.id) {
+      setLoginError("Google sign-in could not be loaded. Please try again.");
       setIsLoggingIn(false);
       return;
     }
