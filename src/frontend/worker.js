@@ -118,25 +118,57 @@ function collectUploadUrls(value, urls = new Set(), seen = new Set()) {
   return urls;
 }
 
+function stripUploadUrls(value, seen = new Set()) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string") {
+    return value.trim().startsWith("http") && value.includes("/uploads/") ? null : value;
+  }
+  if (typeof value !== "object" || seen.has(value)) return value;
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((entry) => stripUploadUrls(entry, seen));
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, stripUploadUrls(entry, seen)]));
+}
+
+async function clearRejectedFileReferences(env, record) {
+  if (!env.DB || !record?.id) return false;
+  const idValue = String(record.id);
+  switch (record.table) {
+    case "kyc_submissions":
+      await env.DB.prepare("UPDATE kyc_submissions SET cnic_front_url = NULL, cnic_back_url = NULL, selfie_url = NULL, passport_url = NULL, face_video_url = NULL WHERE id = ?").bind(idValue).run();
+      return true;
+    case "case_submissions": {
+      let categoryDetails = record.category_details || null;
+      try { categoryDetails = JSON.stringify(stripUploadUrls(JSON.parse(categoryDetails || "null"))); } catch { /* preserve non-JSON details */ }
+      await env.DB.prepare("UPDATE case_submissions SET photo_urls = NULL, selfie_url = NULL, video_url = NULL, paid_receipt_url = NULL, category_details = ? WHERE id = ?").bind(categoryDetails, idValue).run();
+      return true;
+    }
+    case "deposits": await env.DB.prepare("UPDATE deposits SET proof_url = NULL WHERE id = ?").bind(idValue).run(); return true;
+    case "feedbacks": await env.DB.prepare("UPDATE feedbacks SET video_url = NULL WHERE id = ?").bind(idValue).run(); return true;
+    case "case_resolutions": await env.DB.prepare("UPDATE case_resolutions SET receipt_url = NULL, affidavit_url = NULL WHERE id = ?").bind(idValue).run(); return true;
+    case "donations": await env.DB.prepare("UPDATE donations SET proof_url = NULL WHERE id = ?").bind(idValue).run(); return true;
+    case "dream_participations": await env.DB.prepare("UPDATE dream_participations SET proof_url = NULL WHERE id = ?").bind(idValue).run(); return true;
+    case "withdrawal_requests": await env.DB.prepare("UPDATE withdrawal_requests SET payment_proof_url = NULL WHERE id = ?").bind(idValue).run(); return true;
+    default: return false;
+  }
+}
+
 async function getRejectedFileCleanupRecords(env) {
   const sources = [
-    ["kyc", "kyc_submissions"],
-    ["cases", "case_submissions"],
-    ["deposits", "deposits"],
-    ["feedback", "feedbacks"],
-    ["direct/contribution payments", "case_resolutions"],
-    ["community donations", "donations"],
-    ["dream participation", "dream_participations"],
-    ["earnings withdrawals", "withdrawal_requests"],
+    ["kyc", "kyc_submissions", true], ["cases", "case_submissions", true],
+    ["deposits", "deposits", true], ["feedback", "feedbacks", true],
+    ["direct/contribution payments", "case_resolutions", true], ["community donations", "donations", true],
+    ["dream participation", "dream_participations", true], ["earnings withdrawals", "withdrawal_requests", false],
   ];
   const records = [];
-  for (const [label, table] of sources) {
+  for (const [label, table, hasRejectionReason] of sources) {
     try {
       const rows = await env.DB.prepare(
-        `SELECT * FROM ${table} WHERE lower(COALESCE(status, '')) IN ('rejected', 'disputed', 'cancelled')`
+        `SELECT * FROM ${table}
+         WHERE lower(COALESCE(status, '')) IN ('rejected', 'disputed', 'cancelled', 'duplicate', 're_kyc', 'admin_rejected')
+         ${hasRejectionReason ? "OR NULLIF(TRIM(COALESCE(rejection_reason, '')), '') IS NOT NULL" : ""}`
       ).all();
       for (const row of rows.results || []) {
-        records.push({ label, id: row.id || null, urls: [...collectUploadUrls(row)] });
+        records.push({ label, table, id: row.id || null, category_details: row.category_details || null, urls: [...collectUploadUrls(row)] });
       }
     } catch (error) {
       // Optional migrations may not exist in every environment.
@@ -2246,10 +2278,15 @@ async function handleRequest(request, env, ctx) {
         const records = await getRejectedFileCleanupRecords(env);
         const uniqueUrls = [...new Set(records.flatMap((record) => record.urls))];
         const result = await deleteUploadUrls(env, uniqueUrls);
+        let referencesCleared = 0;
+        for (const record of records) {
+          if (await clearRejectedFileReferences(env, record)) referencesCleared += 1;
+        }
         return json({
           ...result,
           records: records.length,
           rejected_records: records.length,
+          references_cleared: referencesCleared,
           record_breakdown: records.reduce((counts, record) => {
             counts[record.label] = (counts[record.label] || 0) + 1;
             return counts;
