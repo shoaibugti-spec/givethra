@@ -646,7 +646,8 @@ export default function AdminPage() {
     setLoading(true);
     try {
       const result = await adminDeleteFiles([]);
-      toast.success(`Cleaned ${Number(result?.deleted || 0)} files from ${Number(result?.records || 0)} rejected records.`);
+      const failed = Number(result?.failed || 0);
+      toast.success(`Cleaned ${Number(result?.deleted || 0)} files from ${Number(result?.records || result?.rejected_records || 0)} rejected records${failed ? ` (${failed} skipped)` : ""}.`);
     } catch (e) {
       toast.error("Cleanup failed, check console.");
       console.error(e);

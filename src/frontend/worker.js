@@ -101,6 +101,72 @@ function id() {
   return crypto.randomUUID();
 }
 
+function collectUploadUrls(value, urls = new Set(), seen = new Set()) {
+  if (value === null || value === undefined) return urls;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("http") && trimmed.includes("/uploads/")) urls.add(trimmed);
+    if ((trimmed.startsWith("{") || trimmed.startsWith("[")) && trimmed.length < 500000) {
+      try { collectUploadUrls(JSON.parse(trimmed), urls, seen); } catch { /* ordinary text */ }
+    }
+    return urls;
+  }
+  if (typeof value !== "object" || seen.has(value)) return urls;
+  seen.add(value);
+  if (Array.isArray(value)) value.forEach((entry) => collectUploadUrls(entry, urls, seen));
+  else Object.values(value).forEach((entry) => collectUploadUrls(entry, urls, seen));
+  return urls;
+}
+
+async function getRejectedFileCleanupRecords(env) {
+  const sources = [
+    ["kyc", "kyc_submissions"],
+    ["cases", "case_submissions"],
+    ["deposits", "deposits"],
+    ["feedback", "feedbacks"],
+    ["direct/contribution payments", "case_resolutions"],
+    ["community donations", "donations"],
+    ["dream participation", "dream_participations"],
+    ["earnings withdrawals", "withdrawal_requests"],
+  ];
+  const records = [];
+  for (const [label, table] of sources) {
+    try {
+      const rows = await env.DB.prepare(
+        `SELECT * FROM ${table} WHERE lower(COALESCE(status, '')) IN ('rejected', 'disputed', 'cancelled')`
+      ).all();
+      for (const row of rows.results || []) {
+        records.push({ label, id: row.id || null, urls: [...collectUploadUrls(row)] });
+      }
+    } catch (error) {
+      // Optional migrations may not exist in every environment.
+      console.warn(`Rejected-file cleanup skipped ${table}`, error?.message || error);
+    }
+  }
+  return records;
+}
+
+async function deleteUploadUrls(env, values) {
+  const urls = [...collectUploadUrls(values)];
+  let deleted = 0;
+  let failed = 0;
+  for (const value of urls) {
+    try {
+      const parsed = new URL(value);
+      if (!PUBLIC_ORIGINS.has(parsed.origin)) { failed += 1; continue; }
+      const marker = "/uploads/";
+      const index = parsed.pathname.indexOf(marker);
+      const key = index >= 0 ? decodeURIComponent(parsed.pathname.slice(index + marker.length)) : "";
+      if (!key) { failed += 1; continue; }
+      await env.UPLOADS.delete(key);
+      deleted += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  return { deleted, failed, urls: urls.length };
+}
+
 function base64UrlEncode(value) {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
   let binary = "";
@@ -2173,18 +2239,22 @@ async function handleRequest(request, env, ctx) {
       if (parts[2] === "delete-files" && request.method === "POST") {
         const body = await readJson(request);
         const urls = Array.isArray(body?.urls) ? body.urls : [];
-        let deleted = 0;
-        for (const value of urls) {
-          try {
-            const parsed = new URL(String(value));
-            const marker = "/uploads/";
-            const index = parsed.pathname.indexOf(marker);
-            if (index < 0) continue;
-            const key = decodeURIComponent(parsed.pathname.slice(index + marker.length));
-            if (key) { await env.UPLOADS.delete(key); deleted += 1; }
-          } catch { /* Ignore malformed or external URLs. */ }
+        if (urls.length > 0) {
+          const result = await deleteUploadUrls(env, urls);
+          return json({ ...result, records: 0, rejected_records: 0 }, 200, origin);
         }
-        return json({ deleted }, 200, origin);
+        const records = await getRejectedFileCleanupRecords(env);
+        const uniqueUrls = [...new Set(records.flatMap((record) => record.urls))];
+        const result = await deleteUploadUrls(env, uniqueUrls);
+        return json({
+          ...result,
+          records: records.length,
+          rejected_records: records.length,
+          record_breakdown: records.reduce((counts, record) => {
+            counts[record.label] = (counts[record.label] || 0) + 1;
+            return counts;
+          }, {}),
+        }, 200, origin);
       }
     }
 
