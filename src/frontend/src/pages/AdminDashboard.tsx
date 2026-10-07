@@ -174,16 +174,22 @@ const DOC_LABELS: Record<string, string> = {
   landlord_cnic_url: "Landlord CNIC",
   shop_agreement_url: "Shop Agreement",
   business_proof_url: "Business / Shop Verification",
+  pension_proof_url: "Pension Slip / Pension Proof",
+  previous_income_proof_url: "Previous Employment / Income Proof",
   disability_certificate_url: "Disability Certificate",
   selfie: "Case Selfie",
   video: "Case Appeal Video",
   salarySlipUrl: "Salary Slip (6 Months)",
   statementUrl: "Bank Statement (6 Months)",
   profession_proof_url: "Profession / App Profile Proof",
-  support_declaration_url: "Declaration of Financial Support",
+  support_declaration_url: "Household Provider Income Proof",
+  pension_proof: "Pension Slip / Pension Proof",
+  previous_income_proof: "Previous Employment / Income Proof",
+  pensionProofUrl: "Pension Slip / Pension Proof",
+  previousIncomeProofUrl: "Previous Employment / Income Proof",
   business_proof: "Business / Shop Verification",
   profession_proof: "Profession / App Profile Proof",
-  support_declaration: "Declaration of Financial Support",
+  support_declaration: "Household Provider Income Proof",
   rentalAgreementUrl: "Rental Agreement",
   landlordCnicUrl: "Landlord's CNIC",
   ownerCnicUrl: "Owner's CNIC",
@@ -1260,7 +1266,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     const excludeKeys = new Set([
       "_documents", "edu_documents", "edu_sub_fields", "property_ownership",
       "rental_agreement_url", "landlord_cnic_url", "job_status", "gender",
-      "statement_url", "salary_slip_url", "owner_cnic_url", "property_rental_agreement_url",
+      "statement_url", "salary_slip_url", "pension_proof_url", "previous_income_proof_url", "owner_cnic_url", "property_rental_agreement_url",
       "property_landlord_cnic_url", "property_owner_cnic_url", "owner_relation",
       "marital_status", "is_orphan", "orphan_parent", "seeker_name",
       "seeker_contact", "receiver_name", "receiver_contact", "receiver_bank",
@@ -1429,6 +1435,8 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
   // receive the human label instead of "Statement Url" or a storage filename.
   pushFile("salary_slip", c.salary_slip_url || catDetails?.salary_slip_url, "Salary Slip (6 Months)");
   pushFile("statement", c.statement_url || catDetails?.statement_url, "Bank Statement (6 Months)");
+  pushFile("pension_proof", c.pension_proof_url || catDetails?.pension_proof_url, "Pension Slip / Pension Proof");
+  pushFile("previous_income_proof", c.previous_income_proof_url || catDetails?.previous_income_proof_url, "Previous Employment / Income Proof");
   pushFile("rental_agreement", catDetails?.rental_agreement_url || catDetails?.property_rental_agreement_url || catDetails?.rentalAgreementUrl, "Rental Agreement");
   pushFile("landlord_cnic", catDetails?.landlord_cnic_url || catDetails?.property_landlord_cnic_url || catDetails?.landlordCnicUrl, "Landlord's CNIC");
   pushFile("owner_cnic", catDetails?.owner_cnic_url || catDetails?.property_owner_cnic_url || catDetails?.ownerCnicUrl, "Owner's CNIC");

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateStep } from "./validation";
+import { getRequiredEmploymentDocumentKeys } from "../employment";
 
 const base = {
   category: "Food & Groceries",
@@ -67,5 +68,11 @@ describe("submit request validation", () => {
     const common = { ...base, instituteName: "Utility Company", refNumber: "REF-123", catDocUrls: { bill: "https://files.test/bill.jpg" } };
     expect(validateStep("categoryDetails", { ...common, category: "Electricity Bill", catFields: { monthly_units: "120", bill_owner_name: "Test User", company: "Utility Company" } })).toContain("appliance");
     expect(validateStep("categoryDetails", { ...common, category: "Electricity Bill", catFields: { monthly_units: "120", bill_owner_name: "Test User", company: "Utility Company", appliances: { fan: 1 } } })).toBeNull();
+  });
+
+  it("requires pension proof for Retired and previous-income proof for former workers", () => {
+    expect(getRequiredEmploymentDocumentKeys("Retired")).toEqual(["pensionProofUrl", "statementUrl"]);
+    expect(getRequiredEmploymentDocumentKeys("Previously Employed / Left Job / Laid Off")).toEqual(["previousIncomeProofUrl", "statementUrl"]);
+    expect(getRequiredEmploymentDocumentKeys("Unemployed / Housewife")).toContain("supportDeclarationUrl");
   });
 });

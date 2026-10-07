@@ -23,6 +23,9 @@ function getDocLabel(key: string) {
     bill: "Bill / Challan Photo",
     salary_slip: "Salary Slip (6 Months)",
     statement: "Bank Statement (6 Months)",
+    pension_proof: "Pension Slip / Pension Proof",
+    previous_income_proof: "Previous Employment / Income Proof",
+    support_declaration: "Household Provider Income Proof",
     student_id: "Student ID / B-Form",
     student_id_proof: "Student ID Proof",
   };

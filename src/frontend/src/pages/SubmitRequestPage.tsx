@@ -1557,6 +1557,8 @@ export default function SubmitRequestPage() {
       businessProofUrl: "business_proof",
       professionProofUrl: "profession_proof",
       supportDeclarationUrl: "support_declaration",
+      pensionProofUrl: "pension_proof",
+      previousIncomeProofUrl: "previous_income_proof",
     };
     const missingEmploymentDoc = employmentOption?.documents.find((document) => document.required && !catDocUrls[employmentKeyMap[document.key]]);
     if (missingEmploymentDoc) return `Please attach: ${missingEmploymentDoc.label}.`;
@@ -1913,6 +1915,8 @@ export default function SubmitRequestPage() {
         business_proof_url: catDocUrls["business_proof"] || "",
         profession_proof_url: catDocUrls["profession_proof"] || "",
         support_declaration_url: catDocUrls["support_declaration"] || "",
+        pension_proof_url: catDocUrls["pension_proof"] || "",
+        previous_income_proof_url: catDocUrls["previous_income_proof"] || "",
         gender: gender,
         marital_status: maritalStatus,
         is_orphan: isOrphan,
@@ -3138,6 +3142,8 @@ export default function SubmitRequestPage() {
                         businessProofUrl: "business_proof",
                         professionProofUrl: "profession_proof",
                         supportDeclarationUrl: "support_declaration",
+                        pensionProofUrl: "pension_proof",
+                        previousIncomeProofUrl: "previous_income_proof",
                       };
                       return docBox(keyMap[document.key], document.label, document.required, document.hint, ".pdf,image/*");
                     })}

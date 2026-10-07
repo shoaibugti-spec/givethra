@@ -44,6 +44,8 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
     formData.businessProofUrl,
     formData.professionProofUrl,
     formData.supportDeclarationUrl,
+    formData.pensionProofUrl,
+    formData.previousIncomeProofUrl,
   ].filter(Boolean) as string[];
 
   const isEarlyRequest = formData.isEarlyRequest === true;
@@ -86,6 +88,8 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
       business_proof_url: formData.businessProofUrl,
       profession_proof_url: formData.professionProofUrl,
       support_declaration_url: formData.supportDeclarationUrl,
+      pension_proof_url: formData.pensionProofUrl,
+      previous_income_proof_url: formData.previousIncomeProofUrl,
       rental_agreement_url: formData.rentalAgreementUrl,
       landlord_cnic_url: formData.landlordCnicUrl,
       owner_cnic_url: formData.ownerCnicUrl,
