@@ -2,7 +2,7 @@ export const EMPLOYMENT_OPTIONS = [
   {
     value: "Salaried / Employed",
     label: "Salaried / Employed",
-    description: "Company employee, or recently laid off within the last 1–2 years",
+    description: "Currently employed by a company or organization with a current salary",
     documents: [
       { key: "salarySlipUrl", label: "Last 6 Months Salary Slips", required: true, hint: "If recently laid off, upload your last available salary slip" },
       { key: "statementUrl", label: "Last 6 Months Bank Statement", required: true, hint: "Bank, EasyPaisa, or JazzCash" },
