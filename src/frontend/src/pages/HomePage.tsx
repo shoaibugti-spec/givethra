@@ -343,9 +343,11 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
   const [submittedUserQuery, setSubmittedUserQuery] = useState("");
   const [userResults, setUserResults] = useState<any[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
+  const homeLoadRequestRef = useRef(0);
 
   const loadHomeData = async () => {
     if (!user?.id) return;
+    const requestId = ++homeLoadRequestRef.current;
     setLoading(true);
     const [walletResult, supportResult, earningsResult, postsResult, ownPostsResult] = await Promise.allSettled([
       getWallet(user.id),
@@ -354,6 +356,7 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
       getCommunityPosts(feedTab),
       getCommunityPosts("my-posts"),
     ]);
+    if (requestId !== homeLoadRequestRef.current) return;
     if (walletResult.status === "fulfilled") setWalletBalance(Number(walletResult.value?.balance || 0));
     if (supportResult.status === "fulfilled") setSupports(Number(supportResult.value?.supports || 0));
     if (supportResult.status === "fulfilled") {
@@ -425,7 +428,7 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
 
   const submitPost = async () => {
     const text = message.trim();
-    if (!text || !user?.id || (postCooldownUntil != null && postCooldownUntil > Date.now())) return;
+    if (posting || !text || !user?.id || (postCooldownUntil != null && postCooldownUntil > Date.now())) return;
     setPosting(true);
     try {
       const created = await createCommunityPost({ message: text, user_id: user.id, display_name: user.fullName || "User", is_guest: false });
@@ -450,11 +453,18 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
   const sharePost = async (post: any) => {
     const text = `${post.display_name || "Givethra member"}: ${post.message || ""}`;
     const url = `${window.location.origin}/community`;
-    if (navigator.share) await navigator.share({ title: "Givethra post", text, url });
-    else await navigator.clipboard?.writeText(`${text}\n${url}`);
+    try {
+      if (navigator.share) await navigator.share({ title: "Givethra post", text, url });
+      else {
+        await navigator.clipboard?.writeText(`${text}\n${url}`);
+        toast.success("Post link copied");
+      }
+    } catch (error) {
+      if ((error as DOMException)?.name !== "AbortError") toast.error("Post could not be shared");
+    }
   };
   const reactToPost = async (post: any) => {
-    if (!post?.id || post.supported_by_me || post.user_id === user?.id) return;
+    if (!post?.id || post.supported_by_me || post.user_id === user?.id || busyPost != null) return;
     setBusyPost(`support:${post.id}`);
     try {
       const result = await supportPost(String(post.id));
@@ -472,12 +482,14 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
     }
   };
   const togglePostHero = async (post: any) => {
-    if (!post?.user_id || post.user_id === user?.id) return;
+    if (!post?.user_id || post.user_id === user?.id || busyPost != null) return;
     setBusyPost(`hero:${post.id}`);
     try {
       if (post.is_following) await unfollowUser(String(post.user_id));
       else await followUser(String(post.user_id));
       setPosts((current) => current.map((item) => item.id === post.id ? { ...item, is_following: !post.is_following } : item));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Hero action could not be completed");
     } finally {
       setBusyPost(null);
     }
@@ -593,6 +605,7 @@ export default function HomePage() {
   const [detectedCity, setDetectedCity] = useState<string | null>(null);
 
   const resultsRef = useRef<HTMLDivElement>(null);
+  const casesLoadRequestRef = useRef(0);
 
   useEffect(() => {
     const onModeChange = (event: Event) => setHomeMode((event as CustomEvent<"support" | "earning">).detail === "earning" ? "earning" : "support");
@@ -700,14 +713,15 @@ export default function HomePage() {
   }
 
   async function loadCases() {
+    const requestId = ++casesLoadRequestRef.current;
     setLoading(true);
     try {
       const data = await getApprovedCases();
-      setCases(data ?? []);
+      if (requestId === casesLoadRequestRef.current) setCases(data ?? []);
     } catch {
       // ignore
     } finally {
-      setLoading(false);
+      if (requestId === casesLoadRequestRef.current) setLoading(false);
     }
   }
 
