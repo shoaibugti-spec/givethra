@@ -105,7 +105,7 @@ export default function HeroLeaderboard() {
             <div>
               <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-primary"><Trophy className="h-4 w-4" /> Community recognition</p>
               <h2 id="hero-leaderboard-title" className="mt-2 font-display text-2xl font-black tracking-tight sm:text-3xl">Hero Ranking Leaderboard</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Celebrating the people turning verified help into real impact. Rankings are based on approved, admin-confirmed help.</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Celebrating the people turning verified help into real impact. Rankings are based on approved, Givethra-confirmed help.</p>
             </div>
             <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-primary/15 bg-background/70 px-3 py-2 text-xs font-semibold text-muted-foreground">
               <Users className="h-4 w-4 text-primary" /> Top 100 Heroes
