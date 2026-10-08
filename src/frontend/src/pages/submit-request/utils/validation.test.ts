@@ -54,6 +54,11 @@ describe("submit request validation", () => {
     expect(validateStep("categoryDetails", form)).toBeNull();
   });
 
+  it("requires the fixed Rs 3,000 Emergency amount", () => {
+    expect(validateStep("amount", { ...base, category: "Emergency Help", amount: "3000" })).toBeNull();
+    expect(validateStep("amount", { ...base, category: "Emergency Help", amount: "2500" })).toContain("fixed at Rs 3,000");
+  });
+
   it("requires 1–300 units for Gas and Water without requiring appliances", () => {
     for (const category of ["Gas Bill", "Water Bill"]) {
       const fields = { monthly_units: "120", bill_owner_name: "Test User", company: "Utility Company" };

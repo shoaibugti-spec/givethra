@@ -18,8 +18,10 @@ const EMERGENCY_TYPES = [
   "Accident",
   "Sudden illness",
   "Natural disaster",
+  "Fire",
+  "Flood",
+  "Serious injury",
   "Displacement",
-  "Other urgent need",
 ];
 
 export default function EmergencyHelpForm({

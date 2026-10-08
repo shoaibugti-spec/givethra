@@ -14,6 +14,7 @@ const MARRIAGE_SUPPORT_ITEMS = new Set([
   "Electric stove", "Grinder / juicer", "Air cooler", "Cosmetics / makeup set", "Mirror",
   "Dressing table", "Sofa set", "Five pairs of clothes", "Five pairs of shoes",
 ]);
+const EMERGENCY_TYPES = new Set(["Accident", "Sudden illness", "Natural disaster", "Fire", "Flood", "Serious injury", "Displacement"]);
 
 function googleClientId(env) {
   return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || "").trim();
@@ -874,6 +875,26 @@ async function handleCases(request, env, user, url, parts, origin) {
       }
       if (!MARRIAGE_SUPPORT_FOR.has(String(marriageDetails?.marriage_for || "")) || !MARRIAGE_SUPPORT_ITEMS.has(String(marriageDetails?.marriage_item || ""))) {
         return json({ error: "Select who the marriage support is for and exactly one approved marriage item." }, 400, origin);
+      }
+    }
+    if (String(record.category || "") === "Emergency Help") {
+      const amount = Number(record.amount_needed);
+      let emergencyDetails = record.category_details;
+      if (typeof emergencyDetails === "string") {
+        try { emergencyDetails = JSON.parse(emergencyDetails); } catch { emergencyDetails = null; }
+      }
+      if (amount !== 3000) return json({ error: "Emergency Help amount is fixed at Rs 3,000." }, 400, origin);
+      if (!EMERGENCY_TYPES.has(String(emergencyDetails?.emergency_type || ""))) {
+        return json({ error: "Select an approved emergency type." }, 400, origin);
+      }
+      if (!String(emergencyDetails?.emergency_description || "").trim()) {
+        return json({ error: "Describe the emergency clearly." }, 400, origin);
+      }
+      const emergencyProof = emergencyDetails?.emergency_proof
+        || emergencyDetails?._documents?.emergency_proof
+        || emergencyDetails?.cat_doc_urls?.emergency_proof;
+      if (!String(emergencyProof || "").trim()) {
+        return json({ error: "Upload the emergency proof, receipt, or report." }, 400, origin);
       }
     }
     if (["Electricity Bill", "Gas Bill", "Water Bill"].includes(String(record.category || ""))) {

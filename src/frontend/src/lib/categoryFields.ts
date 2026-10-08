@@ -512,15 +512,14 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
 
   "Emergency Help": {
     fields: [
-      { key: "emergency_type", label: "Type of Emergency", placeholder: "e.g. accident, fire, flood", required: true },
-      { key: "help_needed", label: "What immediate help do you need?", placeholder: "e.g. medical, shelter, food", required: true },
+      { key: "emergency_type", label: "Type of Emergency", choices: ["Accident", "Sudden illness", "Natural disaster", "Fire", "Flood", "Serious injury", "Displacement"], required: true },
+      { key: "emergency_description", label: "Describe the emergency", type: "textarea", placeholder: "What happened, when, and what help is needed now", required: true },
       { key: "provider_name", label: "Who will receive payment? (name)", placeholder: "Hospital, shop, or person", required: true },
       { key: "provider_contact", label: "Contact Number", placeholder: "For verification", required: true },
       JOB_FIELD,
     ],
     documents: [
-      { key: "emergency_photo", label: "Photo / Evidence of Emergency", required: true, hint: "Clear photo showing the situation" },
-      { key: "estimate", label: "Estimate / Bill for needed help", required: true, hint: "From service provider" },
+      { key: "emergency_proof", label: "Emergency Proof / Receipt / Report", required: true, hint: "Upload one clear emergency report, bill, receipt, or other official proof" },
       SALARY_DOC,
       STATEMENT_DOC,
     ],

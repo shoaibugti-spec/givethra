@@ -8,6 +8,7 @@ import {
   EDUCATION_ADMISSION_FIELDS,
   EDUCATION_FEE_FIELDS,
   getEducationDocs,
+  getFixedAmount,
 } from "../constants";
 import { ELECTRICITY_MAX_ELIGIBLE_UNITS, normalizeElectricityAppliances } from "../electricity";
 import { getRequiredEmploymentDocumentKeys } from "../employment";
@@ -187,6 +188,8 @@ export function validateStep(stepId: string, formData: any): string | null {
     case "amount": {
       if (isDebtCategory(formData.category)) return null;
       const value = Number(formData.amount);
+      const fixedAmount = getFixedAmount(formData.category);
+      if (fixedAmount != null) return value === fixedAmount ? null : `Amount is fixed at Rs ${fixedAmount.toLocaleString()}`;
       if (!Number.isFinite(value) || value <= 0) return "Please enter the amount needed";
       const min = getMinAmount(formData.category);
       if (min && value < min) return `Amount must be at least Rs ${min.toLocaleString()}`;

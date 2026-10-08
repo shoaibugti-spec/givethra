@@ -3824,9 +3824,6 @@ export default function SubmitRequestPage() {
               </div>
             )}
 
-            {/* PAYMENT RECEIVER (for other categories) */}
-            {renderPaymentReceiver()}
-
             {/* ============================================================
                 AMOUNT SECTION - WITH POLICY
                 ============================================================ */}
