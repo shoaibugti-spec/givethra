@@ -60,9 +60,7 @@ async function ensureUserCoreRows(env, user) {
     `SELECT lower(status) AS status
      FROM kyc_submissions
      WHERE user_id = ? AND COALESCE(is_current, 1) = 1
-     ORDER BY CASE lower(COALESCE(status, ''))
-       WHEN 'approved' THEN 1 WHEN 'pending' THEN 2 WHEN 'rejected' THEN 3 ELSE 4 END,
-       submitted_at DESC, rowid DESC LIMIT 1`
+     ORDER BY submitted_at DESC, rowid DESC LIMIT 1`
   ).bind(String(user.user_id)).first();
   if (kyc?.status) {
     effectiveKycStatus = String(kyc.status).toLowerCase();
@@ -363,9 +361,7 @@ async function hydrateAuthenticatedUser(env, session) {
       `SELECT u.user_id, u.email, u.full_name, u.avatar_url,
               COALESCE((SELECT lower(k.status) FROM kyc_submissions k
                 WHERE k.user_id = u.user_id AND COALESCE(k.is_current, 1) = 1
-                ORDER BY CASE lower(COALESCE(k.status, ''))
-                  WHEN 'approved' THEN 1 WHEN 'pending' THEN 2 WHEN 'rejected' THEN 3 ELSE 4 END,
-                  k.submitted_at DESC, k.rowid DESC LIMIT 1), u.kyc_status, 'none') AS kyc_status,
+                ORDER BY k.submitted_at DESC, k.rowid DESC LIMIT 1), u.kyc_status, 'none') AS kyc_status,
               u.total_cases, u.pending_cases, u.active_or_completed_cases, u.rejected_cases,
               COALESCE(w.balance, u.balance, 0) AS balance, u.last_community_visit, u.onboarding_completed,
               p.full_name AS profile_full_name, p.avatar_url AS profile_avatar_url
@@ -2181,12 +2177,10 @@ async function handleRequest(request, env, ctx) {
             const effectiveKyc = await env.DB.prepare(
               `SELECT lower(status) AS status FROM kyc_submissions
                WHERE user_id = ? AND COALESCE(is_current, 1) = 1
-               ORDER BY CASE lower(COALESCE(status, ''))
-                 WHEN 'approved' THEN 1 WHEN 'pending' THEN 2 WHEN 'rejected' THEN 3 ELSE 4 END,
-                 submitted_at DESC, rowid DESC LIMIT 1`
+               ORDER BY submitted_at DESC, rowid DESC LIMIT 1`
             ).bind(current.user_id).first();
             await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?")
-              .bind(String(effectiveKyc?.status || values.status).toLowerCase(), now(), current.user_id).run();
+              .bind(String(values.status || effectiveKyc?.status || "none").toLowerCase(), now(), current.user_id).run();
             if (String(current.status || "").trim().toLowerCase() !== values.status) {
               if (values.status === "approved") {
                 await sendNotification(
