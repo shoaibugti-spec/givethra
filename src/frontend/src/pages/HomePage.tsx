@@ -6,6 +6,7 @@ import InstallButton from "@/components/InstallButton";
 import CompletionCooldownBanner from "@/components/CompletionCooldownBanner";
 import Layout from "@/components/Layout";
 import HeroesWall from "@/components/HeroesWall";
+import HeroLeaderboard from "@/components/HeroLeaderboard";
 import KindnessWall from "@/components/KindnessWall";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -1494,6 +1495,7 @@ export default function HomePage() {
           </div>
         </section>
 
+        <HeroLeaderboard />
         <HeroesWall />
         <KindnessWall />
 

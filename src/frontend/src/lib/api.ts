@@ -411,6 +411,14 @@ export async function getHeroesWall(limit = 24) {
   return data;
 }
 
+export async function getHeroLeaderboard(limit = 100) {
+  const cappedLimit = Math.min(Math.max(limit, 1), 100);
+  const res = await fetchWithAuth(`${WORKER_URL}/api/hero-leaderboard?limit=${cappedLimit}`, { headers: headers(), cache: "no-store" });
+  const data = await res.json().catch(() => []);
+  if (!res.ok) throw new Error(data?.error || `Hero leaderboard request failed (${res.status})`);
+  return Array.isArray(data) ? data : [];
+}
+
 export async function getCommunityPosts(tab: "for-you" | "latest" | "most-supported" | "my-posts" = "for-you", rankSeed?: number) {
   const query = new URLSearchParams({ tab });
   if (tab === "for-you" && typeof rankSeed === "number" && Number.isFinite(rankSeed)) query.set("seed", String(Math.trunc(rankSeed)));

@@ -1026,6 +1026,40 @@ async function handleHeroesWall(request, env, origin) {
 }
 
 // ============================================================
+//  PUBLIC: HERO RANKING LEADERBOARD
+// ============================================================
+async function handleHeroLeaderboard(request, env, origin) {
+  if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, origin);
+  const url = new URL(request.url);
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 100), 1), 100);
+  const rows = await env.DB.prepare(
+    `SELECT r.hero_id AS user_id,
+            COALESCE(NULLIF(u.full_name, ''), NULLIF(p.full_name, ''), 'Givethra Hero') AS full_name,
+            COALESCE(NULLIF(u.avatar_url, ''), NULLIF(p.avatar_url, '')) AS avatar_url,
+            COUNT(DISTINCT r.case_id) AS cases_helped,
+            COALESCE(SUM(COALESCE(r.amount_paid, 0)), 0) AS total_amount,
+            COALESCE(MAX(r.completed_at), MAX(r.admin_confirmed_at), MAX(r.submitted_at)) AS last_helped_at
+     FROM case_resolutions r
+     LEFT JOIN users u ON u.user_id = r.hero_id
+     LEFT JOIN profiles p ON p.user_id = r.hero_id
+     WHERE r.hero_id IS NOT NULL
+       AND trim(r.hero_id) <> ''
+       AND lower(COALESCE(r.status, '')) IN ('approved', 'completed')
+       AND COALESCE(r.admin_confirmed, 0) IN (1, '1', 'true')
+     GROUP BY r.hero_id, u.full_name, p.full_name, u.avatar_url, p.avatar_url
+     HAVING COUNT(DISTINCT r.case_id) > 0
+     ORDER BY COUNT(DISTINCT r.case_id) DESC, total_amount DESC, last_helped_at DESC
+     LIMIT ?`
+  ).bind(limit).all();
+  return json((rows.results || []).map((row, index) => ({
+    ...row,
+    rank: index + 1,
+    cases_helped: Number(row.cases_helped || 0),
+    total_amount: Number(row.total_amount || 0),
+  })), 200, origin);
+}
+
+// ============================================================
 //  COMMUNITY POSTS HANDLER
 // ============================================================
 async function signSessionPayload(payload, secret) {
@@ -1560,6 +1594,9 @@ async function handleRequest(request, env, ctx) {
   // ============================================================
   if (parts[0] === "api" && parts[1] === "heroes-wall") {
     return handleHeroesWall(request, env, origin);
+  }
+  if (parts[0] === "api" && parts[1] === "hero-leaderboard") {
+    return handleHeroLeaderboard(request, env, origin);
   }
 
   if (parts[0] === "api" && parts[1] === "feedbacks" && request.method === "GET" && !url.searchParams.get("case_id") && !url.searchParams.get("user_id")) {
