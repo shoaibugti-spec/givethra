@@ -139,17 +139,17 @@ export default function HeroLeaderboard() {
             const BadgeIcon = badge.icon;
             const name = hero.full_name || "Givethra Hero";
             const badgeOpen = expandedBadge === hero.user_id;
-            return <div key={hero.user_id} className={`relative flex items-center gap-3 rounded-2xl border p-3 transition-all hover:border-primary/35 hover:shadow-sm sm:gap-4 sm:p-4 ${rank <= 3 ? "border-primary/20 bg-primary/[0.035]" : "border-border bg-background"}`}>
+            return <div key={hero.user_id} className={`relative grid grid-cols-[auto,minmax(0,1fr),auto,auto] items-start gap-2 rounded-2xl border p-3 transition-all hover:border-primary/35 hover:shadow-sm sm:flex sm:items-center sm:gap-4 sm:p-4 ${rank <= 3 ? "border-primary/20 bg-primary/[0.035]" : "border-border bg-background"}`}>
               <div className="flex w-8 shrink-0 items-center justify-center sm:w-10">{rankIcon(rank)}</div>
               <Link to="/profile/$id" params={{ id: hero.user_id }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                 <div className="h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-primary/10 ring-1 ring-border sm:h-12 sm:w-12">{hero.avatar_url ? <img src={hero.avatar_url} alt={name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center text-sm font-black text-primary">{initials(name)}</div>}</div>
-                <div className="min-w-0"><p className="truncate font-bold text-foreground hover:text-primary">{name}</p><p className="mt-0.5 text-xs text-muted-foreground">{Number(hero.cases_helped || 0)} {Number(hero.cases_helped || 0) === 1 ? "case" : "cases"} helped</p></div>
+                <div className="min-w-0"><p className="break-words font-bold leading-5 text-foreground hover:text-primary">{name}</p><p className="mt-0.5 text-xs text-muted-foreground">{Number(hero.cases_helped || 0)} {Number(hero.cases_helped || 0) === 1 ? "case" : "cases"} helped</p></div>
               </Link>
               <div className="hidden items-center gap-2 sm:flex">
                 <button type="button" onClick={() => setExpandedBadge(badgeOpen ? null : hero.user_id)} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-black ring-1 ${badge.className}`} aria-label={`${badge.label} badge information`} title={badge.description}><BadgeIcon className="h-3.5 w-3.5" /> {badge.label}</button>
                 {badgeOpen && <span className="max-w-[190px] text-[10px] leading-4 text-muted-foreground">{badge.description}</span>}
               </div>
-              <div className="shrink-0 text-right"><p className="text-sm font-black text-teal-600">Rs {Number(hero.total_amount || 0).toLocaleString()}</p><p className="text-[10px] text-muted-foreground">verified help</p></div>
+              <div className="shrink-0 whitespace-nowrap text-right"><p className="text-sm font-black text-teal-600">Rs {Number(hero.total_amount || 0).toLocaleString()}</p><p className="text-[10px] text-muted-foreground">verified help</p></div>
               <Link to="/profile/$id" params={{ id: hero.user_id }} className="hidden rounded-xl border border-primary/20 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/10 md:inline-flex">Profile</Link>
               <button type="button" onClick={() => setExpandedBadge(badgeOpen ? null : hero.user_id)} className={`sm:hidden inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ${badge.className}`} aria-label={`${badge.label} badge information`}><BadgeCheck className="h-4 w-4" /></button>
               {badgeOpen && <div className="absolute right-3 top-[calc(100%+4px)] z-10 max-w-[230px] rounded-xl border border-border bg-card p-3 text-[11px] leading-4 text-muted-foreground shadow-lg sm:hidden">{badge.description}</div>}

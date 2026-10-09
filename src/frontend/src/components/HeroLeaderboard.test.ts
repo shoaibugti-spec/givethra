@@ -24,6 +24,9 @@ describe("Hero Ranking Leaderboard", () => {
     expect(componentSource).toContain("Highest amount");
     expect(componentSource).toContain('to="/profile/$id"');
     expect(componentSource).toContain("overflow-y-auto");
+    expect(componentSource).toContain("grid-cols-[auto,minmax(0,1fr),auto,auto]");
+    expect(componentSource).toContain("break-words font-bold");
+    expect(componentSource).toContain("whitespace-nowrap text-right");
     expect(homeSource).toContain('import HeroLeaderboard from "@/components/HeroLeaderboard";');
     expect(homeSource.indexOf("<HeroLeaderboard />")).toBeLessThan(homeSource.indexOf("<HeroesWall />"));
   });
