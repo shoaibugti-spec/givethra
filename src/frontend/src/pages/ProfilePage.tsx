@@ -69,6 +69,7 @@ import {
   followUser,
   unfollowUser,
   removeRequester,
+  supportPost,
 } from "@/lib/api";
 import {
   Tooltip,
@@ -176,6 +177,7 @@ export default function ProfilePage() {
   const [relationshipType, setRelationshipType] = useState<"heroes" | "requesters" | null>(null);
   const [relationshipUsers, setRelationshipUsers] = useState<any[]>([]);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
+  const [supportingPostId, setSupportingPostId] = useState<string | null>(null);
 
   const [requesterStats, setRequesterStats] = useState<RequesterStats>({
     totalSubmitted: 0,
@@ -329,6 +331,42 @@ export default function ProfilePage() {
       toast.error(error instanceof Error ? error.message : "Could not update Hero status");
     } finally {
       setHeroUpdating(false);
+    }
+  }
+
+  async function supportProfilePost(post: any) {
+    const postId = String(post?.id || "");
+    if (!postId || isOwnProfile || supportingPostId === postId || post?.supported_by_me) return;
+
+    const previousCount = Number(post?.support_count || 0);
+    setSupportingPostId(postId);
+    setProfile((current: any) => current ? {
+      ...current,
+      posts: (current.posts || []).map((item: any) => item.id === postId
+        ? { ...item, support_count: previousCount + 1, supported_by_me: true }
+        : item),
+    } : current);
+
+    try {
+      const result = await supportPost(postId);
+      const confirmedCount = Number(result?.support_count ?? previousCount + 1);
+      setProfile((current: any) => current ? {
+        ...current,
+        posts: (current.posts || []).map((item: any) => item.id === postId
+          ? { ...item, support_count: confirmedCount, supported_by_me: true }
+          : item),
+      } : current);
+      toast.success(result?.alreadySupported ? "You already supported this post." : "Support sent!");
+    } catch (error: any) {
+      setProfile((current: any) => current ? {
+        ...current,
+        posts: (current.posts || []).map((item: any) => item.id === postId
+          ? { ...item, support_count: previousCount, supported_by_me: false }
+          : item),
+      } : current);
+      toast.error(error?.message || "Failed to send Support.");
+    } finally {
+      setSupportingPostId(null);
     }
   }
 
@@ -744,12 +782,32 @@ export default function ProfilePage() {
               <span className="text-xs text-muted-foreground">{profile.posts.length} posts</span>
             </div>
             {profile.posts.map((post: any) => (
-              <article key={post.id} className="rounded-xl border border-border p-3">
+              <article key={post.id} className="rounded-xl border border-border p-3 space-y-3">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {post.is_pinned ? <Pin className="h-3 w-3 text-primary" /> : null}
                   <span>{post.is_pinned ? "Pinned" : "Community post"}</span>
                 </div>
                 <p className="mt-2 text-sm whitespace-pre-wrap">{post.message}</p>
+                <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                  <span className="text-xs text-muted-foreground">
+                    {Number(post.support_count || 0).toLocaleString()} Supports
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => supportProfilePost(post)}
+                    disabled={isOwnProfile || supportingPostId === String(post.id) || Boolean(post.supported_by_me)}
+                    aria-label={isOwnProfile ? "Your post" : post.supported_by_me ? "Supported" : "Support this post"}
+                    aria-pressed={Boolean(post.supported_by_me)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-60 ${
+                      post.supported_by_me
+                        ? "border-amber-500 bg-amber-500 text-white"
+                        : "border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <HandCoins className="h-3.5 w-3.5" />
+                    {isOwnProfile ? "Your post" : post.supported_by_me ? "Supported" : supportingPostId === String(post.id) ? "Supporting..." : "Support"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>

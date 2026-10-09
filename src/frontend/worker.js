@@ -613,6 +613,30 @@ async function getEarningsSummary(env, userId) {
   return { ...profile, wallet_pkr: Number(wallet?.balance || 0), earnings_usd: Number(profile?.support_earnings_usd || 0), posts: rows.results || [], withdrawals: withdrawals.results || [], withdrawal_open: withdrawalWindow(), next_withdrawal_date: nextWithdrawalDate() };
 }
 
+async function getProfileCommunityPosts(env, profileUserId, viewerUserId = "") {
+  const posts = await env.DB.prepare(
+    `WITH support_counts AS (
+       SELECT post_id, COUNT(*) AS support_count,
+         MAX(CASE WHEN source_user_id = ? THEN 1 ELSE 0 END) AS supported_by_me
+       FROM user_supports
+       GROUP BY post_id
+     )
+     SELECT cp.*, COALESCE(sc.support_count, 0) AS support_count,
+       COALESCE(sc.supported_by_me, 0) AS supported_by_me
+     FROM community_posts cp
+     LEFT JOIN support_counts sc ON sc.post_id = cp.id
+     WHERE cp.user_id = ?
+     ORDER BY cp.is_pinned DESC, cp.created_at DESC
+     LIMIT 100`
+  ).bind(viewerUserId, profileUserId).all();
+
+  return (posts.results || []).map((post) => ({
+    ...post,
+    support_count: Number(post.support_count || 0),
+    supported_by_me: Boolean(post.supported_by_me),
+  }));
+}
+
 async function handleProfile(request, env, user, parts, origin) {
   const userId = String(parts[2] || user.user_id || "");
   if (!userId || (request.method !== "GET" && !canAccessUser(user, userId))) return json({ error: "Forbidden" }, 403, origin);
@@ -625,22 +649,22 @@ async function handleProfile(request, env, user, parts, origin) {
       const variant = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
       if (variant) {
         const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
-        const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
+        const posts = await getProfileCommunityPosts(env, userId, user?.user_id || "");
         const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
         const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
         const profileData = user?.user_id === userId ? variant : withoutPrivateContact(variant);
-        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts:posts.results||[] }, 200, origin);
+        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts }, 200, origin);
       }
     } catch { /* migration is additive; use legacy profile until applied */ }
     const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
     const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
-    const posts = await env.DB.prepare("SELECT * FROM community_posts WHERE user_id=? ORDER BY is_pinned DESC, created_at DESC LIMIT 100").bind(userId).all();
+    const posts = await getProfileCommunityPosts(env, userId, user?.user_id || "");
     const activeCase = profileRole === "requester" ? await env.DB.prepare("SELECT * FROM case_submissions WHERE user_id=? AND lower(COALESCE(status,'')) IN ('approved','open','in_progress') ORDER BY submitted_at DESC LIMIT 1").bind(userId).first() : null;
     const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
     const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
     const profileData = user?.user_id === userId ? (profile || {}) : withoutPrivateContact(profile || {});
     const safeCase = user?.user_id === userId ? activeCase : withoutPrivateContact(activeCase);
-    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts:posts.results||[], active_case:safeCase||null }, 200, origin);
+    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts, active_case:safeCase||null }, 200, origin);
   }
   if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
   const body = await readJson(request);
