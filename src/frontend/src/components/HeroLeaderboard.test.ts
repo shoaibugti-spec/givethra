@@ -13,12 +13,17 @@ describe("Hero Ranking Leaderboard", () => {
     expect(workerSource).toContain("admin_confirmed");
     expect(workerSource).toContain("COUNT(DISTINCT r.case_id)");
     expect(workerSource).toContain("SUM(COALESCE(r.amount_paid, 0))");
+    expect(workerSource).toContain("direct_help_count");
+    expect(workerSource).toContain("contribution_count");
   });
 
   it("renders the requested tier filters, amount/case sorting, badge info, and profile links", () => {
     expect(componentSource).toContain("Super Hero");
+    expect(componentSource).toContain("Newborn Hero");
     expect(componentSource).toContain("Young Hero");
-    expect(componentSource).toContain("New Hero");
+    expect(componentSource).not.toContain('label: "New Hero"');
+    expect(componentSource).toContain("direct_help_count");
+    expect(componentSource).toContain("contribution_count");
     expect(componentSource).toContain("Top 100 Heroes");
     expect(componentSource).toContain("Most cases");
     expect(componentSource).toContain("Highest amount");

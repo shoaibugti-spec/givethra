@@ -1062,6 +1062,8 @@ async function handleHeroLeaderboard(request, env, origin) {
             COALESCE(NULLIF(u.avatar_url, ''), NULLIF(p.avatar_url, '')) AS avatar_url,
             COUNT(DISTINCT r.case_id) AS cases_helped,
             COALESCE(SUM(COALESCE(r.amount_paid, 0)), 0) AS total_amount,
+            COUNT(DISTINCT CASE WHEN lower(COALESCE(r.paid_to, '')) <> 'givethra' THEN r.case_id END) AS direct_help_count,
+            COUNT(DISTINCT CASE WHEN lower(COALESCE(r.paid_to, '')) = 'givethra' THEN r.case_id END) AS contribution_count,
             COALESCE(MAX(r.completed_at), MAX(r.admin_confirmed_at), MAX(r.submitted_at)) AS last_helped_at
      FROM case_resolutions r
      LEFT JOIN users u ON u.user_id = r.hero_id
@@ -1080,6 +1082,8 @@ async function handleHeroLeaderboard(request, env, origin) {
     rank: index + 1,
     cases_helped: Number(row.cases_helped || 0),
     total_amount: Number(row.total_amount || 0),
+    direct_help_count: Number(row.direct_help_count || 0),
+    contribution_count: Number(row.contribution_count || 0),
   })), 200, origin);
 }
 
