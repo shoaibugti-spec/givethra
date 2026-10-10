@@ -17,7 +17,7 @@ describe("Hero Ranking Leaderboard", () => {
     expect(workerSource).toContain("contribution_count");
   });
 
-  it("renders the requested tier filters, amount/case sorting, badge info, and profile links", () => {
+  it("renders the requested tier filters, badge info, and profile links without sorting controls", () => {
     expect(componentSource).toContain("Super Hero");
     expect(componentSource).toContain("Newborn Hero");
     expect(componentSource).toContain("Young Hero");
@@ -27,8 +27,10 @@ describe("Hero Ranking Leaderboard", () => {
     expect(componentSource).toContain("activeTab");
     expect(componentSource).toContain("topFour");
     expect(componentSource).toContain("remainingHeroes");
-    expect(componentSource).toContain("Most cases");
-    expect(componentSource).toContain("Highest amount");
+    expect(componentSource).not.toContain("Most cases");
+    expect(componentSource).not.toContain("Highest amount");
+    expect(componentSource).not.toContain("ArrowDown");
+    expect(componentSource).not.toContain("ArrowUp");
     expect(componentSource).toContain('to="/profile/$id"');
     expect(componentSource).toContain("BADGES[getBadge(hero)].label");
     expect(homeSource).toContain('import HeroLeaderboard from "@/components/HeroLeaderboard";');

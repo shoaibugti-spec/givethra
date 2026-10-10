@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Award, BadgeCheck, Crown, Medal, Sparkles, Trophy, Users } from "lucide-react";
+import { Award, BadgeCheck, Crown, Medal, Sparkles, Trophy, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { getHeroLeaderboard } from "@/lib/api";
 
@@ -14,7 +14,6 @@ type LeaderboardHero = {
 };
 
 type BadgeKey = "all" | "super" | "hero" | "young" | "new";
-type SortKey = "cases" | "amount";
 
 const BADGES: Record<Exclude<BadgeKey, "all">, { label: string; description: string; icon: typeof Crown; className: string }> = {
   super: {
@@ -59,8 +58,6 @@ function initials(name: string) {
 export default function HeroLeaderboard() {
   const [heroes, setHeroes] = useState<LeaderboardHero[]>([]);
   const [filter, setFilter] = useState<BadgeKey>("all");
-  const [sortKey, setSortKey] = useState<SortKey>("cases");
-  const [ascending, setAscending] = useState(false);
   const [expandedBadge, setExpandedBadge] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -87,12 +84,12 @@ export default function HeroLeaderboard() {
   const visibleHeroes = useMemo(() => {
     const filtered = heroes.filter((hero) => filter === "all" || getBadge(hero) === filter);
     return [...filtered].sort((a, b) => {
-      const aValue = sortKey === "cases" ? Number(a.cases_helped || 0) : Number(a.total_amount || 0);
-      const bValue = sortKey === "cases" ? Number(b.cases_helped || 0) : Number(b.total_amount || 0);
-      if (aValue !== bValue) return ascending ? aValue - bValue : bValue - aValue;
+      const aValue = Number(a.cases_helped || 0);
+      const bValue = Number(b.cases_helped || 0);
+      if (aValue !== bValue) return bValue - aValue;
       return Number(b.cases_helped || 0) - Number(a.cases_helped || 0);
     });
-  }, [ascending, filter, heroes, sortKey]);
+  }, [filter, heroes]);
 
   const topFour = visibleHeroes.slice(0, 4);
   const remainingHeroes = visibleHeroes.slice(4);
@@ -125,15 +122,6 @@ export default function HeroLeaderboard() {
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Sorting Controls */}
-        <div className="px-4 sm:px-6 mb-4 flex justify-end gap-3 max-w-4xl w-full mx-auto">
-          <button type="button" onClick={() => setSortKey("cases")} className={`text-xs font-bold transition-colors ${sortKey === "cases" ? "text-teal-400" : "text-gray-500 hover:text-gray-300"}`}>Most cases</button>
-          <button type="button" onClick={() => setSortKey("amount")} className={`text-xs font-bold transition-colors ${sortKey === "amount" ? "text-teal-400" : "text-gray-500 hover:text-gray-300"}`}>Highest amount</button>
-          <button type="button" onClick={() => setAscending((value) => !value)} className="text-gray-400 hover:text-white transition-colors">
-            {ascending ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-          </button>
         </div>
 
         {/* Content Area */}
