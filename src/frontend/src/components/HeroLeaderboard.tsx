@@ -21,25 +21,25 @@ const BADGES: Record<Exclude<BadgeKey, "all">, { label: string; description: str
     label: "Super Hero",
     description: "You have unlocked, contributed, and provided direct help. You are the ultimate Hero!",
     icon: Crown,
-    className: "bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-800",
+    className: "bg-amber-500/20 text-amber-400 ring-amber-500/30",
   },
   hero: {
     label: "Hero",
     description: "You paid directly for someone's need. You are a true Hero!",
     icon: Award,
-    className: "bg-violet-100 text-violet-700 ring-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:ring-violet-800",
+    className: "bg-cyan-500/20 text-cyan-400 ring-cyan-500/30",
   },
   young: {
     label: "Young Hero",
     description: "You contributed to a fundraising pool. Every contribution counts!",
     icon: Sparkles,
-    className: "bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-800",
+    className: "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30",
   },
   new: {
     label: "Newborn Hero",
     description: "You unlocked a case but did not complete a payment. Take the next step!",
     icon: Sparkles,
-    className: "bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-800",
+    className: "bg-purple-500/20 text-purple-400 ring-purple-500/30",
   },
 };
 
@@ -56,13 +56,6 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "GH";
 }
 
-function rankIcon(rank: number) {
-  if (rank === 1) return <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 to-amber-500 text-amber-900 shadow-sm ring-2 ring-amber-300/70"><Crown className="h-4 w-4" fill="currentColor" /><span className="absolute -bottom-1 rounded-full bg-amber-700 px-1 text-[8px] font-black leading-3 text-white">1</span></span>;
-  if (rank === 2) return <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-400 text-slate-700 shadow-sm ring-2 ring-slate-300/70"><Medal className="h-4 w-4" /><span className="absolute -bottom-1 rounded-full bg-slate-600 px-1 text-[8px] font-black leading-3 text-white">2</span></span>;
-  if (rank === 3) return <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-orange-200 to-orange-500 text-orange-900 shadow-sm ring-2 ring-orange-300/70"><Medal className="h-4 w-4" /><span className="absolute -bottom-1 rounded-full bg-orange-700 px-1 text-[8px] font-black leading-3 text-white">3</span></span>;
-  return <span className="text-sm font-black text-muted-foreground">#{rank}</span>;
-}
-
 export default function HeroLeaderboard() {
   const [heroes, setHeroes] = useState<LeaderboardHero[]>([]);
   const [filter, setFilter] = useState<BadgeKey>("all");
@@ -71,6 +64,8 @@ export default function HeroLeaderboard() {
   const [expandedBadge, setExpandedBadge] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [activeTab, setActiveTab] = useState<'region' | 'internal' | 'global'>('region');
 
   useEffect(() => {
     let cancelled = false;
@@ -99,64 +94,198 @@ export default function HeroLeaderboard() {
     });
   }, [ascending, filter, heroes, sortKey]);
 
+  const topFour = visibleHeroes.slice(0, 4);
+  const remainingHeroes = visibleHeroes.slice(4);
+
   return (
-    <section aria-labelledby="hero-leaderboard-title" className="bg-background px-4 py-8 sm:py-10">
-      <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl border border-primary/15 bg-card shadow-[0_18px_60px_-30px_rgba(13,148,136,0.45)]">
-        <div className="border-b border-border bg-gradient-to-br from-primary/10 via-card to-amber-50/70 px-5 py-6 dark:to-amber-950/20 sm:px-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-primary"><Trophy className="h-4 w-4" /> Community recognition</p>
-              <h2 id="hero-leaderboard-title" className="mt-2 font-display text-2xl font-black tracking-tight sm:text-3xl">Hero Ranking Leaderboard</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Celebrating the people turning verified help into real impact. Rankings are based on approved, Givethra-confirmed help.</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-primary/15 bg-background/70 px-3 py-2 text-xs font-semibold text-muted-foreground">
-              <Users className="h-4 w-4 text-primary" /> Top 100 Heroes
-            </div>
-          </div>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-2" aria-label="Hero badge filters">
-              {(["all", "super", "hero", "young", "new"] as BadgeKey[]).map((key) => {
-                const label = key === "all" ? "All Heroes" : BADGES[key].label;
-                return <button key={key} type="button" onClick={() => setFilter(key)} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${filter === key ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"}`}>{label}</button>;
-              })}
-            </div>
-            <button type="button" onClick={() => setAscending((value) => !value)} className="inline-flex items-center gap-2 self-start rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground sm:self-auto" aria-label={`Sort ${ascending ? "highest" : "lowest"} first`}>
-              {sortKey === "cases" ? "Cases helped" : "Help amount"}
-              {ascending ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-            </button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2" aria-label="Leaderboard sorting">
-            {(["cases", "amount"] as SortKey[]).map((key) => <button key={key} type="button" onClick={() => setSortKey(key)} className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${sortKey === key ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}>{key === "cases" ? "Most cases" : "Highest amount"} {sortKey === key ? <ArrowUpDown className="h-3 w-3" /> : null}</button>)}
+    <section className="bg-[#0B121F] text-white min-h-screen flex justify-center py-6 sm:py-10 px-0 sm:px-4">
+      <div className="w-full max-w-4xl flex flex-col bg-[#0B121F]">
+
+        {/* Header Section */}
+        <div className="text-center px-4 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 drop-shadow-sm">
+            Givethra Heroes
+          </h1>
+        </div>
+
+        {/* Top Toggles (Region, Internal, Global) */}
+        <div className="px-4 sm:px-6 mb-6">
+          <div className="flex bg-[#151F32] p-1 rounded-xl border border-slate-800/60 max-w-md mx-auto">
+            {(['region', 'internal', 'global'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all capitalize ${
+                  activeTab === tab
+                    ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                {tab === 'region' ? 'Region' : tab === 'internal' ? 'Internal' : 'Global'}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="max-h-[360px] overflow-y-auto p-2 sm:max-h-[620px] sm:p-5" aria-live="polite">
-          {loading && <div className="grid gap-3">{[1, 2, 3, 4].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-muted" />)}</div>}
-          {!loading && error && <div className="rounded-2xl bg-muted/50 p-6 text-center text-sm text-muted-foreground">{error}</div>}
-          {!loading && !error && !visibleHeroes.length && <div className="rounded-2xl bg-muted/50 p-6 text-center text-sm text-muted-foreground">Verified Hero rankings will appear here after approved help is confirmed.</div>}
-          {!loading && !error && visibleHeroes.length > 0 && <div className="space-y-2">{visibleHeroes.map((hero, index) => {
-            const rank = index + 1;
-            const badgeKey = getBadge(hero);
-            const badge = BADGES[badgeKey];
-            const BadgeIcon = badge.icon;
-            const name = hero.full_name || "Givethra Hero";
-            const badgeOpen = expandedBadge === hero.user_id;
-            return <div key={hero.user_id} className={`relative flex min-h-[58px] items-center gap-2 rounded-xl border px-2.5 py-2 transition-all hover:border-primary/35 hover:shadow-sm sm:gap-4 sm:rounded-2xl sm:p-4 ${rank <= 3 ? "border-primary/20 bg-primary/[0.035]" : "border-border bg-background"}`}>
-              <div className="flex w-7 shrink-0 items-center justify-center sm:w-10">{rankIcon(rank)}</div>
-              <Link to="/profile/$id" params={{ id: hero.user_id }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-primary/10 ring-1 ring-border sm:h-12 sm:w-12 sm:rounded-2xl">{hero.avatar_url ? <img src={hero.avatar_url} alt={name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center text-xs font-black text-primary sm:text-sm">{initials(name)}</div>}</div>
-                <div className="min-w-0"><p className="whitespace-nowrap text-xs font-bold leading-4 text-foreground hover:text-primary sm:text-base sm:leading-5" title={name}>{name}</p><p className="mt-0.5 whitespace-nowrap text-[10px] text-muted-foreground sm:text-xs">{Number(hero.cases_helped || 0)} {Number(hero.cases_helped || 0) === 1 ? "case" : "cases"} helped</p></div>
-              </Link>
-              <div className="hidden items-center gap-2 sm:flex">
-                <button type="button" onClick={() => setExpandedBadge(badgeOpen ? null : hero.user_id)} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-black ring-1 ${badge.className}`} aria-label={`${badge.label} badge information`} title={badge.description}><BadgeIcon className="h-3.5 w-3.5" /> {badge.label}</button>
-                {badgeOpen && <span className="max-w-[190px] text-[10px] leading-4 text-muted-foreground">{badge.description}</span>}
+        {/* Sorting Controls */}
+        <div className="px-4 sm:px-6 mb-4 flex justify-end gap-3 max-w-4xl w-full mx-auto">
+          <button type="button" onClick={() => setSortKey("cases")} className={`text-xs font-bold transition-colors ${sortKey === "cases" ? "text-teal-400" : "text-gray-500 hover:text-gray-300"}`}>Most cases</button>
+          <button type="button" onClick={() => setSortKey("amount")} className={`text-xs font-bold transition-colors ${sortKey === "amount" ? "text-teal-400" : "text-gray-500 hover:text-gray-300"}`}>Highest amount</button>
+          <button type="button" onClick={() => setAscending((value) => !value)} className="text-gray-400 hover:text-white transition-colors">
+            {ascending ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 w-full max-w-4xl mx-auto">
+          {loading && (
+            <div className="grid gap-3 px-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-slate-800/50" />)}</div>
+          )}
+
+          {!loading && error && <div className="rounded-2xl bg-slate-800/50 p-6 text-center text-sm text-gray-400 mx-4">{error}</div>}
+
+          {!loading && !error && !visibleHeroes.length && <div className="rounded-2xl bg-slate-800/50 p-6 text-center text-sm text-gray-400 mx-4">Verified Hero rankings will appear here after approved help is confirmed.</div>}
+
+          {!loading && !error && visibleHeroes.length > 0 && (
+            <div className="space-y-6">
+
+              {/* 🏆 ڈائمنڈ پوڈیم (1st, 2nd, 3rd, 4th) - اب کراؤن، بیج اور سائز کے ساتھ */}
+              <div className="relative pt-6 pb-4 px-2 sm:px-6">
+                <div className="grid grid-cols-3 gap-1 sm:gap-4 max-w-2xl mx-auto">
+
+                  {/* 1st Place - Center Top (Largest Size + Crown) */}
+                  {topFour[0] && (
+                    <div className="col-start-2 flex flex-col items-center z-20">
+                      <Link to="/profile/$id" params={{ id: topFour[0].user_id }} className="flex flex-col items-center group w-full">
+                        <span className="text-2xl mb-0.5 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]">👑</span>
+                        <span className="text-amber-400 font-bold text-xs mb-1 drop-shadow-md">1st</span>
+                        <div className="h-16 w-16 sm:h-24 sm:w-24 rounded-full overflow-hidden ring-4 ring-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.3)] group-hover:scale-105 transition-transform">
+                          {topFour[0].avatar_url ? <img src={topFour[0].avatar_url} alt={topFour[0].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-amber-900/50 text-amber-400 font-black text-lg">{initials(topFour[0].full_name || "Hero")}</div>}
+                        </div>
+                        <p className="mt-2 text-xs sm:text-sm font-black text-center truncate w-full text-white">{topFour[0].full_name || "Givethra Hero"}</p>
+
+                        {/* Badge Below Name */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[0])].className}`}>
+                          {(() => { const Icon = BADGES[getBadge(topFour[0])].icon; return <Icon className="h-3 w-3" />; })()}
+                          {BADGES[getBadge(topFour[0])].label}
+                        </span>
+
+                        <p className="text-[10px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[0].cases_helped || 0} Cases helped</p>
+                        <p className="text-[10px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[0].total_amount || 0).toLocaleString()}</p>
+                      </Link>
+                    </div>
+                  )}
+
+                  {/* 2nd Place - Left (Normal Size) */}
+                  {topFour[1] && (
+                    <div className="col-start-1 row-start-2 flex flex-col items-center mt-[-10px] sm:mt-[-20px] z-10">
+                      <Link to="/profile/$id" params={{ id: topFour[1].user_id }} className="flex flex-col items-center group w-full">
+                        <span className="text-cyan-400 font-bold text-xs mb-1 drop-shadow-md">2nd</span>
+                        <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-full overflow-hidden ring-4 ring-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.3)] group-hover:scale-105 transition-transform">
+                          {topFour[1].avatar_url ? <img src={topFour[1].avatar_url} alt={topFour[1].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-cyan-900/50 text-cyan-400 font-black text-sm">{initials(topFour[1].full_name || "Hero")}</div>}
+                        </div>
+                        <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[1].full_name || "Givethra Hero"}</p>
+
+                        {/* Badge Below Name */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[1])].className}`}>
+                          {(() => { const Icon = BADGES[getBadge(topFour[1])].icon; return <Icon className="h-3 w-3" />; })()}
+                          {BADGES[getBadge(topFour[1])].label}
+                        </span>
+
+                        <p className="text-[9px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[1].cases_helped || 0} Cases</p>
+                        <p className="text-[9px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[1].total_amount || 0).toLocaleString()}</p>
+                      </Link>
+                    </div>
+                  )}
+
+                  {/* 3rd Place - Right (Normal Size) */}
+                  {topFour[2] && (
+                    <div className="col-start-3 row-start-2 flex flex-col items-center mt-[-10px] sm:mt-[-20px] z-10">
+                      <Link to="/profile/$id" params={{ id: topFour[2].user_id }} className="flex flex-col items-center group w-full">
+                        <span className="text-emerald-400 font-bold text-xs mb-1 drop-shadow-md">3rd</span>
+                        <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-full overflow-hidden ring-4 ring-emerald-400/50 shadow-[0_0_15px_rgba(52,211,153,0.3)] group-hover:scale-105 transition-transform">
+                          {topFour[2].avatar_url ? <img src={topFour[2].avatar_url} alt={topFour[2].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-emerald-900/50 text-emerald-400 font-black text-sm">{initials(topFour[2].full_name || "Hero")}</div>}
+                        </div>
+                        <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[2].full_name || "Givethra Hero"}</p>
+
+                        {/* Badge Below Name */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[2])].className}`}>
+                          {(() => { const Icon = BADGES[getBadge(topFour[2])].icon; return <Icon className="h-3 w-3" />; })()}
+                          {BADGES[getBadge(topFour[2])].label}
+                        </span>
+
+                        <p className="text-[9px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[2].cases_helped || 0} Cases</p>
+                        <p className="text-[9px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[2].total_amount || 0).toLocaleString()}</p>
+                      </Link>
+                    </div>
+                  )}
+
+                  {/* 4th Place - Bottom Center (Slightly Smaller Size) */}
+                  {topFour[3] && (
+                    <div className="col-start-2 row-start-3 flex flex-col items-center mt-[-10px] sm:mt-[-15px] z-0">
+                      <Link to="/profile/$id" params={{ id: topFour[3].user_id }} className="flex flex-col items-center group w-full">
+                        <span className="text-purple-400 font-bold text-xs mb-1 drop-shadow-md">4th</span>
+                        <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full overflow-hidden ring-4 ring-purple-400/50 shadow-[0_0_15px_rgba(192,132,252,0.3)] group-hover:scale-105 transition-transform">
+                          {topFour[3].avatar_url ? <img src={topFour[3].avatar_url} alt={topFour[3].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-purple-900/50 text-purple-400 font-black text-xs">{initials(topFour[3].full_name || "Hero")}</div>}
+                        </div>
+                        <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[3].full_name || "Givethra Hero"}</p>
+
+                        {/* Badge Below Name */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[3])].className}`}>
+                          {(() => { const Icon = BADGES[getBadge(topFour[3])].icon; return <Icon className="h-3 w-3" />; })()}
+                          {BADGES[getBadge(topFour[3])].label}
+                        </span>
+
+                        <p className="text-[9px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[3].cases_helped || 0} Case</p>
+                        <p className="text-[9px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[3].total_amount || 0).toLocaleString()}</p>
+                      </Link>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="shrink-0 whitespace-nowrap text-right"><p className="text-[11px] font-black text-teal-600 sm:text-sm">Rs {Number(hero.total_amount || 0).toLocaleString()}</p><p className="text-[9px] text-muted-foreground sm:text-[10px]">verified help</p></div>
-              <Link to="/profile/$id" params={{ id: hero.user_id }} className="hidden rounded-xl border border-primary/20 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/10 md:inline-flex">Profile</Link>
-              <button type="button" onClick={() => setExpandedBadge(badgeOpen ? null : hero.user_id)} className={`inline-flex max-w-[86px] shrink-0 items-center justify-center gap-1 rounded-full px-2 py-1 text-[9px] font-black leading-3 ring-1 sm:hidden ${badge.className}`} aria-label={`${badge.label} badge information`}><BadgeCheck className="h-3 w-3" /><span className="truncate">{badge.label}</span></button>
-              {badgeOpen && <div className="absolute right-3 top-[calc(100%+4px)] z-10 max-w-[230px] rounded-xl border border-border bg-card p-3 text-[11px] leading-4 text-muted-foreground shadow-lg sm:hidden">{badge.description}</div>}
-            </div>;
-          })}</div>}
+
+              {/* 📋 Rank 5 to 100 - Clean Dark Mode List */}
+              <div className="mt-4 border-t border-slate-800/80">
+                {remainingHeroes.map((hero, index) => {
+                  const actualRank = index + 5;
+                  const name = hero.full_name || "Givethra Hero";
+                  const rowBg = actualRank % 2 === 0 ? "bg-[#111929]" : "bg-[#0B121F]";
+
+                  return (
+                    <div key={hero.user_id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 sm:p-4 border-b border-slate-800/50 transition-colors hover:bg-slate-800/30 ${rowBg}`}>
+
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="flex w-8 shrink-0 items-center justify-center text-sm font-black text-gray-400">
+                          {actualRank}
+                        </div>
+                        <Link to="/profile/$id" params={{ id: hero.user_id }} className="h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-slate-700 block">
+                          {hero.avatar_url ? <img src={hero.avatar_url} alt={name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center bg-slate-800 text-xs font-black text-gray-300">{initials(name)}</div>}
+                        </Link>
+                        <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <Link to="/profile/$id" params={{ id: hero.user_id }} className="truncate text-sm font-bold text-white hover:text-teal-400 transition-colors">{name}</Link>
+                          <span className={`inline-flex w-max items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ${BADGES[getBadge(hero)].className}`}>
+                            {(() => { const Icon = BADGES[getBadge(hero)].icon; return <Icon className="h-3 w-3" />; })()}
+                            {BADGES[getBadge(hero)].label}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-6 pl-11 sm:pl-0 border-t border-slate-800/50 sm:border-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
+                        <div className="text-left sm:text-right">
+                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Help</p>
+                          <p className="text-xs font-bold text-gray-300">{hero.cases_helped || 0} Helps</p>
+                        </div>
+                        <div className="text-right min-w-[80px]">
+                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Amount</p>
+                          <p className="text-xs sm:text-sm font-black text-teal-400">Rs {Number(hero.total_amount || 0).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
