@@ -63,7 +63,6 @@ export default function HeroLeaderboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
-  // نیا اسٹیٹ ریجن، انٹرنل، گلوبل کے لیے
   const [activeTab, setActiveTab] = useState<'region' | 'internal' | 'global'>('region');
 
   useEffect(() => {
@@ -107,7 +106,7 @@ export default function HeroLeaderboard() {
           </h1>
         </div>
 
-        {/* 🔥 نیا ٹیب سیکشن (ریجن، انٹرنل، گلوبل) - ایکٹو ٹیب کا رنگ تبدیل ہو گا */}
+        {/* Top Toggles (Region, Internal, Global) */}
         <div className="px-4 sm:px-6 mb-6">
           <div className="flex bg-[#151F32] p-1 rounded-xl border border-slate-800/60 max-w-md mx-auto">
             {(['region', 'internal', 'global'] as const).map((tab) => (
@@ -148,64 +147,93 @@ export default function HeroLeaderboard() {
           {!loading && !error && visibleHeroes.length > 0 && (
             <div className="space-y-6">
               
-              {/* 🏆 ڈائمنڈ پوڈیم (1st, 2nd, 3rd, 4th سرکل کے اوپر) */}
+              {/* 🏆 ڈائمنڈ پوڈیم (1st, 2nd, 3rd, 4th) - اب کراؤن، بیج اور سائز کے ساتھ */}
               <div className="relative pt-6 pb-4 px-2 sm:px-6">
                 <div className="grid grid-cols-3 gap-1 sm:gap-4 max-w-2xl mx-auto">
                   
-                  {/* 1st Place - Center Top */}
+                  {/* 1st Place - Center Top (Largest Size + Crown) */}
                   {topFour[0] && (
                     <div className="col-start-2 flex flex-col items-center z-20">
                       <Link to="/profile/$id" params={{ id: topFour[0].user_id }} className="flex flex-col items-center group w-full">
+                        <span className="text-2xl mb-0.5 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]">👑</span>
                         <span className="text-amber-400 font-bold text-xs mb-1 drop-shadow-md">1st</span>
-                        <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-full overflow-hidden ring-4 ring-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.3)] group-hover:scale-105 transition-transform">
+                        <div className="h-16 w-16 sm:h-24 sm:w-24 rounded-full overflow-hidden ring-4 ring-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.3)] group-hover:scale-105 transition-transform">
                           {topFour[0].avatar_url ? <img src={topFour[0].avatar_url} alt={topFour[0].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-amber-900/50 text-amber-400 font-black text-lg">{initials(topFour[0].full_name || "Hero")}</div>}
                         </div>
                         <p className="mt-2 text-xs sm:text-sm font-black text-center truncate w-full text-white">{topFour[0].full_name || "Givethra Hero"}</p>
+                        
+                        {/* Badge Below Name */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[0])].className}`}>
+                          {(() => { const Icon = BADGES[getBadge(topFour[0])].icon; return <Icon className="h-3 w-3" />; })()}
+                          {BADGES[getBadge(topFour[0])].label}
+                        </span>
+
                         <p className="text-[10px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[0].cases_helped || 0} Cases helped</p>
                         <p className="text-[10px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[0].total_amount || 0).toLocaleString()}</p>
                       </Link>
                     </div>
                   )}
 
-                  {/* 2nd Place - Left */}
+                  {/* 2nd Place - Left (Normal Size) */}
                   {topFour[1] && (
                     <div className="col-start-1 row-start-2 flex flex-col items-center mt-[-10px] sm:mt-[-20px] z-10">
                       <Link to="/profile/$id" params={{ id: topFour[1].user_id }} className="flex flex-col items-center group w-full">
                         <span className="text-cyan-400 font-bold text-xs mb-1 drop-shadow-md">2nd</span>
-                        <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full overflow-hidden ring-4 ring-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.3)] group-hover:scale-105 transition-transform">
+                        <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-full overflow-hidden ring-4 ring-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.3)] group-hover:scale-105 transition-transform">
                           {topFour[1].avatar_url ? <img src={topFour[1].avatar_url} alt={topFour[1].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-cyan-900/50 text-cyan-400 font-black text-sm">{initials(topFour[1].full_name || "Hero")}</div>}
                         </div>
                         <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[1].full_name || "Givethra Hero"}</p>
+                        
+                        {/* Badge Below Name */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[1])].className}`}>
+                          {(() => { const Icon = BADGES[getBadge(topFour[1])].icon; return <Icon className="h-3 w-3" />; })()}
+                          {BADGES[getBadge(topFour[1])].label}
+                        </span>
+
                         <p className="text-[9px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[1].cases_helped || 0} Cases</p>
                         <p className="text-[9px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[1].total_amount || 0).toLocaleString()}</p>
                       </Link>
                     </div>
                   )}
 
-                  {/* 3rd Place - Right */}
+                  {/* 3rd Place - Right (Normal Size) */}
                   {topFour[2] && (
                     <div className="col-start-3 row-start-2 flex flex-col items-center mt-[-10px] sm:mt-[-20px] z-10">
                       <Link to="/profile/$id" params={{ id: topFour[2].user_id }} className="flex flex-col items-center group w-full">
                         <span className="text-emerald-400 font-bold text-xs mb-1 drop-shadow-md">3rd</span>
-                        <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full overflow-hidden ring-4 ring-emerald-400/50 shadow-[0_0_15px_rgba(52,211,153,0.3)] group-hover:scale-105 transition-transform">
+                        <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-full overflow-hidden ring-4 ring-emerald-400/50 shadow-[0_0_15px_rgba(52,211,153,0.3)] group-hover:scale-105 transition-transform">
                           {topFour[2].avatar_url ? <img src={topFour[2].avatar_url} alt={topFour[2].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-emerald-900/50 text-emerald-400 font-black text-sm">{initials(topFour[2].full_name || "Hero")}</div>}
                         </div>
                         <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[2].full_name || "Givethra Hero"}</p>
+                        
+                        {/* Badge Below Name */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[2])].className}`}>
+                          {(() => { const Icon = BADGES[getBadge(topFour[2])].icon; return <Icon className="h-3 w-3" />; })()}
+                          {BADGES[getBadge(topFour[2])].label}
+                        </span>
+
                         <p className="text-[9px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[2].cases_helped || 0} Cases</p>
                         <p className="text-[9px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[2].total_amount || 0).toLocaleString()}</p>
                       </Link>
                     </div>
                   )}
 
-                  {/* 4th Place - Bottom Center */}
+                  {/* 4th Place - Bottom Center (Slightly Smaller Size) */}
                   {topFour[3] && (
                     <div className="col-start-2 row-start-3 flex flex-col items-center mt-[-10px] sm:mt-[-15px] z-0">
                       <Link to="/profile/$id" params={{ id: topFour[3].user_id }} className="flex flex-col items-center group w-full">
                         <span className="text-purple-400 font-bold text-xs mb-1 drop-shadow-md">4th</span>
-                        <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-full overflow-hidden ring-4 ring-purple-400/50 shadow-[0_0_15px_rgba(192,132,252,0.3)] group-hover:scale-105 transition-transform">
+                        <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full overflow-hidden ring-4 ring-purple-400/50 shadow-[0_0_15px_rgba(192,132,252,0.3)] group-hover:scale-105 transition-transform">
                           {topFour[3].avatar_url ? <img src={topFour[3].avatar_url} alt={topFour[3].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-purple-900/50 text-purple-400 font-black text-xs">{initials(topFour[3].full_name || "Hero")}</div>}
                         </div>
                         <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[3].full_name || "Givethra Hero"}</p>
+                        
+                        {/* Badge Below Name */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[3])].className}`}>
+                          {(() => { const Icon = BADGES[getBadge(topFour[3])].icon; return <Icon className="h-3 w-3" />; })()}
+                          {BADGES[getBadge(topFour[3])].label}
+                        </span>
+
                         <p className="text-[9px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[3].cases_helped || 0} Case</p>
                         <p className="text-[9px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[3].total_amount || 0).toLocaleString()}</p>
                       </Link>
@@ -234,6 +262,7 @@ export default function HeroLeaderboard() {
                         <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                           <Link to="/profile/$id" params={{ id: hero.user_id }} className="truncate text-sm font-bold text-white hover:text-teal-400 transition-colors">{name}</Link>
                           <span className={`inline-flex w-max items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ${BADGES[getBadge(hero)].className}`}>
+                            {(() => { const Icon = BADGES[getBadge(hero)].icon; return <Icon className="h-3 w-3" />; })()}
                             {BADGES[getBadge(hero)].label}
                           </span>
                         </div>
