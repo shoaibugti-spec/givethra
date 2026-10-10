@@ -1797,11 +1797,11 @@ function KycCard({ kyc, onUpdate, dupCount }: any) {
         {kyc.cnic_front_url && <Img url={kyc.cnic_front_url} label="CNIC Front" />}
         {kyc.cnic_back_url && <Img url={kyc.cnic_back_url} label="CNIC Back" />}
         {kyc.selfie_url && <Img url={kyc.selfie_url} label="Selfie" />}
-        {kyc.passport_url && <a href={kyc.passport_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1"><FileText className="h-3 w-3" /> Passport</a>}
+        {kyc.passport_url && <a href={normalizeAdminMediaUrl(kyc.passport_url)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1"><FileText className="h-3 w-3" /> Passport</a>}
         {kyc.face_video_url && (
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground">Face Video</p>
-            <video src={kyc.face_video_url} controls className="w-full rounded border max-h-24" />
+            <video src={normalizeAdminMediaUrl(kyc.face_video_url)} controls preload="metadata" className="w-full rounded border max-h-32 bg-black" />
           </div>
         )}
       </div>
@@ -2754,10 +2754,27 @@ function DetailRow({ label, value, mono }: { label: string; value?: string; mono
   );
 }
 
+function normalizeAdminMediaUrl(rawUrl: string): string {
+  const url = String(rawUrl || "").trim();
+  if (!url) return "";
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.pathname === "/uploads" && parsed.searchParams.get("key")) {
+      const objectKey = parsed.searchParams.get("key") || "";
+      parsed.pathname = `/uploads/${objectKey}`;
+      parsed.search = "";
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 function Img({ url, label }: { url: string; label: string }) {
+  const normalizedUrl = normalizeAdminMediaUrl(url);
   let displayLabel = label;
   try {
-    const urlObj = new URL(url);
+    const urlObj = new URL(normalizedUrl);
     const key = urlObj.searchParams.get("key");
     if (key) {
       const parts = key.split("/");
@@ -2780,8 +2797,8 @@ function Img({ url, label }: { url: string; label: string }) {
       <p className="text-[10px] font-medium text-muted-foreground truncate" title={displayLabel}>
         📎 {displayLabel}
       </p>
-      <a href={url} target="_blank" rel="noopener noreferrer">
-        <img src={url} alt={displayLabel} className="w-full rounded border max-h-24 object-cover" />
+      <a href={normalizedUrl} target="_blank" rel="noopener noreferrer">
+        <img src={normalizedUrl} alt={displayLabel} className="w-full rounded border max-h-32 min-h-20 object-cover bg-muted" />
       </a>
     </div>
   );
