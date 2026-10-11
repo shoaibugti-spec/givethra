@@ -590,7 +590,7 @@ export default function HomePage() {
   const [unlockCount, setUnlockCount] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [homeMode, setHomeMode] = useState<"support" | "earning">(() => (localStorage.getItem("givethra_home_mode") === "earning" || localStorage.getItem("givethra_home_mode") === "wallet" ? "earning" : "support"));
+  const [homeMode, setHomeMode] = useState<"support" | "earning">(() => (window.location.pathname !== "/" && (localStorage.getItem("givethra_home_mode") === "earning" || localStorage.getItem("givethra_home_mode") === "wallet") ? "earning" : "support"));
   const [showWhatsAppWelcome, setShowWhatsAppWelcome] = useState(false);
   const whatsappWelcomeStorageKey = `givethra_whatsapp_welcome_last_seen:${user?.id ? `user:${user.id}` : "guest"}`;
 

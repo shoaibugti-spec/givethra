@@ -264,6 +264,14 @@ function RootLayout() {
     if (authRole === "help_seeker" && role !== "requester") setRole("requester");
   }, [authRole, role, setRole]);
 
+  // The public entry URL is always the main Home experience. Community and
+  // Earnings remain opt-in destinations and must never become the first view.
+  useEffect(() => {
+    if (location.pathname !== "/") return;
+    localStorage.setItem("givethra_home_mode", "support");
+    window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" }));
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!isAuthenticated || !user || isAdmin || location.pathname !== "/") return;
     let cancelled = false;

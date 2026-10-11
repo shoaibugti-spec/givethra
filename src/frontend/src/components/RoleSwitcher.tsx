@@ -9,7 +9,7 @@ export default function RoleSwitcher({ supportPostCount = 0 }: { supportPostCoun
   const navigate = useNavigate();
   const [switching, setSwitching] = useState(false);
   const [activeTab, setActiveTab] = useState<"support" | "earning">(() =>
-    typeof window !== "undefined" && (window.localStorage.getItem("givethra_home_mode") === "earning" || window.localStorage.getItem("givethra_home_mode") === "wallet") ? "earning" : "support"
+    typeof window !== "undefined" && window.location.pathname !== "/" && (window.localStorage.getItem("givethra_home_mode") === "earning" || window.localStorage.getItem("givethra_home_mode") === "wallet") ? "earning" : "support"
   );
 
   useEffect(() => {
