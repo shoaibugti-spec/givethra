@@ -8,6 +8,8 @@ describe("Admin KYC media previews", () => {
     expect(source).toContain("function normalizeAdminMediaUrl");
     expect(source).toContain('parsed.pathname === "/uploads"');
     expect(source).toContain("parsed.searchParams.get(\"key\")");
+    expect(source).toContain('parsed.pathname.startsWith("/uploads/")');
+    expect(source).toContain("parsed.host = window.location.host");
     expect(source).toContain("normalizeAdminMediaUrl(kyc.face_video_url)");
     expect(source).toContain("preload=\"metadata\"");
   });

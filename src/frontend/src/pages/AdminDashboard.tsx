@@ -2764,6 +2764,12 @@ function normalizeAdminMediaUrl(rawUrl: string): string {
       parsed.pathname = `/uploads/${objectKey}`;
       parsed.search = "";
     }
+    // Older KYC rows may retain http:// or an old Givethra host. Always
+    // serve first-party upload paths from the current HTTPS app origin.
+    if (parsed.pathname.startsWith("/uploads/")) {
+      parsed.protocol = window.location.protocol;
+      parsed.host = window.location.host;
+    }
     return parsed.toString();
   } catch {
     return url;
