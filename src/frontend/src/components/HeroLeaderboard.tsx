@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Award, BadgeCheck, Crown, Medal, Sparkles, Trophy, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { getHeroLeaderboard } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 
 type LeaderboardHero = {
   user_id: string;
@@ -148,7 +149,7 @@ export default function HeroLeaderboard() {
                         <span className="text-2xl mb-0.5 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]">👑</span>
                         <span className="text-amber-400 font-bold text-xs mb-1 drop-shadow-md">1st</span>
                         <div className="h-16 w-16 sm:h-24 sm:w-24 rounded-full overflow-hidden ring-4 ring-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.3)] group-hover:scale-105 transition-transform">
-                          {topFour[0].avatar_url ? <img src={topFour[0].avatar_url} alt={topFour[0].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-amber-900/50 text-amber-400 font-black text-lg">{initials(topFour[0].full_name || "Hero")}</div>}
+                          {topFour[0].avatar_url ? <img src={resolveMediaUrl(topFour[0].avatar_url)} alt={topFour[0].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-amber-900/50 text-amber-400 font-black text-lg">{initials(topFour[0].full_name || "Hero")}</div>}
                         </div>
                         <p className="mt-2 text-xs sm:text-sm font-black text-center truncate w-full text-white">{topFour[0].full_name || "Givethra Hero"}</p>
 
@@ -170,7 +171,7 @@ export default function HeroLeaderboard() {
                       <Link to="/profile/$id" params={{ id: topFour[1].user_id }} className="flex flex-col items-center group w-full">
                         <span className="text-cyan-400 font-bold text-xs mb-1 drop-shadow-md">2nd</span>
                         <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-full overflow-hidden ring-4 ring-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.3)] group-hover:scale-105 transition-transform">
-                          {topFour[1].avatar_url ? <img src={topFour[1].avatar_url} alt={topFour[1].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-cyan-900/50 text-cyan-400 font-black text-sm">{initials(topFour[1].full_name || "Hero")}</div>}
+                          {topFour[1].avatar_url ? <img src={resolveMediaUrl(topFour[1].avatar_url)} alt={topFour[1].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-cyan-900/50 text-cyan-400 font-black text-sm">{initials(topFour[1].full_name || "Hero")}</div>}
                         </div>
                         <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[1].full_name || "Givethra Hero"}</p>
 
@@ -192,7 +193,7 @@ export default function HeroLeaderboard() {
                       <Link to="/profile/$id" params={{ id: topFour[2].user_id }} className="flex flex-col items-center group w-full">
                         <span className="text-emerald-400 font-bold text-xs mb-1 drop-shadow-md">3rd</span>
                         <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-full overflow-hidden ring-4 ring-emerald-400/50 shadow-[0_0_15px_rgba(52,211,153,0.3)] group-hover:scale-105 transition-transform">
-                          {topFour[2].avatar_url ? <img src={topFour[2].avatar_url} alt={topFour[2].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-emerald-900/50 text-emerald-400 font-black text-sm">{initials(topFour[2].full_name || "Hero")}</div>}
+                          {topFour[2].avatar_url ? <img src={resolveMediaUrl(topFour[2].avatar_url)} alt={topFour[2].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-emerald-900/50 text-emerald-400 font-black text-sm">{initials(topFour[2].full_name || "Hero")}</div>}
                         </div>
                         <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[2].full_name || "Givethra Hero"}</p>
 
@@ -214,7 +215,7 @@ export default function HeroLeaderboard() {
                       <Link to="/profile/$id" params={{ id: topFour[3].user_id }} className="flex flex-col items-center group w-full">
                         <span className="text-purple-400 font-bold text-xs mb-1 drop-shadow-md">4th</span>
                         <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full overflow-hidden ring-4 ring-purple-400/50 shadow-[0_0_15px_rgba(192,132,252,0.3)] group-hover:scale-105 transition-transform">
-                          {topFour[3].avatar_url ? <img src={topFour[3].avatar_url} alt={topFour[3].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-purple-900/50 text-purple-400 font-black text-xs">{initials(topFour[3].full_name || "Hero")}</div>}
+                          {topFour[3].avatar_url ? <img src={resolveMediaUrl(topFour[3].avatar_url)} alt={topFour[3].full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-purple-900/50 text-purple-400 font-black text-xs">{initials(topFour[3].full_name || "Hero")}</div>}
                         </div>
                         <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[3].full_name || "Givethra Hero"}</p>
 
@@ -247,7 +248,7 @@ export default function HeroLeaderboard() {
                           {actualRank}
                         </div>
                         <Link to="/profile/$id" params={{ id: hero.user_id }} className="h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-slate-700 block">
-                          {hero.avatar_url ? <img src={hero.avatar_url} alt={name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center bg-slate-800 text-xs font-black text-gray-300">{initials(name)}</div>}
+                          {hero.avatar_url ? <img src={resolveMediaUrl(hero.avatar_url)} alt={name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center bg-slate-800 text-xs font-black text-gray-300">{initials(name)}</div>}
                         </Link>
                         <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                           <Link to="/profile/$id" params={{ id: hero.user_id }} className="truncate text-sm font-bold text-white hover:text-teal-400 transition-colors">{name}</Link>

@@ -853,6 +853,8 @@ function decodeCaseRow(row) {
       try { result[field] = JSON.parse(result[field]); } catch { /* preserve legacy plain strings */ }
     }
   }
+  result.selfie_url = result.selfie_url || result.selfie || result.selfieUrl || result.live_selfie_url || null;
+  result.avatar_url = result.avatar_url || result.profile_avatar_url || result.profile_picture || null;
   return result;
 }
 
@@ -1020,7 +1022,9 @@ async function handleHeroesWall(request, env, origin) {
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 100);
   const rows = await env.DB.prepare(
     `SELECT c.id, c.user_id, c.title, c.category, c.currency, c.amount_needed,
-            c.amount_collected, c.submitted_at AS updated_at,
+            c.amount_collected, c.selfie_url,
+            COALESCE(NULLIF(u.avatar_url, ''), NULLIF(p.avatar_url, '')) AS avatar_url,
+            c.submitted_at AS updated_at,
             COALESCE(
               NULLIF(c.amount_collected, 0),
               (SELECT SUM(COALESCE(r.amount_paid, 0)) FROM case_resolutions r
@@ -1038,6 +1042,8 @@ async function handleHeroesWall(request, env, origin) {
               c.submitted_at
             ) AS completed_at
      FROM case_submissions c
+     LEFT JOIN users u ON u.user_id = c.user_id
+     LEFT JOIN profiles p ON p.user_id = c.user_id
      WHERE lower(COALESCE(c.status, '')) = 'completed'
         OR EXISTS (
           SELECT 1 FROM case_resolutions r
@@ -1264,7 +1270,8 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
        comment_counts AS (SELECT post_id, COUNT(*) AS comments_count FROM community_post_comments GROUP BY post_id),
        repost_counts AS (SELECT repost_id, COUNT(*) AS repost_count FROM community_posts WHERE repost_id IS NOT NULL GROUP BY repost_id),
        support_counts AS (SELECT post_id, COUNT(*) AS support_count, MAX(CASE WHEN source_user_id = ? THEN 1 ELSE 0 END) AS supported_by_me FROM user_supports GROUP BY post_id)
-       SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, u.signed_up_at AS user_created_at, p.avatar_url,
+       SELECT cp.*, u.full_name AS user_name, u.kyc_status AS user_kyc_status, u.signed_up_at AS user_created_at,
+       COALESCE(NULLIF(p.avatar_url, ''), NULLIF(u.avatar_url, '')) AS avatar_url,
        COALESCE(lc.likes_count,0) AS likes_count, COALESCE(cc.comments_count,0) AS comments_count, COALESCE(lc.is_liked,0) AS is_liked,
        COALESCE(rc.repost_count,0) AS repost_count,
        COALESCE(sc.support_count,0) AS support_count, COALESCE(sc.supported_by_me,0) AS supported_by_me,
@@ -1669,11 +1676,30 @@ async function handleRequest(request, env, ctx) {
   if (parts[0] === "api" && parts[1] === "hero-leaderboard") {
     return handleHeroLeaderboard(request, env, origin);
   }
+  if (parts[0] === "api" && parts[1] === "user-search" && request.method === "GET") {
+    const query = String(url.searchParams.get("q") || "").trim().toLowerCase();
+    if (query.length < 2) return json([], 200, origin);
+    const pattern = `%${query}%`;
+    const rows = await env.DB.prepare(
+      `SELECT u.user_id,
+              COALESCE(NULLIF(p.full_name, ''), NULLIF(u.full_name, ''), 'Givethra member') AS full_name,
+              p.username,
+              COALESCE(NULLIF(p.avatar_url, ''), NULLIF(u.avatar_url, '')) AS avatar_url
+       FROM users u
+       LEFT JOIN profiles p ON p.user_id = u.user_id
+       WHERE lower(COALESCE(p.full_name, u.full_name, '')) LIKE ?
+          OR lower(COALESCE(p.username, '')) LIKE ?
+       ORDER BY CASE WHEN lower(COALESCE(p.username, '')) = ? THEN 0 ELSE 1 END,
+                lower(COALESCE(p.full_name, u.full_name, ''))
+       LIMIT 30`
+    ).bind(pattern, pattern, query).all();
+    return json(rows.results || [], 200, origin);
+  }
 
   if (parts[0] === "api" && parts[1] === "feedbacks" && request.method === "GET" && !url.searchParams.get("case_id") && !url.searchParams.get("user_id")) {
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 50), 1), 500);
     const rows = await env.DB.prepare(
-      "SELECT f.*, u.full_name as user_name, c.title as case_title, c.status as case_status FROM feedbacks f LEFT JOIN users u ON f.user_id = u.user_id LEFT JOIN case_submissions c ON c.id = f.case_id WHERE lower(COALESCE(c.status, '')) = 'completed' AND lower(COALESCE(f.status, '')) = 'approved' ORDER BY f.created_at DESC LIMIT ?"
+      "SELECT f.*, u.full_name as user_name, COALESCE(NULLIF(p.avatar_url, ''), NULLIF(u.avatar_url, '')) AS avatar_url, c.title as case_title, c.status as case_status FROM feedbacks f LEFT JOIN users u ON f.user_id = u.user_id LEFT JOIN profiles p ON p.user_id = f.user_id LEFT JOIN case_submissions c ON c.id = f.case_id WHERE lower(COALESCE(c.status, '')) = 'completed' AND lower(COALESCE(f.status, '')) = 'approved' ORDER BY f.created_at DESC LIMIT ?"
     ).bind(limit).all();
     return json(rows.results || [], 200, origin);
   }
