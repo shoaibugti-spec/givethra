@@ -809,9 +809,8 @@ export async function adminUpdateKyc(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
-
 export async function adminUpdateCase(id: string, data: any) {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/cases/${id}`, {
     method: "PUT",

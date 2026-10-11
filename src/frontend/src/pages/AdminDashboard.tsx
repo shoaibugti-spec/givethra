@@ -337,6 +337,7 @@ export default function AdminPage() {
   const [depositStatusFilter, setDepositStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<"all" | "pending_review" | "approved" | "rejected">("all");
   const [feedbackBusyId, setFeedbackBusyId] = useState<string | null>(null);
+  const [kycBusyId, setKycBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -427,9 +428,11 @@ export default function AdminPage() {
 
   async function updateKyc(id: string, status: string, reason = "", action: "approve" | "reject" | "re_kyc" | "duplicate" = "approve") {
     const kyc = kycList.find((k) => k.id === id);
-    if (!kyc) return;
+    if (!kyc || kycBusyId === id) return;
+    setKycBusyId(id);
 
-    if (action === "duplicate") {
+    try {
+      if (action === "duplicate") {
       const cnic = cleanCnic(kyc.cnic_number);
       if (!cnic) { toast.error("No CNIC found to check duplicates"); return; }
       const duplicateFound = kycList.some((k) => k.cnic_number === kyc.cnic_number && k.status === "approved" && k.id !== id);
@@ -449,14 +452,21 @@ export default function AdminPage() {
       }
     }
 
-    await adminUpdateKyc(id, { status, reviewed_at: new Date().toISOString(), reviewed_by: user?.email, rejection_reason: reason });
-    if (kyc.user_id) {
-      if (status === "approved") await sendNotification(kyc.user_id, "kyc_approved", "KYC Approved ✅", "Your identity has been verified. You can now submit and unlock cases.", "/kyc");
-      else if (status === "rejected") await sendNotification(kyc.user_id, "kyc_rejected", "KYC Rejected", reason ? `Reason: ${reason}` : "Please submit clear, well-lit photos and try again.", "/kyc");
-      else if (status === "re_kyc") await sendNotification(kyc.user_id, "kyc_re_kyc", "KYC Requires Re-submission 🔄", `Please resubmit your KYC with correct information. Reason: ${reason || "CNIC mismatch or missing details"}.`, "/kyc");
+    const reviewedAt = new Date().toISOString();
+    await adminUpdateKyc(id, { status, reviewed_at: reviewedAt, reviewed_by: user?.email, rejection_reason: reason });
+    // The Worker sends the approval/rejection notification. Avoid sending a
+    // second notification from the browser and update only this KYC row
+    // instead of reloading every Admin dashboard section.
+    setKycList((current) => current.map((row) => row.id === id ? { ...row, status, reviewed_at: reviewedAt, reviewed_by: user?.email, rejection_reason: reason } : row));
+    if (status === "re_kyc" && kyc.user_id) {
+      await sendNotification(kyc.user_id, "kyc_re_kyc", "KYC Requires Re-submission 🔄", `Please resubmit your KYC with correct information. Reason: ${reason || "CNIC mismatch or missing details"}.`, "/kyc");
     }
     toast.success(`KYC ${status}!`);
-    loadData();
+    } catch (error: any) {
+      toast.error(error?.message || "KYC update failed. Please try again.");
+    } finally {
+      setKycBusyId(null);
+    }
   }
 
   async function updateCase(id: string, status: string, reason = "") {
@@ -907,7 +917,7 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
             </TabsContent>
 
             <TabsContent value="kyc" className="space-y-4 mt-4">
-              <KycSearchBox kycList={kycList} onUpdate={updateKyc} cnicCounts={cnicCounts} profileMap={profileMap} />
+              <KycSearchBox kycList={kycList} onUpdate={updateKyc} cnicCounts={cnicCounts} profileMap={profileMap} busyId={kycBusyId} />
             </TabsContent>
 
             <TabsContent value="cases" className="space-y-4 mt-4">
@@ -1141,7 +1151,7 @@ function SuspensionsPanel({ suspensions, profiles, onUnlock, onReload }: any) {
   );
 }
 
-function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
+function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap, busyId }: any) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const sortedKyc = [...kycList].sort((a: any, b: any) => {
@@ -1175,7 +1185,7 @@ function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap }: any) {
         filtered.map((kyc: any) => {
           const c = cleanCnic(kyc.cnic_number);
           const dupCount = c ? (cnicCounts[c] ?? 0) : 0;
-          return <KycCard key={kyc.id} kyc={kyc} onUpdate={onUpdate} dupCount={dupCount} />;
+          return <KycCard key={kyc.id} kyc={kyc} onUpdate={onUpdate} dupCount={dupCount} busy={busyId === kyc.id} />;
         })
       }
     </div>
@@ -1770,7 +1780,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
 }
 // ========== END OF MODIFIED CaseCard ==========
 
-function KycCard({ kyc, onUpdate, dupCount }: any) {
+function KycCard({ kyc, onUpdate, dupCount, busy = false }: any) {
   const [reason, setReason] = useState("");
   const isDuplicate = dupCount > 1;
   const isPending = kyc.status === "pending";
@@ -1810,11 +1820,11 @@ function KycCard({ kyc, onUpdate, dupCount }: any) {
         <div className="space-y-2">
           <Textarea placeholder="Rejection reason (if rejecting)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="text-sm" />
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(kyc.id, "approved", "", "approve")}>
-              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
+            <Button size="sm" disabled={busy} className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onUpdate(kyc.id, "approved", "", "approve")}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5 mr-1" />} {busy ? "Saving..." : "Approve"}
             </Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(kyc.id, "rejected", reason, "reject")}>
-              <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+            <Button size="sm" disabled={busy} variant="outline" className="text-red-600 border-red-300" onClick={() => onUpdate(kyc.id, "rejected", reason, "reject")}>
+              <XCircle className="h-3.5 w-3.5 mr-1" /> {busy ? "Saving..." : "Reject"}
             </Button>
           </div>
         </div>
