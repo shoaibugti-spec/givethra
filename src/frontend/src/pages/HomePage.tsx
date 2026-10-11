@@ -24,6 +24,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { runUserGuide } from "@/lib/userGuide";
 import { orderCasesForViewer } from "@/lib/caseOrdering";
+import { handleImageError, resolveMediaUrl } from "@/lib/media";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   BadgeCheck,
@@ -875,8 +876,9 @@ export default function HomePage() {
     if (currentSlide.type === "image") {
       return (
         <img
-          src={currentSlide.image}
+          src={resolveMediaUrl(currentSlide.image)}
           alt="Givethra"
+          onError={handleImageError}
           className="h-full w-full object-cover object-top"
         />
       );
@@ -903,7 +905,7 @@ export default function HomePage() {
     }
 
     if (currentSlide.type === "category") {
-      return <img src={currentSlide.image} alt="" loading="eager" draggable={false} className="pointer-events-none h-full w-full select-none object-cover object-top" />;
+      return <img src={resolveMediaUrl(currentSlide.image)} alt="" loading="eager" draggable={false} onError={handleImageError} className="pointer-events-none h-full w-full select-none object-cover object-top" />;
     }
 
     if (currentSlide.type === "action") {
@@ -928,7 +930,7 @@ export default function HomePage() {
     if (currentSlide.type === "guide" && currentSlide.image) {
       return (
         <div className="relative h-full w-full overflow-hidden bg-slate-950">
-          <img src={currentSlide.image} alt="Identity verification" loading="eager" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={resolveMediaUrl(currentSlide.image)} alt="Identity verification" loading="eager" onError={handleImageError} className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-transparent" />
           <div className="relative z-10 flex h-full max-w-[72%] flex-col justify-center gap-2 px-5 text-white md:max-w-[58%] md:px-8">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/30 ring-1 ring-white/20">
@@ -1023,8 +1025,9 @@ export default function HomePage() {
                 className="group relative h-20 w-full overflow-hidden rounded-2xl bg-teal-800 text-left shadow-md shadow-teal-200 transition-all hover:scale-[1.01] active:scale-[0.99] sm:h-24"
               >
                 <img
-                  src="/dreams-products-banner.jpg"
+                  src={resolveMediaUrl("/dreams-products-banner.jpg")}
                   alt="Shop Dream Now — Givethra Dreams"
+                  onError={handleImageError}
                   className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.03]"
                 />
                 <span className="absolute inset-0 bg-gradient-to-r from-teal-950/60 via-teal-900/15 to-teal-950/35" />
@@ -1111,8 +1114,9 @@ export default function HomePage() {
                         {/* Image at top */}
                         <div className="relative h-14 w-full overflow-hidden bg-slate-100 sm:h-16">
                           <img
-                            src={image}
+                            src={resolveMediaUrl(image)}
                             alt={category}
+                            onError={handleImageError}
                             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           />
                         </div>
@@ -1380,9 +1384,10 @@ export default function HomePage() {
                           <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-card to-teal-50 px-4 pt-4">
                             <div className="flex items-center gap-3 rounded-2xl border border-primary/10 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
                               <img
-                                src={selfieUrl}
+                                src={resolveMediaUrl(selfieUrl)}
                                 alt={`${requesterName} selfie`}
                                 loading="lazy"
+                                onError={handleImageError}
                                 className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-md"
                               />
                               <div className="min-w-0">

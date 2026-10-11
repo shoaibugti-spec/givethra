@@ -58,10 +58,12 @@ function ensureGoogleIdentityServices(timeoutMs = 20000): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
     const script = existing || document.createElement("script");
     let settled = false;
+    let poll = 0;
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
+      if (poll) window.clearInterval(poll);
       if (error) {
         googleScriptPromise = null;
         reject(error);
@@ -70,6 +72,9 @@ function ensureGoogleIdentityServices(timeoutMs = 20000): Promise<void> {
       }
     };
     const timer = window.setTimeout(() => finish(new Error("Google sign-in is taking longer than expected. Please check your connection and try again.")), timeoutMs);
+    poll = window.setInterval(() => {
+      if ((window as any).google?.accounts?.id) finish();
+    }, 100);
     script.addEventListener("load", () => {
       const waitForApi = () => {
         if ((window as any).google?.accounts?.id) return finish();
