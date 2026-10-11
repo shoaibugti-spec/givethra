@@ -1031,7 +1031,7 @@ export default function HomePage() {
                   className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.03]"
                 />
                 <span className="absolute inset-0 bg-gradient-to-r from-teal-950/60 via-teal-900/15 to-teal-950/35" />
-                <span className="absolute inset-y-0 left-4 flex items-center gap-2 text-lg font-extrabold text-white drop-shadow sm:left-7 sm:text-2xl">
+                <span className="absolute inset-y-0 left-4 flex max-w-[60%] items-center gap-2 text-base font-extrabold leading-tight text-white drop-shadow sm:left-7 sm:max-w-none sm:text-2xl">
                   <Sparkles className="h-6 w-6 shrink-0 sm:h-7 sm:w-7" />
                   <span>Shop Dream Now</span>
                 </span>
@@ -1264,7 +1264,7 @@ export default function HomePage() {
 
                 <div className="space-y-2">
                   <Label className="text-xs">Urgency</Label>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                     <button
                       type="button"
                       onClick={() => setFilterUrgency("all")}
