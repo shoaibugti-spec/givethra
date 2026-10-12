@@ -358,10 +358,6 @@ export default function EditProfilePage() {
       return;
     }
 
-    if (setupMode && !username.trim()) {
-      toast.error("Username is required to create your profile");
-      return;
-    }
     if (username && !/^[a-zA-Z0-9_]{3,24}$/.test(username.trim())) {
       toast.error("Username must be 3–24 characters using letters, numbers, or underscore");
       return;
@@ -406,6 +402,8 @@ export default function EditProfilePage() {
 
           avatar_url: avatarUrl,
           cover_url: coverUrl,
+
+          profile_setup_completed_at: setupMode ? new Date().toISOString() : undefined,
 
           updated_at: new Date().toISOString(),
         },
@@ -628,6 +626,17 @@ export default function EditProfilePage() {
                 </CardContent>
               </Card>
 
+              {setupMode && (
+                <Card className="border-primary/25 bg-primary/5">
+                  <CardContent className="p-4">
+                    <p className="text-sm font-semibold text-foreground">Complete your profile once</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      Add your name, contact number, bio and profile images, then save. You will return to the home page and this setup step will not appear again.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Personal Information */}
               <Card className="border border-border">
                 <CardHeader className="pb-3">
@@ -637,6 +646,12 @@ export default function EditProfilePage() {
                 </CardHeader>
 
                 <CardContent className="space-y-5">
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input id="email" value={user?.email || ""} readOnly aria-readonly="true" className="bg-muted/50" />
+                    <p className="text-xs text-muted-foreground">Your verified sign-in email cannot be changed here.</p>
+                  </div>
 
                   {/* Name */}
                   <div className="space-y-2">

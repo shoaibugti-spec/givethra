@@ -288,7 +288,7 @@ export async function updateKycSubmission(id: string, data: any) {
 }
 
 // ---------- PROFILES ----------
-export async function getProfile(userId: string, profileRole?: "hero" | "requester" | null) {
+export async function getProfile(userId: string, profileRole?: "hero" | "requester" | null): Promise<any> {
   const query = profileRole ? `?profile_role=${encodeURIComponent(profileRole)}` : "";
   const res = await fetchWithAuth(`${WORKER_URL}/api/profiles/${userId}${query}`, {
     headers: headers(),

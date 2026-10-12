@@ -1422,17 +1422,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
     // Older records may contain signed/query-style URLs such as
     // /uploads?key=users/... . The Worker serves the same R2 object through
     // the stable /uploads/<key> route, so normalize before rendering links.
-    try {
-      const parsed = new URL(url);
-      if (parsed.pathname === "/uploads" && parsed.searchParams.get("key")) {
-        const objectKey = parsed.searchParams.get("key") || "";
-        parsed.pathname = `/uploads/${objectKey}`;
-        parsed.search = "";
-        url = parsed.toString();
-      }
-    } catch {
-      // Invalid URLs are filtered below and never rendered as links.
-    }
+    url = normalizeAdminMediaUrl(url);
     if (!url.startsWith("http")) return;
     if (fileEntries.some((f) => f.url === url)) return;
     fileEntries.push({ key, label: getFileLabel(key, url, label), url });
@@ -1655,7 +1645,8 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {uniqueFiles.map(({ key, label, url }) => {
-              const lowerFileName = `${url} ${label}`.toLowerCase();
+              const mediaUrl = normalizeAdminMediaUrl(url);
+              const lowerFileName = `${mediaUrl} ${label}`.toLowerCase();
               const isVideo = lowerFileName.match(/\.(mp4|webm|mov|avi)(?:$|\?)/i) || lowerFileName.includes("video");
               const isPdf = lowerFileName.match(/\.pdf(?:$|\?)/i);
               const isImage = lowerFileName.match(/\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)(?:$|\?)/i) || lowerFileName.includes("image") || lowerFileName.includes("photo") || lowerFileName.includes("selfie");
@@ -1674,14 +1665,14 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
                     📎 {label}
                   </p>
                   {isVideo ? (
-                    <video src={url} controls className="w-full rounded border max-h-32 bg-black" />
+                    <video src={mediaUrl} controls className="w-full rounded border max-h-32 bg-black" />
                   ) : isPdf ? (
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
+                    <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="block text-center py-4 bg-muted text-primary text-xs font-semibold rounded hover:underline">
                       📄 View PDF
                     </a>
                   ) : isImage ? (
-                    <a href={url} target="_blank" rel="noopener noreferrer">
-                      <img src={url} alt={label} className="w-full rounded border max-h-28 object-cover hover:opacity-95" />
+                    <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+                      <img src={mediaUrl} alt={label} onError={(event) => { event.currentTarget.style.display = "none"; event.currentTarget.parentElement?.classList.add("hidden"); }} className="w-full rounded border max-h-28 object-cover hover:opacity-95" />
                     </a>
                   ) : (
                     <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded border bg-muted/60 p-3 text-center">
@@ -1690,10 +1681,10 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
                     </div>
                   )}
                   <div className="flex items-center justify-center gap-2 text-[9px]">
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                       {isImage || isPdf || isVideo ? "Open in Full Size ↗" : "Open File ↗"}
                     </a>
-                    <a href={downloadUrl} download={label} className="inline-flex items-center gap-0.5 text-primary hover:underline">
+                    <a href={normalizeAdminMediaUrl(downloadUrl)} download={label} className="inline-flex items-center gap-0.5 text-primary hover:underline">
                       <Download className="h-3 w-3" /> Download
                     </a>
                   </div>
@@ -1731,7 +1722,7 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ml-1 ${isContributionResolution(r) ? "bg-primary/10 text-primary" : "bg-blue-100 text-blue-700"}`}>{isContributionResolution(r) ? "FUNDRAISING" : "DIRECT"}</span>
               </p>
               <p><span className="text-muted-foreground">Amount:</span> {s} {r.seeker_confirmed_amount ?? r.amount_paid} {cur} · <span className="text-muted-foreground">TXN:</span> <span className="font-mono">{r.transaction_id}</span></p>
-              {r.receipt_url && <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-[10px]"><ExternalLink className="h-3 w-3" /> Receipt</a>}
+              {r.receipt_url && <a href={normalizeAdminMediaUrl(r.receipt_url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-[10px]"><ExternalLink className="h-3 w-3" /> Receipt</a>}
             </div>
           ))}
         </div>
@@ -1948,7 +1939,7 @@ function FeedbackCard({ fb, profileMap, caseList, onUpdate, busyId }: any) {
         {c && <p className="text-muted-foreground mt-0.5">Case: {c.title}</p>}
       </div>
       {fb.text_message && <p className="text-sm whitespace-pre-line">{fb.text_message}</p>}
-      {fb.video_url && <video src={fb.video_url} controls className="w-full rounded border max-h-56" />}
+      {fb.video_url && <video src={normalizeAdminMediaUrl(fb.video_url)} controls className="w-full rounded border max-h-56" />}
       {status === "rejected" && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"><span className="font-semibold">Rejection reason:</span> {fb.rejection_reason || "No reason recorded."}</div>}
       {status === "pending_review" && (
         <div className="space-y-2 pt-1 border-t border-border">
@@ -2082,7 +2073,7 @@ function UserCard({ u, onSuspendChange, onManualUnlock }: any) {
                 {u.kycDetails.rejection_reason && <p className="text-red-600 mt-1"><strong>Rejection Reason:</strong> {u.kycDetails.rejection_reason}</p>}
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
-                {[["CNIC Front", u.kycDetails.cnic_front_url], ["CNIC Back", u.kycDetails.cnic_back_url], ["Selfie", u.kycDetails.selfie_url], ["Passport", u.kycDetails.passport_url], ["Face Video", u.kycDetails.face_video_url]].map(([label, url]) => url ? <a key={String(label)} href={String(url)} target="_blank" rel="noopener noreferrer" className="text-primary underline">{label} ↗</a> : null)}
+                {[["CNIC Front", u.kycDetails.cnic_front_url], ["CNIC Back", u.kycDetails.cnic_back_url], ["Selfie", u.kycDetails.selfie_url], ["Passport", u.kycDetails.passport_url], ["Face Video", u.kycDetails.face_video_url]].map(([label, url]) => url ? <a key={String(label)} href={normalizeAdminMediaUrl(String(url))} target="_blank" rel="noopener noreferrer" className="text-primary underline">{label} ↗</a> : null)}
               </div>
             </div>
           )}
@@ -2172,7 +2163,7 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
       {paidReceiptUrl && (
         <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-300 p-3">
           <p className="text-xs font-semibold text-green-700 flex items-center gap-1"><CheckCircle className="h-4 w-4" /> Payment Receipt</p>
-          <a href={paidReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1">
+          <a href={normalizeAdminMediaUrl(paidReceiptUrl)} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1">
             <ExternalLink className="h-4 w-4" /> View Receipt
           </a>
         </div>
@@ -2233,7 +2224,7 @@ function ResolutionHistoryCard({ r, c, profileMap }: any) {
         <p><span className="font-medium text-foreground">Completed:</span> {r.completed_at || r.admin_confirmed_at ? new Date(r.completed_at || r.admin_confirmed_at).toLocaleDateString() : "—"}</p>
       </div>
       {isRejected && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">Rejection reason: {r.rejection_reason || r.notes || "Not provided"}</p>}
-      {r.receipt_url && <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-sm font-medium"><ExternalLink className="h-4 w-4" /> View payment receipt</a>}
+      {r.receipt_url && <a href={normalizeAdminMediaUrl(r.receipt_url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-sm font-medium"><ExternalLink className="h-4 w-4" /> View payment receipt</a>}
     </div>
   );
 }
@@ -2277,7 +2268,7 @@ function VerifyCard({ r, c, profileMap, onConfirm, onReject }: any) {
       </div>
 
       {r.receipt_url && (
-        <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-sm font-medium">
+        <a href={normalizeAdminMediaUrl(r.receipt_url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-sm font-medium">
           <ExternalLink className="h-4 w-4" /> View Payment Receipt
         </a>
       )}
@@ -2638,11 +2629,11 @@ function SupportPanel({ allMsgs, profileMap, onNewMessage, unreadCount }: any) {
                   {m.attachment_url && (
                     <div className="mt-2">
                       {m.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                        <a href={m.attachment_url} target="_blank" rel="noopener noreferrer">
-                          <img src={m.attachment_url} alt="Attachment" className="max-w-full max-h-48 rounded-lg border" />
+                        <a href={normalizeAdminMediaUrl(m.attachment_url)} target="_blank" rel="noopener noreferrer">
+                          <img src={normalizeAdminMediaUrl(m.attachment_url)} alt="Attachment" className="max-w-full max-h-48 rounded-lg border" />
                         </a>
                       ) : (
-                        <a href={m.attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs underline bg-primary/10 px-2 py-1 rounded-lg">
+                        <a href={normalizeAdminMediaUrl(m.attachment_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs underline bg-primary/10 px-2 py-1 rounded-lg">
                           <FileText className="h-3 w-3" /> View Attachment
                         </a>
                       )}
@@ -2769,9 +2760,9 @@ function normalizeAdminMediaUrl(rawUrl: string): string {
   if (!url) return "";
   try {
     const parsed = new URL(url, window.location.origin);
-    if (parsed.pathname === "/uploads" && parsed.searchParams.get("key")) {
-      const objectKey = parsed.searchParams.get("key") || "";
-      parsed.pathname = `/uploads/${objectKey}`;
+    const queryKey = parsed.searchParams.get("key");
+    if ((parsed.pathname === "/uploads" || parsed.pathname === "/api/uploads") && queryKey) {
+      parsed.pathname = `/uploads/${queryKey.replace(/^\/+/, "")}`;
       parsed.search = "";
     }
     // Older KYC rows may retain http:// or an old Givethra host. Always
@@ -2791,7 +2782,7 @@ function Img({ url, label }: { url: string; label: string }) {
   let displayLabel = label;
   try {
     const urlObj = new URL(normalizedUrl);
-    const key = urlObj.searchParams.get("key");
+      const key = urlObj.searchParams.get("key") || urlObj.pathname.split("/uploads/")[1];
     if (key) {
       const parts = key.split("/");
       const lastPart = parts[parts.length - 1];
@@ -2814,7 +2805,7 @@ function Img({ url, label }: { url: string; label: string }) {
         📎 {displayLabel}
       </p>
       <a href={normalizedUrl} target="_blank" rel="noopener noreferrer">
-        <img src={normalizedUrl} alt={displayLabel} className="w-full rounded border max-h-32 min-h-20 object-cover bg-muted" />
+      <img src={normalizedUrl} alt={displayLabel} onError={(event) => { event.currentTarget.replaceWith(Object.assign(document.createElement("div"), { className: "rounded border bg-muted p-3 text-xs text-muted-foreground", textContent: "File is unavailable or was removed" })); }} className="w-full rounded border max-h-32 min-h-20 object-cover bg-muted" />
       </a>
     </div>
   );

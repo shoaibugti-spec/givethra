@@ -651,9 +651,9 @@ async function handleProfile(request, env, user, parts, origin) {
         const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
         const posts = await getProfileCommunityPosts(env, userId, user?.user_id || "");
         const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-        const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
+        const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports, profile_setup_completed_at FROM users WHERE user_id = ?").bind(userId).first();
         const profileData = user?.user_id === userId ? variant : withoutPrivateContact(variant);
-        return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts }, 200, origin);
+        return json({ ...profileData, profile_setup_completed_at: supportData?.profile_setup_completed_at || null, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts }, 200, origin);
       }
     } catch { /* migration is additive; use legacy profile until applied */ }
     const profile = await env.DB.prepare("SELECT * FROM profiles WHERE user_id = ?").bind(userId).first();
@@ -661,14 +661,17 @@ async function handleProfile(request, env, user, parts, origin) {
     const posts = await getProfileCommunityPosts(env, userId, user?.user_id || "");
     const activeCase = profileRole === "requester" ? await env.DB.prepare("SELECT * FROM case_submissions WHERE user_id=? AND lower(COALESCE(status,'')) IN ('approved','open','in_progress') ORDER BY submitted_at DESC LIMIT 1").bind(userId).first() : null;
     const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-    const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports FROM users WHERE user_id = ?").bind(userId).first();
+    const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports, profile_setup_completed_at FROM users WHERE user_id = ?").bind(userId).first();
     const profileData = user?.user_id === userId ? (profile || {}) : withoutPrivateContact(profile || {});
     const safeCase = user?.user_id === userId ? activeCase : withoutPrivateContact(activeCase);
-    return json({ ...profileData, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts, active_case:safeCase||null }, 200, origin);
+    return json({ ...profileData, profile_setup_completed_at: supportData?.profile_setup_completed_at || null, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts, active_case:safeCase||null }, 200, origin);
   }
   if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405, origin);
   const body = await readJson(request);
   const values = pick(body, allowedFields);
+  const setupCompletedAt = typeof body?.profile_setup_completed_at === "string" && body.profile_setup_completed_at.trim()
+    ? body.profile_setup_completed_at.trim()
+    : null;
   if (Object.keys(values).length === 0) return json({ error: "No valid fields to update" }, 400, origin);
   if (Object.prototype.hasOwnProperty.call(values, "bio") && hasBioContactInfo(values.bio)) {
     return json({ error: "Bio cannot contain phone numbers, email addresses, @ symbols, or contact information." }, 422, origin);
@@ -691,8 +694,8 @@ async function handleProfile(request, env, user, parts, origin) {
       merged.avatar_url || null, merged.cover_url || null, current?.created_at || timestamp, timestamp).run();
     const saved = await env.DB.prepare("SELECT * FROM profile_variants WHERE user_id = ? AND profile_role = ?").bind(userId, profileRole).first();
     if (saved) {
-      await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?")
-        .bind(saved.full_name || user.full_name || null, saved.avatar_url || user.avatar_url || null, timestamp, userId).run();
+      await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, profile_setup_completed_at = COALESCE(?, profile_setup_completed_at), updated_at = ? WHERE user_id = ?")
+        .bind(saved.full_name || user.full_name || null, saved.avatar_url || user.avatar_url || null, setupCompletedAt, timestamp, userId).run();
       return json({ ...saved, profile_role: profileRole }, 200, origin);
     }
   } catch { /* migration is additive; use legacy profile until applied */ }
@@ -708,8 +711,8 @@ async function handleProfile(request, env, user, parts, origin) {
   ).bind(userId, merged.full_name || null, merged.phone_number || null, merged.country || null, merged.city || null,
     merged.bio || null, merged.preferred_language || "en", merged.avatar_url || null, merged.cover_url || null,
     merged.created_at, merged.updated_at).run();
-  await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?")
-    .bind(merged.full_name || user.full_name || null, merged.avatar_url || user.avatar_url || null, timestamp, userId).run();
+  await env.DB.prepare("UPDATE users SET full_name = ?, avatar_url = ?, profile_setup_completed_at = COALESCE(?, profile_setup_completed_at), updated_at = ? WHERE user_id = ?")
+    .bind(merged.full_name || user.full_name || null, merged.avatar_url || user.avatar_url || null, setupCompletedAt, timestamp, userId).run();
   return json({ ...merged, profile_role: profileRole }, 200, origin);
 }
 

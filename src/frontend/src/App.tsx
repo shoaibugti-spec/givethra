@@ -273,12 +273,12 @@ function RootLayout() {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user || isAdmin || location.pathname !== "/") return;
+    if (!isAuthenticated || !user || isAdmin || location.pathname === "/edit-profile") return;
     let cancelled = false;
     setChecking(true);
     getProfile(user.id, role)
       .then((profile) => {
-        if (!cancelled && !String(profile?.full_name || "").trim()) {
+        if (!cancelled && !profile?.profile_setup_completed_at) {
           navigate({ to: "/edit-profile", search: { setup: "1" } });
         }
       })
