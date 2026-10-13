@@ -1729,7 +1729,7 @@ async function handleRequest(request, env, ctx) {
       if (rawQuery.length < 2) return json([], 200, origin);
       const pattern = `%${rawQuery.toLowerCase()}%`;
       const rows = await env.DB.prepare(
-        `SELECT u.user_id,
+        `SELECT u.user_id, u.user_id AS cid,
                 COALESCE(NULLIF(TRIM(p.full_name), ''), NULLIF(TRIM(u.full_name), ''), 'Givethra member') AS full_name,
                 p.username, p.avatar_url, p.city, p.country,
                 CASE WHEN lower(COALESCE(u.kyc_status, '')) = 'approved' THEN 1 ELSE 0 END AS is_verified

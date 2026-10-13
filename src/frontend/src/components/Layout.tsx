@@ -59,7 +59,7 @@ function NavLink({
       to={to}
       onClick={onClick}
       className={cn(
-        "text-sm font-medium transition-colors hover:text-primary",
+        "flex w-full touch-manipulation select-none items-center gap-2.5 rounded-lg px-2 py-2.5 text-sm font-medium transition-colors hover:bg-muted hover:text-primary md:inline-flex md:w-auto md:gap-0 md:rounded-none md:px-0 md:py-0 md:hover:bg-transparent",
         isActive ? "text-primary" : "text-muted-foreground"
       )}
     >
@@ -109,9 +109,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         const latest = await getCommunityPosts("latest");
         const posts = Array.isArray(latest) ? latest : [];
         const newest = posts.reduce((max: number, post: any) => Math.max(max, new Date(post?.created_at || 0).getTime()), 0);
-        const seen = Number(localStorage.getItem("givethra_my_help_posts_seen_at") || 0);
+        let seen = 0;
+        try { seen = Number(window.localStorage.getItem("givethra_my_help_posts_seen_at") || 0); } catch {}
         if (!cancelled) setSupportPostCount(seen ? posts.filter((post: any) => new Date(post?.created_at || 0).getTime() > seen).length : 0);
-        if (!seen && newest) localStorage.setItem("givethra_my_help_posts_seen_at", String(newest));
+        if (!seen && newest) { try { window.localStorage.setItem("givethra_my_help_posts_seen_at", String(newest)); } catch {} }
       } catch {
         if (!cancelled) setSupportPostCount(0);
       }
@@ -120,7 +121,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const timer = window.setInterval(loadSupportPostCount, 20000);
     const handleSupportPostsSeen = (event: Event) => {
       const newest = Number((event as CustomEvent<{ newest?: number }>).detail?.newest || Date.now());
-      localStorage.setItem("givethra_my_help_posts_seen_at", String(newest));
+      try { window.localStorage.setItem("givethra_my_help_posts_seen_at", String(newest)); } catch {}
       setSupportPostCount(0);
     };
     window.addEventListener("givethra-support-posts-seen", handleSupportPostsSeen);
@@ -160,7 +161,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
-            className="md:hidden h-10 w-10 shrink-0 flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
+            className="md:hidden h-11 w-11 shrink-0 touch-manipulation flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
           >
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -168,7 +169,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             to={isAuthenticated ? "/home" : "/"}
             onClick={() => {
               if (!isAuthenticated) return;
-              localStorage.setItem("givethra_home_mode", "support");
+              try { window.localStorage.setItem("givethra_home_mode", "support"); } catch {}
               window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" }));
             }}
             aria-label="Givethra home"

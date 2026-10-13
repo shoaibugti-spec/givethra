@@ -12,7 +12,14 @@ export default function BottomNav() {
   const router = useRouterState();
   const currentPath = router.location.pathname;
   const { isAuthenticated } = useAuth();
-  const [homeMode, setHomeMode] = useState<"support" | "earning">(() => (localStorage.getItem("givethra_home_mode") === "earning" ? "earning" : "support"));
+  const [homeMode, setHomeMode] = useState<"support" | "earning">(() => {
+    if (typeof window === "undefined") return "support";
+    try {
+      return window.localStorage.getItem("givethra_home_mode") === "earning" ? "earning" : "support";
+    } catch {
+      return "support";
+    }
+  });
   useEffect(() => {
     const onModeChange = (event: Event) => setHomeMode((event as CustomEvent<"support" | "earning">).detail === "earning" ? "earning" : "support");
     window.addEventListener("givethra-home-panel-tab", onModeChange);

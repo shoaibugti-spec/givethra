@@ -25,5 +25,14 @@ describe("navigation and support search regression", () => {
     expect(workerSource).toContain('parts[1] === "user-search"');
     expect(workerSource).toContain('if (!user) return json({ error: "Authentication required" }, 401, origin);');
     expect(workerSource).toContain("LIMIT 25");
+    expect(workerSource).toContain("u.user_id AS cid");
+  });
+
+  it("survives restricted mobile storage and preserves touch-sized navigation", () => {
+    const bottomNavSource = readFileSync(new URL("./BottomNav.tsx", import.meta.url), "utf8");
+    expect(layoutSource).toContain("touch-manipulation");
+    expect(layoutSource).toContain("h-11 w-11");
+    expect(bottomNavSource).toContain('typeof window === "undefined"');
+    expect(bottomNavSource).toContain("try {");
   });
 });
