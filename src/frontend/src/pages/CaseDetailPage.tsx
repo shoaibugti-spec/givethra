@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { handleImageError, resolveMediaUrl } from "@/lib/media";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$", PKR: "Rs", SAR: "SAR", AED: "AED", GBP: "£", EUR: "€", INR: "₹",
@@ -321,7 +322,9 @@ export default function CaseDetailPage() {
 
       if (user && data) {
         const owner = data.user_id === user.id;
-        const [fullUnlock, contributionUnlock, mediaUnlock, count, res, kyc, prof] = await Promise.all([
+        // Optional user-specific panels must not make the public case itself fail.
+        // Mobile networks can reject one auth/auxiliary request while the case API succeeds.
+        const results = await Promise.allSettled([
           getCaseUnlock(id, user.id, "full"),
           getCaseUnlock(id, user.id, "partial"),
           getCaseUnlock(id, user.id, "media"),
@@ -330,6 +333,17 @@ export default function CaseDetailPage() {
           getKycSubmission(data.user_id),
           getProfile(user.id),
         ]);
+        const value = <T,>(index: number, fallback: T): T => {
+          const result = results[index];
+          return result?.status === "fulfilled" ? (result.value as T) : fallback;
+        };
+        const fullUnlock = value(0, null);
+        const contributionUnlock = value(1, null);
+        const mediaUnlock = value(2, null);
+        const count = value(3, 0);
+        const res = value(4, [] as any[]);
+        const kyc = value(5, null);
+        const prof = value(6, null);
         const activeUnlock = fullUnlock || contributionUnlock || null;
         setMyUnlock(activeUnlock);
         setUnlocked(!!activeUnlock || owner);
@@ -981,7 +995,7 @@ export default function CaseDetailPage() {
                       <div key={resolution.id} className="rounded-lg border border-border p-3 space-y-2">
                         <div className="flex items-center justify-between gap-2 text-sm"><span>{isContributionResolution(resolution) ? "Contribution" : "Direct Help"}</span><span className="font-semibold">{sym} {resolution.seeker_confirmed_amount ?? resolution.amount_paid ?? resolution.amount ?? caseData.amount_collected ?? caseData.amount_needed ?? 0} {cur}</span></div>
                         {(resolution.transaction_id || resolution.txn_number || resolution.transaction_number || resolution.payment_reference || resolution.reference_number || caseData.reference_number || caseData.payment_transaction_id || caseData.paid_transaction_id) && <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{resolution.transaction_id || resolution.txn_number || resolution.transaction_number || resolution.payment_reference || resolution.reference_number || caseData.reference_number || caseData.payment_transaction_id || caseData.paid_transaction_id}</span></p>}
-                        {(resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url) && <a href={resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url} target="_blank" rel="noopener noreferrer" className="block"><img src={resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url} alt="Payment proof" className="max-h-48 w-full rounded-lg border object-contain" /></a>}
+                        {(resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url) && <a href={resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url} target="_blank" rel="noopener noreferrer" className="block"><img src={resolveMediaUrl(resolution.receipt_url || resolution.paid_receipt_url || resolution.payment_proof_url || resolution.proof_url)} alt="Payment proof" onError={handleImageError} className="max-h-48 w-full rounded-lg border object-contain" /></a>}
                         <Button size="sm" variant="outline" className="w-full gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, resolution, seekerKyc, resolution.hero_name || "Verified Hero")}><FileText className="h-3.5 w-3.5" /> View Affidavit</Button>
                       </div>
                     ))}
@@ -1136,7 +1150,7 @@ export default function CaseDetailPage() {
                   <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">🎥 Verification Media</h2>{mediaUnlocked && <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600">Unlocked</span>}</div>
                   {mediaUnlocked ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {caseData.selfie_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Live Selfie</p><img src={caseData.selfie_url} alt="Selfie" className="w-full rounded-lg border max-h-40 object-cover" /></div>}
+                      {caseData.selfie_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Live Selfie</p><img src={resolveMediaUrl(caseData.selfie_url)} alt="Selfie" onError={handleImageError} className="w-full rounded-lg border max-h-40 object-cover" /></div>}
                       {caseData.video_url && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Verification Appeal Video (View Only)</p><video src={caseData.video_url} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline onContextMenu={e => e.preventDefault()} className="w-full rounded-lg border max-h-40" /></div>}
                     </div>
                   ) : (
@@ -1298,7 +1312,7 @@ function OwnerResolutions({ caseId, caseData, seekerKyc, onConfirm, onDispute, s
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-teal-700"><CheckCircle2 className="h-5 w-5" /><h2 className="font-bold">Help Confirmed</h2></div>
               <p className="text-sm text-muted-foreground">{sym} {res.seeker_confirmed_amount ?? res.amount_paid} {cur} — {res.resolution_type}</p>
-              {res.receipt_url && <a href={res.receipt_url} target="_blank" rel="noopener noreferrer" className="block"><img src={res.receipt_url} alt="Payment proof" className="max-h-48 w-full rounded-lg border object-contain" /></a>}
+              {res.receipt_url && <a href={res.receipt_url} target="_blank" rel="noopener noreferrer" className="block"><img src={resolveMediaUrl(res.receipt_url)} alt="Payment proof" onError={handleImageError} className="max-h-48 w-full rounded-lg border object-contain" /></a>}
               <Button size="sm" variant="outline" className="w-full gap-2 border-teal-300 text-teal-700" onClick={() => generateAffidavit(caseData, res, seekerKyc, res.hero_name || "Verified Hero")}><FileText className="h-3.5 w-3.5" /> View Affidavit</Button>
             </div>
           ) : res.status === "disputed" ? (
