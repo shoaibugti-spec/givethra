@@ -345,6 +345,7 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
   const [submittedUserQuery, setSubmittedUserQuery] = useState("");
   const [userResults, setUserResults] = useState<any[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
+  const [userSearchError, setUserSearchError] = useState("");
   const homeLoadRequestRef = useRef(0);
 
   const loadHomeData = async () => {
@@ -408,16 +409,21 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
     if (query.length < 2) {
       setUserResults([]);
       setSearchingUsers(false);
+      setUserSearchError("");
       return;
     }
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setSearchingUsers(true);
+      setUserSearchError("");
       try {
         const results = await searchUsers(query);
         if (!cancelled) setUserResults(Array.isArray(results) ? results : []);
-      } catch {
-        if (!cancelled) setUserResults([]);
+      } catch (error) {
+        if (!cancelled) {
+          setUserResults([]);
+          setUserSearchError(error instanceof Error ? error.message : "Search is temporarily unavailable.");
+        }
       } finally {
         if (!cancelled) setSearchingUsers(false);
       }
@@ -529,14 +535,14 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
             </div>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input value={userQuery} onChange={(event) => setUserQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") setSubmittedUserQuery(userQuery); }} placeholder="Search name or @username" className="h-11 w-full rounded-xl border border-border bg-muted/20 pl-10 pr-24 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+              <input value={userQuery} onChange={(event) => setUserQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); setSubmittedUserQuery(userQuery); } }} autoComplete="off" inputMode="search" placeholder="Search name or @username" className="h-11 w-full rounded-xl border border-border bg-muted/20 pl-10 pr-24 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
               <button type="button" onClick={() => setSubmittedUserQuery(userQuery)} disabled={userQuery.trim().length < 2} className="absolute right-1 top-1 h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">Search</button>
             </div>
             {submittedUserQuery.trim().length >= 2 && (
               <div className="mt-3 space-y-2">
-                {searchingUsers ? <p className="py-3 text-center text-xs text-muted-foreground">Searching…</p> : userResults.length === 0 ? <p className="py-3 text-center text-xs text-muted-foreground">No users found.</p> : userResults.map((result) => (
+                {searchingUsers ? <p className="py-3 text-center text-xs text-muted-foreground">Searching…</p> : userSearchError ? <p className="py-3 text-center text-xs text-red-600">{userSearchError}</p> : userResults.length === 0 ? <p className="py-3 text-center text-xs text-muted-foreground">No users found.</p> : userResults.map((result) => (
                   <Link key={result.user_id} to="/profile/$id" params={{ id: String(result.user_id) }} className="flex items-center gap-3 rounded-xl border border-border/70 p-3 transition hover:border-primary/40 hover:bg-primary/5">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-bold text-primary">{result.avatar_url ? <img src={result.avatar_url} alt="" className="h-full w-full object-cover" /> : String(result.full_name || "U").slice(0, 1).toUpperCase()}</div>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 font-bold text-primary">{result.avatar_url ? <img src={resolveMediaUrl(result.avatar_url)} alt="" onError={handleImageError} className="h-full w-full object-cover" /> : String(result.full_name || "U").slice(0, 1).toUpperCase()}</div>
                     <div className="min-w-0"><p className="truncate text-sm font-semibold">{result.full_name || "Givethra member"}</p><p className="truncate text-xs text-muted-foreground">{result.username ? `@${result.username}` : "Givethra member"}{result.city ? ` · ${result.city}` : ""}</p></div>
                     <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
                   </Link>

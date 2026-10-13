@@ -1683,6 +1683,30 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
+    if (parts[1] === "user-search" && request.method === "GET") {
+      if (!user) return json({ error: "Authentication required" }, 401, origin);
+      const rawQuery = String(url.searchParams.get("q") || "").trim().replace(/^@+/, "");
+      if (rawQuery.length < 2) return json([], 200, origin);
+      const pattern = `%${rawQuery.toLowerCase()}%`;
+      const rows = await env.DB.prepare(
+        `SELECT u.user_id,
+                COALESCE(NULLIF(TRIM(p.full_name), ''), NULLIF(TRIM(u.full_name), ''), 'Givethra member') AS full_name,
+                p.username, p.avatar_url, p.city, p.country,
+                CASE WHEN lower(COALESCE(u.kyc_status, '')) = 'approved' THEN 1 ELSE 0 END AS is_verified
+         FROM users u
+         LEFT JOIN profiles p ON p.user_id = u.user_id
+         WHERE COALESCE(p.is_suspended, 0) = 0
+           AND (
+             lower(COALESCE(p.full_name, '')) LIKE ?
+             OR lower(COALESCE(u.full_name, '')) LIKE ?
+             OR lower(COALESCE(p.username, '')) LIKE ?
+           )
+         ORDER BY CASE WHEN lower(COALESCE(p.username, '')) = lower(?) THEN 0 ELSE 1 END,
+                  lower(COALESCE(p.full_name, u.full_name, ''))
+         LIMIT 25`
+      ).bind(pattern, pattern, pattern, rawQuery.toLowerCase()).all();
+      return json(rows.results || [], 200, origin);
+    }
     if (parts[1] === "dream-payment-accounts" || (parts[1] === "admin" && parts[2] === "dream-payment-accounts")) {
       return handleDreamPaymentAccounts(request, env, user, parts, origin);
     }

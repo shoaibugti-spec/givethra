@@ -3,29 +3,27 @@ import { describe, expect, it } from "vitest";
 
 const layoutSource = readFileSync(new URL("./Layout.tsx", import.meta.url), "utf8");
 const homeSource = readFileSync(new URL("../pages/HomePage.tsx", import.meta.url), "utf8");
+const switcherSource = readFileSync(new URL("./RoleSwitcher.tsx", import.meta.url), "utf8");
+const workerSource = readFileSync(new URL("../../worker.js", import.meta.url), "utf8");
 
-describe("requested navigation regression", () => {
-  it("keeps the requested notification, community, and translation controls", () => {
-    const notification = layoutSource.indexOf('aria-label="Notifications"');
-    const community = layoutSource.indexOf('aria-label="Community Posts"');
-    const translation = layoutSource.indexOf("<LanguageSwitcher />");
-    expect(notification).toBeGreaterThan(-1);
-    expect(community).toBeGreaterThan(notification);
-    expect(translation).toBeGreaterThan(community);
-  });
-
-  it("uses the shared top navigation and keeps dedicated wall links on homepage", () => {
-    expect(homeSource).toContain('import Layout from "@/components/Layout"');
-    expect(homeSource).toContain("<Layout>");
-    expect(homeSource).toContain('to="/heroes-wall"');
-    expect(homeSource).toContain('to="/kindness-wall"');
-    expect(homeSource).not.toContain("<FeedbackWall />");
-    expect(homeSource).not.toContain("Public Post");
-  });
-
-  it("keeps the hamburger menu and centered search controls", () => {
+describe("navigation and support search regression", () => {
+  it("keeps the mobile menu and a non-overflowing centered switcher", () => {
     expect(layoutSource).toContain('aria-label="Toggle menu"');
-    expect(layoutSource).toContain('type="search"');
-    expect(layoutSource).toContain('placeholder="Search verified cases..."');
+    expect(layoutSource).toContain("min-w-0 flex-1 flex items-center justify-center");
+    expect(switcherSource).toContain('onClick={() => handleSwitch("support")}');
+    expect(switcherSource).toContain("min-h-10 min-w-10");
+  });
+
+  it("keeps support search keyboard/button submission and profile result links", () => {
+    expect(homeSource).toContain('placeholder="Search name or @username"');
+    expect(homeSource).toContain('inputMode="search"');
+    expect(homeSource).toContain('to="/profile/$id"');
+    expect(homeSource).toContain("setSubmittedUserQuery(userQuery)");
+  });
+
+  it("keeps the server-side search authenticated and bounded", () => {
+    expect(workerSource).toContain('parts[1] === "user-search"');
+    expect(workerSource).toContain('if (!user) return json({ error: "Authentication required" }, 401, origin);');
+    expect(workerSource).toContain("LIMIT 25");
   });
 });

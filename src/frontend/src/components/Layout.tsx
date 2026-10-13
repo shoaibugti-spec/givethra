@@ -182,7 +182,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          <div className="flex-1 flex items-center justify-center">
+          <div className="min-w-0 flex-1 flex items-center justify-center overflow-visible">
             {isAuthenticated && <RoleSwitcher supportPostCount={supportPostCount} />}
           </div>
 

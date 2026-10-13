@@ -36,12 +36,12 @@ export default function RoleSwitcher({ supportPostCount = 0 }: { supportPostCoun
   if (!isAuthenticated) return null;
 
   return (
-    <div className="flex items-center gap-1 rounded-full border border-border/50 bg-muted p-1 shadow-sm" aria-label="Home view switcher">
-      <button type="button" aria-label="Home" aria-pressed={activeTab === "support"} onClick={() => { setActiveTab("support"); localStorage.setItem("givethra_home_mode", "support"); window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" })); navigate({ to: "/home" }); }} disabled={switching} className={`flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-all active:scale-[.97] ${activeTab === "support" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}>
+    <div className="flex shrink-0 touch-manipulation select-none items-center gap-1 rounded-full border border-border/50 bg-muted p-1 shadow-sm" aria-label="Home view switcher">
+      <button type="button" aria-label="Home" aria-pressed={activeTab === "support"} onClick={() => handleSwitch("support")} disabled={switching} className={`flex min-h-10 min-w-10 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-semibold transition-all active:scale-[.97] sm:px-3 ${activeTab === "support" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}>
         <HeartHandshake className="h-4 w-4" />
         <span className="hidden sm:inline">Home</span>
       </button>
-      <button type="button" aria-label="Earnings" aria-pressed={activeTab === "earning"} onClick={() => handleSwitch("earning")} disabled={switching} className={`relative flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-all active:scale-[.97] ${activeTab === "earning" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}>
+      <button type="button" aria-label="Earnings" aria-pressed={activeTab === "earning"} onClick={() => handleSwitch("earning")} disabled={switching} className={`relative flex min-h-10 min-w-10 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-semibold transition-all active:scale-[.97] sm:px-3 ${activeTab === "earning" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}>
         <DollarSign className="h-4 w-4" />
         <span className="hidden sm:inline">Earnings</span>
         {supportPostCount > 0 ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] leading-4 text-white shadow-sm">{supportPostCount > 99 ? "99+" : supportPostCount}</span> : null}
