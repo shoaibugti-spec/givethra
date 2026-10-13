@@ -14,6 +14,8 @@ describe("mobile navigation touch targets", () => {
     const bottomNav = read("./BottomNav.tsx");
     expect(layout).toContain("w-full touch-manipulation select-none items-center gap-2 py-2.5");
     expect(layout).toContain("relative z-10");
+    expect(layout).toContain("!isHomeRoute");
+    expect(layout).toContain("bottom-[calc(4.5rem+env(safe-area-inset-bottom))]");
     expect(bottomNav).toContain("md:hidden");
     expect(bottomNav).toContain("min-h-16 flex-1 touch-manipulation");
   });
