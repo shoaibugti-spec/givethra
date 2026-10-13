@@ -2197,6 +2197,33 @@ async function handleRequest(request, env, ctx) {
         return json({ sent, failed: userIds.length - sent }, 201, origin);
       }
 
+      if (parts[2] === "withdrawals") {
+        if (request.method === "GET") {
+          const rows = await env.DB.prepare(
+            "SELECT w.*, COALESCE(p.full_name, u.full_name, u.email, w.user_id) AS full_name, u.email FROM withdrawal_requests w LEFT JOIN users u ON u.user_id = w.user_id LEFT JOIN profiles p ON p.user_id = w.user_id ORDER BY w.requested_at DESC"
+          ).all();
+          return json(rows.results || [], 200, origin);
+        }
+        if (request.method === "PUT" && parts[3]) {
+          const body = await readJson(request);
+          const status = ["approved", "rejected", "completed"].includes(String(body?.status)) ? String(body.status) : null;
+          if (!status) return json({ error: "Invalid withdrawal status" }, 400, origin);
+          const proof = body?.payment_proof_url ? String(body.payment_proof_url).trim() : null;
+          const row = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first();
+          if (!row) return json({ error: "Withdrawal request not found" }, 404, origin);
+          await env.DB.prepare(
+            "UPDATE withdrawal_requests SET status = ?, payment_proof_url = COALESCE(?, payment_proof_url), reviewed_by = ?, reviewed_at = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE completed_at END WHERE id = ?"
+          ).bind(status, proof, user.user_id, now(), status, now(), parts[3]).run();
+          if (status === "completed" && String(row.status || "").toLowerCase() !== "completed") {
+            await env.DB.prepare(
+              "UPDATE earnings_wallets SET balance_pkr = MAX(0, balance_pkr - ?), updated_at = ? WHERE user_id = ?"
+            ).bind(Number(row.amount_pkr), now(), row.user_id).run();
+          }
+          return json(await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first(), 200, origin);
+        }
+        return json({ error: "Method not allowed" }, 405, origin);
+      }
+
       if (parts[2] === "wallets") {
         if (request.method === "GET") {
           const target = url.searchParams.get("user_id");
@@ -2231,6 +2258,7 @@ async function handleRequest(request, env, ctx) {
           deposits: { table: "deposits", order: "submitted_at" },
           profiles: { table: "profiles", order: "updated_at" },
           wallets: { table: "wallets", order: "updated_at" },
+          withdrawals: { table: "withdrawal_requests", order: "requested_at" },
           unlocks: { table: "case_unlocks", order: "unlocked_at" },
           "support-messages": { table: "support_messages", order: "created_at" },
           feedbacks: { table: "feedbacks", order: "created_at" },

@@ -13,6 +13,7 @@ describe("Admin production data routes", () => {
       ['deposits: { table: "deposits", order: "submitted_at" }', "deposits"],
       ['profiles: { table: "profiles", order: "updated_at" }', "profiles"],
       ['wallets: { table: "wallets", order: "updated_at" }', "wallets"],
+      ['withdrawals: { table: "withdrawal_requests", order: "requested_at" }', "withdrawals"],
       ['unlocks: { table: "case_unlocks", order: "unlocked_at" }', "unlocks"],
       ['"support-messages": { table: "support_messages", order: "created_at" }', "support"],
       ['feedbacks: { table: "feedbacks", order: "created_at" }', "feedbacks"],
@@ -23,6 +24,7 @@ describe("Admin production data routes", () => {
     const adminBlock = workerSource.slice(workerSource.indexOf('if (parts[1] === "admin")'), workerSource.indexOf('// Case unlocks'));
     expect(adminBlock).toContain('const tableMap = {');
     expect(adminBlock).toContain('const entry = tableMap[parts[2]];');
+    expect(adminBlock).toContain('if (parts[2] === "withdrawals")');
   });
 
   it("keeps Admin loading resilient when one endpoint fails", () => {
