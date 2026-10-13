@@ -343,7 +343,7 @@ export default function CaseDetailPage() {
         const count = value(3, 0);
         const res = value(4, [] as any[]);
         const kyc = value(5, null);
-        const prof = value(6, null);
+        const prof = value<any>(6, null);
         const activeUnlock = fullUnlock || contributionUnlock || null;
         setMyUnlock(activeUnlock);
         setUnlocked(!!activeUnlock || owner);
