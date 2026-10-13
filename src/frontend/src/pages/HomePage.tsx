@@ -975,8 +975,8 @@ export default function HomePage() {
     <Layout>
       <div className="bg-background pb-20 md:pb-0">
         {showWhatsAppWelcome && (
-          <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-4 sm:items-center">
-            <div role="dialog" aria-modal="true" aria-labelledby="whatsapp-welcome-title" className="relative w-full max-w-sm rounded-2xl border border-green-200 bg-card p-5 shadow-2xl dark:border-green-900">
+          <div className="pointer-events-none fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-4 sm:items-center">
+            <div role="dialog" aria-modal="true" aria-labelledby="whatsapp-welcome-title" className="pointer-events-auto relative w-full max-w-sm rounded-2xl border border-green-200 bg-card p-5 shadow-2xl dark:border-green-900">
               <button type="button" onClick={closeWhatsAppWelcome} aria-label="Close WhatsApp welcome" className="absolute right-3 top-3 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-950/40"><MessageCircle className="h-6 w-6" /></div>
               <h2 id="whatsapp-welcome-title" className="mt-4 text-xl font-bold">Stay updated with Givethra</h2>
