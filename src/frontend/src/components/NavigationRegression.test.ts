@@ -14,6 +14,10 @@ describe("navigation and support search regression", () => {
     expect(switcherSource).toContain("min-h-10 min-w-10");
   });
 
+  it("keeps the floating support action above the authenticated bottom nav", () => {
+    expect(layoutSource).toContain('isAuthenticated ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-5"');
+  });
+
   it("keeps support search keyboard/button submission and profile result links", () => {
     expect(homeSource).toContain('placeholder="Search name or @username"');
     expect(homeSource).toContain('inputMode="search"');
