@@ -34,14 +34,17 @@ import {
   ChevronRight,
   FileText,
   Users,
+  MapPin,
+  Gift,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   getUnreadNotificationsCount,
   getCommunityPosts,
 } from "@/lib/api";
 import RoleSwitcher from "@/components/RoleSwitcher";
+import { loadHelpImpact, formatAmount, type HelpImpact } from "@/lib/helpStats";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
 const FACEBOOK_URL =
@@ -209,6 +212,89 @@ function DrawerTile({
   );
 }
 
+type ImpactState = "idle" | "loading" | "ready" | "error";
+
+function ImpactCard({ state, impact }: { state: ImpactState; impact: HelpImpact | null }) {
+  const loading = !impact && state !== "error";
+  const plural = (count: number) => (count === 1 ? "case" : "cases");
+  const columns = [
+    {
+      key: "given",
+      label: "You helped",
+      icon: HeartHandshake,
+      side: impact?.given ?? null,
+      caption: (count: number) => `${count} ${plural(count)} helped`,
+    },
+    {
+      key: "received",
+      label: "You received",
+      icon: Gift,
+      side: impact?.received ?? null,
+      caption: (count: number) => `from ${count} ${plural(count)}`,
+    },
+  ];
+  const anyApprox = Boolean(impact?.given?.approx || impact?.received?.approx);
+
+  return (
+    <section
+      aria-label="Your impact"
+      className="relative mt-4 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-3.5 shadow-sm"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground">
+          Your impact
+        </p>
+        {impact ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+            <MapPin className="h-3 w-3" />
+            {impact.country ? `${impact.country} \u00b7 ` : ""}
+            {impact.currency}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2.5">
+        {columns.map(({ key, label, icon: Icon, side, caption }) => (
+          <div key={key} className="min-w-0 rounded-xl bg-background/80 p-3 ring-1 ring-border">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="truncate text-xs font-semibold text-muted-foreground">{label}</span>
+            </div>
+            <div className="mt-2.5">
+              {loading ? (
+                <span className="block h-6 w-24 animate-pulse rounded bg-muted" />
+              ) : side ? (
+                <p className="flex items-baseline gap-1 truncate" title={side.approx ? "Approximate value in your local currency" : undefined}>
+                  <span className="text-[11px] font-bold text-muted-foreground">
+                    {side.approx ? "\u2248 " : ""}
+                    {side.currency}
+                  </span>
+                  <span className="text-xl font-extrabold tabular-nums text-foreground">
+                    {formatAmount(side.amount)}
+                  </span>
+                </p>
+              ) : (
+                <p className="text-xl font-extrabold text-muted-foreground">{"\u2014"}</p>
+              )}
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {loading ? "\u00a0" : side ? caption(side.cases) : "Unavailable right now"}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {anyApprox ? (
+        <p className="mt-2.5 text-[10px] leading-snug text-muted-foreground">
+          Amounts in other currencies are converted to your local currency at today's approximate rate.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 function getInitials(name: string): string {
   const letters = name
     .trim()
@@ -235,6 +321,39 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const displayName = user?.fullName ?? "";
   const roleLabel =
     role === "hero" ? "Hero" : role === "requester" ? "Requester" : null;
+
+  // "Your impact": loaded the first time the menu opens (and refreshed if the
+  // numbers are more than a minute old) so normal pages make no extra requests.
+  const [impact, setImpact] = useState<HelpImpact | null>(null);
+  const [impactState, setImpactState] = useState<ImpactState>("idle");
+  const impactLoadedAt = useRef(0);
+  const userId = user?.id;
+
+  useEffect(() => {
+    setImpact(null);
+    setImpactState("idle");
+    impactLoadedAt.current = 0;
+  }, [userId]);
+
+  useEffect(() => {
+    if (!menuOpen || !isAuthenticated || !userId) return;
+    if (Date.now() - impactLoadedAt.current < 60000) return;
+    let cancelled = false;
+    setImpactState((current) => (current === "ready" ? current : "loading"));
+    loadHelpImpact(userId)
+      .then((result) => {
+        if (cancelled) return;
+        impactLoadedAt.current = Date.now();
+        setImpact(result);
+        setImpactState("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setImpactState((current) => (current === "ready" ? current : "error"));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [menuOpen, isAuthenticated, userId]);
 
   // Close the mobile menu after any navigation.
   useEffect(() => {
@@ -579,6 +698,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             aria-label="Mobile navigation"
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4"
           >
+            {isAuthenticated && <ImpactCard state={impactState} impact={impact} />}
+
             {/* Donation / community contribution */}
             <Link
               to="/donation"
