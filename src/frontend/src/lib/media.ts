@@ -20,6 +20,19 @@ export function resolveMediaUrl(value: unknown): string {
 
 export function handleImageError(event: SyntheticEvent<HTMLImageElement>): void {
   const image = event.currentTarget;
+  const original = image.dataset.originalSrc || image.currentSrc || image.src;
+  const retryCount = Number(image.dataset.imageRetry || "0");
+
+  // A mobile browser/CDN can briefly return a stale 404 or incomplete response.
+  // Retry once with a cache-busting query before showing the placeholder.
+  if (retryCount === 0 && original && !original.includes("placeholder.svg")) {
+    image.dataset.originalSrc = original;
+    image.dataset.imageRetry = "1";
+    const separator = original.includes("?") ? "&" : "?";
+    image.src = `${original}${separator}img_retry=${Date.now()}`;
+    return;
+  }
+
   if (image.dataset.fallbackApplied === "1") return;
   image.dataset.fallbackApplied = "1";
   image.src = FALLBACK_IMAGE;
