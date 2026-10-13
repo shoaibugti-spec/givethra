@@ -275,9 +275,18 @@ function RootLayout() {
   useEffect(() => {
     if (!isAuthenticated || !user || isAdmin || location.pathname === "/edit-profile") return;
     let cancelled = false;
+    const setupMarkerKey = `givethra_profile_setup_completed:${user.id}`;
+    try {
+      if (localStorage.getItem(setupMarkerKey) === "1") return;
+    } catch {
+      // Continue with the server marker when browser storage is unavailable.
+    }
     setChecking(true);
     getProfile(user.id, role)
       .then((profile) => {
+        if (profile?.profile_setup_completed_at) {
+          try { localStorage.setItem(setupMarkerKey, "1"); } catch { /* ignore storage restrictions */ }
+        }
         if (!cancelled && !profile?.profile_setup_completed_at) {
           navigate({ to: "/edit-profile", search: { setup: "1" } });
         }

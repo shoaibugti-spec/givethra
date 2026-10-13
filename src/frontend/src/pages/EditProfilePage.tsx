@@ -462,6 +462,11 @@ export default function EditProfilePage() {
 
       if (setupMode) {
         try {
+          localStorage.setItem(`givethra_profile_setup_completed:${user.id}`, "1");
+        } catch {
+          // The server-side marker remains authoritative when storage is unavailable.
+        }
+        try {
           sessionStorage.setItem("givethra_kyc_return_to", "/");
         } catch {
           // Continue even when browser storage is unavailable.
