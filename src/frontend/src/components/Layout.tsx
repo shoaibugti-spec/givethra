@@ -80,6 +80,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
+  const isHomeRoute = router.location.pathname === "/" || router.location.pathname === "/home";
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
@@ -498,17 +499,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      <a
-        href={WHATSAPP_SUPPORT_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="24/7 WhatsApp Support"
-        className={`fixed ${isAuthenticated ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-5"} right-4 z-50 inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-green-600/15 transition hover:bg-green-700 hover:shadow-xl md:bottom-6 md:right-6`}
-      >
-        <MessageCircle className="h-5 w-5" />
-        <span className="hidden sm:inline">24/7 WhatsApp Support</span>
-        <span className="sm:hidden">Support</span>
-      </a>
+      {!isHomeRoute && (
+        <a
+          href={WHATSAPP_SUPPORT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="24/7 WhatsApp Support"
+          className={`fixed ${isAuthenticated ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-5"} right-4 z-50 inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-green-600/15 transition hover:bg-green-700 hover:shadow-xl md:bottom-6 md:right-6`}
+        >
+          <MessageCircle className="h-5 w-5" />
+          <span className="hidden sm:inline">24/7 WhatsApp Support</span>
+          <span className="sm:hidden">Support</span>
+        </a>
+      )}
     </div>
   );
 }

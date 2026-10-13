@@ -18,6 +18,11 @@ describe("navigation and support search regression", () => {
     expect(layoutSource).toContain('isAuthenticated ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-5"');
   });
 
+  it("does not render a second floating support action on Home", () => {
+    expect(layoutSource).toContain('const isHomeRoute = router.location.pathname === "/" || router.location.pathname === "/home";');
+    expect(layoutSource).toContain("{!isHomeRoute && (");
+  });
+
   it("keeps support search keyboard/button submission and profile result links", () => {
     expect(homeSource).toContain('placeholder="Search name or @username"');
     expect(homeSource).toContain('inputMode="search"');
