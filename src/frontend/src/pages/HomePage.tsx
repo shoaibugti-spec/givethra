@@ -329,8 +329,13 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
   const [supportEarningsUsd, setSupportEarningsUsd] = useState(0);
   const [earningsSummary, setEarningsSummary] = useState<any>(null);
   const [activeMoneyTab, setActiveMoneyTab] = useState<"earning" | "support" | "wallet">(() => {
-    const saved = typeof window !== "undefined" ? window.localStorage.getItem("givethra_home_mode") : null;
-    return saved === "earning" || saved === "wallet" ? saved : "support";
+    if (typeof window === "undefined") return "support";
+    try {
+      const saved = window.localStorage.getItem("givethra_home_mode");
+      return saved === "earning" || saved === "wallet" ? saved : "support";
+    } catch {
+      return "support";
+    }
   });
   const [withdrawalForm, setWithdrawalForm] = useState({ amount: "", bank_name: "", account_title: "", account_number: "" });
   const [posts, setPosts] = useState<any[]>([]);
@@ -597,7 +602,15 @@ export default function HomePage() {
   const [unlockCount, setUnlockCount] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [homeMode, setHomeMode] = useState<"support" | "earning">(() => (window.location.pathname !== "/" && (localStorage.getItem("givethra_home_mode") === "earning" || localStorage.getItem("givethra_home_mode") === "wallet") ? "earning" : "support"));
+  const [homeMode, setHomeMode] = useState<"support" | "earning">(() => {
+    if (typeof window === "undefined" || window.location.pathname === "/") return "support";
+    try {
+      const saved = window.localStorage.getItem("givethra_home_mode");
+      return saved === "earning" || saved === "wallet" ? "earning" : "support";
+    } catch {
+      return "support";
+    }
+  });
   const [showWhatsAppWelcome, setShowWhatsAppWelcome] = useState(false);
   const whatsappWelcomeStorageKey = `givethra_whatsapp_welcome_last_seen:${user?.id ? `user:${user.id}` : "guest"}`;
 

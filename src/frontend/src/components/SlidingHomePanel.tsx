@@ -12,8 +12,12 @@ const TABS: Array<{ id: PanelTab; label: string; icon: typeof DollarSign }> = [
 export default function SlidingHomePanel({ children, onTabChange }: SlidingHomePanelProps) {
   const [activeTab, setActiveTab] = useState<PanelTab>(() => {
     if (typeof window === "undefined") return "support";
-    const saved = window.localStorage.getItem("givethra_home_mode");
-    return saved === "earning" || saved === "wallet" ? saved : "support";
+    try {
+      const saved = window.localStorage.getItem("givethra_home_mode");
+      return saved === "earning" || saved === "wallet" ? saved : "support";
+    } catch {
+      return "support";
+    }
   });
   useEffect(() => {
     const onModeChange = (event: Event) => {

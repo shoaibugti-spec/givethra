@@ -121,7 +121,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const timer = window.setInterval(loadSupportPostCount, 20000);
     const handleSupportPostsSeen = (event: Event) => {
       const newest = Number((event as CustomEvent<{ newest?: number }>).detail?.newest || Date.now());
-      try { window.localStorage.setItem("givethra_my_help_posts_seen_at", String(newest)); } catch {}
+      try {
+        window.localStorage.setItem("givethra_my_help_posts_seen_at", String(newest));
+      } catch {
+        // Restricted browsers may block storage; the badge can still reset in memory.
+      }
       setSupportPostCount(0);
     };
     window.addEventListener("givethra-support-posts-seen", handleSupportPostsSeen);
@@ -169,7 +173,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             to={isAuthenticated ? "/home" : "/"}
             onClick={() => {
               if (!isAuthenticated) return;
-              try { window.localStorage.setItem("givethra_home_mode", "support"); } catch {}
+              try {
+                window.localStorage.setItem("givethra_home_mode", "support");
+              } catch {
+                // Restricted browsers should still be able to navigate home.
+              }
               window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" }));
             }}
             aria-label="Givethra home"

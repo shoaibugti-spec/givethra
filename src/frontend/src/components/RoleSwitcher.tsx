@@ -4,13 +4,27 @@ import { useNavigate } from "@tanstack/react-router";
 import { DollarSign, HeartHandshake } from "lucide-react";
 import { useEffect, useState } from "react";
 
+function persistHomeMode(tab: "support" | "earning") {
+  try {
+    window.localStorage.setItem("givethra_home_mode", tab);
+  } catch {
+    // Restricted browsers can still switch tabs in memory.
+  }
+}
+
 export default function RoleSwitcher({ supportPostCount = 0 }: { supportPostCount?: number }) {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [switching, setSwitching] = useState(false);
-  const [activeTab, setActiveTab] = useState<"support" | "earning">(() =>
-    typeof window !== "undefined" && window.location.pathname !== "/" && (window.localStorage.getItem("givethra_home_mode") === "earning" || window.localStorage.getItem("givethra_home_mode") === "wallet") ? "earning" : "support"
-  );
+  const [activeTab, setActiveTab] = useState<"support" | "earning">(() => {
+    if (typeof window === "undefined" || window.location.pathname === "/") return "support";
+    try {
+      const saved = window.localStorage.getItem("givethra_home_mode");
+      return saved === "earning" || saved === "wallet" ? "earning" : "support";
+    } catch {
+      return "support";
+    }
+  });
 
   useEffect(() => {
     const onModeChange = (event: Event) => {
@@ -25,7 +39,7 @@ export default function RoleSwitcher({ supportPostCount = 0 }: { supportPostCoun
     setSwitching(true);
     try {
       setActiveTab(tab);
-      localStorage.setItem("givethra_home_mode", tab);
+      persistHomeMode(tab);
       window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: tab }));
       navigate({ to: "/home" });
     } finally {
