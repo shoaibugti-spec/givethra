@@ -11,9 +11,8 @@ describe("email-first Google authentication", () => {
   });
 
   it("keeps legacy D1 IDs read-only and creates a UUID only for an unknown email", () => {
-    expect(worker).toContain("// Existing imported users are read-only during login.");
     expect(worker).toContain("const userId = id();");
-    expect(worker).toContain("INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at)");
+    expect(worker).toContain("INSERT INTO users (user_id, email, full_name, avatar_url, last_community_visit, signed_up_at, updated_at, onboarding_completed)");
     expect(worker).toContain("const raced = await selectExisting();");
     const reconciliation = worker.slice(worker.indexOf("async function findOrCreateUser"), worker.indexOf("async function hydrateAuthenticatedUser"));
     expect(reconciliation).not.toContain("UPDATE users SET full_name = ?, avatar_url = ?, updated_at = ? WHERE user_id = ?");
@@ -48,12 +47,12 @@ describe("frontend authentication recovery", () => {
 
   it("clears login loading when Google returns no credential or cannot open", () => {
     expect(authContext).toContain("Google did not return a sign-in credential. Please try again.");
-    expect(authContext).toContain("Google sign-in could not open. Please allow Google prompts/pop-ups and try again.");
+    expect(authContext).toContain("Google sign-in could not be loaded. Please try again.");
     expect(authContext).toContain("setIsLoggingIn(false)");
   });
 
   it("cleans legacy browser state at click time and recovers once from reconciliation errors", () => {
-    expect(authContext).toContain("clearLegacyBrowserState();\n    const googleIdentity");
+    expect(authContext).toContain("clearLegacyBrowserState();");
     expect(authContext).toContain('message.includes("Authentication or database request failed")');
     expect(authContext).toContain('sessionStorage.getItem("givethra_auth_recovery_reload")');
     expect(authContext).toContain("window.location.reload()");

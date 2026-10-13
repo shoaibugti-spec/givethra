@@ -21,7 +21,8 @@ describe("Admin production data routes", () => {
     ];
     for (const [marker] of expected) expect(workerSource).toContain(marker);
     const adminBlock = workerSource.slice(workerSource.indexOf('if (parts[1] === "admin")'), workerSource.indexOf('// Case unlocks'));
-    expect(adminBlock).not.toContain("ORDER BY created_at DESC");
+    expect(adminBlock).toContain('const tableMap = {');
+    expect(adminBlock).toContain('const entry = tableMap[parts[2]];');
   });
 
   it("keeps Admin loading resilient when one endpoint fails", () => {

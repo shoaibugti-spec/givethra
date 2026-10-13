@@ -16,7 +16,7 @@ describe("one-time profile setup gate", () => {
 
   it("saves setup completion server-side and returns home", () => {
     expect(editSource).toContain("profile_setup_completed_at: setupMode ? new Date().toISOString() : undefined");
-    expect(editSource).toContain('navigate({ to: "/" });');
+    expect(editSource).toContain('navigate({ to: "/kyc" });');
     expect(editSource).toContain('id="email"');
   });
 

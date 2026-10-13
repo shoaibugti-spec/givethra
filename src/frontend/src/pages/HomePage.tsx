@@ -1537,7 +1537,7 @@ export default function HomePage() {
 
         <section className="py-8 px-4 bg-background border-y border-border">
           <div className="mx-auto max-w-3xl rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-teal-50 p-6 text-center shadow-sm">
-            <p className="text-2xl">📱</p><h2 className="mt-2 font-display text-xl font-bold">Get the Givethra Android App</h2><p className="mt-1 text-sm text-muted-foreground">Verified cases, anytime — right on your phone.</p><Button className="mt-4">Download App</Button><div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4"><span>Verified &amp; Secure</span><span>100% Transparency</span><span>Compassion</span><span>Global Community</span><span>Safe &amp; Private</span><span>Your Data is Protected</span></div>
+            <p className="text-2xl">📱</p><h2 className="mt-2 font-display text-xl font-bold">Get the Givethra Android App</h2><p className="mt-1 text-sm text-muted-foreground">Verified cases, anytime — right on your phone.</p><a href="/Givethra.apk" download="Givethra.apk" className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">Download App</a><div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4"><span>Verified &amp; Secure</span><span>100% Transparency</span><span>Compassion</span><span>Global Community</span><span>Safe &amp; Private</span><span>Your Data is Protected</span></div>
           </div>
         </section>
         <section className="py-8 px-4 bg-muted/30 border-y border-border">
