@@ -366,8 +366,12 @@ export default function AdminPage() {
       ]);
       const rowsAt = (index: number) => {
         const result = results[index];
-        return result?.status === "fulfilled" ? asRows(result.value) : [];
+        return result?.status === "fulfilled" ? asRows(result.value) : null;
       };
+      const failedSections = results.filter((result) => result.status === "rejected").length;
+      if (failedSections > 0) {
+        toast.warning(`${failedSections} Admin section${failedSections === 1 ? "" : "s"} could not be loaded. Other data remains available.`);
+      }
       const kyc = rowsAt(0);
       const cases = rowsAt(1);
       const res = rowsAt(2);
@@ -380,22 +384,24 @@ export default function AdminPage() {
       const offs = rowsAt(9);
       const susp = rowsAt(10);
       const wds = rowsAt(11);
-      setKycList(kyc);
-      setCaseList(cases);
-      setResolutions(res);
-      setDeposits(deps);
-      setProfiles(profs);
-      setWallets(wals);
-      setUnlocks(unl);
-      setSupportMsgs(sup);
-      setFeedbacks(fbs.map((feedback: any) => ({
-        ...feedback,
-        status: String(feedback.status || "pending_review").toLowerCase() === "pending" ? "pending_review" : String(feedback.status || "pending_review").toLowerCase(),
-      })));
-      setOffers(offs);
-      setSuspensions(susp);
-      setWithdrawals(wds);
-      setUnreadSupport(sup.filter((m: any) => m.sender === "user" && !m.is_read).length);
+      if (kyc) setKycList(kyc);
+      if (cases) setCaseList(cases);
+      if (res) setResolutions(res);
+      if (deps) setDeposits(deps);
+      if (profs) setProfiles(profs);
+      if (wals) setWallets(wals);
+      if (unl) setUnlocks(unl);
+      if (sup) {
+        setSupportMsgs(sup);
+        setUnreadSupport(sup.filter((m: any) => m.sender === "user" && !m.is_read).length);
+      }
+      if (fbs) setFeedbacks(fbs.map((feedback: any) => ({
+          ...feedback,
+          status: String(feedback.status || "pending_review").toLowerCase() === "pending" ? "pending_review" : String(feedback.status || "pending_review").toLowerCase(),
+        })));
+      if (offs) setOffers(offs);
+      if (susp) setSuspensions(susp);
+      if (wds) setWithdrawals(wds);
     } catch (err) {
       console.error("Admin data load error:", err);
       toast.error("Failed to load admin data.");

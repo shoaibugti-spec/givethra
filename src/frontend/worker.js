@@ -740,6 +740,21 @@ async function handleProfile(request, env, user, parts, origin) {
 // ============================================================
 //  KYC HANDLER
 // ============================================================
+function validateKycRecord(record) {
+  const documentType = String(record?.document_type || "cnic").trim().toLowerCase();
+  if (!record?.full_name || String(record.full_name).trim().length < 3) return "Full name is required.";
+  if (!['cnic', 'passport'].includes(documentType)) return "Choose a valid identity document type.";
+  const isHttpsUrl = (value) => typeof value === "string" && /^https:\/\//i.test(value.trim());
+  if (!isHttpsUrl(record.face_video_url) || !isHttpsUrl(record.selfie_url)) return "A valid selfie and face video are required.";
+  if (documentType === "cnic") {
+    if (!/^\d{5}-?\d{7}-?\d$/.test(String(record.cnic_number || "").trim())) return "Enter a valid 13-digit CNIC number.";
+    if (!isHttpsUrl(record.cnic_front_url) || !isHttpsUrl(record.cnic_back_url)) return "Both CNIC photos are required.";
+  } else if (!isHttpsUrl(record.passport_url)) {
+    return "A valid passport file is required.";
+  }
+  return null;
+}
+
 async function handleKyc(request, env, user, url, parts, origin) {
   const queryUser = requestedUserId(url);
   const target = queryUser || user.user_id;
@@ -754,6 +769,8 @@ async function handleKyc(request, env, user, url, parts, origin) {
   if (request.method === "POST") {
     const body = await readJson(request);
     const record = pick(body, ["full_name", "date_of_birth", "address", "cnic_number", "cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url", "document_type"]);
+    const validationError = validateKycRecord(record);
+    if (validationError) return json({ error: validationError, code: "KYC_VALIDATION_FAILED" }, 400, origin);
     const existing = await env.DB.prepare(
       "SELECT * FROM kyc_submissions WHERE user_id = ? ORDER BY submitted_at DESC, rowid DESC LIMIT 1"
     ).bind(user.user_id).first();
@@ -803,6 +820,8 @@ async function handleKyc(request, env, user, url, parts, origin) {
     }
     const body = await readJson(request);
     const record = pick(body, ["full_name", "date_of_birth", "address", "cnic_number", "cnic_front_url", "cnic_back_url", "selfie_url", "passport_url", "face_video_url", "document_type"]);
+    const validationError = validateKycRecord(record);
+    if (validationError) return json({ error: validationError, code: "KYC_VALIDATION_FAILED" }, 400, origin);
     await env.DB.prepare(
       "UPDATE kyc_submissions SET full_name = ?, date_of_birth = ?, address = ?, cnic_number = ?, cnic_front_url = ?, cnic_back_url = ?, selfie_url = ?, passport_url = ?, face_video_url = ?, document_type = ?, status = 'pending', rejection_reason = NULL, reviewed_at = NULL, reviewed_by = NULL, submitted_at = ? WHERE id = ? AND user_id = ?"
     ).bind(record.full_name || null, record.date_of_birth || null, record.address || null, record.cnic_number || null, record.cnic_front_url || null, record.cnic_back_url || null, record.selfie_url || null, record.passport_url || null, record.face_video_url || null, record.document_type || null, now(), parts[2], user.user_id).run();

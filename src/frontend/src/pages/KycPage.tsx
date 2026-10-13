@@ -163,7 +163,7 @@ export default function KycPage() {
     setOcrError(null);
     const canvas = grabFrame();
     if (!canvas) {
-      toast.error("Tasveer nahi li ja saki. Dobara koshish karein.");
+      toast.error("The photo could not be captured. Please try again.");
       return;
     }
     
@@ -198,19 +198,19 @@ export default function KycPage() {
           setOcrProcessing(false);
           setForm(p => ({ ...p, cnic_number: formatted }));
           finalizeCapture(capturedKind, capturedCanvas);
-          toast.success(`CNIC number parh liya: ${formatted}. Agar galat hai to khud durust kar lein.`);
+          toast.success(`CNIC number detected: ${formatted}. You can correct it manually if needed.`);
         } else {
           setOcrProcessing(false);
-          setOcrError("CNIC number saaf nahi parha gaya. CNIC ko seedha, poora aur roshni mein rakh kar dobara capture karein.");
-          toast.error("CNIC number saaf nahi parha gaya. Dobara koshish karein.");
+          setOcrError("The CNIC number could not be read clearly. Keep the complete CNIC straight and well lit, then capture it again.");
+          toast.error("The CNIC number could not be read clearly. Please try again.");
           setCapturedImage(null);
           setCapturedCanvas(null);
           setCapturedKind(null);
         }
       } catch {
         setOcrProcessing(false);
-        setOcrError("OCR fail ho gaya. Dobara koshish karein.");
-        toast.error("OCR fail ho gaya. Dobara koshish karein.");
+        setOcrError("Automatic text recognition failed. Please try again.");
+        toast.error("Automatic text recognition failed. Please try again.");
         setCapturedImage(null);
         setCapturedCanvas(null);
         setCapturedKind(null);
@@ -495,7 +495,7 @@ export default function KycPage() {
 
           {isFront && (
             <div className="rounded-xl bg-teal-500/10 border border-teal-500/20 p-3 text-sm text-teal-800 dark:text-teal-300">
-              ✅ Tasveer capture ho gayi hai. "Verify & Confirm" dabayein — OCR number parh kar auto-fill kar dega. Agar koi ghalti ho to baad mein khud durust kar sakte hain.
+              ✅ Photo captured. Select "Verify & Confirm" to detect and fill the CNIC number. You can correct it manually if needed.
             </div>
           )}
 
@@ -506,7 +506,7 @@ export default function KycPage() {
           {isFront && ocrProcessing && (
             <div className="text-center text-sm text-primary py-2 flex items-center justify-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
-              Tasveer se number parha ja raha hai...
+              Reading the number from the photo...
             </div>
           )}
           
@@ -705,10 +705,10 @@ export default function KycPage() {
                   />
                   {form.cnic_number && cnicFrontPreview ? (
                     <p className="text-xs text-teal-600 flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> OCR se number auto-fill ho gaya hai. Agar koi ghalti hai to khud durust kar lein.
+                    <CheckCircle2 className="h-3.5 w-3.5" /> The number was filled automatically. Please correct it manually if needed.
                     </p>
                   ) : (
-                    <p className="text-xs text-muted-foreground">CNIC front capture ke baad OCR number auto-fill kar dega. Agar ghalti ho to khud theek kar sakte hain.</p>
+                    <p className="text-xs text-muted-foreground">The CNIC front scan will fill the number automatically. You can correct it manually if needed.</p>
                   )}
                   {form.cnic_number && !/^\d{5}-\d{7}-\d{1}$/.test(form.cnic_number) && (
                     <p className="text-xs text-red-500">⚠️ Format: 00000-0000000-0 (13 digits)</p>

@@ -275,7 +275,7 @@ export async function insertKycSubmission(data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function updateKycSubmission(id: string, data: any) {
@@ -284,7 +284,7 @@ export async function updateKycSubmission(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 // ---------- PROFILES ----------
@@ -717,42 +717,42 @@ export async function uploadFileToStorage(file: File, path: string): Promise<str
 // ---------- ADMIN APIs ----------
 export async function adminGetAllKyc() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/kyc`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminGetAllCases() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/cases`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminGetAllResolutions() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/resolutions`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminGetAllDeposits() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/deposits`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminGetAllProfiles() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/profiles`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminGetAllWallets() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/wallets`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminGetAllUnlocks() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/unlocks`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminGetAllSupportMessages() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/support-messages`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminSendSupportReply(data: Record<string, unknown>) {
@@ -779,7 +779,7 @@ export async function adminMarkSupportMessagesAsRead(userId: string) {
 
 export async function adminGetAllFeedbacks() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/feedbacks`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminBroadcastNotification(data: Record<string, unknown>) {
@@ -795,12 +795,12 @@ export async function adminBroadcastNotification(data: Record<string, unknown>) 
 
 export async function adminGetAllOffers() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/offers`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminGetAllSuspensions() {
   const res = await fetchWithAuth(`${WORKER_URL}/api/admin/suspensions`, { headers: headers() });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminUpdateKyc(id: string, data: any) {
@@ -817,7 +817,7 @@ export async function adminUpdateCase(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminUpdateFeedback(id: string, data: any) {
@@ -826,7 +826,7 @@ export async function adminUpdateFeedback(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminUpdateResolution(id: string, data: any) {
@@ -835,7 +835,7 @@ export async function adminUpdateResolution(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminUpdateDeposit(id: string, data: any) {
@@ -844,7 +844,7 @@ export async function adminUpdateDeposit(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminCloseCase(id: string, data: any) {
@@ -853,7 +853,7 @@ export async function adminCloseCase(id: string, data: any) {
     headers: headers(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readApiResponse(res);
 }
 
 export async function adminGetUserSuspension(userId: string) {
