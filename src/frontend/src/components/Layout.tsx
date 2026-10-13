@@ -22,6 +22,18 @@ import {
   Settings,
   Lock,
   KeyRound,
+  HeartHandshake,
+  LayoutList,
+  Wallet,
+  Compass,
+  Sparkles,
+  LifeBuoy,
+  Info,
+  HelpCircle,
+  LogOut,
+  ChevronRight,
+  FileText,
+  Users,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
@@ -68,6 +80,147 @@ function NavLink({
   );
 }
 
+// ---------- Mobile drawer building blocks ----------
+type DrawerIcon = React.ComponentType<{ className?: string }>;
+
+function DrawerSectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-3 pb-1.5 pt-6 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+function DrawerRow({
+  to,
+  icon: Icon,
+  label,
+  hint,
+  badge,
+  active,
+  external,
+  onNavigate,
+}: {
+  to: string;
+  icon: DrawerIcon;
+  label: string;
+  hint?: string;
+  badge?: string | number | null;
+  active?: boolean;
+  external?: boolean;
+  onNavigate: () => void;
+}) {
+  const className = cn(
+    "flex min-h-[52px] touch-manipulation select-none items-center gap-3 rounded-xl px-2.5 py-2 text-[15px] font-semibold transition-colors active:bg-muted",
+    active ? "bg-primary/10 text-primary" : "text-foreground"
+  );
+  const content = (
+    <>
+      <span
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+          active
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted text-muted-foreground"
+        )}
+      >
+        <Icon className="h-[18px] w-[18px]" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate leading-tight">{label}</span>
+        {hint ? (
+          <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
+            {hint}
+          </span>
+        ) : null}
+      </span>
+      {badge ? (
+        <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+          {badge}
+        </span>
+      ) : null}
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+    </>
+  );
+  if (external) {
+    return (
+      <a
+        href={to}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onNavigate}
+        className={className}
+      >
+        {content}
+      </a>
+    );
+  }
+  return (
+    <Link to={to} onClick={onNavigate} className={className}>
+      {content}
+    </Link>
+  );
+}
+
+function DrawerTile({
+  to,
+  icon: Icon,
+  label,
+  badge,
+  active,
+  onNavigate,
+}: {
+  to: string;
+  icon: DrawerIcon;
+  label: string;
+  badge?: string | number | null;
+  active?: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <Link
+      to={to}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "relative flex min-h-[88px] touch-manipulation select-none flex-col justify-between rounded-2xl border p-3.5 transition active:scale-[.98]",
+        active
+          ? "border-primary/40 bg-primary/10"
+          : "border-border bg-background"
+      )}
+    >
+      <span
+        className={cn(
+          "flex h-9 w-9 items-center justify-center rounded-xl",
+          active
+            ? "bg-primary text-primary-foreground"
+            : "bg-primary/10 text-primary"
+        )}
+      >
+        <Icon className="h-[18px] w-[18px]" />
+      </span>
+      <span className="text-sm font-bold text-foreground">{label}</span>
+      {badge ? (
+        <span className="absolute right-3 top-3 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white">
+          {badge}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
+
+function getInitials(name: string): string {
+  const letters = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  return letters || "G";
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
   const { isAuthenticated, logout, user } = useAuth();
@@ -80,6 +233,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
+  const roleLabel =
+    role === "hero" ? "Hero" : role === "requester" ? "Requester" : null;
+
+  // Close the mobile menu after any navigation.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [router.location.pathname]);
+
+  // While the menu is open: lock page scroll, close on Escape, and close if
+  // the screen grows to desktop width (so scroll is never left locked).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    const onResize = () => {
+      if (window.innerWidth >= 768) setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
@@ -165,6 +346,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
             className="md:hidden h-11 w-11 shrink-0 touch-manipulation flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
           >
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -274,6 +456,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
             <NavLink to="/cases">Browse Cases</NavLink>
             <NavLink to="/dreams">Dreams</NavLink>
+            <NavLink to="/donation">Contribute</NavLink>
             {isAuthenticated && <NavLink to="/my-help">My Help</NavLink>}
             {isAuthenticated && <NavLink to="/my-cases">My Cases</NavLink>}
             {isAuthenticated && (
@@ -285,135 +468,247 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* ===== MOBILE MENU ===== */}
-        {menuOpen && (
-          <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
-            <NavLink to="/cases" onClick={closeMenu}>
-              Browse Cases
-            </NavLink>
-            <div className="py-1"><NavLink to="/dreams" onClick={closeMenu}>Dreams</NavLink></div>
-            {isAuthenticated && (
-              <>
-                <div className="py-1"><NavLink to="/my-help" onClick={closeMenu}>My Help</NavLink></div>
-                <div className="py-1"><NavLink to="/my-cases" onClick={closeMenu}>My Cases</NavLink></div>
-                <div className="py-1">
-                  <NavLink to="/support" onClick={closeMenu}>
-                    Help & Support
-                  </NavLink>
-                </div>
-              </>
-            )}
-            {isAdmin && (
-              <div className="py-1">
-                <NavLink to="/admin" onClick={closeMenu}>
-                  Admin Panel
-                </NavLink>
-              </div>
-            )}
-            <div className="py-1">
-              <NavLink to="/about" onClick={closeMenu}>
-                About
-              </NavLink>
-            </div>
-            <div className="py-1">
-              <NavLink to="/faq" onClick={closeMenu}>
-                FAQ
-              </NavLink>
-            </div>
+      </header>
 
-            {isAuthenticated && (
-              <>
-                <div className="pt-3 mt-1 border-t border-border">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                    Account
-                  </p>
-                </div>
-                <div className="py-1 flex items-center gap-2">
-                  <Settings className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/settings" onClick={closeMenu}>
-                    Settings
-                  </NavLink>
-                </div>
-                <div className="py-1 flex items-center gap-2">
-                  <Lock className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/privacy" onClick={closeMenu}>
-                    Privacy Policy
-                  </NavLink>
-                </div>
-                <div className="py-1 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/security" onClick={closeMenu}>
-                    Security
-                  </NavLink>
-                </div>
-                <div className="py-1 flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/account-privacy" onClick={closeMenu}>
-                    Account Privacy
-                  </NavLink>
-                </div>
-              </>
-            )}
-
-            <div className="pt-1">
+      {/* ===== MOBILE MENU (full-height drawer) =====
+          Rendered outside <header> on purpose: the header is a sticky z-50
+          stacking context, so a menu inside it would sit under the bottom nav
+          and could never scroll. This drawer is fixed, scrollable and always
+          shows the logout / sign-in buttons at the bottom. */}
+      <div
+        className={cn(
+          "fixed inset-0 z-[100] md:hidden transition-[visibility] duration-300",
+          menuOpen ? "visible" : "invisible"
+        )}
+        aria-hidden={!menuOpen}
+      >
+        <div
+          onClick={closeMenu}
+          className={cn(
+            "absolute inset-0 bg-slate-950/60 transition-opacity duration-300",
+            menuOpen ? "opacity-100" : "opacity-0"
+          )}
+        />
+        <aside
+          id="mobile-menu"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Main menu"
+          className={cn(
+            "absolute inset-y-0 left-0 flex w-[88%] max-w-[380px] flex-col bg-card shadow-2xl transition-transform duration-300 ease-out",
+            menuOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          {/* Header / identity */}
+          <div
+            className="relative shrink-0 overflow-hidden bg-gradient-to-br from-primary via-primary to-teal-700 px-5 pb-5 text-primary-foreground"
+            style={{ paddingTop: "max(1.25rem, env(safe-area-inset-top))" }}
+          >
+            <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10" />
+            <div className="pointer-events-none absolute -bottom-16 right-20 h-36 w-36 rounded-full bg-white/10" />
+            <div className="relative flex items-center justify-between">
+              <Link
+                to={isAuthenticated ? "/home" : "/"}
+                onClick={closeMenu}
+                aria-label="Givethra home"
+                className="flex items-center gap-2"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
+                  <Heart className="h-[18px] w-[18px]" fill="currentColor" />
+                </span>
+                <span className="font-display text-xl font-bold tracking-tight">
+                  Givethra
+                </span>
+              </Link>
               <button
                 type="button"
-                onClick={() => {
-                  toggleTheme();
-                  closeMenu();
-                }}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors"
+                onClick={closeMenu}
+                aria-label="Close menu"
+                className="flex h-10 w-10 touch-manipulation items-center justify-center rounded-full bg-white/15 transition active:bg-white/25"
               >
-                {theme === "dark" ? (
-                  <>
-                    <Sun className="h-4 w-4" /> Light Mode
-                  </>
-                ) : (
-                  <>
-                    <Moon className="h-4 w-4" /> Dark Mode
-                  </>
-                )}
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="pt-3 border-t border-border mt-2 space-y-2">
-              {isAuthenticated ? (
-                <>
-                  <Link
-                    to="/profile/$id"
-                    params={{ id: "me" }}
-                    onClick={closeMenu}
-                  >
-                    <Button variant="outline" size="sm" className="w-full">
-                      <Shield className="h-4 w-4 mr-2" /> Profile
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleLogout}
-                  >
-                    Logout
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Link to="/sign-in" onClick={closeMenu}>
-                    <Button variant="outline" size="sm" className="w-full">
-                      Sign in
-                    </Button>
-                  </Link>
-                  <Link to="/sign-up" onClick={closeMenu}>
-                    <Button size="sm" className="w-full font-semibold">
-                      Get Started
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
+
+            {isAuthenticated ? (
+              <Link
+                to="/profile/me"
+                onClick={closeMenu}
+                className="relative mt-5 flex items-center gap-3.5 rounded-2xl bg-white/10 p-3 ring-1 ring-white/20 transition active:bg-white/20"
+              >
+                <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/20 text-lg font-bold ring-2 ring-white/40">
+                  {getInitials(displayName)}
+                  {user?.photo ? (
+                    <img
+                      src={user.photo}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                      }}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : null}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-base font-bold leading-tight">
+                    {displayName || "My Profile"}
+                  </span>
+                  {user?.email ? (
+                    <span className="mt-0.5 block truncate text-xs text-white/75">
+                      {user.email}
+                    </span>
+                  ) : null}
+                  {roleLabel ? (
+                    <span className="mt-1.5 inline-block rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                      {roleLabel}
+                    </span>
+                  ) : null}
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-white/70" />
+              </Link>
+            ) : (
+              <p className="relative mt-4 max-w-[240px] text-sm leading-relaxed text-white/85">
+                Verified help. Real impact. Join people helping people.
+              </p>
+            )}
           </div>
-        )}
-      </header>
+
+          {/* Scrollable links */}
+          <nav
+            aria-label="Mobile navigation"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4"
+          >
+            {/* Donation / community contribution */}
+            <Link
+              to="/donation"
+              onClick={closeMenu}
+              className="relative mt-4 block touch-manipulation select-none overflow-hidden rounded-2xl bg-gradient-to-br from-amber-300 via-amber-200 to-amber-100 p-4 text-amber-950 shadow-md ring-1 ring-amber-400/50 transition active:scale-[.99]"
+            >
+              <WalletCards className="pointer-events-none absolute -bottom-4 -right-3 h-28 w-28 text-amber-500/25" />
+              <span className="relative flex items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-950 text-amber-200">
+                  <Heart className="h-5 w-5" fill="currentColor" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[10px] font-extrabold uppercase tracking-[0.16em] text-amber-900/70">
+                    Community contribution
+                  </span>
+                  <span className="block font-display text-base font-bold leading-tight">
+                    Keep verified help moving
+                  </span>
+                </span>
+              </span>
+              <span className="relative mt-3 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-amber-900/80">
+                  Give once or monthly
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-950 px-3.5 py-1.5 text-xs font-bold text-amber-100">
+                  Contribute <ChevronRight className="h-3.5 w-3.5" />
+                </span>
+              </span>
+            </Link>
+
+            {/* Quick access */}
+            {isAuthenticated && (
+              <div className="mt-4 grid grid-cols-2 gap-2.5">
+                <DrawerTile to="/my-help" icon={HeartHandshake} label="My Help" active={isRouteActive("/my-help")} onNavigate={closeMenu} />
+                <DrawerTile to="/my-cases" icon={LayoutList} label="My Cases" active={isRouteActive("/my-cases")} onNavigate={closeMenu} />
+                <DrawerTile to="/wallet" icon={Wallet} label="Wallet" active={isRouteActive("/wallet")} onNavigate={closeMenu} />
+                <DrawerTile to="/notifications" icon={Bell} label="Notifications" badge={notifCount > 0 ? (notifCount > 99 ? "99+" : notifCount) : null} active={isRouteActive("/notifications")} onNavigate={closeMenu} />
+              </div>
+            )}
+
+            <DrawerSectionTitle>Explore</DrawerSectionTitle>
+            <DrawerRow to="/cases" icon={Compass} label="Browse Cases" hint="Verified people who need help" active={isRouteActive("/cases")} onNavigate={closeMenu} />
+            <DrawerRow to="/dreams" icon={Sparkles} label="Dreams" hint="Shop dreams, support dreams" active={isRouteActive("/dreams")} onNavigate={closeMenu} />
+            {isAdmin && (
+              <DrawerRow to="/admin" icon={Shield} label="Admin Panel" active={isRouteActive("/admin")} onNavigate={closeMenu} />
+            )}
+
+            <DrawerSectionTitle>Help &amp; information</DrawerSectionTitle>
+            {isAuthenticated && (
+              <DrawerRow to="/support" icon={LifeBuoy} label="Help & Support" active={isRouteActive("/support")} onNavigate={closeMenu} />
+            )}
+            <DrawerRow to={WHATSAPP_SUPPORT_URL} external icon={MessageCircle} label="24/7 WhatsApp Support" hint="Chat with our team" onNavigate={closeMenu} />
+            <DrawerRow to="/about" icon={Info} label="About Givethra" active={isRouteActive("/about")} onNavigate={closeMenu} />
+            <DrawerRow to="/faq" icon={HelpCircle} label="FAQ" active={isRouteActive("/faq")} onNavigate={closeMenu} />
+            <DrawerRow to="/contact" icon={Mail} label="Contact Us" active={isRouteActive("/contact")} onNavigate={closeMenu} />
+
+            {isAuthenticated && (
+              <>
+                <DrawerSectionTitle>Account</DrawerSectionTitle>
+                <DrawerRow to="/settings" icon={Settings} label="Settings" active={isRouteActive("/settings")} onNavigate={closeMenu} />
+                <DrawerRow to="/security" icon={Shield} label="Security" active={isRouteActive("/security")} onNavigate={closeMenu} />
+                <DrawerRow to="/account-privacy" icon={KeyRound} label="Account Privacy" active={isRouteActive("/account-privacy")} onNavigate={closeMenu} />
+              </>
+            )}
+
+            <DrawerSectionTitle>Legal</DrawerSectionTitle>
+            <DrawerRow to="/privacy" icon={Lock} label="Privacy Policy" active={isRouteActive("/privacy")} onNavigate={closeMenu} />
+            <DrawerRow to="/terms" icon={FileText} label="Terms" active={isRouteActive("/terms")} onNavigate={closeMenu} />
+            <DrawerRow to="/community-guidelines" icon={Users} label="Community Guidelines" active={isRouteActive("/community-guidelines")} onNavigate={closeMenu} />
+          </nav>
+
+          {/* Footer: always visible */}
+          <div
+            className="shrink-0 border-t border-border bg-card px-4 pt-3"
+            style={{ paddingBottom: "max(0.875rem, env(safe-area-inset-bottom))" }}
+          >
+            <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1" role="group" aria-label="Theme">
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                aria-pressed={theme !== "dark"}
+                className={cn(
+                  "flex min-h-10 touch-manipulation items-center justify-center gap-2 rounded-lg text-sm font-semibold transition",
+                  theme !== "dark" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"
+                )}
+              >
+                <Sun className="h-4 w-4" /> Light
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                aria-pressed={theme === "dark"}
+                className={cn(
+                  "flex min-h-10 touch-manipulation items-center justify-center gap-2 rounded-lg text-sm font-semibold transition",
+                  theme === "dark" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"
+                )}
+              >
+                <Moon className="h-4 w-4" /> Dark
+              </button>
+            </div>
+
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 text-sm font-bold text-red-700 transition active:bg-red-100 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+              >
+                <LogOut className="h-4 w-4" /> Log out
+              </button>
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5">
+                <Link
+                  to="/sign-in"
+                  onClick={closeMenu}
+                  className="flex min-h-12 items-center justify-center rounded-xl border border-border text-sm font-bold text-foreground transition active:bg-muted"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  to="/sign-up"
+                  onClick={closeMenu}
+                  className="flex min-h-12 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-sm transition active:opacity-90"
+                >
+                  Get Started
+                </Link>
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
 
       <main className="flex-1 has-bottom-nav">{children}</main>
 
