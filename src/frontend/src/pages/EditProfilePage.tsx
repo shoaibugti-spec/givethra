@@ -461,7 +461,12 @@ export default function EditProfilePage() {
       toast.success("Profile updated successfully!");
 
       if (setupMode) {
-        navigate({ to: "/" });
+        try {
+          sessionStorage.setItem("givethra_kyc_return_to", "/");
+        } catch {
+          // Continue even when browser storage is unavailable.
+        }
+        navigate({ to: "/kyc" });
       } else {
         navigate({
           to: "/profile/$id",
