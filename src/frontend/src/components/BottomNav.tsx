@@ -32,11 +32,11 @@ export default function BottomNav() {
   ];
 
   return (
-    <nav aria-label="Bottom navigation" data-ocid="bottom_nav" className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="flex h-16 items-stretch">
+    <nav aria-label="Bottom navigation" data-ocid="bottom_nav" className="fixed inset-x-0 bottom-0 z-50 touch-manipulation bg-card border-t border-border md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="flex min-h-16 items-stretch">
         {navItems.map(({ to, label, icon: Icon, ocid }) => {
           const active = to === "/home" ? currentPath === "/" || currentPath === "/home" : currentPath === to || currentPath.startsWith(`${to}/`);
-          return <Link key={to} to={to} data-ocid={ocid} aria-label={label} aria-current={active ? "page" : undefined} className={cn("relative flex flex-1 flex-col items-center justify-center gap-0.5 transition-colors", active ? "text-primary" : "text-muted-foreground hover:text-foreground")}><div className={cn("flex h-8 w-8 items-center justify-center rounded-full", active && "bg-primary/10")}><Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 1.8} /></div><span className={cn("text-[10px] font-medium leading-none", active && "text-primary")}>{label}</span></Link>;
+          return <Link key={to} to={to} data-ocid={ocid} aria-label={label} aria-current={active ? "page" : undefined} className={cn("relative flex min-h-16 flex-1 touch-manipulation select-none flex-col items-center justify-center gap-0.5 transition-colors", active ? "text-primary" : "text-muted-foreground hover:text-foreground")}><div className={cn("flex h-8 w-8 items-center justify-center rounded-full", active && "bg-primary/10")}><Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 1.8} /></div><span className={cn("text-[10px] font-medium leading-none", active && "text-primary")}>{label}</span></Link>;
         })}
       </div>
     </nav>

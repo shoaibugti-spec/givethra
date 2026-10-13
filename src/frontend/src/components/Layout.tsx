@@ -59,7 +59,7 @@ function NavLink({
       to={to}
       onClick={onClick}
       className={cn(
-        "text-sm font-medium transition-colors hover:text-primary",
+        "flex min-h-11 w-full touch-manipulation select-none items-center text-sm font-medium transition-colors hover:text-primary md:min-h-0 md:w-auto",
         isActive ? "text-primary" : "text-muted-foreground"
       )}
     >
@@ -160,7 +160,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
-            className="md:hidden h-10 w-10 shrink-0 flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
+            className="md:hidden h-11 w-11 shrink-0 touch-manipulation flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
           >
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -278,7 +278,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* ===== MOBILE MENU ===== */}
         {menuOpen && (
-          <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
+          <div className="md:hidden relative z-10 border-t border-border bg-card px-4 py-4 space-y-1 touch-manipulation">
             <NavLink to="/cases" onClick={closeMenu}>
               Browse Cases
             </NavLink>
