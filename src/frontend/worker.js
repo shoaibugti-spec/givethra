@@ -651,7 +651,7 @@ async function handleProfile(request, env, user, parts, origin) {
         const counts = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM follows WHERE following_id=?) AS followers, (SELECT COUNT(*) FROM follows WHERE follower_id=?) AS following").bind(userId,userId).first();
         const posts = await getProfileCommunityPosts(env, userId, user?.user_id || "");
         const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-        const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports, profile_setup_completed_at FROM users WHERE user_id = ?").bind(userId).first();
+        const supportData = await env.DB.prepare("SELECT * FROM users WHERE user_id = ?").bind(userId).first();
         const profileData = user?.user_id === userId ? variant : withoutPrivateContact(variant);
         return json({ ...profileData, profile_setup_completed_at: supportData?.profile_setup_completed_at || null, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts }, 200, origin);
       }
@@ -661,7 +661,7 @@ async function handleProfile(request, env, user, parts, origin) {
     const posts = await getProfileCommunityPosts(env, userId, user?.user_id || "");
     const activeCase = profileRole === "requester" ? await env.DB.prepare("SELECT * FROM case_submissions WHERE user_id=? AND lower(COALESCE(status,'')) IN ('approved','open','in_progress') ORDER BY submitted_at DESC LIMIT 1").bind(userId).first() : null;
     const following = user ? await env.DB.prepare("SELECT id FROM follows WHERE follower_id=? AND following_id=?").bind(user.user_id,userId).first() : null;
-    const supportData = await env.DB.prepare("SELECT COALESCE(supports_count, 0) AS supports_count, COALESCE(credits_from_supports, 0) AS credits_from_supports, profile_setup_completed_at FROM users WHERE user_id = ?").bind(userId).first();
+    const supportData = await env.DB.prepare("SELECT * FROM users WHERE user_id = ?").bind(userId).first();
     const profileData = user?.user_id === userId ? (profile || {}) : withoutPrivateContact(profile || {});
     const safeCase = user?.user_id === userId ? activeCase : withoutPrivateContact(activeCase);
     return json({ ...profileData, profile_setup_completed_at: supportData?.profile_setup_completed_at || null, user_id: userId, profile_role: profileRole, followers_count:Number(counts?.followers||0), following_count:Number(counts?.following||0), heroes_count:Number(counts?.followers||0), supports_count:Number(supportData?.supports_count||0), credits_from_supports:Number(supportData?.credits_from_supports||0), is_following:Boolean(following), posts, active_case:safeCase||null }, 200, origin);
