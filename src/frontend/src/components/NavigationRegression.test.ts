@@ -10,6 +10,8 @@ describe("navigation and support search regression", () => {
   it("keeps the mobile menu and a non-overflowing centered switcher", () => {
     expect(layoutSource).toContain('aria-label="Toggle menu"');
     expect(layoutSource).toContain("min-w-0 flex-1 flex items-center justify-center");
+    expect(layoutSource).toContain("bg-card px-4 py-2 touch-manipulation");
+    expect(layoutSource).toContain("items-center gap-2 py-2.5 text-sm");
     expect(switcherSource).toContain('onClick={() => handleSwitch("support")}');
     expect(switcherSource).toContain("min-h-10 min-w-10");
   });

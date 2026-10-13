@@ -12,7 +12,7 @@ describe("mobile navigation touch targets", () => {
   it("uses full-width menu links and stable bottom-nav hit areas", () => {
     const layout = read("./Layout.tsx");
     const bottomNav = read("./BottomNav.tsx");
-    expect(layout).toContain("min-h-11 w-full touch-manipulation");
+    expect(layout).toContain("w-full touch-manipulation select-none items-center gap-2 py-2.5");
     expect(layout).toContain("relative z-10");
     expect(bottomNav).toContain("md:hidden");
     expect(bottomNav).toContain("min-h-16 flex-1 touch-manipulation");

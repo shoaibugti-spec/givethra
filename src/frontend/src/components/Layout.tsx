@@ -59,7 +59,7 @@ function NavLink({
       to={to}
       onClick={onClick}
       className={cn(
-        "flex min-h-11 w-full touch-manipulation select-none items-center text-sm font-medium transition-colors hover:text-primary md:min-h-0 md:w-auto",
+        "flex w-full touch-manipulation select-none items-center gap-2 py-2.5 text-sm font-medium transition-colors hover:text-primary md:min-h-0 md:w-auto md:gap-0 md:py-0",
         isActive ? "text-primary" : "text-muted-foreground"
       )}
     >
@@ -279,82 +279,58 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* ===== MOBILE MENU ===== */}
         {menuOpen && (
-          <div className="md:hidden relative z-10 border-t border-border bg-card px-4 py-4 space-y-1 touch-manipulation">
+          <div className="md:hidden relative z-10 border-t border-border bg-card px-4 py-2 touch-manipulation">
             <NavLink to="/cases" onClick={closeMenu}>
               Browse Cases
             </NavLink>
-            <div className="py-1"><NavLink to="/dreams" onClick={closeMenu}>Dreams</NavLink></div>
+            <NavLink to="/dreams" onClick={closeMenu}>Dreams</NavLink>
             {isAuthenticated && (
               <>
-                <div className="py-1"><NavLink to="/my-help" onClick={closeMenu}>My Help</NavLink></div>
-                <div className="py-1"><NavLink to="/my-cases" onClick={closeMenu}>My Cases</NavLink></div>
-                <div className="py-1">
-                  <NavLink to="/support" onClick={closeMenu}>
-                    Help & Support
-                  </NavLink>
-                </div>
+                <NavLink to="/my-help" onClick={closeMenu}>My Help</NavLink>
+                <NavLink to="/my-cases" onClick={closeMenu}>My Cases</NavLink>
+                <NavLink to="/support" onClick={closeMenu}>Help & Support</NavLink>
               </>
             )}
             {isAdmin && (
-              <div className="py-1">
-                <NavLink to="/admin" onClick={closeMenu}>
-                  Admin Panel
-                </NavLink>
-              </div>
+              <NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink>
             )}
-            <div className="py-1">
-              <NavLink to="/about" onClick={closeMenu}>
-                About
-              </NavLink>
-            </div>
-            <div className="py-1">
-              <NavLink to="/faq" onClick={closeMenu}>
-                FAQ
-              </NavLink>
-            </div>
+            <NavLink to="/about" onClick={closeMenu}>About</NavLink>
+            <NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink>
 
             {isAuthenticated && (
               <>
-                <div className="pt-3 mt-1 border-t border-border">
+                <div className="pt-3 mt-2 border-t border-border">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                     Account
                   </p>
                 </div>
-                <div className="py-1 flex items-center gap-2">
-                  <Settings className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/settings" onClick={closeMenu}>
-                    Settings
-                  </NavLink>
-                </div>
-                <div className="py-1 flex items-center gap-2">
-                  <Lock className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/privacy" onClick={closeMenu}>
-                    Privacy Policy
-                  </NavLink>
-                </div>
-                <div className="py-1 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/security" onClick={closeMenu}>
-                    Security
-                  </NavLink>
-                </div>
-                <div className="py-1 flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-muted-foreground" />
-                  <NavLink to="/account-privacy" onClick={closeMenu}>
-                    Account Privacy
-                  </NavLink>
-                </div>
+                <NavLink to="/settings" onClick={closeMenu}>
+                  <Settings className="h-4 w-4 shrink-0" />
+                  Settings
+                </NavLink>
+                <NavLink to="/privacy" onClick={closeMenu}>
+                  <Lock className="h-4 w-4 shrink-0" />
+                  Privacy Policy
+                </NavLink>
+                <NavLink to="/security" onClick={closeMenu}>
+                  <Shield className="h-4 w-4 shrink-0" />
+                  Security
+                </NavLink>
+                <NavLink to="/account-privacy" onClick={closeMenu}>
+                  <KeyRound className="h-4 w-4 shrink-0" />
+                  Account Privacy
+                </NavLink>
               </>
             )}
 
-            <div className="pt-1">
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={() => {
                   toggleTheme();
                   closeMenu();
                 }}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors"
+                className="flex w-full touch-manipulation items-center gap-2 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
                 {theme === "dark" ? (
                   <>
@@ -374,6 +350,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     to="/profile/$id"
                     params={{ id: "me" }}
                     onClick={closeMenu}
+                    className="block"
                   >
                     <Button variant="outline" size="sm" className="w-full">
                       <Shield className="h-4 w-4 mr-2" /> Profile
@@ -390,12 +367,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </>
               ) : (
                 <>
-                  <Link to="/sign-in" onClick={closeMenu}>
+                  <Link to="/sign-in" onClick={closeMenu} className="block">
                     <Button variant="outline" size="sm" className="w-full">
                       Sign in
                     </Button>
                   </Link>
-                  <Link to="/sign-up" onClick={closeMenu}>
+                  <Link to="/sign-up" onClick={closeMenu} className="block">
                     <Button size="sm" className="w-full font-semibold">
                       Get Started
                     </Button>
