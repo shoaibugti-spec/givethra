@@ -1640,8 +1640,26 @@ async function handleRequest(request, env, ctx) {
     try {
       const object = await env.UPLOADS.get(key);
       if (!object) return new Response("File not found", { status: 404 });
+      const extension = key.toLowerCase().split("?")[0].split(".").pop() || "";
+      const inferredContentType = {
+        avif: "image/avif",
+        gif: "image/gif",
+        jpeg: "image/jpeg",
+        jpg: "image/jpeg",
+        png: "image/png",
+        svg: "image/svg+xml",
+        webp: "image/webp",
+        mp4: "video/mp4",
+        mov: "video/quicktime",
+        webm: "video/webm",
+        pdf: "application/pdf",
+      }[extension];
+      const storedContentType = object.httpMetadata?.contentType || "";
+      const contentType = !storedContentType || storedContentType === "application/octet-stream"
+        ? inferredContentType || storedContentType || "application/octet-stream"
+        : storedContentType;
       const headers = new Headers({
-        "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+        "Content-Type": contentType,
         "Cache-Control": "public, max-age=31536000",
         "X-Content-Type-Options": "nosniff",
       });
@@ -1657,7 +1675,15 @@ async function handleRequest(request, env, ctx) {
     }
   }
   if (env.ASSETS && parts[0] !== "api" && request.method === "GET") {
-    return env.ASSETS.fetch(request);
+    const assetResponse = await env.ASSETS.fetch(request);
+    const contentType = assetResponse.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("text/html")) return assetResponse;
+    const storageGuard = '<script id="givethra-storage-guard">(function(){try{var s=window.localStorage;var k="__givethra_storage_test__";s.setItem(k,"1");s.removeItem(k)}catch(e){try{var m=Object.create(null);var f={getItem:function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null},setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m=Object.create(null)},key:function(i){var a=Object.keys(m);return a[i]||null}};Object.defineProperty(f,"length",{get:function(){return Object.keys(m).length}});Object.defineProperty(window,"localStorage",{value:f,configurable:true})}catch(ignore){}}})();</script>';
+    const html = await assetResponse.text();
+    const patchedHtml = /<head\b[^>]*>/i.test(html) ? html.replace(/(<head\b[^>]*>)/i, "$1" + storageGuard) : storageGuard + html;
+    const headers = new Headers(assetResponse.headers);
+    headers.delete("content-length");
+    return new Response(patchedHtml, { status: assetResponse.status, statusText: assetResponse.statusText, headers });
   }
 
   if (parts[0] === "api" && parts[1] === "dreams" && request.method === "GET") {

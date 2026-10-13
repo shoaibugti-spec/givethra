@@ -268,7 +268,11 @@ function RootLayout() {
   // Earnings remain opt-in destinations and must never become the first view.
   useEffect(() => {
     if (location.pathname !== "/") return;
-    localStorage.setItem("givethra_home_mode", "support");
+    try {
+      localStorage.setItem("givethra_home_mode", "support");
+    } catch {
+      // Restricted/private browser storage must not crash the application.
+    }
     window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" }));
   }, [location.pathname]);
 
