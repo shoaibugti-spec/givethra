@@ -227,7 +227,16 @@ const PageLoader = () => (
   </div>
 );
 
+// Shown only if BottomNav itself crashes. Uses plain <a href> links so the
+// navigation still works even when the router/JS state is unhealthy.
 function BottomNavFallback() {
+  const items = [
+    { href: "/home", label: "Home" },
+    { href: "/my-help", label: "My Help" },
+    { href: "/my-cases", label: "My Cases" },
+    { href: "/wallet", label: "Wallet" },
+    { href: "/profile/me", label: "Profile" },
+  ];
   return (
     <nav
       aria-label="Bottom navigation"
@@ -235,20 +244,66 @@ function BottomNavFallback() {
       className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-card border-t border-border"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="flex items-stretch h-16 opacity-50">
-        {["Home", "My Cases", "Submit", "Wallet", "Profile"].map((label) => (
-          <div
-            key={label}
+      <div className="flex items-stretch h-16">
+        {items.map(({ href, label }) => (
+          <a
+            key={href}
+            href={href}
             className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[48px] text-muted-foreground"
           >
-            <div className="h-8 w-8" />
             <span className="text-[10px] font-medium leading-none">{label}</span>
-          </div>
+          </a>
         ))}
       </div>
     </nav>
   );
 }
+
+// Pages a signed-in user may open even before a role (hero / requester) has
+// been chosen. A signed-in user with no stored role is common: a new device,
+// storage that is blocked or cleared, or logging in again after logout (logout
+// removes the stored role). These pages must never bounce back to "/".
+const ROLE_OPTIONAL_PATHS = new Set([
+  "/",
+  "/home",
+  "/sign-in",
+  "/sign-up",
+  "/kyc",
+  "/onboarding",
+  "/onboarding-submit",
+  "/become-hero",
+  "/need-help",
+  "/submit-request",
+  "/edit-profile",
+  "/my-help",
+  "/my-cases",
+  "/wallet",
+  "/notifications",
+  "/donation",
+  "/support",
+  "/settings",
+  "/security",
+  "/about",
+  "/account-privacy",
+  "/privacy",
+  "/terms",
+  "/community-guidelines",
+  "/faq",
+  "/contact",
+  "/community",
+  "/heroes-wall",
+  "/kindness-wall",
+  "/dreams",
+  "/cases",
+  "/payment-proof",
+]);
+const ROLE_OPTIONAL_PREFIXES = [
+  "/cases/",
+  "/payment-proof/",
+  "/affidavit/",
+  "/dreams/",
+  "/profile/",
+];
 
 import BottomNav from "@/components/BottomNav";
 
@@ -308,35 +363,12 @@ function RootLayout() {
 
   useEffect(() => {
     if (!role && !isAdmin && !checking && isAuthenticated) {
-      const publicPaths = [
-        "/",
-        "/sign-in",
-        "/sign-up",
-        "/kyc",
-        "/onboarding",
-        "/about",
-        "/account-privacy",
-        "/privacy",
-        "/terms",
-        "/community-guidelines",
-        "/faq",
-        "/contact",
-        "/community",
-        "/heroes-wall",
-        "/kindness-wall",
-        "/dreams",
-        "/need-help",
-        "/cases",
-        "/payment-proof",
-      ];
-      // 🔥 FIX: Now uses startsWith() for parameterized routes so users aren't
-      // redirected away when role hasn't loaded yet.
+      // A signed-in user without a role must still be able to use the app
+      // navigation (/home, /my-help, /my-cases, /wallet, /profile/...), the
+      // role pages (/become-hero, /need-help) and the profile setup page.
       const isPublicRoute =
-        publicPaths.includes(location.pathname) ||
-        location.pathname.startsWith("/cases/") ||
-        location.pathname.startsWith("/payment-proof/") ||
-        location.pathname.startsWith("/affidavit/") ||
-        location.pathname.startsWith("/dreams/");
+        ROLE_OPTIONAL_PATHS.has(location.pathname) ||
+        ROLE_OPTIONAL_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
       if (!isPublicRoute) {
         navigate({ to: "/" });
       }
