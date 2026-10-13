@@ -59,7 +59,7 @@ function NavLink({
       to={to}
       onClick={onClick}
       className={cn(
-        "flex w-full touch-manipulation select-none items-center gap-2 py-2.5 text-sm font-medium transition-colors hover:text-primary md:min-h-0 md:w-auto md:gap-0 md:py-0",
+        "text-sm font-medium transition-colors hover:text-primary",
         isActive ? "text-primary" : "text-muted-foreground"
       )}
     >
@@ -80,7 +80,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
-  const isHomeRoute = router.location.pathname === "/" || router.location.pathname === "/home";
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
@@ -161,7 +160,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
-            className="md:hidden h-11 w-11 shrink-0 touch-manipulation flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
+            className="md:hidden h-10 w-10 shrink-0 flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
           >
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -279,58 +278,82 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* ===== MOBILE MENU ===== */}
         {menuOpen && (
-          <div className="md:hidden relative z-10 border-t border-border bg-card px-4 py-2 touch-manipulation">
+          <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-1">
             <NavLink to="/cases" onClick={closeMenu}>
               Browse Cases
             </NavLink>
-            <NavLink to="/dreams" onClick={closeMenu}>Dreams</NavLink>
+            <div className="py-1"><NavLink to="/dreams" onClick={closeMenu}>Dreams</NavLink></div>
             {isAuthenticated && (
               <>
-                <NavLink to="/my-help" onClick={closeMenu}>My Help</NavLink>
-                <NavLink to="/my-cases" onClick={closeMenu}>My Cases</NavLink>
-                <NavLink to="/support" onClick={closeMenu}>Help & Support</NavLink>
+                <div className="py-1"><NavLink to="/my-help" onClick={closeMenu}>My Help</NavLink></div>
+                <div className="py-1"><NavLink to="/my-cases" onClick={closeMenu}>My Cases</NavLink></div>
+                <div className="py-1">
+                  <NavLink to="/support" onClick={closeMenu}>
+                    Help & Support
+                  </NavLink>
+                </div>
               </>
             )}
             {isAdmin && (
-              <NavLink to="/admin" onClick={closeMenu}>Admin Panel</NavLink>
+              <div className="py-1">
+                <NavLink to="/admin" onClick={closeMenu}>
+                  Admin Panel
+                </NavLink>
+              </div>
             )}
-            <NavLink to="/about" onClick={closeMenu}>About</NavLink>
-            <NavLink to="/faq" onClick={closeMenu}>FAQ</NavLink>
+            <div className="py-1">
+              <NavLink to="/about" onClick={closeMenu}>
+                About
+              </NavLink>
+            </div>
+            <div className="py-1">
+              <NavLink to="/faq" onClick={closeMenu}>
+                FAQ
+              </NavLink>
+            </div>
 
             {isAuthenticated && (
               <>
-                <div className="pt-3 mt-2 border-t border-border">
+                <div className="pt-3 mt-1 border-t border-border">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                     Account
                   </p>
                 </div>
-                <NavLink to="/settings" onClick={closeMenu}>
-                  <Settings className="h-4 w-4 shrink-0" />
-                  Settings
-                </NavLink>
-                <NavLink to="/privacy" onClick={closeMenu}>
-                  <Lock className="h-4 w-4 shrink-0" />
-                  Privacy Policy
-                </NavLink>
-                <NavLink to="/security" onClick={closeMenu}>
-                  <Shield className="h-4 w-4 shrink-0" />
-                  Security
-                </NavLink>
-                <NavLink to="/account-privacy" onClick={closeMenu}>
-                  <KeyRound className="h-4 w-4 shrink-0" />
-                  Account Privacy
-                </NavLink>
+                <div className="py-1 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  <NavLink to="/settings" onClick={closeMenu}>
+                    Settings
+                  </NavLink>
+                </div>
+                <div className="py-1 flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                  <NavLink to="/privacy" onClick={closeMenu}>
+                    Privacy Policy
+                  </NavLink>
+                </div>
+                <div className="py-1 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  <NavLink to="/security" onClick={closeMenu}>
+                    Security
+                  </NavLink>
+                </div>
+                <div className="py-1 flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  <NavLink to="/account-privacy" onClick={closeMenu}>
+                    Account Privacy
+                  </NavLink>
+                </div>
               </>
             )}
 
-            <div className="pt-2">
+            <div className="pt-1">
               <button
                 type="button"
                 onClick={() => {
                   toggleTheme();
                   closeMenu();
                 }}
-                className="flex w-full touch-manipulation items-center gap-2 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-1 transition-colors"
               >
                 {theme === "dark" ? (
                   <>
@@ -350,7 +373,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     to="/profile/$id"
                     params={{ id: "me" }}
                     onClick={closeMenu}
-                    className="block"
                   >
                     <Button variant="outline" size="sm" className="w-full">
                       <Shield className="h-4 w-4 mr-2" /> Profile
@@ -367,12 +389,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </>
               ) : (
                 <>
-                  <Link to="/sign-in" onClick={closeMenu} className="block">
+                  <Link to="/sign-in" onClick={closeMenu}>
                     <Button variant="outline" size="sm" className="w-full">
                       Sign in
                     </Button>
                   </Link>
-                  <Link to="/sign-up" onClick={closeMenu} className="block">
+                  <Link to="/sign-up" onClick={closeMenu}>
                     <Button size="sm" className="w-full font-semibold">
                       Get Started
                     </Button>
@@ -476,19 +498,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      {!isHomeRoute && (
-        <a
-          href={WHATSAPP_SUPPORT_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="24/7 WhatsApp Support"
-          className={`fixed ${isAuthenticated ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-5"} right-4 z-50 inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-green-600/15 transition hover:bg-green-700 hover:shadow-xl md:bottom-6 md:right-6`}
-        >
-          <MessageCircle className="h-5 w-5" />
-          <span className="hidden sm:inline">24/7 WhatsApp Support</span>
-          <span className="sm:hidden">Support</span>
-        </a>
-      )}
+      <a
+        href={WHATSAPP_SUPPORT_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="24/7 WhatsApp Support"
+        className="fixed bottom-5 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-green-600/15 transition hover:bg-green-700 hover:shadow-xl md:bottom-6 md:right-6"
+      >
+        <MessageCircle className="h-5 w-5" />
+        <span className="hidden sm:inline">24/7 WhatsApp Support</span>
+        <span className="sm:hidden">Support</span>
+      </a>
     </div>
   );
 }
