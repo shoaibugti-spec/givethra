@@ -510,6 +510,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   className={iconLinkClass("/notifications")}
                 >
                   <Bell className="h-5 w-5" />
+                  {notifCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex items-center justify-center ring-2 ring-card">
+                      {notifCount > 99 ? "99+" : notifCount}
+                    </span>
+                  )}
                 </Link>
                 <Link
                   to="/donation"
