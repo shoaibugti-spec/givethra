@@ -76,6 +76,7 @@ export default function NotificationsPage() {
       setNotifs(data ?? []);
       // Mark all as read because user opened the page
       await markAllNotificationsAsRead(user.id);
+      window.dispatchEvent(new Event("notification-updated"));
     } catch (e) {
       console.error("Failed to load notifications", e);
     } finally {
@@ -99,12 +100,14 @@ export default function NotificationsPage() {
   async function markAllRead() {
     if (!user?.id) return;
     await markAllNotificationsAsRead(user.id);
+    window.dispatchEvent(new Event("notification-updated"));
     setNotifs((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }
 
   async function clearAll() {
     if (!user?.id) return;
     await deleteAllNotifications(user.id);
+    window.dispatchEvent(new Event("notification-updated"));
     setNotifs([]);
   }
 
