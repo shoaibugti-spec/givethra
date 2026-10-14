@@ -85,7 +85,9 @@ export default function EditProfilePage() {
   const { isAuthenticated, user, refreshUser } = useAuth();
   const { role } = useRole();
   const navigate = useNavigate();
-  const setupMode = new URLSearchParams(window.location.search).get("setup") === "1";
+  // TanStack Router can write the value as setup=%221%22 (with quotes), so strip quotes before comparing.
+  const setupParam = String(new URLSearchParams(window.location.search).get("setup") ?? "").replace(/["']/g, "").trim().toLowerCase();
+  const setupMode = setupParam === "1" || setupParam === "true";
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +96,7 @@ export default function EditProfilePage() {
   const [saving, setSaving] = useState(false);
 
   const [kycStatus, setKycStatus] = useState<string | null>(null);
+  const [setupCompletedAt, setSetupCompletedAt] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -184,6 +187,7 @@ export default function EditProfilePage() {
 
         setAvatarUrl(prof.avatar_url ?? null);
         setCoverUrl(prof.cover_url ?? null);
+        setSetupCompletedAt(prof.profile_setup_completed_at ?? null);
       } else {
         setFullName(user.fullName ?? "");
         const nameParts = String(user.fullName || "").trim().split(/\s+/);
@@ -373,6 +377,8 @@ export default function EditProfilePage() {
 
     setSaving(true);
 
+    const markSetupDone = setupMode || !setupCompletedAt;
+
     try {
       const savedProfile = await updateProfile(
         user.id,
@@ -403,7 +409,7 @@ export default function EditProfilePage() {
           avatar_url: avatarUrl,
           cover_url: coverUrl,
 
-          profile_setup_completed_at: setupMode ? new Date().toISOString() : undefined,
+          profile_setup_completed_at: markSetupDone ? (setupCompletedAt || new Date().toISOString()) : undefined,
 
           updated_at: new Date().toISOString(),
         },
@@ -460,12 +466,16 @@ export default function EditProfilePage() {
 
       toast.success("Profile updated successfully!");
 
-      if (setupMode) {
+      if (markSetupDone) {
+        setSetupCompletedAt(savedProfile?.profile_setup_completed_at ?? new Date().toISOString());
         try {
           localStorage.setItem(`givethra_profile_setup_completed:${user.id}`, "1");
         } catch {
           // The server-side marker remains authoritative when storage is unavailable.
         }
+      }
+
+      if (setupMode) {
         try {
           sessionStorage.setItem("givethra_kyc_return_to", "/");
         } catch {
