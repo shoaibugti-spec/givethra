@@ -380,9 +380,7 @@ export default function EditProfilePage() {
     const markSetupDone = setupMode || !setupCompletedAt;
 
     try {
-      const savedProfile = await updateProfile(
-        user.id,
-        {
+      const profilePayload: Record<string, unknown> = {
           full_name: fullName.trim(),
           first_name: firstName.trim(),
           last_name: lastName.trim(),
@@ -412,9 +410,18 @@ export default function EditProfilePage() {
           profile_setup_completed_at: markSetupDone ? (setupCompletedAt || new Date().toISOString()) : undefined,
 
           updated_at: new Date().toISOString(),
-        },
-        role
-      );
+      };
+
+      let savedProfile: any;
+      try {
+        savedProfile = await updateProfile(user.id, profilePayload, role);
+      } catch (firstError) {
+        // If the server rejects the setup marker field, save the profile without it
+        // and keep the marker on this device so the user is never stuck in a loop.
+        if (!markSetupDone) throw firstError;
+        const { profile_setup_completed_at: _ignored, ...payloadWithoutMarker } = profilePayload;
+        savedProfile = await updateProfile(user.id, payloadWithoutMarker, role);
+      }
 
       if (
         savedProfile &&
@@ -461,6 +468,14 @@ export default function EditProfilePage() {
 
       setAvatarFile(null);
       setCoverFile(null);
+
+      if (markSetupDone) {
+        try {
+          localStorage.setItem(`givethra_profile_setup_completed:${user.id}`, "1");
+        } catch {
+          // The server-side marker remains authoritative when storage is unavailable.
+        }
+      }
 
       await refreshUser().catch(() => null);
 
