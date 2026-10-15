@@ -19,6 +19,129 @@ import {
   uploadFileToStorage,
 } from "@/lib/api";
 
+// ---------------------------------------------------------------------------
+// OCR helpers
+// Phone-camera frames are small and uneven. Before OCR we upscale the image,
+// convert to grayscale and stretch the contrast, then try the whole card and
+// then two crops around where the CNIC number is printed. Tesseract confuses
+// digits with look-alike letters (O/0, I/1, S/5, B/8), so those are mapped back.
+// ---------------------------------------------------------------------------
+function toOcrCanvas(
+  src: HTMLCanvasElement,
+  fx = 0, fy = 0, fw = 1, fh = 1,
+  targetWidth = 1800,
+): HTMLCanvasElement {
+  const sx = Math.round(src.width * fx);
+  const sy = Math.round(src.height * fy);
+  const sw = Math.max(1, Math.round(src.width * fw));
+  const sh = Math.max(1, Math.round(src.height * fh));
+  const scale = Math.min(targetWidth / sw, 3);
+  const out = document.createElement("canvas");
+  out.width = Math.max(1, Math.round(sw * scale));
+  out.height = Math.max(1, Math.round(sh * scale));
+  const ctx = out.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+  if (!ctx) return out;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(src, sx, sy, sw, sh, 0, 0, out.width, out.height);
+  try {
+    const img = ctx.getImageData(0, 0, out.width, out.height);
+    const d = img.data;
+    const hist = new Uint32Array(256);
+    for (let i = 0; i < d.length; i += 4) {
+      const g = Math.round((d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000);
+      d[i] = d[i + 1] = d[i + 2] = g;
+      hist[g]++;
+    }
+    const total = out.width * out.height;
+    let acc = 0, lo = 0, hi = 255;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= total * 0.02) { lo = v; break; } }
+    acc = 0;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= total * 0.98) { hi = v; break; } }
+    const range = Math.max(hi - lo, 1);
+    for (let i = 0; i < d.length; i += 4) {
+      const v = Math.max(0, Math.min(255, Math.round(((d[i] - lo) * 255) / range)));
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
+    ctx.putImageData(img, 0, 0);
+  } catch {
+    // If pixel access fails, the plain resized image is still used.
+  }
+  return out;
+}
+
+const DIGITISH = "[0-9OoQDIil|SsBZzG]";
+const CNIC_RE = new RegExp(`(${DIGITISH}{5})[\\s\\-._]{0,2}(${DIGITISH}{7})[\\s\\-._]{0,2}(${DIGITISH})(?![0-9])`, "g");
+const DIGIT_FIX: Record<string, string> = {
+  O: "0", o: "0", Q: "0", D: "0",
+  I: "1", i: "1", l: "1", "|": "1",
+  S: "5", s: "5", B: "8", Z: "2", z: "2", G: "6",
+};
+
+function findCnic(text: string): string | null {
+  let best: { digits: string; real: number } | null = null;
+  CNIC_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = CNIC_RE.exec(text)) !== null) {
+    const raw = m[1] + m[2] + m[3];
+    const real = (raw.match(/[0-9]/g) || []).length;
+    if (real < 9) continue; // too many guessed characters: probably not a number
+    const digits = raw.split("").map((c) => DIGIT_FIX[c] ?? c).join("");
+    if (!/^\d{13}$/.test(digits)) continue;
+    if (!best || real > best.real) best = { digits, real };
+  }
+  if (!best) return null;
+  const d = best.digits;
+  return `${d.slice(0, 5)}-${d.slice(5, 12)}-${d.slice(12, 13)}`;
+}
+
+async function readCnicNumber(
+  card: HTMLCanvasElement,
+  onStep?: (step: number, total: number) => void,
+): Promise<{ number: string | null; letters: number }> {
+  const passes: Array<[number, number, number, number]> = [
+    [0, 0, 1, 1],        // whole card
+    [0, 0.3, 0.8, 0.65], // lower-left: where the number is on most cards
+    [0, 0.45, 0.7, 0.4], // tight band around the number
+  ];
+  let letters = 0;
+  for (let i = 0; i < passes.length; i++) {
+    onStep?.(i + 1, passes.length);
+    const [fx, fy, fw, fh] = passes[i];
+    const prepared = toOcrCanvas(card, fx, fy, fw, fh, i === 0 ? 1800 : 1600);
+    const result = await Tesseract.recognize(prepared, "eng");
+    const text = result.data.text || "";
+    if (i === 0) letters = (text.match(/[A-Za-z]/g) || []).length;
+    const number = findCnic(text);
+    if (number) return { number, letters };
+  }
+  return { number: null, letters };
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// Safari/iPhone cannot record WebM, so the format is picked from what the
+// browser supports (WebM first, then MP4).
+function pickRecorderMime(): string {
+  const MR: any = (window as any).MediaRecorder;
+  if (!MR || typeof MR.isTypeSupported !== "function") return "";
+  const candidates = [
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
+    "video/mp4;codecs=avc1,mp4a.40.2",
+    "video/mp4",
+  ];
+  return candidates.find((t) => MR.isTypeSupported(t)) || "";
+}
+
+const VIDEO_STEPS: Array<{ until: number; en: string; ur: string }> = [
+  { until: 3, en: "Look straight at the camera", ur: "Seedha camera ki taraf dekhein" },
+  { until: 6, en: "Slowly turn your face to the RIGHT", ur: "Chehra aahista se DAYEIN taraf ghumayein" },
+  { until: 9, en: "Slowly turn your face to the LEFT", ur: "Chehra aahista se BAYEIN taraf ghumayein" },
+  { until: 12, en: "Look slightly UP", ur: "Thoda UPAR dekhein" },
+  { until: 99, en: "Look straight again — almost done", ur: "Dobara seedha dekhein — bas khatam" },
+];
+
 export default function KycPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -54,7 +177,18 @@ export default function KycPage() {
   const [activeCamera, setActiveCamera] = useState<string | null>(null);
   const [ocrProcessing, setOcrProcessing] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
-  
+  const [ocrStatus, setOcrStatus] = useState<string>("");
+  const [ocrFailed, setOcrFailed] = useState(false);
+  const [cameraRes, setCameraRes] = useState<{ w: number; h: number } | null>(null);
+  const [camPerm, setCamPerm] = useState<"unknown" | "granted" | "denied" | "prompt">("unknown");
+  const [videoOpen, setVideoOpen] = useState(false);
+  const [videoCountdown, setVideoCountdown] = useState<number | null>(null);
+  const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const videoCancelledRef = useRef(false);
+  const runIdRef = useRef(0);
+
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [capturedKind, setCapturedKind] = useState<"front" | "back" | "selfie" | null>(null);
   const [capturedCanvas, setCapturedCanvas] = useState<HTMLCanvasElement | null>(null);
@@ -88,6 +222,81 @@ export default function KycPage() {
     return () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
   }, [stream]);
 
+  // Ask for camera + microphone once, as soon as the KYC form is shown, so the
+  // browser prompt appears right away (one combined prompt) instead of failing
+  // later when the user taps a camera button. A website cannot force-allow it:
+  // the user must tap "Allow", and a previously blocked site can only be
+  // unblocked in the browser settings (the page shows how).
+  const showForm = !!user && !isLoading && (!submission || reapplying);
+  useEffect(() => {
+    if (!showForm) return;
+    let cancelled = false;
+    let status: any = null;
+    (async () => {
+      try {
+        status = await (navigator as any).permissions?.query?.({ name: "camera" });
+        if (status) {
+          status.onchange = () => {
+            if (cancelled) return;
+            setCamPerm(status.state === "granted" ? "granted" : status.state === "denied" ? "denied" : "prompt");
+          };
+          if (status.state === "granted") { setCamPerm("granted"); return; }
+          if (status.state === "denied") { setCamPerm("denied"); return; }
+          setCamPerm("prompt");
+        }
+      } catch { /* Permissions API not available (older Safari) */ }
+      if (!cancelled) await requestCameraAccess();
+    })();
+    return () => { cancelled = true; if (status) status.onchange = null; };
+  }, [showForm]);
+
+  // Attach the live video preview once its <video> exists.
+  useEffect(() => {
+    const v = liveVideoRef.current;
+    if (videoOpen && liveStream && v) {
+      v.srcObject = liveStream;
+      const p = v.play?.();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    }
+  }, [videoOpen, liveStream]);
+
+  // Never leave a recorder or camera running when the page is left.
+  useEffect(() => {
+    return () => {
+      runIdRef.current++;
+      videoCancelledRef.current = true;
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+      try {
+        const r = mediaRecorderRef.current;
+        if (r && r.state !== "inactive") r.stop();
+      } catch { /* ignore */ }
+      videoStreamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  async function requestCameraAccess(): Promise<boolean> {
+    if (!navigator.mediaDevices?.getUserMedia) return false;
+    let s: MediaStream | null = null;
+    let lastErr: any = null;
+    for (const c of [{ video: true, audio: true }, { video: true }] as MediaStreamConstraints[]) {
+      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) { lastErr = err; }
+    }
+    s?.getTracks().forEach((t) => t.stop());
+    if (s) { setCamPerm("granted"); return true; }
+    if (lastErr?.name === "NotAllowedError" || lastErr?.name === "SecurityError") setCamPerm("denied");
+    return false;
+  }
+
+  // Attach the stream once the <video> element exists (more reliable than a timer).
+  useEffect(() => {
+    const v = videoRef.current;
+    if (activeCamera && stream && v) {
+      v.srcObject = stream;
+      const p = v.play?.();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    }
+  }, [activeCamera, stream]);
+
   async function loadSubmission() {
     if (!user) return;
     try {
@@ -107,28 +316,55 @@ export default function KycPage() {
       setCapturedKind(null);
       setCapturedCanvas(null);
       
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: target === "selfie" ? "user" : "environment",
-          advanced: [{ focusMode: "continuous" } as any],
-        },
-      });
+      setCameraRes(null);
+      setOcrFailed(false);
+
+      const facing = target === "selfie" ? "user" : "environment";
+      let s: MediaStream;
+      try {
+        // Ask for a high resolution. Without this most phones give 640x480,
+        // which is too blurry for the CNIC text to be read.
+        s = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: facing },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            advanced: [{ focusMode: "continuous" } as any],
+          },
+        });
+      } catch (err: any) {
+        if (err?.name === "NotAllowedError" || err?.name === "SecurityError") throw err;
+        // Some devices reject the extra constraints: retry with the basics.
+        s = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: facing },
+        });
+      }
 
       try {
         const [track] = s.getVideoTracks();
-        const capabilities: any = track.getCapabilities ? track.getCapabilities() : {};
-        if (capabilities?.focusMode?.includes?.("continuous")) {
-          await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] });
-        }
+        const caps: any = track.getCapabilities ? track.getCapabilities() : {};
+        const adv: any = {};
+        if (caps?.focusMode?.includes?.("continuous")) adv.focusMode = "continuous";
+        if (caps?.exposureMode?.includes?.("continuous")) adv.exposureMode = "continuous";
+        if (caps?.whiteBalanceMode?.includes?.("continuous")) adv.whiteBalanceMode = "continuous";
+        if (Object.keys(adv).length) await track.applyConstraints({ advanced: [adv] });
       } catch {
-        // ignore
+        // optional improvements only
       }
 
       setStream(s);
       setActiveCamera(target);
-      setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = s; }, 100);
-    } catch {
-      toast.error("Camera access denied.");
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError" || err?.name === "SecurityError") {
+        setCamPerm("denied");
+        toast.error("Camera access denied. Please allow camera permission (see the instructions on this page).");
+      } else if (err?.name === "NotFoundError") {
+        toast.error("No camera found on this device.");
+      } else {
+        toast.error("The camera could not be started. Close other apps using the camera and try again.");
+      }
     }
   }
 
@@ -150,12 +386,23 @@ export default function KycPage() {
 
   function grabFrame(): HTMLCanvasElement | null {
     const video = videoRef.current;
-    const canvas = canvasRef.current;
     const rect = getCropRect();
-    if (!video || !canvas || !rect || rect.w <= 0 || rect.h <= 0) return null;
-    canvas.width = rect.w;
-    canvas.height = rect.h;
-    canvas.getContext("2d")?.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+    if (!video || !rect || rect.w <= 0 || rect.h <= 0) return null;
+    // Keep the crop inside the real video frame and use whole pixels.
+    const x = Math.max(0, Math.round(rect.x));
+    const y = Math.max(0, Math.round(rect.y));
+    const w = Math.min(video.videoWidth - x, Math.round(rect.w));
+    const h = Math.min(video.videoHeight - y, Math.round(rect.h));
+    if (w <= 0 || h <= 0) return null;
+    // A fresh canvas per capture: the cropped pixels are kept at the camera's
+    // full native resolution (no downscaling) for OCR and upload.
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(video, x, y, w, h, 0, 0, w, h);
     return canvas;
   }
 
@@ -167,7 +414,8 @@ export default function KycPage() {
       return;
     }
     
-    const imageData = canvas.toDataURL("image/jpeg");
+    const imageData = canvas.toDataURL("image/jpeg", 0.9);
+    setOcrFailed(false);
     setCapturedImage(imageData);
     setCapturedCanvas(canvas);
     setCapturedKind(activeCamera as "front" | "back" | "selfie");
@@ -185,35 +433,35 @@ export default function KycPage() {
 
     if (capturedKind === "front") {
       setOcrProcessing(true);
+      setOcrError(null);
+      setOcrFailed(false);
+      setOcrStatus("Reading the number from the photo...");
       try {
-        const result = await Tesseract.recognize(capturedCanvas, "eng");
-        const text = result.data.text || "";
-        const match = text.match(/\d{5}[\s-]?\d{7}[\s-]?\d{1}/);
-        const letterCount = (text.match(/[A-Za-z]/g) || []).length;
-        const fullCardVisible = letterCount >= 20;
+        const { number, letters } = await readCnicNumber(capturedCanvas, (step, total) =>
+          setOcrStatus(`Reading the number from the photo... (${step}/${total})`),
+        );
+        setOcrProcessing(false);
+        setOcrStatus("");
 
-        if (match && fullCardVisible) {
-          const digits = match[0].replace(/\D/g, "");
-          const formatted = `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12, 13)}`;
-          setOcrProcessing(false);
-          setForm(p => ({ ...p, cnic_number: formatted }));
+        if (number && letters >= 10) {
+          setForm(p => ({ ...p, cnic_number: number }));
           finalizeCapture(capturedKind, capturedCanvas);
-          toast.success(`CNIC number detected: ${formatted}. You can correct it manually if needed.`);
+          toast.success(`CNIC number detected: ${number}. You can correct it manually if needed.`);
         } else {
-          setOcrProcessing(false);
-          setOcrError("The CNIC number could not be read clearly. Keep the complete CNIC straight and well lit, then capture it again.");
-          toast.error("The CNIC number could not be read clearly. Please try again.");
-          setCapturedImage(null);
-          setCapturedCanvas(null);
-          setCapturedKind(null);
+          // Keep the photo on screen so the user can retry, retake, or continue
+          // and type the number by hand. Nobody is blocked by a weak OCR result.
+          setOcrFailed(true);
+          setOcrError(
+            number
+              ? "The complete card is not clearly visible. Retake with the whole CNIC inside the frame, or continue and type the number yourself."
+              : "The number could not be read automatically. Retake in good light with the card flat and steady, or continue and type the number yourself.",
+          );
         }
       } catch {
         setOcrProcessing(false);
-        setOcrError("Automatic text recognition failed. Please try again.");
-        toast.error("Automatic text recognition failed. Please try again.");
-        setCapturedImage(null);
-        setCapturedCanvas(null);
-        setCapturedKind(null);
+        setOcrStatus("");
+        setOcrFailed(true);
+        setOcrError("Automatic reading is not available right now (check your internet). You can continue and type the number yourself.");
       }
     } else {
       finalizeCapture(capturedKind, capturedCanvas);
@@ -224,7 +472,7 @@ export default function KycPage() {
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], `${kind}.jpg`, { type: "image/jpeg" });
-      const preview = canvas.toDataURL("image/jpeg");
+      const preview = canvas.toDataURL("image/jpeg", 0.85);
 
       if (kind === "front") {
         setCnicFront(file);
@@ -241,9 +489,10 @@ export default function KycPage() {
       setCapturedCanvas(null);
       setCapturedKind(null);
       setOcrError(null);
-      
+      setOcrFailed(false);
+
       toast.success(`${kind === "front" ? "CNIC Front" : kind === "back" ? "CNIC Back" : "Selfie"} captured successfully!`);
-    }, "image/jpeg");
+    }, "image/jpeg", 0.95);
   }
 
   function cancelCaptured() {
@@ -251,57 +500,160 @@ export default function KycPage() {
     setCapturedCanvas(null);
     setCapturedKind(null);
     setOcrError(null);
+    setOcrFailed(false);
     if (capturedKind) {
       startPhotoCamera(capturedKind);
     }
   }
 
-  async function startVideoRecording() {
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          channelCount: { ideal: 1 },
-          sampleRate: { ideal: 48000 },
-        },
-      });
-      setStream(s);
-      setVideoRecording(true);
-      setVideoTimer(0);
-      setTimeout(() => { if (liveVideoRef.current) liveVideoRef.current.srcObject = s; }, 100);
-      const preferredMimeType = "video/webm;codecs=vp8,opus";
-      const mimeType = typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(preferredMimeType)
-        ? preferredMimeType
-        : "video/webm";
-      const recorder = new MediaRecorder(s, {
-        mimeType,
-        videoBitsPerSecond: 1500000,
-        audioBitsPerSecond: 128000,
-      });
-      mediaRecorderRef.current = recorder;
-      videoChunksRef.current = [];
-      recorder.ondataavailable = e => { if (e.data.size > 0) videoChunksRef.current.push(e.data); };
-      recorder.onstop = () => {
-        const recordedType = recorder.mimeType || mimeType;
-        const blob = new Blob(videoChunksRef.current, { type: recordedType });
-        setVideoFile(new File([blob], "face.webm", { type: recordedType }));
-        setVideoBlob(URL.createObjectURL(blob));
-        s.getTracks().forEach(t => t.stop());
-        setVideoRecording(false);
-      };
-      recorder.start();
-      let sec = 0;
-      const interval = setInterval(() => {
-        sec++;
-        setVideoTimer(sec);
-        if (sec >= 15) { clearInterval(interval); recorder.stop(); }
-      }, 1000);
-    } catch {
-      toast.error("Camera/mic access denied.");
+  // ---- Automatic face video (3-2-1 countdown, 15 s, auto stop) ------------
+  function clearRecordTimer() {
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
     }
+  }
+
+  function stopVideoStream() {
+    videoStreamRef.current?.getTracks().forEach((t) => t.stop());
+    videoStreamRef.current = null;
+    setLiveStream(null);
+  }
+
+  function cancelVideoRecording() {
+    videoCancelledRef.current = true;
+    runIdRef.current++; // aborts a running countdown
+    clearRecordTimer();
+    const r = mediaRecorderRef.current;
+    mediaRecorderRef.current = null;
+    try { if (r && r.state !== "inactive") r.stop(); } catch { /* ignore */ }
+    stopVideoStream();
+    setVideoRecording(false);
+    setVideoCountdown(null);
+    setVideoTimer(0);
+    setVideoOpen(false);
+  }
+
+  // A still frame from the video becomes the selfie if the user has none yet,
+  // so the user does not have to take a separate selfie.
+  function grabAutoSelfie() {
+    const v = liveVideoRef.current;
+    if (!v || !v.videoWidth) return;
+    const c = document.createElement("canvas");
+    c.width = v.videoWidth;
+    c.height = v.videoHeight;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(v, 0, 0);
+    c.toBlob((blob) => {
+      if (!blob) return;
+      const f = new File([blob], "selfie.jpg", { type: "image/jpeg" });
+      const preview = c.toDataURL("image/jpeg", 0.85);
+      setSelfie((prev) => prev ?? f);
+      setSelfiePreview((prev) => prev ?? preview);
+    }, "image/jpeg", 0.92);
+  }
+
+  async function startVideoRecording() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      toast.error("This browser cannot record video. Please open this page in Chrome (Android) or Safari (iPhone).");
+      return;
+    }
+    const runId = ++runIdRef.current;
+    videoCancelledRef.current = false;
+    setOcrError(null);
+
+    // 1280x720 / 24 fps is enough for liveness and keeps the upload small.
+    const attempts: MediaStreamConstraints[] = [
+      {
+        video: { facingMode: { ideal: "user" }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 30 } },
+        audio: { echoCancellation: true, noiseSuppression: true, channelCount: { ideal: 1 } },
+      },
+      { video: { facingMode: "user" }, audio: true },
+      { video: { facingMode: "user" } }, // microphone unavailable or refused
+    ];
+    let s: MediaStream | null = null;
+    let lastErr: any = null;
+    for (const c of attempts) {
+      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) { lastErr = err; }
+    }
+    if (!s) {
+      if (lastErr?.name === "NotAllowedError" || lastErr?.name === "SecurityError") {
+        setCamPerm("denied");
+        toast.error("Camera permission is blocked. Please allow it (see the instructions on this page).");
+      } else if (lastErr?.name === "NotFoundError") {
+        toast.error("No camera found on this device.");
+      } else {
+        toast.error("The camera could not be started. Close other apps using the camera and try again.");
+      }
+      return;
+    }
+    if (runId !== runIdRef.current) { s.getTracks().forEach((t) => t.stop()); return; }
+
+    setCamPerm("granted");
+    videoStreamRef.current = s;
+    setLiveStream(s);
+    setVideoTimer(0);
+    setVideoRecording(false);
+    setVideoOpen(true);
+
+    for (let n = 3; n >= 1; n--) {
+      setVideoCountdown(n);
+      await sleep(1000);
+      if (runId !== runIdRef.current) return;
+    }
+    setVideoCountdown(null);
+
+    const mime = pickRecorderMime();
+    const opts: any = { videoBitsPerSecond: 1200000, audioBitsPerSecond: 64000 };
+    if (mime) opts.mimeType = mime;
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(s, opts);
+    } catch {
+      try {
+        recorder = new MediaRecorder(s);
+      } catch {
+        toast.error("This browser cannot record video. Please open this page in Chrome (Android) or Safari (iPhone).");
+        cancelVideoRecording();
+        return;
+      }
+    }
+    mediaRecorderRef.current = recorder;
+    videoChunksRef.current = [];
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) videoChunksRef.current.push(e.data); };
+    recorder.onstop = () => {
+      clearRecordTimer();
+      stopVideoStream();
+      setVideoRecording(false);
+      setVideoCountdown(null);
+      setVideoOpen(false);
+      if (videoCancelledRef.current) return;
+      const fullType = recorder.mimeType || mime || "video/webm";
+      const blob = new Blob(videoChunksRef.current, { type: fullType });
+      if (blob.size < 1000) {
+        toast.error("The video could not be recorded. Please try again.");
+        return;
+      }
+      const baseType = fullType.split(";")[0] || "video/webm";
+      const ext = baseType.includes("mp4") ? "mp4" : "webm";
+      setVideoFile(new File([blob], `face.${ext}`, { type: baseType }));
+      setVideoBlob(URL.createObjectURL(blob));
+      toast.success("Face video recorded.");
+    };
+
+    recorder.start(1000);
+    setVideoRecording(true);
+    let sec = 0;
+    recordTimerRef.current = setInterval(() => {
+      sec++;
+      setVideoTimer(sec);
+      if (sec === 2) grabAutoSelfie();
+      if (sec >= 15) {
+        clearRecordTimer();
+        try { if (recorder.state !== "inactive") recorder.stop(); } catch { /* ignore */ }
+      }
+    }, 1000);
   }
 
   async function uploadFile(file: File, path: string): Promise<string> {
@@ -411,6 +763,71 @@ export default function KycPage() {
     rejected: { icon: <AlertTriangle className="h-4 w-4" />, label: "Rejected", color: "bg-red-100 text-red-700" },
   };
 
+  // Full-screen automatic face video: countdown -> 15 s recording -> auto stop
+  if (videoOpen) {
+    const step = VIDEO_STEPS.find((st) => videoTimer < st.until) ?? VIDEO_STEPS[VIDEO_STEPS.length - 1];
+    return (
+      <div className="fixed inset-0 z-[120] flex flex-col bg-black text-white">
+        <div
+          className="shrink-0 space-y-1 bg-black/80 px-4 pb-2 text-center text-xs"
+          style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+        >
+          <p className="font-semibold text-amber-300">Remove glasses, cap, hat or mask. Keep your full face in the oval, in good light.</p>
+          <p className="text-white/70">Chasma, topi ya mask utaar dein. Poora chehra oval ke andar rakhein.</p>
+        </div>
+
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          <video
+            ref={liveVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ transform: "scaleX(-1)" }}
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div
+              className="rounded-[50%] border-4 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"
+              style={{ width: "72%", maxWidth: 340, aspectRatio: "3 / 4" }}
+            />
+          </div>
+
+          {videoCountdown !== null && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30">
+              <span className="text-8xl font-extrabold drop-shadow">{videoCountdown}</span>
+              <span className="mt-2 text-sm font-medium">Recording starts… / Recording shuru hone wali hai</span>
+            </div>
+          )}
+
+          {videoRecording && (
+            <>
+              <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold">
+                <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+                REC {videoTimer}s / 15s
+              </div>
+              <div className="absolute inset-x-3 bottom-4 rounded-xl bg-black/65 px-4 py-3 text-center">
+                <p className="text-lg font-bold leading-tight">{step.en}</p>
+                <p className="mt-0.5 text-sm text-white/75">{step.ur}</p>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div
+          className="shrink-0 space-y-3 bg-black px-4 pt-3"
+          style={{ paddingBottom: "max(0.875rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
+            <div className="h-2 rounded-full bg-red-500 transition-all" style={{ width: `${(videoTimer / 15) * 100}%` }} />
+          </div>
+          <Button variant="outline" className="w-full bg-transparent text-white" onClick={cancelVideoRecording}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Camera view with capture
   if (activeCamera && !capturedImage) {
     const isSelfie = activeCamera === "selfie";
@@ -441,7 +858,17 @@ export default function KycPage() {
           )}
 
           <div className="relative w-full rounded-xl overflow-hidden border">
-            <video ref={videoRef} autoPlay playsInline className="w-full block" />
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full block"
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                setCameraRes({ w: v.videoWidth, h: v.videoHeight });
+              }}
+            />
 
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-2">
               {!isSelfie ? (
@@ -465,6 +892,16 @@ export default function KycPage() {
               )}
             </div>
           </div>
+
+          {cameraRes && (
+            Math.max(cameraRes.w, cameraRes.h) < 1280 ? (
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-300 p-2 text-xs text-amber-700 text-center">
+                ⚠️ This camera is giving a low-quality image ({cameraRes.w}×{cameraRes.h}). Move to better light, clean the lens, or open this page in Chrome / Safari.
+              </div>
+            ) : (
+              <p className="text-center text-[11px] text-muted-foreground">Camera quality: {cameraRes.w}×{cameraRes.h}</p>
+            )
+          )}
 
           <canvas ref={canvasRef} className="hidden" />
 
@@ -506,7 +943,7 @@ export default function KycPage() {
           {isFront && ocrProcessing && (
             <div className="text-center text-sm text-primary py-2 flex items-center justify-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
-              Reading the number from the photo...
+              {ocrStatus || "Reading the number from the photo..."}
             </div>
           )}
           
@@ -527,14 +964,32 @@ export default function KycPage() {
               disabled={ocrProcessing}
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
-              {ocrProcessing ? "Processing..." : isFront ? "Verify & Confirm" : "Confirm"}
+              {ocrProcessing ? "Processing..." : isFront ? (ocrFailed ? "Try Reading Again" : "Verify & Confirm") : "Confirm"}
             </Button>
           </div>
+
+          {isFront && ocrFailed && !ocrProcessing && (
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => {
+                if (capturedCanvas && capturedKind) {
+                  finalizeCapture(capturedKind, capturedCanvas);
+                  toast.info("Photo saved. Please type your CNIC number in the field below.");
+                }
+              }}
+            >
+              Use this photo &amp; type the number myself
+            </Button>
+          )}
         </div>
       </div>
     );
   }
 
+  const inAppBrowser =
+    typeof navigator !== "undefined" &&
+    /FBAN|FBAV|FB_IAB|Instagram|Snapchat|TikTok|MicroMessenger|Line\/|; wv\)/i.test(navigator.userAgent);
   const showStatusCard = submission && !reapplying;
   const isRejected = submission?.status === "rejected";
 
@@ -649,6 +1104,37 @@ export default function KycPage() {
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm text-primary flex items-center justify-between">
                 <span>Re-submitting your KYC with new photos.</span>
                 <button onClick={() => setReapplying(false)} className="text-xs underline">Cancel</button>
+              </div>
+            )}
+
+            {inAppBrowser && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                ⚠️ You seem to be inside an app's built-in browser (WhatsApp, Facebook, etc.), which often blocks the camera.
+                Please open <strong>givethra.org</strong> in Chrome (Android) or Safari (iPhone).
+              </div>
+            )}
+
+            {camPerm === "denied" && (
+              <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 space-y-2 text-sm text-red-900">
+                <p className="font-bold">Camera / microphone is blocked for this site</p>
+                <p className="text-xs">
+                  The browser remembers a previous "Block". Only you can switch it on once:
+                </p>
+                <ul className="list-disc list-inside text-xs space-y-1">
+                  <li><strong>Android Chrome:</strong> tap the lock / settings icon next to the address bar → Permissions → set Camera and Microphone to <strong>Allow</strong>.</li>
+                  <li><strong>iPhone Safari:</strong> tap the “aA” icon in the address bar → Website Settings → Camera and Microphone → <strong>Allow</strong>.</li>
+                </ul>
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => { requestCameraAccess(); }}>Ask again</Button>
+                  <Button size="sm" className="flex-1" onClick={() => window.location.reload()}>I allowed it — reload</Button>
+                </div>
+              </div>
+            )}
+
+            {camPerm !== "denied" && camPerm !== "granted" && (
+              <div className="rounded-xl border border-blue-300 bg-blue-50 p-3 text-xs text-blue-800 flex items-center justify-between gap-3">
+                <span>📷 When your browser asks, please tap <strong>Allow</strong> for camera and microphone. Browser poochay to <strong>Allow</strong> dabayein.</span>
+                <Button size="sm" variant="outline" onClick={() => { requestCameraAccess(); }}>Allow</Button>
               </div>
             )}
 
@@ -768,18 +1254,13 @@ export default function KycPage() {
                   <video src={videoBlob} controls className="w-full rounded-lg border max-h-40" />
                   <Button variant="outline" size="sm" className="w-full" onClick={() => { setVideoBlob(null); setVideoFile(null); }}>Re-record</Button>
                 </div>
-              ) : videoRecording ? (
-                <div className="space-y-2">
-                  <video ref={liveVideoRef} autoPlay playsInline muted className="w-full rounded-lg border" />
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-red-500">● Recording... {videoTimer}s / 15s</span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-red-500 h-2 rounded-full transition-all" style={{ width: `${(videoTimer / 15) * 100}%` }} />
-                  </div>
-                </div>
               ) : (
-                <Button variant="outline" className="w-full" onClick={startVideoRecording}>🎥 Record 15s Face Video</Button>
+                <div className="space-y-1.5">
+                  <Button variant="outline" className="w-full" onClick={startVideoRecording}>🎥 Record 15s Face Video</Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Recording starts by itself after a 3-2-1 countdown and stops automatically after 15 seconds.
+                  </p>
+                </div>
               )}
             </div>
 
