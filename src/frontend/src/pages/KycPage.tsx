@@ -30,6 +30,7 @@ function toOcrCanvas(
   src: HTMLCanvasElement,
   fx = 0, fy = 0, fw = 1, fh = 1,
   targetWidth = 1800,
+  binarize = false,
 ): HTMLCanvasElement {
   const sx = Math.round(src.width * fx);
   const sy = Math.round(src.height * fy);
@@ -63,6 +64,28 @@ function toOcrCanvas(
       const v = Math.max(0, Math.min(255, Math.round(((d[i] - lo) * 255) / range)));
       d[i] = d[i + 1] = d[i + 2] = v;
     }
+    if (binarize) {
+      // Otsu threshold: pure black text on white, helps on dim or low-contrast cards.
+      const h = new Uint32Array(256);
+      for (let i = 0; i < d.length; i += 4) h[d[i]]++;
+      let sum = 0;
+      for (let t = 0; t < 256; t++) sum += t * h[t];
+      let sumB = 0, wB = 0, best = 0, thr = 128;
+      for (let t = 0; t < 256; t++) {
+        wB += h[t];
+        if (!wB) continue;
+        const wF = total - wB;
+        if (!wF) break;
+        sumB += t * h[t];
+        const mB = sumB / wB, mF = (sum - sumB) / wF;
+        const between = wB * wF * (mB - mF) * (mB - mF);
+        if (between > best) { best = between; thr = t; }
+      }
+      for (let i = 0; i < d.length; i += 4) {
+        const v = d[i] > thr ? 255 : 0;
+        d[i] = d[i + 1] = d[i + 2] = v;
+      }
+    }
     ctx.putImageData(img, 0, 0);
   } catch {
     // If pixel access fails, the plain resized image is still used.
@@ -78,8 +101,8 @@ const DIGIT_FIX: Record<string, string> = {
   S: "5", s: "5", B: "8", Z: "2", z: "2", G: "6",
 };
 
-function findCnic(text: string): string | null {
-  let best: { digits: string; real: number } | null = null;
+function findCnicAll(text: string): Array<{ number: string; real: number }> {
+  const found: Array<{ number: string; real: number }> = [];
   CNIC_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = CNIC_RE.exec(text)) !== null) {
@@ -88,34 +111,96 @@ function findCnic(text: string): string | null {
     if (real < 9) continue; // too many guessed characters: probably not a number
     const digits = raw.split("").map((c) => DIGIT_FIX[c] ?? c).join("");
     if (!/^\d{13}$/.test(digits)) continue;
-    if (!best || real > best.real) best = { digits, real };
+    found.push({ number: `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12, 13)}`, real });
   }
-  if (!best) return null;
-  const d = best.digits;
-  return `${d.slice(0, 5)}-${d.slice(5, 12)}-${d.slice(12, 13)}`;
+  return found;
 }
 
+// Words printed on a CNIC. A number is only trusted when the photo also shows
+// CNIC text, so a random object or a dark/blank photo is never accepted.
+const CNIC_STRONG = ["PAKISTAN", "IDENTITY", "ISLAMIC", "REPUBLIC", "FATHER", "HUSBAND", "GENDER", "COUNTRY", "SIGNATURE", "NATIONAL"];
+const CNIC_WEAK = ["NUMBER", "BIRTH", "EXPIRY", "ISSUE", "CARD"];
+
+function within1(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (b.length < 6) return false; // short words must match exactly
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++;
+    else if (a.length < b.length) j++;
+    else { i++; j++; }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+
+function looksLikeCnic(text: string): boolean {
+  const words = text.toUpperCase().split(/[^A-Z]+/).filter((w) => w.length >= 5);
+  const hit = (list: string[]) => list.filter((k) => words.some((w) => within1(w, k))).length;
+  return hit(CNIC_STRONG) >= 1 || hit(CNIC_STRONG) + hit(CNIC_WEAK) >= 2;
+}
+
+// Average brightness 0-255 of a small copy of the image.
+function meanBrightness(src: HTMLCanvasElement): number {
+  try {
+    const w = 160;
+    const h = Math.max(1, Math.round((src.height / src.width) * w));
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+    if (!ctx) return 255;
+    ctx.drawImage(src, 0, 0, w, h);
+    const d = ctx.getImageData(0, 0, w, h).data;
+    let sum = 0;
+    for (let i = 0; i < d.length; i += 4) sum += (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
+    return sum / (w * h);
+  } catch {
+    return 255;
+  }
+}
+
+// Reads the CNIC number with several differently prepared copies of the photo
+// and lets them vote, so one wrong digit in one pass is outvoted by the others.
 async function readCnicNumber(
   card: HTMLCanvasElement,
   onStep?: (step: number, total: number) => void,
-): Promise<{ number: string | null; letters: number }> {
-  const passes: Array<[number, number, number, number]> = [
-    [0, 0, 1, 1],        // whole card
-    [0, 0.3, 0.8, 0.65], // lower-left: where the number is on most cards
-    [0, 0.45, 0.7, 0.4], // tight band around the number
+): Promise<{ number: string | null; isCnic: boolean }> {
+  // [x, y, w, h, targetWidth, binarize]  (x/y/w/h as fractions of the card)
+  const passes: Array<[number, number, number, number, number, boolean]> = [
+    [0, 0, 1, 1, 1800, false],       // whole card
+    [0, 0.3, 0.8, 0.65, 1600, false], // lower-left, where the number is
+    [0, 0.45, 0.7, 0.4, 1600, false], // tight band around the number
+    [0, 0.45, 0.7, 0.4, 1600, true],  // same band, black-and-white
   ];
-  let letters = 0;
+  const votes = new Map<string, { n: number; real: number }>();
+  let allText = "";
+  const pick = () => {
+    let best: { number: string; n: number; real: number } | null = null;
+    votes.forEach((v, number) => {
+      if (!best || v.n > best.n || (v.n === best.n && v.real > best.real)) best = { number, ...v };
+    });
+    return best as { number: string; n: number; real: number } | null;
+  };
   for (let i = 0; i < passes.length; i++) {
     onStep?.(i + 1, passes.length);
-    const [fx, fy, fw, fh] = passes[i];
-    const prepared = toOcrCanvas(card, fx, fy, fw, fh, i === 0 ? 1800 : 1600);
-    const result = await Tesseract.recognize(prepared, "eng");
+    const [fx, fy, fw, fh, tw, bin] = passes[i];
+    const result = await Tesseract.recognize(toOcrCanvas(card, fx, fy, fw, fh, tw, bin), "eng");
     const text = result.data.text || "";
-    if (i === 0) letters = (text.match(/[A-Za-z]/g) || []).length;
-    const number = findCnic(text);
-    if (number) return { number, letters };
+    allText += "\n" + text;
+    for (const f of findCnicAll(text)) {
+      const cur = votes.get(f.number);
+      votes.set(f.number, { n: (cur?.n ?? 0) + 1, real: Math.max(cur?.real ?? 0, f.real) });
+    }
+    const best = pick();
+    // Stop early: two passes agree, or all 13 characters were genuine digits.
+    if (best && looksLikeCnic(allText) && (best.n >= 2 || best.real === 13)) {
+      return { number: best.number, isCnic: true };
+    }
   }
-  return { number: null, letters };
+  const best = pick();
+  return { number: best ? best.number : null, isCnic: looksLikeCnic(allText) };
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -179,6 +264,8 @@ export default function KycPage() {
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrStatus, setOcrStatus] = useState<string>("");
   const [ocrFailed, setOcrFailed] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const [cameraRes, setCameraRes] = useState<{ w: number; h: number } | null>(null);
   const [camPerm, setCamPerm] = useState<"unknown" | "granted" | "denied" | "prompt">("unknown");
   const [videoOpen, setVideoOpen] = useState(false);
@@ -328,8 +415,10 @@ export default function KycPage() {
           audio: false,
           video: {
             facingMode: { ideal: facing },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            // CNIC photos: ask for the best the phone offers (the browser picks
+            // the closest supported size); selfie: 1080p is plenty.
+            width: { ideal: target === "selfie" ? 1920 : 3840 },
+            height: { ideal: target === "selfie" ? 1080 : 2160 },
             advanced: [{ focusMode: "continuous" } as any],
           },
         });
@@ -350,6 +439,8 @@ export default function KycPage() {
         if (caps?.exposureMode?.includes?.("continuous")) adv.exposureMode = "continuous";
         if (caps?.whiteBalanceMode?.includes?.("continuous")) adv.whiteBalanceMode = "continuous";
         if (Object.keys(adv).length) await track.applyConstraints({ advanced: [adv] });
+        setTorchSupported(!!caps?.torch);
+        setTorchOn(false);
       } catch {
         // optional improvements only
       }
@@ -365,6 +456,17 @@ export default function KycPage() {
       } else {
         toast.error("The camera could not be started. Close other apps using the camera and try again.");
       }
+    }
+  }
+
+  async function toggleTorch() {
+    const track = stream?.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: !torchOn } as any] });
+      setTorchOn((v) => !v);
+    } catch {
+      toast.error("The flashlight is not available on this camera.");
     }
   }
 
@@ -435,33 +537,39 @@ export default function KycPage() {
       setOcrProcessing(true);
       setOcrError(null);
       setOcrFailed(false);
-      setOcrStatus("Reading the number from the photo...");
+      setOcrStatus("Checking the photo...");
       try {
-        const { number, letters } = await readCnicNumber(capturedCanvas, (step, total) =>
+        if (meanBrightness(capturedCanvas) < 55) {
+          setOcrProcessing(false);
+          setOcrStatus("");
+          setOcrFailed(true);
+          setOcrError("The photo is too dark. Move to a bright place (or use the flashlight button) and retake it.");
+          return;
+        }
+        const { number, isCnic } = await readCnicNumber(capturedCanvas, (step, total) =>
           setOcrStatus(`Reading the number from the photo... (${step}/${total})`),
         );
         setOcrProcessing(false);
         setOcrStatus("");
 
-        if (number && letters >= 10) {
+        if (number && isCnic) {
           setForm(p => ({ ...p, cnic_number: number }));
           finalizeCapture(capturedKind, capturedCanvas);
           toast.success(`CNIC number detected: ${number}. You can correct it manually if needed.`);
         } else {
-          // Keep the photo on screen so the user can retry, retake, or continue
-          // and type the number by hand. Nobody is blocked by a weak OCR result.
+          // The photo is only accepted when a CNIC number is really read from a CNIC.
           setOcrFailed(true);
           setOcrError(
             number
-              ? "The complete card is not clearly visible. Retake with the whole CNIC inside the frame, or continue and type the number yourself."
-              : "The number could not be read automatically. Retake in good light with the card flat and steady, or continue and type the number yourself.",
+              ? "This does not look like the front of a CNIC. Photograph the CNIC card itself, with the whole card inside the frame."
+              : "No CNIC number could be read. Place the CNIC flat inside the frame, in good light, hold the phone steady for a second, and retake.",
           );
         }
       } catch {
         setOcrProcessing(false);
         setOcrStatus("");
         setOcrFailed(true);
-        setOcrError("Automatic reading is not available right now (check your internet). You can continue and type the number yourself.");
+        setOcrError("Automatic reading could not start (check your internet connection) — please try again.");
       }
     } else {
       finalizeCapture(capturedKind, capturedCanvas);
@@ -469,10 +577,24 @@ export default function KycPage() {
   }
 
   function finalizeCapture(kind: "front" | "back" | "selfie", canvas: HTMLCanvasElement) {
-    canvas.toBlob((blob) => {
+    // OCR used the full-resolution frame; the stored copy is capped at 2000 px
+    // wide (still sharp enough to read) to keep uploads small on mobile data.
+    let out = canvas;
+    if (canvas.width > 2000) {
+      const scaled = document.createElement("canvas");
+      scaled.width = 2000;
+      scaled.height = Math.round((canvas.height * 2000) / canvas.width);
+      const sctx = scaled.getContext("2d");
+      if (sctx) {
+        sctx.imageSmoothingQuality = "high";
+        sctx.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+        out = scaled;
+      }
+    }
+    out.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], `${kind}.jpg`, { type: "image/jpeg" });
-      const preview = canvas.toDataURL("image/jpeg", 0.85);
+      const preview = out.toDataURL("image/jpeg", 0.85);
 
       if (kind === "front") {
         setCnicFront(file);
@@ -492,7 +614,7 @@ export default function KycPage() {
       setOcrFailed(false);
 
       toast.success(`${kind === "front" ? "CNIC Front" : kind === "back" ? "CNIC Back" : "Selfie"} captured successfully!`);
-    }, "image/jpeg", 0.95);
+    }, "image/jpeg", 0.92);
   }
 
   function cancelCaptured() {
@@ -909,6 +1031,11 @@ export default function KycPage() {
             <Button variant="outline" className="flex-1" onClick={() => { stream?.getTracks().forEach(t => t.stop()); setActiveCamera(null); setOcrError(null); }}>
               Cancel
             </Button>
+            {torchSupported && activeCamera !== "selfie" && (
+              <Button variant="outline" onClick={toggleTorch}>
+                {torchOn ? "Light: ON" : "Light"}
+              </Button>
+            )}
             <Button className="flex-1" onClick={captureImage}>
               <Camera className="h-4 w-4 mr-2" />
               Capture
@@ -968,20 +1095,6 @@ export default function KycPage() {
             </Button>
           </div>
 
-          {isFront && ocrFailed && !ocrProcessing && (
-            <Button
-              variant="secondary"
-              className="w-full"
-              onClick={() => {
-                if (capturedCanvas && capturedKind) {
-                  finalizeCapture(capturedKind, capturedCanvas);
-                  toast.info("Photo saved. Please type your CNIC number in the field below.");
-                }
-              }}
-            >
-              Use this photo &amp; type the number myself
-            </Button>
-          )}
         </div>
       </div>
     );
