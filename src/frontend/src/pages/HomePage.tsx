@@ -5,6 +5,7 @@
 import InstallButton from "@/components/InstallButton";
 import CompletionCooldownBanner from "@/components/CompletionCooldownBanner";
 import Layout from "@/components/Layout";
+import SocialLinks from "@/components/SocialLinks";
 import HeroesWall from "@/components/HeroesWall";
 import HeroLeaderboard from "@/components/HeroLeaderboard";
 import KindnessWall from "@/components/KindnessWall";
@@ -39,9 +40,6 @@ import {
   Bell,
   Heart,
   FileText,
-  Facebook,
-  Instagram,
-  Linkedin,
   Mail,
   ChevronRight,
   MessageCircle,
@@ -93,10 +91,6 @@ import SlidingHomePanel from "@/components/SlidingHomePanel";
 
 // Support earnings conversion: 10,000 = $1.
 
-const FACEBOOK_URL =
-  "https://www.facebook.com/profile.php?id=61590715263595";
-const INSTAGRAM_URL =
-  "https://www.instagram.com/givethra.community";
 const WHATSAPP_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const SUPPORT_WHATSAPP_URL =
@@ -1615,23 +1609,7 @@ export default function HomePage() {
               <h2 className="font-display text-lg font-bold text-foreground">Connect with Givethra</h2>
               <p className="text-sm text-muted-foreground">Follow us and reach out — we're here to help.</p>
             </div>
-            <div className="flex items-center justify-center gap-3">
-              <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a href="https://www.linkedin.com/company/givethra-org/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <Linkedin className="h-5 w-5" />
-              </a>
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Channel" className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <MessageCircle className="h-5 w-5" />
-              </a>
-              <a href={`mailto:${CONTACT_EMAIL}`} aria-label="Email" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <Mail className="h-5 w-5" />
-              </a>
-            </div>
+            <SocialLinks className="justify-center" />
             <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline">
               <MessageCircle className="h-4 w-4" /> Follow our WhatsApp Channel
             </a>
