@@ -203,6 +203,134 @@ async function readCnicNumber(
   return { number: best ? best.number : null, isCnic: looksLikeCnic(allText) };
 }
 
+// ---------------------------------------------------------------------------
+// Sharpness + review-copy helpers
+// ---------------------------------------------------------------------------
+function boxBlurH(src: Float32Array, W: number, H: number, r: number): Float32Array {
+  const out = new Float32Array(W * H);
+  const n = 2 * r + 1;
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    let sum = 0;
+    for (let k = -r; k <= r; k++) sum += src[row + Math.min(W - 1, Math.max(0, k))];
+    for (let x = 0; x < W; x++) {
+      out[row + x] = sum / n;
+      const add = Math.min(W - 1, x + r + 1);
+      const rem = Math.max(0, x - r);
+      sum += src[row + add] - src[row + rem];
+    }
+  }
+  return out;
+}
+
+function boxBlurV(src: Float32Array, W: number, H: number, r: number): Float32Array {
+  const out = new Float32Array(W * H);
+  const n = 2 * r + 1;
+  for (let x = 0; x < W; x++) {
+    let sum = 0;
+    for (let k = -r; k <= r; k++) sum += src[Math.min(H - 1, Math.max(0, k)) * W + x];
+    for (let y = 0; y < H; y++) {
+      out[y * W + x] = sum / n;
+      const add = Math.min(H - 1, y + r + 1);
+      const rem = Math.max(0, y - r);
+      sum += src[add * W + x] - src[rem * W + x];
+    }
+  }
+  return out;
+}
+
+// Blur measure after Crete et al.: 0 = very sharp, 1 = very blurry. It compares
+// how much the image's edges weaken when it is blurred once more, so it does not
+// depend on what is printed on the card.
+function creteBlur(g: Float32Array, W: number, H: number): number {
+  const bv = boxBlurV(g, W, H, 4); // vertical blur
+  const bh = boxBlurH(g, W, H, 4); // horizontal blur
+  let sF = 0, sV = 0;
+  for (let y = 0; y < H - 1; y++) {
+    for (let x = 0; x < W - 1; x++) {
+      const i = y * W + x;
+      const dxF = Math.abs(g[i + 1] - g[i]);
+      const dyF = Math.abs(g[i + W] - g[i]);
+      const dxB = Math.abs(bh[i + 1] - bh[i]);
+      const dyB = Math.abs(bv[i + W] - bv[i]);
+      sF += dxF + dyF;
+      sV += Math.max(0, dxF - dxB) + Math.max(0, dyF - dyB);
+    }
+  }
+  return sF > 0 ? (sF - sV) / sF : 1;
+}
+
+// Photos blurrier than this cannot be read by the review team and are retaken.
+// 0 = razor sharp, 1 = very blurry; measured on an 800 px wide copy of the card.
+// (Calibrated on real samples: sharp CNIC back 0.24, soft CNIC front 0.37.)
+const BLUR_MAX = 0.33;
+
+function blurOfCanvas(src: HTMLCanvasElement): number {
+  const ctx = src.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+  const d = ctx ? ctx.getImageData(0, 0, src.width, src.height) : null;
+  if (!d) return 0;
+  const g = new Float32Array(src.width * src.height);
+  for (let i = 0, o = 0; i < g.length; i++, o += 4) {
+    g[i] = (d.data[o] * 299 + d.data[o + 1] * 587 + d.data[o + 2] * 114) / 1000;
+  }
+  return creteBlur(g, src.width, src.height);
+}
+
+function scaleCanvas(src: HTMLCanvasElement, maxWidth: number): HTMLCanvasElement {
+  if (src.width <= maxWidth) return src;
+  const out = document.createElement("canvas");
+  out.width = maxWidth;
+  out.height = Math.round((src.height * maxWidth) / src.width);
+  const ctx = out.getContext("2d");
+  if (ctx) {
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(src, 0, 0, out.width, out.height);
+    return out;
+  }
+  return src;
+}
+
+function enhanceRGBA(d: Uint8ClampedArray, W: number, H: number): void {
+  const n = W * H;
+  // 1) contrast stretch on luminance percentiles (same gain on all channels keeps colours)
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    hist[Math.round((d[o] * 299 + d[o + 1] * 587 + d[o + 2] * 114) / 1000)]++;
+  }
+  let acc = 0, lo = 0, hi = 255;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.01) { lo = v; break; } }
+  acc = 0;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.99) { hi = v; break; } }
+  const gain = Math.min(1.6, 239 / Math.max(hi - lo, 1));
+  if (gain > 1.05) {
+    for (let i = 0; i < n; i++) {
+      const o = i * 4;
+      d[o] = (d[o] - lo) * gain + 8;
+      d[o + 1] = (d[o + 1] - lo) * gain + 8;
+      d[o + 2] = (d[o + 2] - lo) * gain + 8;
+    }
+  }
+  // 2) unsharp mask: original + amount * (original - blurred)
+  const amount = 0.9;
+  for (let c = 0; c < 3; c++) {
+    const ch = new Float32Array(n);
+    for (let i = 0; i < n; i++) ch[i] = d[i * 4 + c];
+    let b = boxBlurH(ch, W, H, 2);
+    b = boxBlurV(b, W, H, 2);
+    b = boxBlurH(b, W, H, 2);
+    b = boxBlurV(b, W, H, 2);
+    for (let i = 0; i < n; i++) {
+      const diff = ch[i] - b[i];
+      if (Math.abs(diff) > 2) d[i * 4 + c] = ch[i] + amount * diff;
+      else d[i * 4 + c] = ch[i];
+    }
+  }
+}
+
+const BLUR_MESSAGE =
+  "This photo is blurry, so the text cannot be read clearly. Hold the phone steady, wait a second for the camera to focus, keep the card flat in good light, and retake it.";
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // Safari/iPhone cannot record WebM, so the format is picked from what the
@@ -264,6 +392,10 @@ export default function KycPage() {
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrStatus, setOcrStatus] = useState<string>("");
   const [ocrFailed, setOcrFailed] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [focusing, setFocusing] = useState(false);
+  const [capturedBlur, setCapturedBlur] = useState<number | null>(null);
+  const captureRunRef = useRef(0);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [cameraRes, setCameraRes] = useState<{ w: number; h: number } | null>(null);
@@ -381,6 +513,10 @@ export default function KycPage() {
       v.srcObject = stream;
       const p = v.play?.();
       if (p && typeof p.catch === "function") p.catch(() => {});
+      // Give the camera a moment to settle its focus before a photo is allowed.
+      setFocusing(true);
+      const t = setTimeout(() => setFocusing(false), 1200);
+      return () => clearTimeout(t);
     }
   }, [activeCamera, stream]);
 
@@ -486,7 +622,7 @@ export default function KycPage() {
     return { x, y, w, h };
   }
 
-  function grabFrame(): HTMLCanvasElement | null {
+  function grabFrame(maxWidth?: number): HTMLCanvasElement | null {
     const video = videoRef.current;
     const rect = getCropRect();
     if (!video || !rect || rect.w <= 0 || rect.h <= 0) return null;
@@ -498,30 +634,64 @@ export default function KycPage() {
     if (w <= 0 || h <= 0) return null;
     // A fresh canvas per capture: the cropped pixels are kept at the camera's
     // full native resolution (no downscaling) for OCR and upload.
+    const cw = maxWidth && w > maxWidth ? maxWidth : w;
+    const ch = maxWidth && w > maxWidth ? Math.round((h * maxWidth) / w) : h;
     const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext("2d", { willReadFrequently: !!maxWidth } as any) as CanvasRenderingContext2D | null;
     if (!ctx) return null;
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(video, x, y, w, h, 0, 0, w, h);
+    ctx.drawImage(video, x, y, w, h, 0, 0, cw, ch);
     return canvas;
   }
 
-  function captureImage() {
+  async function captureImage() {
+    if (capturing) return;
     setOcrError(null);
-    const canvas = grabFrame();
-    if (!canvas) {
+    const kind = activeCamera as "front" | "back" | "selfie";
+    const runId = ++captureRunRef.current;
+
+    let best: HTMLCanvasElement | null = null;
+    let bestBlur = 1;
+    if (kind === "selfie") {
+      best = grabFrame();
+    } else {
+      // A moving hand or a camera still refocusing blurs single frames. Take a
+      // burst of frames over about one second and keep the sharpest one.
+      setCapturing(true);
+      const FRAMES = 8;
+      for (let i = 0; i < FRAMES; i++) {
+        const small = grabFrame(800);
+        if (small) {
+          const score = blurOfCanvas(small);
+          if (!best || score < bestBlur) {
+            const full = grabFrame();
+            if (full) {
+              if (best) { best.width = 0; best.height = 0; } // free the previous frame's memory
+              best = full;
+              bestBlur = score;
+            }
+          }
+        }
+        if (i < FRAMES - 1) await sleep(110);
+        if (runId !== captureRunRef.current) { setCapturing(false); return; }
+      }
+      setCapturing(false);
+    }
+    if (runId !== captureRunRef.current) return;
+
+    if (!best) {
       toast.error("The photo could not be captured. Please try again.");
       return;
     }
-    
-    const imageData = canvas.toDataURL("image/jpeg", 0.9);
+
     setOcrFailed(false);
-    setCapturedImage(imageData);
-    setCapturedCanvas(canvas);
-    setCapturedKind(activeCamera as "front" | "back" | "selfie");
-    
+    setCapturedBlur(kind === "selfie" ? null : bestBlur);
+    setCapturedImage(scaleCanvas(best, 1200).toDataURL("image/jpeg", 0.88));
+    setCapturedCanvas(best);
+    setCapturedKind(kind);
+
     stream?.getTracks().forEach(t => t.stop());
     setStream(null);
     setActiveCamera(null);
@@ -539,6 +709,13 @@ export default function KycPage() {
       setOcrFailed(false);
       setOcrStatus("Checking the photo...");
       try {
+        if (capturedBlur !== null && capturedBlur > BLUR_MAX) {
+          setOcrProcessing(false);
+          setOcrStatus("");
+          setOcrFailed(true);
+          setOcrError(BLUR_MESSAGE);
+          return;
+        }
         if (meanBrightness(capturedCanvas) < 55) {
           setOcrProcessing(false);
           setOcrStatus("");
@@ -572,6 +749,11 @@ export default function KycPage() {
         setOcrError("Automatic reading could not start (check your internet connection) — please try again.");
       }
     } else {
+      if (capturedKind !== "selfie" && capturedBlur !== null && capturedBlur > BLUR_MAX) {
+        setOcrFailed(true);
+        setOcrError(BLUR_MESSAGE);
+        return;
+      }
       finalizeCapture(capturedKind, capturedCanvas);
     }
   }
@@ -579,17 +761,18 @@ export default function KycPage() {
   function finalizeCapture(kind: "front" | "back" | "selfie", canvas: HTMLCanvasElement) {
     // OCR used the full-resolution frame; the stored copy is capped at 2000 px
     // wide (still sharp enough to read) to keep uploads small on mobile data.
-    let out = canvas;
-    if (canvas.width > 2000) {
-      const scaled = document.createElement("canvas");
-      scaled.width = 2000;
-      scaled.height = Math.round((canvas.height * 2000) / canvas.width);
-      const sctx = scaled.getContext("2d");
-      if (sctx) {
-        sctx.imageSmoothingQuality = "high";
-        sctx.drawImage(canvas, 0, 0, scaled.width, scaled.height);
-        out = scaled;
-      }
+    const out = scaleCanvas(canvas, 2000);
+    if (kind !== "selfie") {
+      // Review copy: gentle contrast and sharpening so the verification team
+      // can read the small printed text (does not change what the card says).
+      try {
+        const octx = out.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+        if (octx) {
+          const img = octx.getImageData(0, 0, out.width, out.height);
+          enhanceRGBA(img.data, out.width, out.height);
+          octx.putImageData(img, 0, 0);
+        }
+      } catch { /* keep the unenhanced image */ }
     }
     out.toBlob((blob) => {
       if (!blob) return;
@@ -610,6 +793,7 @@ export default function KycPage() {
       setCapturedImage(null);
       setCapturedCanvas(null);
       setCapturedKind(null);
+      setCapturedBlur(null);
       setOcrError(null);
       setOcrFailed(false);
 
@@ -621,6 +805,7 @@ export default function KycPage() {
     setCapturedImage(null);
     setCapturedCanvas(null);
     setCapturedKind(null);
+    setCapturedBlur(null);
     setOcrError(null);
     setOcrFailed(false);
     if (capturedKind) {
@@ -1028,7 +1213,7 @@ export default function KycPage() {
           <canvas ref={canvasRef} className="hidden" />
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => { stream?.getTracks().forEach(t => t.stop()); setActiveCamera(null); setOcrError(null); }}>
+            <Button variant="outline" className="flex-1" onClick={() => { captureRunRef.current++; setCapturing(false); stream?.getTracks().forEach(t => t.stop()); setActiveCamera(null); setOcrError(null); }}>
               Cancel
             </Button>
             {torchSupported && activeCamera !== "selfie" && (
@@ -1036,9 +1221,9 @@ export default function KycPage() {
                 {torchOn ? "Light: ON" : "Light"}
               </Button>
             )}
-            <Button className="flex-1" onClick={captureImage}>
+            <Button className="flex-1" onClick={captureImage} disabled={capturing || focusing}>
               <Camera className="h-4 w-4 mr-2" />
-              Capture
+              {capturing ? "Hold still..." : focusing ? "Focusing..." : "Capture"}
             </Button>
           </div>
         </div>
@@ -1049,6 +1234,7 @@ export default function KycPage() {
   // Captured image preview with verify option
   if (capturedImage && capturedKind) {
     const isFront = capturedKind === "front";
+    const blurBlocked = capturedKind !== "selfie" && capturedBlur !== null && capturedBlur > BLUR_MAX;
     
     return (
       <div className="min-h-screen bg-background">
@@ -1067,6 +1253,18 @@ export default function KycPage() {
             <img src={capturedImage} alt="Captured" className="w-full block" />
           </div>
 
+          {capturedKind !== "selfie" && !blurBlocked && (
+            <p className="text-xs text-muted-foreground text-center">
+              Check that all the small text (name, father's name, number, dates) is easy to read. If not, press Retake.
+            </p>
+          )}
+
+          {blurBlocked && (
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-300 p-3 text-sm text-amber-700 text-center">
+              ⚠️ {BLUR_MESSAGE}
+            </div>
+          )}
+
           {isFront && ocrProcessing && (
             <div className="text-center text-sm text-primary py-2 flex items-center justify-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
@@ -1074,7 +1272,7 @@ export default function KycPage() {
             </div>
           )}
           
-          {isFront && ocrError && (
+          {!blurBlocked && ocrError && (
             <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-300 p-3 text-sm text-amber-700 text-center">
               ⚠️ {ocrError}
             </div>
@@ -1088,7 +1286,7 @@ export default function KycPage() {
             <Button 
               className="flex-1" 
               onClick={verifyCapturedImage}
-              disabled={ocrProcessing}
+              disabled={ocrProcessing || blurBlocked}
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
               {ocrProcessing ? "Processing..." : isFront ? (ocrFailed ? "Try Reading Again" : "Verify & Confirm") : "Confirm"}
