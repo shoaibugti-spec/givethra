@@ -42,6 +42,7 @@ import {
 } from "@/lib/api";
 import RoleSwitcher from "@/components/RoleSwitcher";
 import SocialLinks from "@/components/SocialLinks";
+import { SiWhatsapp } from "react-icons/si";
 import { loadHelpImpact, formatAmount, type HelpImpact } from "@/lib/helpStats";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
@@ -649,8 +650,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {isAuthenticated ? (
               <Link
-                to="/profile/$id"
-                params={{ id: "me" }}
+                to="/profile/me"
                 onClick={closeMenu}
                 className="relative mt-5 flex items-center gap-3.5 rounded-2xl bg-white/10 p-3 ring-1 ring-white/20 transition active:bg-white/20"
               >
@@ -884,9 +884,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="24/7 WhatsApp Support"
-        className="fixed bottom-5 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-green-600/15 transition hover:bg-green-700 hover:shadow-xl md:bottom-6 md:right-6"
+        className="fixed bottom-5 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-[#25D366]/20 transition hover:bg-[#1EBE5A] hover:shadow-xl md:bottom-6 md:right-6"
       >
-        <MessageCircle className="h-5 w-5" />
+        <SiWhatsapp className="h-5 w-5" />
         <span className="hidden sm:inline">24/7 WhatsApp Support</span>
         <span className="sm:hidden">Support</span>
       </a>
