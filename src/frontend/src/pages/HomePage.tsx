@@ -6,6 +6,7 @@ import InstallButton from "@/components/InstallButton";
 import CompletionCooldownBanner from "@/components/CompletionCooldownBanner";
 import Layout from "@/components/Layout";
 import SocialLinks from "@/components/SocialLinks";
+import { SiWhatsapp } from "react-icons/si";
 import HeroesWall from "@/components/HeroesWall";
 import HeroLeaderboard from "@/components/HeroLeaderboard";
 import KindnessWall from "@/components/KindnessWall";
@@ -1003,9 +1004,9 @@ export default function HomePage() {
           rel="noopener noreferrer"
           aria-label="Open 24/7 WhatsApp support"
           title="24/7 WhatsApp Support"
-          className="fixed bottom-24 right-4 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-green-600 text-white shadow-xl ring-4 ring-white/80 transition-all hover:scale-105 hover:bg-green-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-300 md:bottom-6 md:right-6"
+          className="fixed bottom-24 right-4 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl ring-4 ring-white/80 transition-all hover:scale-105 hover:bg-[#1EBE5A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-300 md:bottom-6 md:right-6"
         >
-          <MessageCircle className="h-7 w-7" />
+          <SiWhatsapp className="h-8 w-8" />
           <span className="absolute -right-1 -top-2 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-black leading-none text-primary-foreground shadow-sm">24/7</span>
         </a>
 
