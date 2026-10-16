@@ -865,50 +865,104 @@ declare module "@tanstack/react-router" {
 function AppLoadingScreen() {
   return (
     <div
+      role="status"
+      aria-live="polite"
       style={{
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "var(--background, #ffffff)",
-        gap: "1.5rem",
+        gap: "1.25rem",
+        padding: "2rem",
+        overflow: "hidden",
+        position: "relative",
+        background: "linear-gradient(145deg, #063f4a 0%, #03707b 48%, #00a896 100%)",
       }}
     >
+      <style>{`
+        @keyframes givethra-splash-enter {
+          from { opacity: 0; transform: translateY(14px) scale(.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes givethra-splash-spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes givethra-splash-glow {
+          0%, 100% { opacity: .35; transform: scale(.92); }
+          50% { opacity: .75; transform: scale(1.08); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .givethra-splash-motion { animation: none !important; }
+        }
+      `}</style>
       <div
+        aria-hidden="true"
+        className="givethra-splash-motion"
         style={{
-          width: 52,
-          height: 52,
-          borderRadius: 12,
-          background: "#00A896",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          position: "absolute",
+          width: 260,
+          height: 260,
+          borderRadius: "50%",
+          background: "rgba(91, 236, 222, .22)",
+          filter: "blur(18px)",
+          animation: "givethra-splash-glow 2.6s ease-in-out infinite",
+        }}
+      />
+      <div
+        className="givethra-splash-motion"
+        style={{
+          width: "min(74vw, 190px)",
+          aspectRatio: "3 / 2",
+          borderRadius: 28,
+          overflow: "hidden",
+          position: "relative",
+          zIndex: 1,
+          boxShadow: "0 18px 55px rgba(0, 25, 34, .35), 0 0 0 1px rgba(255,255,255,.22)",
+          animation: "givethra-splash-enter 700ms cubic-bezier(.23,1,.32,1) both",
         }}
       >
-        <span
-          style={{
-            color: "#fff",
-            fontWeight: 800,
-            fontSize: 24,
-            fontFamily: "system-ui, sans-serif",
-          }}
-        >
-          G
-        </span>
+        <img src="/givethra-splash-logo.png" alt="Givethra logo" style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} />
       </div>
       <span
+        className="givethra-splash-motion"
         style={{
           fontWeight: 700,
-          fontSize: 22,
-          letterSpacing: "-0.5px",
+          fontSize: "clamp(1.8rem, 7vw, 2.35rem)",
+          letterSpacing: "-0.04em",
           fontFamily: "system-ui, sans-serif",
-          color: "var(--foreground, #111)",
+          color: "#ffffff",
+          textShadow: "0 3px 18px rgba(0, 37, 47, .32)",
+          animation: "givethra-splash-enter 700ms 120ms cubic-bezier(.23,1,.32,1) both",
         }}
       >
         Givethra
       </span>
-      <LoadingSpinner size="md" label="Loading Application..." />
+      <span
+        className="givethra-splash-motion"
+        style={{
+          marginTop: -10,
+          color: "rgba(255, 255, 255, .88)",
+          fontSize: "clamp(.78rem, 3vw, .95rem)",
+          letterSpacing: ".02em",
+          animation: "givethra-splash-enter 700ms 220ms cubic-bezier(.23,1,.32,1) both",
+        }}
+      >
+        Verified Help. Real Impact.
+      </span>
+      <div
+        className="givethra-splash-motion"
+        aria-label="Loading application"
+        style={{
+          width: 32,
+          height: 32,
+          marginTop: 10,
+          borderRadius: "50%",
+          border: "3px solid rgba(255,255,255,.3)",
+          borderTopColor: "#ffffff",
+          animation: "givethra-splash-spin 900ms linear infinite",
+        }}
+      />
     </div>
   );
 }
