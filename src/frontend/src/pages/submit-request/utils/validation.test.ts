@@ -75,9 +75,9 @@ describe("submit request validation", () => {
     expect(validateStep("categoryDetails", { ...common, category: "Electricity Bill", catFields: { monthly_units: "120", bill_owner_name: "Test User", company: "Utility Company", appliances: { fan: 1 } } })).toBeNull();
   });
 
-  it("requires pension proof for Retired and previous-income proof for former workers", () => {
+  it("requires income documents and a bank statement for every source-of-income option", () => {
     expect(getRequiredEmploymentDocumentKeys("Retired")).toEqual(["pensionProofUrl", "statementUrl"]);
     expect(getRequiredEmploymentDocumentKeys("Previously Employed / Left Job / Laid Off")).toEqual(["previousIncomeProofUrl", "statementUrl"]);
-    expect(getRequiredEmploymentDocumentKeys("Unemployed / Housewife")).toContain("supportDeclarationUrl");
+    expect(getRequiredEmploymentDocumentKeys("Unemployed / Housewife")).toEqual(["statementUrl", "supportDeclarationUrl"]);
   });
 });
