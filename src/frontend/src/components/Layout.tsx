@@ -44,6 +44,7 @@ import {
   getCommunityPosts,
 } from "@/lib/api";
 import RoleSwitcher from "@/components/RoleSwitcher";
+import LegalFooter from "@/components/LegalFooter";
 import { loadHelpImpact, formatAmount, type HelpImpact } from "@/lib/helpStats";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
@@ -838,96 +839,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 has-bottom-nav">{children}</main>
 
-      <footer className="bg-card border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 py-10">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
-                  <Heart className="h-3.5 w-3.5 text-primary-foreground" />
-                </div>
-                <span className="font-display font-bold text-foreground">
-                  Givethra
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground max-w-xs">
-                Verified Help. Real Impact.
-              </p>
-              <div className="flex items-center gap-3 pt-1">
-                <a
-                  href={FACEBOOK_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
-                  <Facebook className="h-4 w-4" />
-                </a>
-                <a
-                  href={INSTAGRAM_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Instagram"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
-                  <Instagram className="h-4 w-4" />
-                </a>
-                <a
-                  href={LINKEDIN_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="LinkedIn"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
-                  <Linkedin className="h-4 w-4" />
-                </a>
-                <a
-                  href="mailto:info@givethra.org"
-                  aria-label="Email"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
-                  <Mail className="h-4 w-4" />
-                </a>
-                <a
-                  href={WHATSAPP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="WhatsApp Channel"
-                  className="h-9 w-9 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                </a>
-              </div>
-            </div>
-            <nav className="flex flex-wrap gap-x-6 gap-y-2">
-              {[
-                { to: "/about", label: "About" },
-                { to: "/faq", label: "FAQ" },
-                { to: "/privacy", label: "Privacy Policy" },
-                { to: "/terms", label: "Terms" },
-                { to: "/community-guidelines", label: "Community Guidelines" },
-                { to: "/contact", label: "Contact Us" },
-              ].map(({ to, label }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-          <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-1">
-            <p>
-              &copy; {new Date().getFullYear()} Givethra. All rights reserved.
-            </p>
-            <p>
-              Givethra™ is a humanitarian platform connecting verified people
-              with verified help.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <LegalFooter />
       <a
         href={WHATSAPP_SUPPORT_URL}
         target="_blank"

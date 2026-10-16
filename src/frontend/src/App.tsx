@@ -23,6 +23,7 @@ import { ThemeProvider } from "next-themes";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import { getProfile } from "@/lib/api";
+import CookieConsent from "@/components/CookieConsent";
 
 // Lazy imports
 const HomePage = lazy(() =>
@@ -180,6 +181,15 @@ const ContactPage = lazy(() =>
     default: () => <div>Failed to load page</div>,
   }))
 );
+const AccessibilityPage = lazy(() => import("@/pages/AccessibilityPage"));
+const CookiePolicyPage = lazy(() => import("@/pages/CookiePolicyPage"));
+const CreditsRefundsPage = lazy(() => import("@/pages/CreditsRefundsPage"));
+const DisclaimerPage = lazy(() => import("@/pages/DisclaimerPage"));
+const DonationPolicyPage = lazy(() => import("@/pages/DonationPolicyPage"));
+const CommunitySupportPage = lazy(() => import("@/pages/CommunitySupportPage"));
+const ReportAbusePage = lazy(() => import("@/pages/ReportAbusePage"));
+const ShopDreamNowRulesPage = lazy(() => import("@/pages/ShopDreamNowRulesPage"));
+const VerificationPolicyPage = lazy(() => import("@/pages/VerificationPolicyPage"));
 const BecomeHeroPage = lazy(() =>
   import("@/pages/BecomeHeroPage").catch(() => ({
     default: () => <div>Failed to load page</div>,
@@ -290,6 +300,16 @@ const ROLE_OPTIONAL_PATHS = new Set([
   "/community-guidelines",
   "/faq",
   "/contact",
+  "/accessibility",
+  "/cookies",
+  "/credits-refunds",
+  "/disclaimer",
+  "/donation-policy",
+  "/community-support",
+  "/report",
+  "/shop-dream-now-rules",
+  "/verification-policy",
+  "/privacy-policy",
   "/community",
   "/heroes-wall",
   "/kindness-wall",
@@ -579,6 +599,16 @@ const communityGuidelinesRoute = createRoute({
     </Suspense>
   ),
 });
+const accessibilityRoute = createRoute({ getParentRoute: () => rootRoute, path: "/accessibility", component: () => <Suspense fallback={<PageLoader />}><AccessibilityPage /></Suspense> });
+const cookiePolicyRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cookies", component: () => <Suspense fallback={<PageLoader />}><CookiePolicyPage /></Suspense> });
+const creditsRefundsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/credits-refunds", component: () => <Suspense fallback={<PageLoader />}><CreditsRefundsPage /></Suspense> });
+const disclaimerRoute = createRoute({ getParentRoute: () => rootRoute, path: "/disclaimer", component: () => <Suspense fallback={<PageLoader />}><DisclaimerPage /></Suspense> });
+const donationPolicyRoute = createRoute({ getParentRoute: () => rootRoute, path: "/donation-policy", component: () => <Suspense fallback={<PageLoader />}><DonationPolicyPage /></Suspense> });
+const communitySupportRoute = createRoute({ getParentRoute: () => rootRoute, path: "/community-support", component: () => <Suspense fallback={<PageLoader />}><CommunitySupportPage /></Suspense> });
+const reportAbuseRoute = createRoute({ getParentRoute: () => rootRoute, path: "/report", component: () => <Suspense fallback={<PageLoader />}><ReportAbusePage /></Suspense> });
+const shopDreamNowRulesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/shop-dream-now-rules", component: () => <Suspense fallback={<PageLoader />}><ShopDreamNowRulesPage /></Suspense> });
+const verificationPolicyRoute = createRoute({ getParentRoute: () => rootRoute, path: "/verification-policy", component: () => <Suspense fallback={<PageLoader />}><VerificationPolicyPage /></Suspense> });
+const privacyPolicyRoute = createRoute({ getParentRoute: () => rootRoute, path: "/privacy-policy", component: () => <Suspense fallback={<PageLoader />}><PrivacyPolicyPage /></Suspense> });
 const notificationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/notifications",
@@ -763,6 +793,16 @@ const routeTree = rootRoute.addChildren([
   faqRoute,
   supportRoute,
   contactRoute,
+  accessibilityRoute,
+  cookiePolicyRoute,
+  creditsRefundsRoute,
+  disclaimerRoute,
+  donationPolicyRoute,
+  communitySupportRoute,
+  reportAbuseRoute,
+  shopDreamNowRulesRoute,
+  verificationPolicyRoute,
+  privacyPolicyRoute,
   becomeHeroRoute,
   needHelpRoute,
   onboardingRoute,
@@ -833,7 +873,7 @@ function AppLoadingScreen() {
 }
 
 function AppShell() {
-  return <RouterProvider router={router} />;
+  return <><RouterProvider router={router} /><CookieConsent /></>;
 }
 
 export default function App() {
