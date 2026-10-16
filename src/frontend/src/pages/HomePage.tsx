@@ -1643,7 +1643,7 @@ export default function HomePage() {
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
               <Link to="/about" className="hover:text-primary transition-colors">About</Link>
               <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
-              <Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-primary transition-colors">Terms</Link>
               <Link to="/community-guidelines" className="hover:text-primary transition-colors">Community Guidelines</Link>
               <Link to="/contact" className="hover:text-primary transition-colors">Contact Us</Link>

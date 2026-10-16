@@ -180,6 +180,15 @@ const ContactPage = lazy(() =>
     default: () => <div>Failed to load page</div>,
   }))
 );
+const AccessibilityPage = lazy(() => import("@/pages/AccessibilityPage"));
+const CommunitySupportPage = lazy(() => import("@/pages/CommunitySupportPage"));
+const CookiePolicyPage = lazy(() => import("@/pages/CookiePolicyPage"));
+const CreditsRefundsPage = lazy(() => import("@/pages/CreditsRefundsPage"));
+const DisclaimerPage = lazy(() => import("@/pages/DisclaimerPage"));
+const DonationPolicyPage = lazy(() => import("@/pages/DonationPolicyPage"));
+const ReportAbusePage = lazy(() => import("@/pages/ReportAbusePage"));
+const ShopDreamNowRulesPage = lazy(() => import("@/pages/ShopDreamNowRulesPage"));
+const VerificationPolicyPage = lazy(() => import("@/pages/VerificationPolicyPage"));
 const BecomeHeroPage = lazy(() =>
   import("@/pages/BecomeHeroPage").catch(() => ({
     default: () => <div>Failed to load page</div>,
@@ -286,10 +295,20 @@ const ROLE_OPTIONAL_PATHS = new Set([
   "/about",
   "/account-privacy",
   "/privacy",
+  "/privacy-policy",
   "/terms",
   "/community-guidelines",
   "/faq",
   "/contact",
+  "/cookies",
+  "/accessibility",
+  "/disclaimer",
+  "/verification-policy",
+  "/credits-refunds",
+  "/donation-policy",
+  "/community-support",
+  "/shop-dream-now-rules",
+  "/report",
   "/community",
   "/heroes-wall",
   "/kindness-wall",
@@ -366,6 +385,8 @@ function RootLayout() {
       // A signed-in user without a role must still be able to use the app
       // navigation (/home, /my-help, /my-cases, /wallet, /profile/...), the
       // role pages (/become-hero, /need-help) and the profile setup page.
+      // 🔥 FIX: Now uses startsWith() for parameterized routes so users aren't
+      // redirected away when role hasn't loaded yet.
       const isPublicRoute =
         ROLE_OPTIONAL_PATHS.has(location.pathname) ||
         ROLE_OPTIONAL_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
@@ -557,7 +578,7 @@ const privacyRoute = createRoute({
   path: "/privacy",
   component: () => (
     <Suspense fallback={<PageLoader />}>
-      <PrivacyPolicyPage />
+      <AccountPrivacyPage />
     </Suspense>
   ),
 });
@@ -659,6 +680,56 @@ const contactRoute = createRoute({
       <ContactPage />
     </Suspense>
   ),
+});
+const privacyPolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/privacy-policy",
+  component: () => <Suspense fallback={<PageLoader />}><PrivacyPolicyPage /></Suspense>,
+});
+const cookiesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cookies",
+  component: () => <Suspense fallback={<PageLoader />}><CookiePolicyPage /></Suspense>,
+});
+const accessibilityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/accessibility",
+  component: () => <Suspense fallback={<PageLoader />}><AccessibilityPage /></Suspense>,
+});
+const disclaimerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/disclaimer",
+  component: () => <Suspense fallback={<PageLoader />}><DisclaimerPage /></Suspense>,
+});
+const verificationPolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/verification-policy",
+  component: () => <Suspense fallback={<PageLoader />}><VerificationPolicyPage /></Suspense>,
+});
+const creditsRefundsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/credits-refunds",
+  component: () => <Suspense fallback={<PageLoader />}><CreditsRefundsPage /></Suspense>,
+});
+const donationPolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/donation-policy",
+  component: () => <Suspense fallback={<PageLoader />}><DonationPolicyPage /></Suspense>,
+});
+const communitySupportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/community-support",
+  component: () => <Suspense fallback={<PageLoader />}><CommunitySupportPage /></Suspense>,
+});
+const shopDreamNowRulesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/shop-dream-now-rules",
+  component: () => <Suspense fallback={<PageLoader />}><ShopDreamNowRulesPage /></Suspense>,
+});
+const reportAbuseRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/report",
+  component: () => <Suspense fallback={<PageLoader />}><ReportAbusePage /></Suspense>,
 });
 const becomeHeroRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -763,6 +834,16 @@ const routeTree = rootRoute.addChildren([
   faqRoute,
   supportRoute,
   contactRoute,
+  privacyPolicyRoute,
+  cookiesRoute,
+  accessibilityRoute,
+  disclaimerRoute,
+  verificationPolicyRoute,
+  creditsRefundsRoute,
+  donationPolicyRoute,
+  communitySupportRoute,
+  shopDreamNowRulesRoute,
+  reportAbuseRoute,
   becomeHeroRoute,
   needHelpRoute,
   onboardingRoute,

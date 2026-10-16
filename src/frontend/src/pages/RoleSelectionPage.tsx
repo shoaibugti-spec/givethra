@@ -136,7 +136,7 @@ function SignInLandingPage({ onSignIn, isLoggingIn, loginError }: { onSignIn: ()
           ))}
         </section>
         <footer className="flex flex-wrap justify-center gap-x-5 gap-y-2 border-t border-border pt-5 text-sm text-muted-foreground">
-          <Link to="/about">About</Link><Link to="/faq">FAQ</Link><Link to="/privacy">Privacy</Link>
+          <Link to="/about">About</Link><Link to="/faq">FAQ</Link><Link to="/privacy-policy">Privacy</Link>
           <Link to="/terms">Terms</Link><Link to="/community-guidelines">Community Guidelines</Link><Link to="/contact">Contact</Link>
         </footer>
       </div>
@@ -400,7 +400,7 @@ export default function RoleSelectionPage() {
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
               <Link to="/about">About</Link>
               <Link to="/faq">FAQ</Link>
-              <Link to="/privacy">Privacy Policy</Link>
+              <Link to="/privacy-policy">Privacy Policy</Link>
               <Link to="/terms">Terms</Link>
               <Link to="/community-guidelines">Community Guidelines</Link>
               <Link to="/contact">Contact Us</Link>
