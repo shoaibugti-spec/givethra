@@ -14,9 +14,6 @@ import {
   Sun,
   User,
   X,
-  Facebook,
-  Instagram,
-  Linkedin,
   MessageCircle,
   Mail,
   Settings,
@@ -44,16 +41,10 @@ import {
   getCommunityPosts,
 } from "@/lib/api";
 import RoleSwitcher from "@/components/RoleSwitcher";
+import SocialLinks from "@/components/SocialLinks";
 import { loadHelpImpact, formatAmount, type HelpImpact } from "@/lib/helpStats";
-import CookieConsent from "@/components/CookieConsent";
-import LegalFooter from "@/components/LegalFooter";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
-const FACEBOOK_URL =
-  "https://www.facebook.com/profile.php?id=61590715263595";
-const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
-const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
-const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const WHATSAPP_SUPPORT_URL = "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 
 export { NavLink };
@@ -840,8 +831,53 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 has-bottom-nav">{children}</main>
 
-      <LegalFooter />
-      <CookieConsent />
+      <footer className="bg-card border-t border-border">
+        <div className="max-w-7xl mx-auto px-4 py-10">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
+                  <Heart className="h-3.5 w-3.5 text-primary-foreground" />
+                </div>
+                <span className="font-display font-bold text-foreground">
+                  Givethra
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Verified Help. Real Impact.
+              </p>
+              <SocialLinks className="pt-1" />
+            </div>
+            <nav className="flex flex-wrap gap-x-6 gap-y-2">
+              {[
+                { to: "/about", label: "About" },
+                { to: "/faq", label: "FAQ" },
+                { to: "/privacy", label: "Privacy Policy" },
+                { to: "/terms", label: "Terms" },
+                { to: "/community-guidelines", label: "Community Guidelines" },
+                { to: "/contact", label: "Contact Us" },
+              ].map(({ to, label }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+          <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-1">
+            <p>
+              &copy; {new Date().getFullYear()} Givethra. All rights reserved.
+            </p>
+            <p>
+              Givethra™ is a humanitarian platform connecting verified people
+              with verified help.
+            </p>
+          </div>
+        </div>
+      </footer>
       <a
         href={WHATSAPP_SUPPORT_URL}
         target="_blank"
