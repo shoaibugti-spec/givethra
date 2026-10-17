@@ -7,7 +7,6 @@
 // routes so users aren't redirected to "/" when role hasn't loaded yet.
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Toaster } from "@/components/ui/sonner";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -230,11 +229,9 @@ const DreamDetailPage = lazy(() =>
   }))
 );
 
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <LoadingSpinner size="lg" label="Loading..." />
-  </div>
-);
+// Keep route transitions consistent with the initial app bootstrap: the old
+// plain white generic spinner should never appear between pages.
+const PageLoader = () => <AppLoadingScreen />;
 
 // Shown only if BottomNav itself crashes. Uses plain <a href> links so the
 // navigation still works even when the router/JS state is unhealthy.

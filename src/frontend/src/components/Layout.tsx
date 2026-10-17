@@ -650,7 +650,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {isAuthenticated ? (
               <Link
-                to="/profile/me"
+                to="/profile/$id"
+                params={{ id: "me" }}
                 onClick={closeMenu}
                 className="relative mt-5 flex items-center gap-3.5 rounded-2xl bg-white/10 p-3 ring-1 ring-white/20 transition active:bg-white/20"
               >
