@@ -697,21 +697,34 @@ export async function updateUserSettings(userId: string, data: any) {
 // ---------- FILE UPLOAD ----------
 export async function uploadFileToStorage(file: File, path: string): Promise<string> {
   const token = getAuthToken();
-  if (!token) throw new Error("Please sign in before uploading payment proof.");
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("path", path);
-  const res = await fetchWithAuth(`${WORKER_URL}/api/upload`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(typeof payload?.error === "string" ? payload.error : `Upload failed (HTTP ${res.status}).`);
+  let lastError: Error | null = null;
+
+  // Keep credentials enabled so a restored cookie session can upload even
+  // when localStorage has not yet been repopulated with the bearer token.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("path", path);
+    try {
+      const res = await fetchWithAuth(`${WORKER_URL}/api/upload`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (res.ok) {
+        if (!payload.url) throw new Error("Upload failed — the server returned no file URL.");
+        return payload.url;
+      }
+      lastError = new Error(typeof payload?.error === "string" ? payload.error : `Upload failed (HTTP ${res.status}).`);
+      if (res.status < 500 || attempt === 1) throw lastError;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Upload failed. Please try again.");
+      if (attempt === 1) throw lastError;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
   }
-  if (!payload.url) throw new Error("Upload failed – no URL returned");
-  return payload.url;
+  throw lastError || new Error("Upload failed. Please try again.");
 }
 
 // ---------- ADMIN APIs ----------

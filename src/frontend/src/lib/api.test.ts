@@ -134,10 +134,19 @@ describe("adminSendSupportReply", () => {
     expect(request.body).toBeInstanceOf(FormData);
   });
 
-  it("fails clearly before upload when there is no signed-in session", async () => {
+  it("allows a restored cookie session to upload without a local bearer token", async () => {
     vi.stubGlobal("localStorage", { getItem: vi.fn(() => null) });
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ url: "https://givethra.org/uploads/dream-receipts/proof.png" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
     await expect(uploadFileToStorage(new File(["proof"], "proof.png"), "dream-receipts/proof.png"))
-      .rejects.toThrow("Please sign in before uploading payment proof");
-    expect(fetchMock).not.toHaveBeenCalled();
+      .resolves.toBe("https://givethra.org/uploads/dream-receipts/proof.png");
+    expect(fetchMock).toHaveBeenCalled();
+    const request = fetchMock.mock.calls.at(-1)?.[1] as RequestInit;
+    expect(request.headers).toEqual({});
+    expect(request.credentials).toBe("include");
   });
 });

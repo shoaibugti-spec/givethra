@@ -2183,7 +2183,14 @@ async function handleRequest(request, env, ctx) {
       if (!file || !path) return json({ error: "File and path required" }, 400, origin);
 
       try {
-        const key = String(path);
+        if (typeof file.arrayBuffer !== "function") return json({ error: "A valid file is required" }, 400, origin);
+        const key = String(path).trim().replace(/^\/+/, "");
+        if (!key || key.length > 240 || key.includes("..") || !/^[a-zA-Z0-9/_\-.]+$/.test(key)) {
+          return json({ error: "Invalid upload path" }, 400, origin);
+        }
+        if (!env.UPLOADS || typeof env.UPLOADS.put !== "function") {
+          return json({ error: "File storage is temporarily unavailable. Please try again." }, 503, origin);
+        }
         const arrayBuffer = await file.arrayBuffer();
         await env.UPLOADS.put(key, arrayBuffer, {
           httpMetadata: {
