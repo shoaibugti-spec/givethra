@@ -1251,6 +1251,20 @@ async function recordCommunitySupport(env, ctx, originalUserId, sourceUserId, po
 }
 
 async function handleCommunityPosts(request, env, user, url, parts, origin, ctx) {
+  if (request.method === "DELETE" && parts.length === 4) {
+    if (!user) return json({ error: "Authentication required" }, 401, origin);
+    if (!isAdmin(user)) return json({ error: "Administrator access required" }, 403, origin);
+    const postId = String(parts[3] || "").trim();
+    if (!postId) return json({ error: "Post ID required" }, 400, origin);
+    const post = await env.DB.prepare("SELECT id FROM community_posts WHERE id = ?").bind(postId).first();
+    if (!post) return json({ error: "Post not found" }, 404, origin);
+    await env.DB.prepare("DELETE FROM community_post_comments WHERE post_id = ?").bind(postId).run();
+    await env.DB.prepare("DELETE FROM community_post_likes WHERE post_id = ?").bind(postId).run();
+    await env.DB.prepare("DELETE FROM user_supports WHERE post_id = ?").bind(postId).run();
+    const deleted = await env.DB.prepare("DELETE FROM community_posts WHERE id = ? OR repost_id = ?").bind(postId, postId).run();
+    return json({ success: true, deleted: Number(deleted?.meta?.changes || 0), post_id: postId }, 200, origin);
+  }
+
   if (request.method === "GET" && parts.length === 3) {
     const guest = user ? null : guestIdentity(request);
     const actorId = user?.user_id || guest?.id || "";
@@ -1290,17 +1304,37 @@ async function handleCommunityPosts(request, env, user, url, parts, origin, ctx)
     if (!message && !repostId) return json({ error: "Message or repost ID required" }, 400, origin);
     const guest = user ? null : guestIdentity(request, body);
     if (!user && !guest) return json({ error: "Guest identity is required" }, 400, origin);
+    const actorId = user?.user_id || guest.id;
     const postId = id();
     const displayName = user ? publicDisplayName(user.full_name,"User") : guest.name;
     let finalMessage = message;
     if (repostId) { const original = await env.DB.prepare("SELECT display_name, message FROM community_posts WHERE id = ?").bind(repostId).first(); if (!original) return json({ error: "Original post not found" }, 404, origin); finalMessage = `${body?.repost_comment ? String(body.repost_comment).trim() + " — " : ""}Reposted from ${publicDisplayName(original.display_name,"User")}`; }
-    await env.DB.prepare(`INSERT INTO community_posts (id,user_id,display_name,message,role,repost_id,repost_comment,created_at) VALUES (?,?,?,?,?,?,?,?)`).bind(postId,user?.user_id||guest.id,displayName,finalMessage,body?.role||null,repostId,body?.repost_comment||null,now()).run();
+    const createdAt = now();
+    const inserted = await env.DB.prepare(
+      `INSERT INTO community_posts (id,user_id,display_name,message,role,repost_id,repost_comment,created_at)
+       SELECT ?,?,?,?,?,?,?,?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM community_posts
+         WHERE user_id = ? AND julianday(created_at) > julianday('now', '-24 hours')
+       )`
+    ).bind(postId, actorId, displayName, finalMessage, body?.role || null, repostId, body?.repost_comment || null, createdAt, actorId).run();
+    if (!Number(inserted?.meta?.changes || 0)) {
+      const latest = await env.DB.prepare(
+        "SELECT created_at FROM community_posts WHERE user_id = ? ORDER BY created_at DESC LIMIT 1"
+      ).bind(actorId).first();
+      const latestTime = latest?.created_at ? new Date(String(latest.created_at)).getTime() : Date.now();
+      return json({
+        error: "You can share one community post every 24 hours.",
+        code: "COMMUNITY_POST_LIMIT",
+        next_post_at: new Date(latestTime + 24 * 60 * 60 * 1000).toISOString(),
+      }, 429, origin);
+    }
     let supportResult = { added: false, supports: 0, creditsEarned: 0 };
     if (repostId) {
       const original = await env.DB.prepare("SELECT user_id FROM community_posts WHERE id = ?").bind(repostId).first();
       if (original?.user_id) supportResult = await recordCommunitySupport(env, ctx, original.user_id, user?.user_id || guest.id, repostId, displayName);
     }
-    return json({ id: postId, user_id: user?.user_id || guest.id, display_name: displayName, message: finalMessage, repost_id: repostId, is_guest: !user, likes_count: 0, comments_count: 0, repost_count: 0, support_added: supportResult.added, supports_received: supportResult.supports, credits_earned: supportResult.creditsEarned }, 201, origin);
+    return json({ id: postId, user_id: actorId, display_name: displayName, message: finalMessage, repost_id: repostId, is_guest: !user, likes_count: 0, comments_count: 0, repost_count: 0, support_added: supportResult.added, supports_received: supportResult.supports, credits_earned: supportResult.creditsEarned }, 201, origin);
   }
 
   if (request.method === "POST" && parts[3] === "pin") {
@@ -1378,9 +1412,11 @@ async function handleCommunityComments(request, env, user, url, parts, origin, c
   if (request.method === "GET") {
     const comments = await env.DB.prepare(
       `SELECT cc.*,
-        CASE WHEN cc.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cc.user_id, 7) ELSE u.full_name END as user_name
+        CASE WHEN cc.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cc.user_id, 7) ELSE u.full_name END as user_name,
+        COALESCE(NULLIF(p.avatar_url, ''), NULLIF(u.avatar_url, '')) AS avatar_url
        FROM community_post_comments cc
        LEFT JOIN users u ON cc.user_id = u.user_id
+       LEFT JOIN profiles p ON p.user_id = cc.user_id
        WHERE cc.post_id = ?
        ORDER BY cc.created_at ASC`
     ).bind(postId).all();
@@ -1407,9 +1443,11 @@ async function handleCommunityComments(request, env, user, url, parts, origin, c
 
     const newComment = await env.DB.prepare(
       `SELECT cc.*,
-        CASE WHEN cc.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cc.user_id, 7) ELSE u.full_name END as user_name
+        CASE WHEN cc.user_id LIKE 'guest:%' THEN 'Guest ' || substr(cc.user_id, 7) ELSE u.full_name END as user_name,
+        COALESCE(NULLIF(p.avatar_url, ''), NULLIF(u.avatar_url, '')) AS avatar_url
        FROM community_post_comments cc
        LEFT JOIN users u ON cc.user_id = u.user_id
+       LEFT JOIN profiles p ON p.user_id = cc.user_id
        WHERE cc.id = ?`
     ).bind(commentId).first();
 
@@ -1756,6 +1794,9 @@ async function handleRequest(request, env, ctx) {
       return handleCommunityPosts(request, env, user, url, parts, origin, ctx);
     }
     if (parts[2] === "posts" && parts.length === 3 && request.method === "POST") {
+      return handleCommunityPosts(request, env, user, url, parts, origin, ctx);
+    }
+    if (parts[2] === "posts" && parts.length === 4 && request.method === "DELETE") {
       return handleCommunityPosts(request, env, user, url, parts, origin, ctx);
     }
     if (parts[2] === "posts" && parts[4] === "likes") {
