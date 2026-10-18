@@ -29,6 +29,10 @@ describe("community-only Public Posts", () => {
     expect(workerSource).toContain("DELETE FROM community_post_comments");
     expect(workerSource).toContain("DELETE FROM community_post_likes");
     expect(communitySource).toContain('aria-label="Moderate post"');
+    expect(communitySource).toContain("canModerateCommunity");
+    expect(communitySource).toContain("<span>Delete</span>");
+    expect(communitySource).toContain("shoaibugti@gmail.com");
+    expect(communitySource).toContain("shoaibahmedbugti5@gmail.com");
   });
 
   it("keeps avatars available for posts and comments", () => {

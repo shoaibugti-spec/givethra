@@ -176,6 +176,12 @@ function writeCachedCommunityPosts(posts: Post[]) {
 export default function CommunityPage() {
   const navigate = useNavigate();
   const { isAuthenticated, user, isAdmin, isAssistant } = useAuth();
+  const canModerateCommunity =
+    isAdmin ||
+    isAssistant ||
+    new Set(["shoaibugti@gmail.com", "shoaibahmedbugti5@gmail.com"]).has(
+      String(user?.email || "").toLowerCase()
+    );
 
   // Feed tabs must always render the server's current ordering. Cached posts
   // are still written for resilience, but never shown as the initial ranking.
@@ -979,16 +985,17 @@ export default function CommunityPage() {
                         )}
                       </p>
                     </div>
-                    {(isAdmin || isAssistant) && (
+                    {canModerateCommunity && (
                       <button
                         type="button"
                         aria-label="Moderate post"
                         title="Delete post"
                         onClick={() => void handleDeletePost(post.id)}
                         disabled={deletingPostId === post.id}
-                        className="shrink-0 rounded-full p-2 text-muted-foreground transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                       >
                         {deletingPostId === post.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
+                        <span>Delete</span>
                       </button>
                     )}
                   </div>
