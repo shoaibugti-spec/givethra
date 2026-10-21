@@ -73,7 +73,7 @@ async function ensureUserCoreRows(env, user) {
       `SELECT lower(status) AS status
        FROM kyc_submissions
        WHERE user_id = ? AND COALESCE(is_current, 1) = 1
-       ORDER BY submitted_at DESC, rowid DESC LIMIT 1`
+     ORDER BY submitted_at DESC, rowid DESC LIMIT 1`
     ).bind(String(user.user_id)).first();
   } catch (error) {
     console.error("KYC status lookup skipped during authentication", error);
@@ -2949,8 +2949,8 @@ export default {
     try {
       return await handleRequest(request, env, ctx);
     } catch (err) {
-      console.error(err);
-      return json({ error: "Authentication or database request failed", code: "INTERNAL_ERROR" }, 500, "https://givethra.org");
+      console.error("Unhandled API request failure", err);
+      return json({ error: "The request could not be completed. Please try again.", code: "REQUEST_FAILED" }, 500, "https://givethra.org");
     }
   },
 };

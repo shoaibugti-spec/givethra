@@ -309,11 +309,10 @@ export default function KycPage() {
     return () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
   }, [stream]);
 
-  // Ask for camera + microphone once, as soon as the KYC form is shown, so the
-  // browser prompt appears right away (one combined prompt) instead of failing
-  // later when the user taps a camera button. A website cannot force-allow it:
-  // the user must tap "Allow", and a previously blocked site can only be
-  // unblocked in the browser settings (the page shows how).
+  // Read the permission state when the form opens, but do not call getUserMedia
+  // from an effect. Mobile Safari/Chrome may reject a permission prompt that is
+  // not triggered by a user gesture. The visible "Allow camera" button below
+  // makes the request directly from the user's tap.
   const showForm = !!user && !isLoading && (!submission || reapplying);
   useEffect(() => {
     if (!showForm) return;
@@ -332,7 +331,6 @@ export default function KycPage() {
           setCamPerm("prompt");
         }
       } catch { /* Permissions API not available (older Safari) */ }
-      if (!cancelled) await requestCameraAccess();
     })();
     return () => { cancelled = true; if (status) status.onchange = null; };
   }, [showForm]);
@@ -365,7 +363,12 @@ export default function KycPage() {
     if (!navigator.mediaDevices?.getUserMedia) return false;
     let s: MediaStream | null = null;
     let lastErr: any = null;
-    for (const c of [{ video: true, audio: true }, { video: true }] as MediaStreamConstraints[]) {
+    // KYC photos only need the camera. Do not request microphone permission
+    // here; asking for it together makes some mobile browsers deny the camera.
+    for (const c of [
+      { video: { facingMode: { ideal: "environment" } } },
+      { video: true },
+    ] as MediaStreamConstraints[]) {
       try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) { lastErr = err; }
     }
     s?.getTracks().forEach((t) => t.stop());
@@ -1245,9 +1248,12 @@ export default function KycPage() {
             )}
 
             {camPerm !== "denied" && camPerm !== "granted" && (
-              <div className="rounded-xl border border-blue-300 bg-blue-50 p-3 text-xs text-blue-800 flex items-center justify-between gap-3">
-                <span>📷 When your browser asks, please tap <strong>Allow</strong> for camera and microphone. Browser poochay to <strong>Allow</strong> dabayein.</span>
-                <Button size="sm" variant="outline" onClick={() => { requestCameraAccess(); }}>Allow</Button>
+              <div className="rounded-xl border-2 border-blue-300 bg-blue-50 p-4 text-xs text-blue-900 space-y-2">
+                <p className="font-semibold">📷 Camera permission is required</p>
+                <p>Tap the button below, then tap <strong>Allow camera</strong> in the browser prompt. Microphone permission is not needed for document photos.</p>
+                <Button size="sm" className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { void requestCameraAccess(); }}>
+                  <Camera className="h-4 w-4" /> Allow camera now
+                </Button>
               </div>
             )}
 
