@@ -1623,7 +1623,7 @@ async function handleRequest(request, env, ctx) {
       return json({ token, user: account }, 200, origin);
     } catch (error) {
       console.error("Google authentication reconciliation failed", error);
-      return json({ error: "Authentication or database request failed", code: "AUTH_RECONCILIATION_FAILED" }, 500, origin);
+      return json({ error: "Sign-in could not be completed. Please try Google sign-in again.", code: "AUTH_RECONCILIATION_FAILED" }, 500, origin);
     }
   }
 

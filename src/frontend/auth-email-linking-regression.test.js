@@ -19,7 +19,7 @@ describe("email-first Google authentication", () => {
   });
 
   it("returns a structured JSON error instead of exposing a raw server error or hanging", () => {
-    expect(worker).toContain('json({ error: "Authentication or database request failed", code: "AUTH_RECONCILIATION_FAILED" }, 500');
+    expect(worker).toContain('json({ error: "Sign-in could not be completed. Please try Google sign-in again.", code: "AUTH_RECONCILIATION_FAILED" }, 500');
     expect(worker).toContain("try {\n      const body = await readJson(request);");
     expect(worker).toContain("const controller = new AbortController();");
   });
