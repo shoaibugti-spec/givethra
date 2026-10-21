@@ -49,26 +49,45 @@ async function ensureUserCoreRows(env, user) {
   if (!env.DB || !user?.user_id) return { kyc_status: user?.kyc_status || 'none' };
   const timestamp = now();
   let effectiveKycStatus = String(user.kyc_status || 'none').toLowerCase();
-  await env.DB.prepare(
-    `INSERT OR IGNORE INTO profiles (user_id, full_name, avatar_url, preferred_language, created_at, updated_at)
-     VALUES (?, ?, ?, 'en', ?, ?)`
-  ).bind(String(user.user_id), user.full_name || null, user.avatar_url || null, timestamp, timestamp).run();
-  await env.DB.prepare(
-    `INSERT OR IGNORE INTO wallets (user_id, balance, updated_at)
-     VALUES (?, ?, ?)`
-  ).bind(String(user.user_id), Number(user.balance || 0), timestamp).run();
-  const kyc = await env.DB.prepare(
-    `SELECT lower(status) AS status
-     FROM kyc_submissions
-     WHERE user_id = ? AND COALESCE(is_current, 1) = 1
-     ORDER BY submitted_at DESC, rowid DESC LIMIT 1`
-  ).bind(String(user.user_id)).first();
+  // Supporting rows must not turn a valid Google login into a generic 500
+  // when an older D1 has not received every optional migration yet.
+  try {
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO profiles (user_id, full_name, avatar_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(String(user.user_id), user.full_name || null, user.avatar_url || null, timestamp, timestamp).run();
+  } catch (error) {
+    console.error("Profile bootstrap skipped during authentication", error);
+  }
+  try {
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO wallets (user_id, balance, updated_at)
+       VALUES (?, ?, ?)`
+    ).bind(String(user.user_id), Number(user.balance || 0), timestamp).run();
+  } catch (error) {
+    console.error("Wallet bootstrap skipped during authentication", error);
+  }
+  let kyc;
+  try {
+    kyc = await env.DB.prepare(
+      `SELECT lower(status) AS status
+       FROM kyc_submissions
+       WHERE user_id = ? AND COALESCE(is_current, 1) = 1
+       ORDER BY submitted_at DESC, rowid DESC LIMIT 1`
+    ).bind(String(user.user_id)).first();
+  } catch (error) {
+    console.error("KYC status lookup skipped during authentication", error);
+  }
   if (kyc?.status) {
     effectiveKycStatus = String(kyc.status).toLowerCase();
     if (effectiveKycStatus !== String(user.kyc_status || '').toLowerCase()) {
-      await env.DB.prepare(
-        `UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?`
-      ).bind(effectiveKycStatus, timestamp, String(user.user_id)).run();
+      try {
+        await env.DB.prepare(
+          `UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?`
+        ).bind(effectiveKycStatus, timestamp, String(user.user_id)).run();
+      } catch (error) {
+        console.error("KYC cache update skipped during authentication", error);
+      }
     }
   }
   return { kyc_status: effectiveKycStatus };

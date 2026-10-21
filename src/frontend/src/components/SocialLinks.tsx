@@ -2,12 +2,13 @@
 import { SOCIALS } from "@/lib/siteConfig";
 import {
   SiTiktok, SiX, SiThreads, SiYoutube, SiReddit, SiTelegram,
-  SiFacebook, SiInstagram, SiLinkedin, SiWhatsapp,
+  SiFacebook, SiInstagram, SiWhatsapp,
 } from "react-icons/si";
+import { FaLinkedin } from "react-icons/fa6";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   tiktok: SiTiktok, x: SiX, threads: SiThreads, youtube: SiYoutube, reddit: SiReddit,
-  telegram: SiTelegram, facebook: SiFacebook, instagram: SiInstagram, linkedin: SiLinkedin, whatsapp: SiWhatsapp,
+  telegram: SiTelegram, facebook: SiFacebook, instagram: SiInstagram, linkedin: FaLinkedin, whatsapp: SiWhatsapp,
 };
 
 export default function SocialLinks() {
