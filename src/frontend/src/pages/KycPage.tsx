@@ -333,6 +333,11 @@ const BLUR_MESSAGE =
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+function isPermissionError(err: any): boolean {
+  const n = err?.name;
+  return n === "NotAllowedError" || n === "PermissionDeniedError" || n === "SecurityError";
+}
+
 // Safari/iPhone cannot record WebM, so the format is picked from what the
 // browser supports (WebM first, then MP4).
 function pickRecorderMime(): string {
@@ -401,6 +406,9 @@ export default function KycPage() {
   const [cameraRes, setCameraRes] = useState<{ w: number; h: number } | null>(null);
   const [camPerm, setCamPerm] = useState<"unknown" | "granted" | "denied" | "prompt">("unknown");
   const [videoOpen, setVideoOpen] = useState(false);
+  const [cameraProblem, setCameraProblem] = useState<{ kind: "photo" | "video"; target?: string; message: string; canRetry: boolean } | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoCountdown, setVideoCountdown] = useState<number | null>(null);
   const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -493,16 +501,108 @@ export default function KycPage() {
     };
   }, []);
 
+  // After a refusal: was the site really blocked, or was the popup only dismissed?
+  async function markDeniedIfBlocked(): Promise<boolean> {
+    try {
+      const st = await (navigator as any).permissions?.query?.({ name: "camera" });
+      if (st && st.state !== "denied") { setCamPerm("prompt"); return false; }
+    } catch { /* Permissions API not available (older Safari) */ }
+    setCamPerm("denied");
+    return true;
+  }
+
+  // One place that turns every camera failure into a clear message and a way forward.
+  async function cameraFail(err: any, kind: "photo" | "video", target?: string) {
+    console.error("KYC camera problem", err);
+    let message = "The camera could not be started. Close other apps that use the camera and try again.";
+    let canRetry = true;
+    if (typeof window !== "undefined" && (!window.isSecureContext || !navigator.mediaDevices)) {
+      message = "Camera only works on a secure (https://) link. Please open the official Givethra link in Chrome or Safari.";
+      canRetry = false;
+    } else if (err?.name === "NotSupportedError" || err?.name === "TypeError") {
+      message = "This browser cannot open the camera inside the page. Use your phone's camera instead, or open Givethra in Chrome (Android) / Safari (iPhone).";
+      canRetry = false;
+    } else if (isPermissionError(err)) {
+      const blocked = await markDeniedIfBlocked();
+      message = blocked
+        ? "Camera / microphone is blocked for this site. Follow the steps shown on the page, or use your phone's camera instead."
+        : "Permission was not given. Tap Try Again and press Allow when the browser asks. If no popup appears, open phone Settings → Apps → Chrome → Permissions and allow Camera and Microphone.";
+    } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
+      message = "No camera was found on this device. You can use your phone's camera instead.";
+      canRetry = false;
+    }
+    setCameraProblem({ kind, target, message, canRetry });
+  }
+
+  // Safety net that always works: the phone's own camera app.
+  function openNativeCapture() {
+    const prob = cameraProblem;
+    setCameraProblem(null);
+    if (!prob) return;
+    if (prob.kind === "video") {
+      videoInputRef.current?.click();
+    } else if (photoInputRef.current) {
+      photoInputRef.current.setAttribute("capture", prob.target === "selfie" ? "user" : "environment");
+      photoInputRef.current.dataset.kind = prob.target || "front";
+      photoInputRef.current.click();
+    }
+  }
+
+  function retryCamera() {
+    const prob = cameraProblem;
+    setCameraProblem(null);
+    if (!prob) return;
+    if (prob.kind === "video") void startVideoRecording();
+    else void startPhotoCamera(prob.target || "front");
+  }
+
+  function handleNativePhoto(file: File, kind: "front" | "back" | "selfie") {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 3000 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d")?.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      setOcrError(null);
+      setOcrFailed(false);
+      setCapturedBlur(kind === "selfie" ? null : blurOfCanvas(scaleCanvas(c, 800)));
+      setCapturedImage(scaleCanvas(c, 1200).toDataURL("image/jpeg", 0.88));
+      setCapturedCanvas(c);
+      setCapturedKind(kind);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast.error("The photo could not be opened. Please try again.");
+    };
+    img.src = url;
+  }
+
+  function handleNativeVideo(file: File) {
+    if (file.size > 150 * 1024 * 1024) {
+      toast.error("The video is too large. Please record a short (about 15 second) video.");
+      return;
+    }
+    setVideoFile(file);
+    setVideoBlob(URL.createObjectURL(file));
+  }
+
   async function requestCameraAccess(): Promise<boolean> {
     if (!navigator.mediaDevices?.getUserMedia) return false;
     let s: MediaStream | null = null;
     let lastErr: any = null;
     for (const c of [{ video: true, audio: true }, { video: true }] as MediaStreamConstraints[]) {
-      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) { lastErr = err; }
+      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) {
+        lastErr = err;
+        // A refusal must not trigger a second popup.
+        if (isPermissionError(err)) break;
+      }
     }
     s?.getTracks().forEach((t) => t.stop());
     if (s) { setCamPerm("granted"); return true; }
-    if (lastErr?.name === "NotAllowedError" || lastErr?.name === "SecurityError") setCamPerm("denied");
+    if (isPermissionError(lastErr)) await markDeniedIfBlocked();
     return false;
   }
 
@@ -533,7 +633,13 @@ export default function KycPage() {
   }
 
   async function startPhotoCamera(target: string) {
+    setCameraProblem(null);
     try {
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        throw new DOMException("Camera API unavailable", "NotSupportedError");
+      }
+      // Release any camera still held from before (e.g. after Retake).
+      stream?.getTracks().forEach((t) => t.stop());
       setOcrError(null);
       setCapturedImage(null);
       setCapturedKind(null);
@@ -559,13 +665,20 @@ export default function KycPage() {
           },
         });
       } catch (err: any) {
-        if (err?.name === "NotAllowedError" || err?.name === "SecurityError") throw err;
-        // Some devices reject the extra constraints: retry with the basics.
-        s = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode: facing },
-        });
+        if (isPermissionError(err)) throw err;
+        // Some devices reject the extra constraints: retry with the basics,
+        // and finally with "any camera" (some phones reject facingMode).
+        try {
+          s = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: facing },
+          });
+        } catch (err2: any) {
+          if (isPermissionError(err2)) throw err2;
+          s = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+        }
       }
+      setCamPerm("granted");
 
       try {
         const [track] = s.getVideoTracks();
@@ -584,14 +697,7 @@ export default function KycPage() {
       setStream(s);
       setActiveCamera(target);
     } catch (err: any) {
-      if (err?.name === "NotAllowedError" || err?.name === "SecurityError") {
-        setCamPerm("denied");
-        toast.error("Camera access denied. Please allow camera permission (see the instructions on this page).");
-      } else if (err?.name === "NotFoundError") {
-        toast.error("No camera found on this device.");
-      } else {
-        toast.error("The camera could not be started. Close other apps using the camera and try again.");
-      }
+      await cameraFail(err, "photo", target);
     }
   }
 
@@ -862,8 +968,9 @@ export default function KycPage() {
   }
 
   async function startVideoRecording() {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      toast.error("This browser cannot record video. Please open this page in Chrome (Android) or Safari (iPhone).");
+    setCameraProblem(null);
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      await cameraFail(window.isSecureContext ? { name: "NotSupportedError" } : null, "video");
       return;
     }
     const runId = ++runIdRef.current;
@@ -882,17 +989,14 @@ export default function KycPage() {
     let s: MediaStream | null = null;
     let lastErr: any = null;
     for (const c of attempts) {
-      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) { lastErr = err; }
+      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) {
+        lastErr = err;
+        // A refusal must not trigger more popups.
+        if (isPermissionError(err)) break;
+      }
     }
     if (!s) {
-      if (lastErr?.name === "NotAllowedError" || lastErr?.name === "SecurityError") {
-        setCamPerm("denied");
-        toast.error("Camera permission is blocked. Please allow it (see the instructions on this page).");
-      } else if (lastErr?.name === "NotFoundError") {
-        toast.error("No camera found on this device.");
-      } else {
-        toast.error("The camera could not be started. Close other apps using the camera and try again.");
-      }
+      await cameraFail(lastErr, "video");
       return;
     }
     if (runId !== runIdRef.current) { s.getTracks().forEach((t) => t.stop()); return; }
@@ -921,8 +1025,8 @@ export default function KycPage() {
       try {
         recorder = new MediaRecorder(s);
       } catch {
-        toast.error("This browser cannot record video. Please open this page in Chrome (Android) or Safari (iPhone).");
         cancelVideoRecording();
+        await cameraFail({ name: "NotSupportedError" }, "video");
         return;
       }
     }
@@ -1307,6 +1411,52 @@ export default function KycPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8">
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            const kind = (e.target.dataset.kind || "front") as "front" | "back" | "selfie";
+            e.target.value = "";
+            if (f) handleNativePhoto(f, kind);
+          }}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          capture="user"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) handleNativeVideo(f);
+          }}
+        />
+
+        {cameraProblem && (
+          <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/50 p-4 sm:items-center" role="dialog" aria-modal="true">
+            <div className="w-full max-w-md space-y-3 rounded-2xl border bg-card p-5 shadow-xl">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <p className="text-sm font-medium">{cameraProblem.message}</p>
+              </div>
+              <div className="grid gap-2">
+                {cameraProblem.canRetry && (
+                  <Button onClick={retryCamera}><RefreshCw className="mr-2 h-4 w-4" /> Try Again</Button>
+                )}
+                <Button variant="outline" onClick={openNativeCapture}>
+                  <Camera className="mr-2 h-4 w-4" /> Use Phone Camera
+                </Button>
+                <Button variant="ghost" onClick={() => setCameraProblem(null)}>Close</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Button variant="ghost" size="sm" className="mb-4 -ml-2" onClick={() => { try { sessionStorage.removeItem("givethra_kyc_return_to"); } catch { /* ignore */ } navigate({ to: returnTo as any }); }}>
           ← Back
         </Button>
