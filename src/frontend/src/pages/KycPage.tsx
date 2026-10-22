@@ -815,20 +815,8 @@ export default function KycPage() {
       setOcrFailed(false);
       setOcrStatus("Checking the photo...");
       try {
-        if (capturedBlur !== null && capturedBlur > BLUR_MAX) {
-          setOcrProcessing(false);
-          setOcrStatus("");
-          setOcrFailed(true);
-          setOcrError(BLUR_MESSAGE);
-          return;
-        }
-        if (meanBrightness(capturedCanvas) < 55) {
-          setOcrProcessing(false);
-          setOcrStatus("");
-          setOcrFailed(true);
-          setOcrError("The photo is too dark. Move to a bright place (or use the flashlight button) and retake it.");
-          return;
-        }
+        // The photo is NOT rejected for being slightly blurry or dim: older phones
+        // often take soft photos. If the number can be read, the photo is accepted.
         const { number, isCnic } = await readCnicNumber(capturedCanvas, (step, total) =>
           setOcrStatus(`Reading the number from the photo... (${step}/${total})`),
         );
@@ -845,7 +833,11 @@ export default function KycPage() {
           setOcrError(
             number
               ? "This does not look like the front of a CNIC. Photograph the CNIC card itself, with the whole card inside the frame."
-              : "No CNIC number could be read. Place the CNIC flat inside the frame, in good light, hold the phone steady for a second, and retake.",
+              : capturedBlur !== null && capturedBlur > BLUR_MAX
+                ? BLUR_MESSAGE
+                : meanBrightness(capturedCanvas) < 55
+                  ? "The CNIC number could not be read because the photo is too dark. Move to a bright place (or use the flashlight button) and retake it."
+                  : "The CNIC number could not be read. Place the CNIC flat inside the frame, in good light, hold the phone steady for a second, and retake.",
           );
         }
       } catch {
@@ -855,11 +847,6 @@ export default function KycPage() {
         setOcrError("Automatic reading could not start (check your internet connection) — please try again.");
       }
     } else {
-      if (capturedKind !== "selfie" && capturedBlur !== null && capturedBlur > BLUR_MAX) {
-        setOcrFailed(true);
-        setOcrError(BLUR_MESSAGE);
-        return;
-      }
       finalizeCapture(capturedKind, capturedCanvas);
     }
   }
@@ -1338,7 +1325,7 @@ export default function KycPage() {
   // Captured image preview with verify option
   if (capturedImage && capturedKind) {
     const isFront = capturedKind === "front";
-    const blurBlocked = capturedKind !== "selfie" && capturedBlur !== null && capturedBlur > BLUR_MAX;
+    const isBlurry = capturedKind !== "selfie" && capturedBlur !== null && capturedBlur > BLUR_MAX;
     
     return (
       <div className="min-h-screen bg-background">
@@ -1357,15 +1344,17 @@ export default function KycPage() {
             <img src={capturedImage} alt="Captured" className="w-full block" />
           </div>
 
-          {capturedKind !== "selfie" && !blurBlocked && (
+          {capturedKind !== "selfie" && !isBlurry && (
             <p className="text-xs text-muted-foreground text-center">
               Check that all the small text (name, father's name, number, dates) is easy to read. If not, press Retake.
             </p>
           )}
 
-          {blurBlocked && (
+          {isBlurry && !ocrError && (
             <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-300 p-3 text-sm text-amber-700 text-center">
-              ⚠️ {BLUR_MESSAGE}
+              {isFront
+                ? "ℹ️ The photo is a little soft. Press Verify & Confirm — if the CNIC number can be read, it will be accepted. If not, you will be asked to retake it."
+                : "ℹ️ The photo is a little soft. If the card text is readable you can Confirm, otherwise press Retake."}
             </div>
           )}
 
@@ -1376,7 +1365,7 @@ export default function KycPage() {
             </div>
           )}
           
-          {!blurBlocked && ocrError && (
+          {ocrError && (
             <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-300 p-3 text-sm text-amber-700 text-center">
               ⚠️ {ocrError}
             </div>
@@ -1390,7 +1379,7 @@ export default function KycPage() {
             <Button 
               className="flex-1" 
               onClick={verifyCapturedImage}
-              disabled={ocrProcessing || blurBlocked}
+              disabled={ocrProcessing}
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
               {ocrProcessing ? "Processing..." : isFront ? (ocrFailed ? "Try Reading Again" : "Verify & Confirm") : "Confirm"}
