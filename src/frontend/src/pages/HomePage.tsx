@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { runUserGuide } from "@/lib/userGuide";
 import { orderCasesForViewer } from "@/lib/caseOrdering";
+import { isCasePastDeadline } from "@/lib/caseExpiry";
 import { handleImageError, resolveMediaUrl } from "@/lib/media";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -590,6 +591,7 @@ export default function HomePage() {
   const [cases, setCases] = useState<any[]>([]);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [utcToday, setUtcToday] = useState(() => new Date().toISOString().slice(0, 10));
   const [notifCount, setNotifCount] = useState(0);
 
   const [kycStatus, setKycStatus] = useState<string>("none");
@@ -622,6 +624,11 @@ export default function HomePage() {
 
   const resultsRef = useRef<HTMLDivElement>(null);
   const casesLoadRequestRef = useRef(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setUtcToday(new Date().toISOString().slice(0, 10)), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const onModeChange = (event: Event) => setHomeMode((event as CustomEvent<"support" | "earning">).detail === "earning" ? "earning" : "support");
@@ -836,6 +843,7 @@ export default function HomePage() {
   const orderedCategories = [...FILTER_CATEGORIES].sort((a, b) => Number(categoryCounts[b] || 0) - Number(categoryCounts[a] || 0));
 
   let filtered = cases.filter((c) => {
+    if (isCasePastDeadline(c.deadline, utcToday)) return false;
     if (filterCountry !== "all" && c.country !== filterCountry) return false;
     if (filterCity !== "all" && c.city !== filterCity) return false;
     if (filterCat !== "all" && normalizePublishedCategory(c.category) !== filterCat) return false;

@@ -1,6 +1,10 @@
 name = "givethra"
 main = "./worker.js"
 compatibility_date = "2024-11-01"
+
+[triggers]
+crons = ["0 0 * * *"]
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"

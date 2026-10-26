@@ -3018,6 +3018,11 @@ export default {
       return json({ error: "The request could not be completed. Please try again.", code: "REQUEST_FAILED" }, 500, "https://givethra.org");
     }
   },
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(expireDueCases(env).catch((err) => {
+      console.error("Scheduled case expiry failed", err);
+    }));
+  },
 };
 
 

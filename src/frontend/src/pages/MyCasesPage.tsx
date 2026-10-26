@@ -28,6 +28,7 @@ import {
   getCasesByIds,
 } from "@/lib/api";
 import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
+import { isCasePastDeadline } from "@/lib/caseExpiry";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$", PKR: "Rs", SAR: "SAR", AED: "AED", GBP: "£", EUR: "€", INR: "₹",
@@ -68,6 +69,7 @@ export default function MyCasesPage() {
   const [myCases, setMyCases] = useState<any[]>([]);
   const [helpRecords, setHelpRecords] = useState<HelpRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [utcToday, setUtcToday] = useState(() => new Date().toISOString().slice(0, 10));
 
   const [activeTab, setActiveTab] = useState<"mycases" | "myhelp">("mycases");
   const [myCaseStatusFilter, setMyCaseStatusFilter] = useState("completed");
@@ -84,6 +86,11 @@ export default function MyCasesPage() {
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setUtcToday(new Date().toISOString().slice(0, 10)), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   async function loadData() {
     if (!user) return;
@@ -285,6 +292,25 @@ export default function MyCasesPage() {
           </div>
         )}
 
+        {isExpired && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            {collected > 0 ? (
+              <>
+                <p className="font-semibold">Expired · verified help recorded: {s} {collected} {cur}</p>
+                <p className="mt-1 text-xs">Open case details to view any payment proof or affidavit available for confirmed help.</p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold">Expired with no confirmed help · {s} 0 {cur}</p>
+                <p className="mt-1 text-xs">You can submit a new request so Heroes can try to help.</p>
+                <Button size="sm" variant="outline" className="mt-3 w-full gap-1.5" onClick={() => navigate({ to: "/submit-request" })}>
+                  <Plus className="h-3.5 w-3.5" /> Submit a new request
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
         <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}>
           <Eye className="h-3.5 w-3.5" /> View Details
         </Button>
@@ -366,8 +392,15 @@ export default function MyCasesPage() {
   // ---------------------------------------------------------------------------
   // Filtered lists
   // ---------------------------------------------------------------------------
-  const filteredMyCases = myCases.filter((c) => {
+  function displayCaseStatus(c: any) {
     const status = String(c.status || "").toLowerCase();
+    const publishedStatuses = ["approved", "published", "active", "open", "in_progress"];
+    if (publishedStatuses.includes(status) && isCasePastDeadline(c.deadline, utcToday)) return "expired";
+    return status;
+  }
+
+  const filteredMyCases = myCases.filter((c) => {
+    const status = displayCaseStatus(c);
     if (myCaseStatusFilter === "approved") {
       return ["approved", "published", "active", "open", "in_progress"].includes(status);
     }
@@ -408,11 +441,12 @@ export default function MyCasesPage() {
             {/* ---------- My Cases tab ---------- */}
             <TabsContent value="mycases" className="space-y-4 mt-4">
               <Tabs value={myCaseStatusFilter} onValueChange={setMyCaseStatusFilter} className="w-full">
-                <TabsList className="grid grid-cols-4 w-full">
+                <TabsList className="grid grid-cols-5 w-full">
                   <TabsTrigger value="pending">Pending</TabsTrigger>
                   <TabsTrigger value="rejected">Rejected</TabsTrigger>
                   <TabsTrigger value="approved">Approved</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
+                  <TabsTrigger value="expired">Expired</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -424,7 +458,7 @@ export default function MyCasesPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-3">{filteredMyCases.map((c) => <CaseRow key={c.id} c={c} />)}</div>
+                <div className="space-y-3">{filteredMyCases.map((c) => <CaseRow key={c.id} c={{ ...c, status: displayCaseStatus(c) }} />)}</div>
               )}
             </TabsContent>
 
