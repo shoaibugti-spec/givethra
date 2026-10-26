@@ -28,7 +28,7 @@ import {
   getCasesByIds,
 } from "@/lib/api";
 import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
-import { isCasePastDeadline, isExpiredCaseRecord } from "@/lib/caseExpiry";
+import { getCaseCalendarDate, isCasePastDeadline, isExpiredCaseRecord } from "@/lib/caseExpiry";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$", PKR: "Rs", SAR: "SAR", AED: "AED", GBP: "£", EUR: "€", INR: "₹",
@@ -69,7 +69,7 @@ export default function MyCasesPage() {
   const [myCases, setMyCases] = useState<any[]>([]);
   const [helpRecords, setHelpRecords] = useState<HelpRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [utcToday, setUtcToday] = useState(() => new Date().toISOString().slice(0, 10));
+  const [utcToday, setUtcToday] = useState(() => getCaseCalendarDate());
 
   const [activeTab, setActiveTab] = useState<"mycases" | "myhelp">("mycases");
   const [myCaseStatusFilter, setMyCaseStatusFilter] = useState("completed");
@@ -88,7 +88,7 @@ export default function MyCasesPage() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setUtcToday(new Date().toISOString().slice(0, 10)), 30_000);
+    const timer = window.setInterval(() => setUtcToday(getCaseCalendarDate()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
 

@@ -26,7 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { runUserGuide } from "@/lib/userGuide";
 import { orderCasesForViewer } from "@/lib/caseOrdering";
-import { isCasePastDeadline, isExpiredCaseRecord } from "@/lib/caseExpiry";
+import { getCaseCalendarDate, isCasePastDeadline, isExpiredCaseRecord, daysUntilCaseDeadline } from "@/lib/caseExpiry";
 import { handleImageError, resolveMediaUrl } from "@/lib/media";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -604,7 +604,7 @@ export default function HomePage() {
   const [cases, setCases] = useState<any[]>([]);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const [utcToday, setUtcToday] = useState(() => new Date().toISOString().slice(0, 10));
+  const [utcToday, setUtcToday] = useState(() => getCaseCalendarDate());
   const [notifCount, setNotifCount] = useState(0);
 
   const [kycStatus, setKycStatus] = useState<string>("none");
@@ -639,7 +639,7 @@ export default function HomePage() {
   const casesLoadRequestRef = useRef(0);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setUtcToday(new Date().toISOString().slice(0, 10)), 30_000);
+    const timer = window.setInterval(() => setUtcToday(getCaseCalendarDate()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -1517,8 +1517,8 @@ export default function HomePage() {
                           )}
 
                           {c.deadline && (() => {
-                            const daysLeft = Math.ceil((new Date(c.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                            if (daysLeft < 0) return null;
+                            const daysLeft = daysUntilCaseDeadline(c.deadline, utcToday);
+                            if (daysLeft == null || daysLeft < 0) return null;
                             return (
                               <div
                                 className={`text-xs font-bold px-2 py-1 rounded-lg text-center ${

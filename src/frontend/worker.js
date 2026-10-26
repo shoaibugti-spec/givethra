@@ -856,11 +856,22 @@ async function handleKyc(request, env, user, url, parts, origin) {
   return json({ error: "Method not allowed" }, 405, origin);
 }
 
+function caseCalendarDate() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+__name(caseCalendarDate, "caseCalendarDate");
 async function expireDueCases(env) {
   if (!env?.DB) return;
   // Deadlines are stored as YYYY-MM-DD. Expire only published/open cases;
   // completed/closed cases remain completed for payment and feedback history.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = caseCalendarDate();
   const due = await env.DB.prepare(
     `SELECT id, user_id, title FROM case_submissions
      WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active', 'open', 'in_progress')
@@ -911,7 +922,7 @@ async function handleCases(request, env, user, url, parts, origin) {
   if (request.method === "GET") {
     await expireDueCases(env);
     if (parts[2] === "approved") {
-      const rows = await env.DB.prepare("SELECT * FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') AND (deadline IS NULL OR date(deadline) >= date('now')) ORDER BY submitted_at DESC").all();
+      const rows = await env.DB.prepare("SELECT * FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') AND (deadline IS NULL OR date(deadline) >= date(?)) ORDER BY submitted_at DESC").bind(caseCalendarDate()).all();
       return json((rows.results || []).map(decodeCaseRow), 200, origin);
     }
     if (parts[2] === "by-ids") {
@@ -967,7 +978,7 @@ async function handleCases(request, env, user, url, parts, origin) {
       return json(row || {}, 200, origin);
     }
     if (parts[2] === "category-counts") {
-      const rows = await env.DB.prepare("SELECT category, COUNT(*) AS count FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') AND (deadline IS NULL OR date(deadline) >= date('now')) GROUP BY category").all();
+      const rows = await env.DB.prepare("SELECT category, COUNT(*) AS count FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') AND (deadline IS NULL OR date(deadline) >= date(?)) GROUP BY category").bind(caseCalendarDate()).all();
       const counts = Object.fromEntries((rows.results || []).filter((row) => row.category).map((row) => [row.category, Number(row.count || 0)]));
       return json(counts, 200, origin);
     }

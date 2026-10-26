@@ -9,7 +9,11 @@ const browseSource = fs.readFileSync(path.join(pagesDirectory, "CasesPage.tsx"),
 
 describe("live verified case visibility", () => {
   it("limits the server's public verified feed to unexpired approved cases", () => {
-    expect(workerSource).toContain("lower(status) IN ('approved', 'published', 'active') AND (deadline IS NULL OR date(deadline) >= date('now'))");
+    expect(workerSource).toContain("lower(status) IN ('approved', 'published', 'active') AND (deadline IS NULL OR date(deadline) >= date(?))");
+    expect(workerSource).toContain("ORDER BY submitted_at DESC\").bind(caseCalendarDate()).all()");
+    expect(workerSource).toContain('timeZone: "Asia/Karachi"');
+    expect(workerSource).toContain("AND deadline IS NOT NULL AND date(deadline) < date(?)");
+    expect(workerSource).toContain(".bind(today).all()");
   });
 
   it("limits Home and Browse cards to live statuses and excludes expired records", () => {

@@ -17,7 +17,7 @@ import { Search, MapPin, CheckCircle2, SlidersHorizontal, X, Share2 } from "luci
 import { useState, useEffect } from "react";
 import { getApprovedCases } from "@/lib/api";
 import { shareCase } from "@/lib/caseSharing";
-import { isExpiredCaseRecord } from "@/lib/caseExpiry";
+import { isExpiredCaseRecord, daysUntilCaseDeadline } from "@/lib/caseExpiry";
 import { toast } from "sonner";
 
 const CATEGORIES = [
@@ -457,11 +457,8 @@ export default function CasesPage() {
 
                     {c.deadline &&
                       (() => {
-                        const daysLeft = Math.ceil(
-                          (new Date(c.deadline).getTime() - Date.now()) /
-                            (1000 * 60 * 60 * 24)
-                        );
-                        if (daysLeft < 0) return null;
+                        const daysLeft = daysUntilCaseDeadline(c.deadline);
+                        if (daysLeft == null || daysLeft < 0) return null;
                         return (
                           <div
                             className={`text-xs font-bold px-2 py-1 rounded-lg text-center ${
