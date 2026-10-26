@@ -21,7 +21,8 @@ export const CATEGORY_LIMITS: Record<
   }
 > = {
   "Widow & Elderly Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
-  "Child Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
+  "Child Support": { type: "fixed", amount: 2000, label: "Fixed Stipend" },
+  "Orphan Support": { type: "fixed", amount: 4000, label: "Fixed Orphan Support" },
   "Disability Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
   "Emergency Help": { type: "fixed", amount: 3000, label: "Fixed Emergency Help" },
   "Livestock / Farming": { type: "fixed", amount: 8000, label: "Fixed Farming Help" },
@@ -52,6 +53,7 @@ export const CATEGORIES = [
   "Medicines",
   "Food & Groceries",
   "Child Support",
+  "Orphan Support",
   "Widow & Elderly Support",
   "Disability Support",
   "Marriage Support",
@@ -262,7 +264,7 @@ export const PERSONAL_PAYMENT_CATS = new Set([
   "Other", "Food & Groceries", "Medicines",
 ]);
 
-export const FIXED_STIPEND_CATS = new Set(["Child Support", "Widow & Elderly Support", "Disability Support"]);
+export const FIXED_STIPEND_CATS = new Set(["Child Support", "Orphan Support", "Widow & Elderly Support", "Disability Support"]);
 export const PROPERTY_RELEVANT_CATS = new Set(["Electricity Bill", "Gas Bill", "Water Bill", "House Rent", "Food & Groceries"]);
 export const SKIP_FIELDS = new Set(["provider_name", "provider_contact", "landlord_name", "landlord_contact", "creditor_name", "creditor_contact", "receiver_name", "receiver_contact"]);
 export const GENDER_OPTIONS = ["Male", "Female", "Child"];

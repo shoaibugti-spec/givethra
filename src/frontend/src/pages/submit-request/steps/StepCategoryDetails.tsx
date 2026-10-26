@@ -9,6 +9,7 @@ import SchoolFeesForm from "../category-forms/SchoolFeesForm";
 import MedicalTreatmentForm from "../category-forms/MedicalTreatmentForm";
 import MedicinesForm from "../category-forms/MedicinesForm";
 import ChildSupportForm from "../category-forms/ChildSupportForm";
+import OrphanSupportForm from "../category-forms/OrphanSupportForm";
 import WidowElderlyForm from "../category-forms/WidowElderlyForm";
 import DisabilitySupportForm from "../category-forms/DisabilitySupportForm";
 import HouseRentForm from "../category-forms/HouseRentForm";
@@ -31,6 +32,7 @@ const CATEGORY_FORM_MAP: Record<string, any> = {
   "Medical & Treatment": MedicalTreatmentForm,
   "Medicines": MedicinesForm,
   "Child Support": ChildSupportForm,
+  "Orphan Support": OrphanSupportForm,
   "Widow & Elderly Support": WidowElderlyForm,
   "Disability Support": DisabilitySupportForm,
   "House Rent": HouseRentForm,

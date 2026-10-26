@@ -15,6 +15,12 @@ const MARRIAGE_SUPPORT_ITEMS = new Set([
   "Dressing table", "Sofa set", "Five pairs of clothes", "Five pairs of shoes",
 ]);
 const EMERGENCY_TYPES = new Set(["Accident", "Sudden illness", "Natural disaster", "Fire", "Flood", "Serious injury", "Displacement"]);
+const FIXED_CASE_AMOUNTS = new Map([
+  ["Child Support", 2000],
+  ["Orphan Support", 4000],
+  ["Widow & Elderly Support", 6000],
+  ["Disability Support", 6000],
+]);
 
 function googleClientId(env) {
   return String(env?.GOOGLE_CLIENT_ID || env?.VITE_GOOGLE_CLIENT_ID || "").trim();
@@ -952,7 +958,25 @@ async function handleCases(request, env, user, url, parts, origin) {
     }
     const body = await readJson(request);
     const record = pick(body, ["category", "title", "short_description", "country", "city", "urgency", "description", "amount_needed", "currency", "why_help", "deadline", "institute_name", "institute_contact", "institute_address", "payment_method", "account_title", "account_number", "account_iban", "photo_urls", "selfie_url", "video_url", "category_details", "was_free"]);
-    if (String(record.category || "") === "Marriage Support") {
+    const categoryName = String(record.category || "");
+    const fixedAmount = FIXED_CASE_AMOUNTS.get(categoryName);
+    if (fixedAmount != null && Number(record.amount_needed) !== fixedAmount) {
+      return json({ error: `${categoryName} amount is fixed at Rs ${fixedAmount.toLocaleString()}.` }, 400, origin);
+    }
+    if (categoryName === "Orphan Support") {
+      let orphanDetails = record.category_details;
+      if (typeof orphanDetails === "string") {
+        try { orphanDetails = JSON.parse(orphanDetails); } catch { orphanDetails = null; }
+      }
+      const fields = orphanDetails?.catFields || orphanDetails || {};
+      const docs = orphanDetails?.cat_doc_urls || orphanDetails?.catDocUrls || orphanDetails?._documents || orphanDetails?.documents || {};
+      const validParentStatus = ["Father passed away", "Mother passed away", "Both passed away"].includes(String(fields.parents_status || ""));
+      const deathProof = docs.parents_proof || fields.parents_proof;
+      if (!validParentStatus || !String(deathProof || "").trim()) {
+        return json({ error: "Orphan Support requires a parent death status and matching death proof." }, 400, origin);
+      }
+    }
+    if (categoryName === "Marriage Support") {
       const amount = Number(record.amount_needed);
       if (!Number.isFinite(amount) || amount < 1000 || amount > 30000) {
         return json({ error: "Marriage Support amount must be between Rs 1,000 and Rs 30,000 for one selected item." }, 400, origin);

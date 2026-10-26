@@ -53,7 +53,7 @@ export default function ChildSupportForm({
   return (
     <BaseCategoryForm
       title="Child Support"
-      subtitle="Fixed stipend Rs 6,000 · verified child need"
+      subtitle="Fixed stipend Rs 2,000 · verified child need"
       onNext={onNext}
       onBack={onBack}
       isFirst={isFirst}
@@ -118,7 +118,7 @@ export default function ChildSupportForm({
 
       <StepGuide
         lines={[
-          "This category has a fixed stipend of Rs 6,000.",
+          "This category has a fixed stipend of Rs 2,000.",
           "Upload clear B-Form and parents status proof.",
           "Details must match the documents exactly.",
           "False information can lead to rejection.",

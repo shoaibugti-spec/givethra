@@ -14,6 +14,7 @@ const ALL_CATEGORIES = [
   { id: "Medicines", label: "Medicines", emoji: "💊", color: "#f43f5e" },
   { id: "Food & Groceries", label: "Food & Groceries", emoji: "🍲", color: "#10b981" },
   { id: "Child Support", label: "Child Support", emoji: "👶", color: "#06b6d4" },
+  { id: "Orphan Support", label: "Orphan Support", emoji: "🕊️", color: "#7c3aed" },
   { id: "Widow & Elderly Support", label: "Widow/Elderly", emoji: "👵", color: "#14b8a6" },
   { id: "Disability Support", label: "Disability Support", emoji: "♿", color: "#0ea5e9" },
   { id: "Marriage Support", label: "Marriage Support", emoji: "💍", color: "#d946ef" },
