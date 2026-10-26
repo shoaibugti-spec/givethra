@@ -14,9 +14,6 @@ import {
   Sun,
   User,
   X,
-  Facebook,
-  Instagram,
-  Linkedin,
   MessageCircle,
   Mail,
   Settings,
@@ -44,15 +41,11 @@ import {
   getCommunityPosts,
 } from "@/lib/api";
 import RoleSwitcher from "@/components/RoleSwitcher";
-import LegalFooter from "@/components/LegalFooter";
+import SocialLinks from "@/components/SocialLinks";
+import { SiWhatsapp } from "react-icons/si";
 import { loadHelpImpact, formatAmount, type HelpImpact } from "@/lib/helpStats";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
-const FACEBOOK_URL =
-  "https://www.facebook.com/profile.php?id=61590715263595";
-const INSTAGRAM_URL = "https://www.instagram.com/givethra.community";
-const LINKEDIN_URL = "https://www.linkedin.com/company/givethra-org/";
-const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const WHATSAPP_SUPPORT_URL = "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 
 export { NavLink };
@@ -657,7 +650,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {isAuthenticated ? (
               <Link
-                to="/profile/me"
+                to="/profile/$id"
+                params={{ id: "me" }}
                 onClick={closeMenu}
                 className="relative mt-5 flex items-center gap-3.5 rounded-2xl bg-white/10 p-3 ring-1 ring-white/20 transition active:bg-white/20"
               >
@@ -839,15 +833,61 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 has-bottom-nav">{children}</main>
 
-      <LegalFooter />
+      <footer className="bg-card border-t border-border">
+        <div className="max-w-7xl mx-auto px-4 py-10">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
+                  <Heart className="h-3.5 w-3.5 text-primary-foreground" />
+                </div>
+                <span className="font-display font-bold text-foreground">
+                  Givethra
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Verified Help. Real Impact.
+              </p>
+              <SocialLinks className="pt-1" />
+            </div>
+            <nav className="flex flex-wrap gap-x-6 gap-y-2">
+              {[
+                { to: "/about", label: "About" },
+                { to: "/faq", label: "FAQ" },
+                { to: "/privacy", label: "Privacy Policy" },
+                { to: "/terms", label: "Terms" },
+                { to: "/community-guidelines", label: "Community Guidelines" },
+                { to: "/contact", label: "Contact Us" },
+              ].map(({ to, label }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+          <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-1">
+            <p>
+              &copy; {new Date().getFullYear()} Givethra. All rights reserved.
+            </p>
+            <p>
+              Givethra™ is a humanitarian platform connecting verified people
+              with verified help.
+            </p>
+          </div>
+        </div>
+      </footer>
       <a
         href={WHATSAPP_SUPPORT_URL}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="24/7 WhatsApp Support"
-        className="fixed bottom-5 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-green-600/15 transition hover:bg-green-700 hover:shadow-xl md:bottom-6 md:right-6"
+        className="fixed bottom-5 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-[#25D366]/20 transition hover:bg-[#1EBE5A] hover:shadow-xl md:bottom-6 md:right-6"
       >
-        <MessageCircle className="h-5 w-5" />
+        <SiWhatsapp className="h-5 w-5" />
         <span className="hidden sm:inline">24/7 WhatsApp Support</span>
         <span className="sm:hidden">Support</span>
       </a>

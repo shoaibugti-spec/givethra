@@ -13,14 +13,38 @@ describe("community-only Public Posts", () => {
   });
 
   it("writes new public posts as approved community content", () => {
-    expect(workerSource).toContain("INSERT INTO community_posts (id, user_id, display_name, message, created_at)");
+    expect(workerSource).toContain("INSERT INTO community_posts");
     expect(workerSource).toContain("const displayName = user");
+  });
+
+  it("enforces one post per actor in a rolling 24-hour window on the server", () => {
+    expect(workerSource).toContain("COMMUNITY_POST_LIMIT");
+    expect(workerSource).toContain("julianday(created_at) > julianday('now', '-24 hours')");
+    expect(workerSource).toContain("next_post_at");
+  });
+
+  it("allows only admins to delete community posts and cleans engagement rows", () => {
+    expect(workerSource).toContain('request.method === "DELETE" && parts.length === 4');
+    expect(workerSource).toContain("if (!isAdmin(user))");
+    expect(workerSource).toContain("DELETE FROM community_post_comments");
+    expect(workerSource).toContain("DELETE FROM community_post_likes");
+    expect(communitySource).toContain('aria-label="Moderate post"');
+    expect(communitySource).toContain("canModerateCommunity");
+    expect(communitySource).toContain("<span>Delete</span>");
+    expect(communitySource).toContain("shoaibugti@gmail.com");
+    expect(communitySource).toContain("shoaibahmedbugti5@gmail.com");
+  });
+
+  it("keeps avatars available for posts and comments", () => {
+    expect(workerSource).toContain("COALESCE(NULLIF(p.avatar_url, ''), NULLIF(u.avatar_url, '')) AS avatar_url");
+    expect(communitySource).toContain("comment.avatar_url");
+    expect(communitySource).toContain("avatar_url: user?.photo || null");
   });
 
   it("keeps the composer in Community Posts and the feedback wall on HomePage", () => {
     expect(communitySource).toContain("setNewPost");
     expect(communitySource).toContain("What's on your mind? Share your thoughts...");
-    expect(homeSource).toContain("<FeedbackWall />");
+    expect(homeSource).toContain("<KindnessWall />");
   });
 
   it("keeps the four feed tabs mapped to distinct server ranking contracts", () => {
@@ -46,6 +70,5 @@ describe("community-only Public Posts", () => {
 
   it("keeps approved seeker feedback in the Kindness Wall path", () => {
     expect(homeSource).toContain("<KindnessWall />");
-    expect(homeSource).toContain("<FeedbackWall />");
   });
 });

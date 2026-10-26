@@ -491,6 +491,16 @@ export async function createCommunityPost(data: Record<string, unknown>) {
   return result;
 }
 
+export async function deleteCommunityPost(postId: string) {
+  const res = await fetchWithAuth(`${WORKER_URL}/api/community/posts/${encodeURIComponent(postId)}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result?.error || `Community post delete failed (${res.status})`);
+  return result;
+}
+
 export async function toggleLike(postId: string) {
   const res = await fetchWithAuth(`${WORKER_URL}/api/community/posts/${encodeURIComponent(postId)}/likes`, {
     method: "POST",

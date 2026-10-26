@@ -7,7 +7,6 @@
 // routes so users aren't redirected to "/" when role hasn't loaded yet.
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Toaster } from "@/components/ui/sonner";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -23,7 +22,6 @@ import { ThemeProvider } from "next-themes";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import { getProfile } from "@/lib/api";
-import CookieConsent from "@/components/CookieConsent";
 
 // Lazy imports
 const HomePage = lazy(() =>
@@ -182,11 +180,11 @@ const ContactPage = lazy(() =>
   }))
 );
 const AccessibilityPage = lazy(() => import("@/pages/AccessibilityPage"));
+const CommunitySupportPage = lazy(() => import("@/pages/CommunitySupportPage"));
 const CookiePolicyPage = lazy(() => import("@/pages/CookiePolicyPage"));
 const CreditsRefundsPage = lazy(() => import("@/pages/CreditsRefundsPage"));
 const DisclaimerPage = lazy(() => import("@/pages/DisclaimerPage"));
 const DonationPolicyPage = lazy(() => import("@/pages/DonationPolicyPage"));
-const CommunitySupportPage = lazy(() => import("@/pages/CommunitySupportPage"));
 const ReportAbusePage = lazy(() => import("@/pages/ReportAbusePage"));
 const ShopDreamNowRulesPage = lazy(() => import("@/pages/ShopDreamNowRulesPage"));
 const VerificationPolicyPage = lazy(() => import("@/pages/VerificationPolicyPage"));
@@ -231,11 +229,9 @@ const DreamDetailPage = lazy(() =>
   }))
 );
 
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <LoadingSpinner size="lg" label="Loading..." />
-  </div>
-);
+// Keep route transitions consistent with the initial app bootstrap: the old
+// plain white generic spinner should never appear between pages.
+const PageLoader = () => <AppLoadingScreen />;
 
 // Shown only if BottomNav itself crashes. Uses plain <a href> links so the
 // navigation still works even when the router/JS state is unhealthy.
@@ -296,20 +292,20 @@ const ROLE_OPTIONAL_PATHS = new Set([
   "/about",
   "/account-privacy",
   "/privacy",
+  "/privacy-policy",
   "/terms",
   "/community-guidelines",
   "/faq",
   "/contact",
-  "/accessibility",
   "/cookies",
-  "/credits-refunds",
+  "/accessibility",
   "/disclaimer",
+  "/verification-policy",
+  "/credits-refunds",
   "/donation-policy",
   "/community-support",
-  "/report",
   "/shop-dream-now-rules",
-  "/verification-policy",
-  "/privacy-policy",
+  "/report",
   "/community",
   "/heroes-wall",
   "/kindness-wall",
@@ -386,6 +382,8 @@ function RootLayout() {
       // A signed-in user without a role must still be able to use the app
       // navigation (/home, /my-help, /my-cases, /wallet, /profile/...), the
       // role pages (/become-hero, /need-help) and the profile setup page.
+      // 🔥 FIX: Now uses startsWith() for parameterized routes so users aren't
+      // redirected away when role hasn't loaded yet.
       const isPublicRoute =
         ROLE_OPTIONAL_PATHS.has(location.pathname) ||
         ROLE_OPTIONAL_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
@@ -577,7 +575,7 @@ const privacyRoute = createRoute({
   path: "/privacy",
   component: () => (
     <Suspense fallback={<PageLoader />}>
-      <PrivacyPolicyPage />
+      <AccountPrivacyPage />
     </Suspense>
   ),
 });
@@ -599,16 +597,6 @@ const communityGuidelinesRoute = createRoute({
     </Suspense>
   ),
 });
-const accessibilityRoute = createRoute({ getParentRoute: () => rootRoute, path: "/accessibility", component: () => <Suspense fallback={<PageLoader />}><AccessibilityPage /></Suspense> });
-const cookiePolicyRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cookies", component: () => <Suspense fallback={<PageLoader />}><CookiePolicyPage /></Suspense> });
-const creditsRefundsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/credits-refunds", component: () => <Suspense fallback={<PageLoader />}><CreditsRefundsPage /></Suspense> });
-const disclaimerRoute = createRoute({ getParentRoute: () => rootRoute, path: "/disclaimer", component: () => <Suspense fallback={<PageLoader />}><DisclaimerPage /></Suspense> });
-const donationPolicyRoute = createRoute({ getParentRoute: () => rootRoute, path: "/donation-policy", component: () => <Suspense fallback={<PageLoader />}><DonationPolicyPage /></Suspense> });
-const communitySupportRoute = createRoute({ getParentRoute: () => rootRoute, path: "/community-support", component: () => <Suspense fallback={<PageLoader />}><CommunitySupportPage /></Suspense> });
-const reportAbuseRoute = createRoute({ getParentRoute: () => rootRoute, path: "/report", component: () => <Suspense fallback={<PageLoader />}><ReportAbusePage /></Suspense> });
-const shopDreamNowRulesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/shop-dream-now-rules", component: () => <Suspense fallback={<PageLoader />}><ShopDreamNowRulesPage /></Suspense> });
-const verificationPolicyRoute = createRoute({ getParentRoute: () => rootRoute, path: "/verification-policy", component: () => <Suspense fallback={<PageLoader />}><VerificationPolicyPage /></Suspense> });
-const privacyPolicyRoute = createRoute({ getParentRoute: () => rootRoute, path: "/privacy-policy", component: () => <Suspense fallback={<PageLoader />}><PrivacyPolicyPage /></Suspense> });
 const notificationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/notifications",
@@ -689,6 +677,56 @@ const contactRoute = createRoute({
       <ContactPage />
     </Suspense>
   ),
+});
+const privacyPolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/privacy-policy",
+  component: () => <Suspense fallback={<PageLoader />}><PrivacyPolicyPage /></Suspense>,
+});
+const cookiesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cookies",
+  component: () => <Suspense fallback={<PageLoader />}><CookiePolicyPage /></Suspense>,
+});
+const accessibilityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/accessibility",
+  component: () => <Suspense fallback={<PageLoader />}><AccessibilityPage /></Suspense>,
+});
+const disclaimerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/disclaimer",
+  component: () => <Suspense fallback={<PageLoader />}><DisclaimerPage /></Suspense>,
+});
+const verificationPolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/verification-policy",
+  component: () => <Suspense fallback={<PageLoader />}><VerificationPolicyPage /></Suspense>,
+});
+const creditsRefundsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/credits-refunds",
+  component: () => <Suspense fallback={<PageLoader />}><CreditsRefundsPage /></Suspense>,
+});
+const donationPolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/donation-policy",
+  component: () => <Suspense fallback={<PageLoader />}><DonationPolicyPage /></Suspense>,
+});
+const communitySupportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/community-support",
+  component: () => <Suspense fallback={<PageLoader />}><CommunitySupportPage /></Suspense>,
+});
+const shopDreamNowRulesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/shop-dream-now-rules",
+  component: () => <Suspense fallback={<PageLoader />}><ShopDreamNowRulesPage /></Suspense>,
+});
+const reportAbuseRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/report",
+  component: () => <Suspense fallback={<PageLoader />}><ReportAbusePage /></Suspense>,
 });
 const becomeHeroRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -793,16 +831,16 @@ const routeTree = rootRoute.addChildren([
   faqRoute,
   supportRoute,
   contactRoute,
+  privacyPolicyRoute,
+  cookiesRoute,
   accessibilityRoute,
-  cookiePolicyRoute,
-  creditsRefundsRoute,
   disclaimerRoute,
+  verificationPolicyRoute,
+  creditsRefundsRoute,
   donationPolicyRoute,
   communitySupportRoute,
-  reportAbuseRoute,
   shopDreamNowRulesRoute,
-  verificationPolicyRoute,
-  privacyPolicyRoute,
+  reportAbuseRoute,
   becomeHeroRoute,
   needHelpRoute,
   onboardingRoute,
@@ -824,56 +862,110 @@ declare module "@tanstack/react-router" {
 function AppLoadingScreen() {
   return (
     <div
+      role="status"
+      aria-live="polite"
       style={{
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "var(--background, #ffffff)",
-        gap: "1.5rem",
+        gap: "1.25rem",
+        padding: "2rem",
+        overflow: "hidden",
+        position: "relative",
+        background: "linear-gradient(145deg, #063f4a 0%, #03707b 48%, #00a896 100%)",
       }}
     >
+      <style>{`
+        @keyframes givethra-splash-enter {
+          from { opacity: 0; transform: translateY(14px) scale(.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes givethra-splash-spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes givethra-splash-glow {
+          0%, 100% { opacity: .35; transform: scale(.92); }
+          50% { opacity: .75; transform: scale(1.08); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .givethra-splash-motion { animation: none !important; }
+        }
+      `}</style>
       <div
+        aria-hidden="true"
+        className="givethra-splash-motion"
         style={{
-          width: 52,
-          height: 52,
-          borderRadius: 12,
-          background: "#00A896",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          position: "absolute",
+          width: 260,
+          height: 260,
+          borderRadius: "50%",
+          background: "rgba(91, 236, 222, .22)",
+          filter: "blur(18px)",
+          animation: "givethra-splash-glow 2.6s ease-in-out infinite",
+        }}
+      />
+      <div
+        className="givethra-splash-motion"
+        style={{
+          width: "min(74vw, 190px)",
+          aspectRatio: "3 / 2",
+          borderRadius: 28,
+          overflow: "hidden",
+          position: "relative",
+          zIndex: 1,
+          boxShadow: "0 18px 55px rgba(0, 25, 34, .35), 0 0 0 1px rgba(255,255,255,.22)",
+          animation: "givethra-splash-enter 700ms cubic-bezier(.23,1,.32,1) both",
         }}
       >
-        <span
-          style={{
-            color: "#fff",
-            fontWeight: 800,
-            fontSize: 24,
-            fontFamily: "system-ui, sans-serif",
-          }}
-        >
-          G
-        </span>
+        <img src="/givethra-splash-logo.png" alt="Givethra logo" style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }} />
       </div>
       <span
+        className="givethra-splash-motion"
         style={{
           fontWeight: 700,
-          fontSize: 22,
-          letterSpacing: "-0.5px",
+          fontSize: "clamp(1.8rem, 7vw, 2.35rem)",
+          letterSpacing: "-0.04em",
           fontFamily: "system-ui, sans-serif",
-          color: "var(--foreground, #111)",
+          color: "#ffffff",
+          textShadow: "0 3px 18px rgba(0, 37, 47, .32)",
+          animation: "givethra-splash-enter 700ms 120ms cubic-bezier(.23,1,.32,1) both",
         }}
       >
         Givethra
       </span>
-      <LoadingSpinner size="md" label="Loading Application..." />
+      <span
+        className="givethra-splash-motion"
+        style={{
+          marginTop: -10,
+          color: "rgba(255, 255, 255, .88)",
+          fontSize: "clamp(.78rem, 3vw, .95rem)",
+          letterSpacing: ".02em",
+          animation: "givethra-splash-enter 700ms 220ms cubic-bezier(.23,1,.32,1) both",
+        }}
+      >
+        Verified Help. Real Impact.
+      </span>
+      <div
+        className="givethra-splash-motion"
+        aria-label="Loading application"
+        style={{
+          width: 32,
+          height: 32,
+          marginTop: 10,
+          borderRadius: "50%",
+          border: "3px solid rgba(255,255,255,.3)",
+          borderTopColor: "#ffffff",
+          animation: "givethra-splash-spin 900ms linear infinite",
+        }}
+      />
     </div>
   );
 }
 
 function AppShell() {
-  return <><RouterProvider router={router} /><CookieConsent /></>;
+  return <RouterProvider router={router} />;
 }
 
 export default function App() {

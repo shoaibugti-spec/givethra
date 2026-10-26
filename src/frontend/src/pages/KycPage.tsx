@@ -203,7 +203,140 @@ async function readCnicNumber(
   return { number: best ? best.number : null, isCnic: looksLikeCnic(allText) };
 }
 
+// ---------------------------------------------------------------------------
+// Sharpness + review-copy helpers
+// ---------------------------------------------------------------------------
+function boxBlurH(src: Float32Array, W: number, H: number, r: number): Float32Array {
+  const out = new Float32Array(W * H);
+  const n = 2 * r + 1;
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    let sum = 0;
+    for (let k = -r; k <= r; k++) sum += src[row + Math.min(W - 1, Math.max(0, k))];
+    for (let x = 0; x < W; x++) {
+      out[row + x] = sum / n;
+      const add = Math.min(W - 1, x + r + 1);
+      const rem = Math.max(0, x - r);
+      sum += src[row + add] - src[row + rem];
+    }
+  }
+  return out;
+}
+
+function boxBlurV(src: Float32Array, W: number, H: number, r: number): Float32Array {
+  const out = new Float32Array(W * H);
+  const n = 2 * r + 1;
+  for (let x = 0; x < W; x++) {
+    let sum = 0;
+    for (let k = -r; k <= r; k++) sum += src[Math.min(H - 1, Math.max(0, k)) * W + x];
+    for (let y = 0; y < H; y++) {
+      out[y * W + x] = sum / n;
+      const add = Math.min(H - 1, y + r + 1);
+      const rem = Math.max(0, y - r);
+      sum += src[add * W + x] - src[rem * W + x];
+    }
+  }
+  return out;
+}
+
+// Blur measure after Crete et al.: 0 = very sharp, 1 = very blurry. It compares
+// how much the image's edges weaken when it is blurred once more, so it does not
+// depend on what is printed on the card.
+function creteBlur(g: Float32Array, W: number, H: number): number {
+  const bv = boxBlurV(g, W, H, 4); // vertical blur
+  const bh = boxBlurH(g, W, H, 4); // horizontal blur
+  let sF = 0, sV = 0;
+  for (let y = 0; y < H - 1; y++) {
+    for (let x = 0; x < W - 1; x++) {
+      const i = y * W + x;
+      const dxF = Math.abs(g[i + 1] - g[i]);
+      const dyF = Math.abs(g[i + W] - g[i]);
+      const dxB = Math.abs(bh[i + 1] - bh[i]);
+      const dyB = Math.abs(bv[i + W] - bv[i]);
+      sF += dxF + dyF;
+      sV += Math.max(0, dxF - dxB) + Math.max(0, dyF - dyB);
+    }
+  }
+  return sF > 0 ? (sF - sV) / sF : 1;
+}
+
+// Photos blurrier than this cannot be read by the review team and are retaken.
+// 0 = razor sharp, 1 = very blurry; measured on an 800 px wide copy of the card.
+// (Calibrated on real samples: sharp CNIC back 0.24, soft CNIC front 0.37.)
+const BLUR_MAX = 0.33;
+
+function blurOfCanvas(src: HTMLCanvasElement): number {
+  const ctx = src.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+  const d = ctx ? ctx.getImageData(0, 0, src.width, src.height) : null;
+  if (!d) return 0;
+  const g = new Float32Array(src.width * src.height);
+  for (let i = 0, o = 0; i < g.length; i++, o += 4) {
+    g[i] = (d.data[o] * 299 + d.data[o + 1] * 587 + d.data[o + 2] * 114) / 1000;
+  }
+  return creteBlur(g, src.width, src.height);
+}
+
+function scaleCanvas(src: HTMLCanvasElement, maxWidth: number): HTMLCanvasElement {
+  if (src.width <= maxWidth) return src;
+  const out = document.createElement("canvas");
+  out.width = maxWidth;
+  out.height = Math.round((src.height * maxWidth) / src.width);
+  const ctx = out.getContext("2d");
+  if (ctx) {
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(src, 0, 0, out.width, out.height);
+    return out;
+  }
+  return src;
+}
+
+function enhanceRGBA(d: Uint8ClampedArray, W: number, H: number): void {
+  const n = W * H;
+  // 1) contrast stretch on luminance percentiles (same gain on all channels keeps colours)
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    hist[Math.round((d[o] * 299 + d[o + 1] * 587 + d[o + 2] * 114) / 1000)]++;
+  }
+  let acc = 0, lo = 0, hi = 255;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.01) { lo = v; break; } }
+  acc = 0;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.99) { hi = v; break; } }
+  const gain = Math.min(1.6, 239 / Math.max(hi - lo, 1));
+  if (gain > 1.05) {
+    for (let i = 0; i < n; i++) {
+      const o = i * 4;
+      d[o] = (d[o] - lo) * gain + 8;
+      d[o + 1] = (d[o + 1] - lo) * gain + 8;
+      d[o + 2] = (d[o + 2] - lo) * gain + 8;
+    }
+  }
+  // 2) unsharp mask: original + amount * (original - blurred)
+  const amount = 0.9;
+  for (let c = 0; c < 3; c++) {
+    const ch = new Float32Array(n);
+    for (let i = 0; i < n; i++) ch[i] = d[i * 4 + c];
+    let b = boxBlurH(ch, W, H, 2);
+    b = boxBlurV(b, W, H, 2);
+    b = boxBlurH(b, W, H, 2);
+    b = boxBlurV(b, W, H, 2);
+    for (let i = 0; i < n; i++) {
+      const diff = ch[i] - b[i];
+      if (Math.abs(diff) > 2) d[i * 4 + c] = ch[i] + amount * diff;
+      else d[i * 4 + c] = ch[i];
+    }
+  }
+}
+
+const BLUR_MESSAGE =
+  "This photo is blurry, so the text cannot be read clearly. Hold the phone steady, wait a second for the camera to focus, keep the card flat in good light, and retake it.";
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function isPermissionError(err: any): boolean {
+  const n = err?.name;
+  return n === "NotAllowedError" || n === "PermissionDeniedError" || n === "SecurityError";
+}
 
 // Safari/iPhone cannot record WebM, so the format is picked from what the
 // browser supports (WebM first, then MP4).
@@ -264,11 +397,18 @@ export default function KycPage() {
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrStatus, setOcrStatus] = useState<string>("");
   const [ocrFailed, setOcrFailed] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [focusing, setFocusing] = useState(false);
+  const [capturedBlur, setCapturedBlur] = useState<number | null>(null);
+  const captureRunRef = useRef(0);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [cameraRes, setCameraRes] = useState<{ w: number; h: number } | null>(null);
   const [camPerm, setCamPerm] = useState<"unknown" | "granted" | "denied" | "prompt">("unknown");
   const [videoOpen, setVideoOpen] = useState(false);
+  const [cameraProblem, setCameraProblem] = useState<{ kind: "photo" | "video"; target?: string; message: string; canRetry: boolean } | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoCountdown, setVideoCountdown] = useState<number | null>(null);
   const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -309,10 +449,11 @@ export default function KycPage() {
     return () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
   }, [stream]);
 
-  // Read the permission state when the form opens, but do not call getUserMedia
-  // from an effect. Mobile Safari/Chrome may reject a permission prompt that is
-  // not triggered by a user gesture. The visible "Allow camera" button below
-  // makes the request directly from the user's tap.
+  // Ask for camera + microphone once, as soon as the KYC form is shown, so the
+  // browser prompt appears right away (one combined prompt) instead of failing
+  // later when the user taps a camera button. A website cannot force-allow it:
+  // the user must tap "Allow", and a previously blocked site can only be
+  // unblocked in the browser settings (the page shows how).
   const showForm = !!user && !isLoading && (!submission || reapplying);
   useEffect(() => {
     if (!showForm) return;
@@ -331,6 +472,7 @@ export default function KycPage() {
           setCamPerm("prompt");
         }
       } catch { /* Permissions API not available (older Safari) */ }
+      if (!cancelled) await requestCameraAccess();
     })();
     return () => { cancelled = true; if (status) status.onchange = null; };
   }, [showForm]);
@@ -359,21 +501,108 @@ export default function KycPage() {
     };
   }, []);
 
+  // After a refusal: was the site really blocked, or was the popup only dismissed?
+  async function markDeniedIfBlocked(): Promise<boolean> {
+    try {
+      const st = await (navigator as any).permissions?.query?.({ name: "camera" });
+      if (st && st.state !== "denied") { setCamPerm("prompt"); return false; }
+    } catch { /* Permissions API not available (older Safari) */ }
+    setCamPerm("denied");
+    return true;
+  }
+
+  // One place that turns every camera failure into a clear message and a way forward.
+  async function cameraFail(err: any, kind: "photo" | "video", target?: string) {
+    console.error("KYC camera problem", err);
+    let message = "The camera could not be started. Close other apps that use the camera and try again.";
+    let canRetry = true;
+    if (typeof window !== "undefined" && (!window.isSecureContext || !navigator.mediaDevices)) {
+      message = "Camera only works on a secure (https://) link. Please open the official Givethra link in Chrome or Safari.";
+      canRetry = false;
+    } else if (err?.name === "NotSupportedError" || err?.name === "TypeError") {
+      message = "This browser cannot open the camera inside the page. Use your phone's camera instead, or open Givethra in Chrome (Android) / Safari (iPhone).";
+      canRetry = false;
+    } else if (isPermissionError(err)) {
+      const blocked = await markDeniedIfBlocked();
+      message = blocked
+        ? "Camera / microphone is blocked for this site. Follow the steps shown on the page, or use your phone's camera instead."
+        : "Permission was not given. Tap Try Again and press Allow when the browser asks. If no popup appears, open phone Settings → Apps → Chrome → Permissions and allow Camera and Microphone.";
+    } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
+      message = "No camera was found on this device. You can use your phone's camera instead.";
+      canRetry = false;
+    }
+    setCameraProblem({ kind, target, message, canRetry });
+  }
+
+  // Safety net that always works: the phone's own camera app.
+  function openNativeCapture() {
+    const prob = cameraProblem;
+    setCameraProblem(null);
+    if (!prob) return;
+    if (prob.kind === "video") {
+      videoInputRef.current?.click();
+    } else if (photoInputRef.current) {
+      photoInputRef.current.setAttribute("capture", prob.target === "selfie" ? "user" : "environment");
+      photoInputRef.current.dataset.kind = prob.target || "front";
+      photoInputRef.current.click();
+    }
+  }
+
+  function retryCamera() {
+    const prob = cameraProblem;
+    setCameraProblem(null);
+    if (!prob) return;
+    if (prob.kind === "video") void startVideoRecording();
+    else void startPhotoCamera(prob.target || "front");
+  }
+
+  function handleNativePhoto(file: File, kind: "front" | "back" | "selfie") {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 3000 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d")?.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      setOcrError(null);
+      setOcrFailed(false);
+      setCapturedBlur(kind === "selfie" ? null : blurOfCanvas(scaleCanvas(c, 800)));
+      setCapturedImage(scaleCanvas(c, 1200).toDataURL("image/jpeg", 0.88));
+      setCapturedCanvas(c);
+      setCapturedKind(kind);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast.error("The photo could not be opened. Please try again.");
+    };
+    img.src = url;
+  }
+
+  function handleNativeVideo(file: File) {
+    if (file.size > 150 * 1024 * 1024) {
+      toast.error("The video is too large. Please record a short (about 15 second) video.");
+      return;
+    }
+    setVideoFile(file);
+    setVideoBlob(URL.createObjectURL(file));
+  }
+
   async function requestCameraAccess(): Promise<boolean> {
     if (!navigator.mediaDevices?.getUserMedia) return false;
     let s: MediaStream | null = null;
     let lastErr: any = null;
-    // KYC photos only need the camera. Do not request microphone permission
-    // here; asking for it together makes some mobile browsers deny the camera.
-    for (const c of [
-      { video: { facingMode: { ideal: "environment" } } },
-      { video: true },
-    ] as MediaStreamConstraints[]) {
-      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) { lastErr = err; }
+    for (const c of [{ video: true, audio: true }, { video: true }] as MediaStreamConstraints[]) {
+      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) {
+        lastErr = err;
+        // A refusal must not trigger a second popup.
+        if (isPermissionError(err)) break;
+      }
     }
     s?.getTracks().forEach((t) => t.stop());
     if (s) { setCamPerm("granted"); return true; }
-    if (lastErr?.name === "NotAllowedError" || lastErr?.name === "SecurityError") setCamPerm("denied");
+    if (isPermissionError(lastErr)) await markDeniedIfBlocked();
     return false;
   }
 
@@ -384,6 +613,10 @@ export default function KycPage() {
       v.srcObject = stream;
       const p = v.play?.();
       if (p && typeof p.catch === "function") p.catch(() => {});
+      // Give the camera a moment to settle its focus before a photo is allowed.
+      setFocusing(true);
+      const t = setTimeout(() => setFocusing(false), 1200);
+      return () => clearTimeout(t);
     }
   }, [activeCamera, stream]);
 
@@ -400,7 +633,13 @@ export default function KycPage() {
   }
 
   async function startPhotoCamera(target: string) {
+    setCameraProblem(null);
     try {
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        throw new DOMException("Camera API unavailable", "NotSupportedError");
+      }
+      // Release any camera still held from before (e.g. after Retake).
+      stream?.getTracks().forEach((t) => t.stop());
       setOcrError(null);
       setCapturedImage(null);
       setCapturedKind(null);
@@ -426,13 +665,20 @@ export default function KycPage() {
           },
         });
       } catch (err: any) {
-        if (err?.name === "NotAllowedError" || err?.name === "SecurityError") throw err;
-        // Some devices reject the extra constraints: retry with the basics.
-        s = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode: facing },
-        });
+        if (isPermissionError(err)) throw err;
+        // Some devices reject the extra constraints: retry with the basics,
+        // and finally with "any camera" (some phones reject facingMode).
+        try {
+          s = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: facing },
+          });
+        } catch (err2: any) {
+          if (isPermissionError(err2)) throw err2;
+          s = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+        }
       }
+      setCamPerm("granted");
 
       try {
         const [track] = s.getVideoTracks();
@@ -451,14 +697,7 @@ export default function KycPage() {
       setStream(s);
       setActiveCamera(target);
     } catch (err: any) {
-      if (err?.name === "NotAllowedError" || err?.name === "SecurityError") {
-        setCamPerm("denied");
-        toast.error("Camera access denied. Please allow camera permission (see the instructions on this page).");
-      } else if (err?.name === "NotFoundError") {
-        toast.error("No camera found on this device.");
-      } else {
-        toast.error("The camera could not be started. Close other apps using the camera and try again.");
-      }
+      await cameraFail(err, "photo", target);
     }
   }
 
@@ -489,7 +728,7 @@ export default function KycPage() {
     return { x, y, w, h };
   }
 
-  function grabFrame(): HTMLCanvasElement | null {
+  function grabFrame(maxWidth?: number): HTMLCanvasElement | null {
     const video = videoRef.current;
     const rect = getCropRect();
     if (!video || !rect || rect.w <= 0 || rect.h <= 0) return null;
@@ -501,30 +740,64 @@ export default function KycPage() {
     if (w <= 0 || h <= 0) return null;
     // A fresh canvas per capture: the cropped pixels are kept at the camera's
     // full native resolution (no downscaling) for OCR and upload.
+    const cw = maxWidth && w > maxWidth ? maxWidth : w;
+    const ch = maxWidth && w > maxWidth ? Math.round((h * maxWidth) / w) : h;
     const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext("2d", { willReadFrequently: !!maxWidth } as any) as CanvasRenderingContext2D | null;
     if (!ctx) return null;
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(video, x, y, w, h, 0, 0, w, h);
+    ctx.drawImage(video, x, y, w, h, 0, 0, cw, ch);
     return canvas;
   }
 
-  function captureImage() {
+  async function captureImage() {
+    if (capturing) return;
     setOcrError(null);
-    const canvas = grabFrame();
-    if (!canvas) {
+    const kind = activeCamera as "front" | "back" | "selfie";
+    const runId = ++captureRunRef.current;
+
+    let best: HTMLCanvasElement | null = null;
+    let bestBlur = 1;
+    if (kind === "selfie") {
+      best = grabFrame();
+    } else {
+      // A moving hand or a camera still refocusing blurs single frames. Take a
+      // burst of frames over about one second and keep the sharpest one.
+      setCapturing(true);
+      const FRAMES = 8;
+      for (let i = 0; i < FRAMES; i++) {
+        const small = grabFrame(800);
+        if (small) {
+          const score = blurOfCanvas(small);
+          if (!best || score < bestBlur) {
+            const full = grabFrame();
+            if (full) {
+              if (best) { best.width = 0; best.height = 0; } // free the previous frame's memory
+              best = full;
+              bestBlur = score;
+            }
+          }
+        }
+        if (i < FRAMES - 1) await sleep(110);
+        if (runId !== captureRunRef.current) { setCapturing(false); return; }
+      }
+      setCapturing(false);
+    }
+    if (runId !== captureRunRef.current) return;
+
+    if (!best) {
       toast.error("The photo could not be captured. Please try again.");
       return;
     }
-    
-    const imageData = canvas.toDataURL("image/jpeg", 0.9);
+
     setOcrFailed(false);
-    setCapturedImage(imageData);
-    setCapturedCanvas(canvas);
-    setCapturedKind(activeCamera as "front" | "back" | "selfie");
-    
+    setCapturedBlur(kind === "selfie" ? null : bestBlur);
+    setCapturedImage(scaleCanvas(best, 1200).toDataURL("image/jpeg", 0.88));
+    setCapturedCanvas(best);
+    setCapturedKind(kind);
+
     stream?.getTracks().forEach(t => t.stop());
     setStream(null);
     setActiveCamera(null);
@@ -542,13 +815,8 @@ export default function KycPage() {
       setOcrFailed(false);
       setOcrStatus("Checking the photo...");
       try {
-        if (meanBrightness(capturedCanvas) < 55) {
-          setOcrProcessing(false);
-          setOcrStatus("");
-          setOcrFailed(true);
-          setOcrError("The photo is too dark. Move to a bright place (or use the flashlight button) and retake it.");
-          return;
-        }
+        // The photo is NOT rejected for being slightly blurry or dim: older phones
+        // often take soft photos. If the number can be read, the photo is accepted.
         const { number, isCnic } = await readCnicNumber(capturedCanvas, (step, total) =>
           setOcrStatus(`Reading the number from the photo... (${step}/${total})`),
         );
@@ -565,7 +833,11 @@ export default function KycPage() {
           setOcrError(
             number
               ? "This does not look like the front of a CNIC. Photograph the CNIC card itself, with the whole card inside the frame."
-              : "No CNIC number could be read. Place the CNIC flat inside the frame, in good light, hold the phone steady for a second, and retake.",
+              : capturedBlur !== null && capturedBlur > BLUR_MAX
+                ? BLUR_MESSAGE
+                : meanBrightness(capturedCanvas) < 55
+                  ? "The CNIC number could not be read because the photo is too dark. Move to a bright place (or use the flashlight button) and retake it."
+                  : "The CNIC number could not be read. Place the CNIC flat inside the frame, in good light, hold the phone steady for a second, and retake.",
           );
         }
       } catch {
@@ -582,17 +854,18 @@ export default function KycPage() {
   function finalizeCapture(kind: "front" | "back" | "selfie", canvas: HTMLCanvasElement) {
     // OCR used the full-resolution frame; the stored copy is capped at 2000 px
     // wide (still sharp enough to read) to keep uploads small on mobile data.
-    let out = canvas;
-    if (canvas.width > 2000) {
-      const scaled = document.createElement("canvas");
-      scaled.width = 2000;
-      scaled.height = Math.round((canvas.height * 2000) / canvas.width);
-      const sctx = scaled.getContext("2d");
-      if (sctx) {
-        sctx.imageSmoothingQuality = "high";
-        sctx.drawImage(canvas, 0, 0, scaled.width, scaled.height);
-        out = scaled;
-      }
+    const out = scaleCanvas(canvas, 2000);
+    if (kind !== "selfie") {
+      // Review copy: gentle contrast and sharpening so the verification team
+      // can read the small printed text (does not change what the card says).
+      try {
+        const octx = out.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+        if (octx) {
+          const img = octx.getImageData(0, 0, out.width, out.height);
+          enhanceRGBA(img.data, out.width, out.height);
+          octx.putImageData(img, 0, 0);
+        }
+      } catch { /* keep the unenhanced image */ }
     }
     out.toBlob((blob) => {
       if (!blob) return;
@@ -613,6 +886,7 @@ export default function KycPage() {
       setCapturedImage(null);
       setCapturedCanvas(null);
       setCapturedKind(null);
+      setCapturedBlur(null);
       setOcrError(null);
       setOcrFailed(false);
 
@@ -624,6 +898,7 @@ export default function KycPage() {
     setCapturedImage(null);
     setCapturedCanvas(null);
     setCapturedKind(null);
+    setCapturedBlur(null);
     setOcrError(null);
     setOcrFailed(false);
     if (capturedKind) {
@@ -680,8 +955,9 @@ export default function KycPage() {
   }
 
   async function startVideoRecording() {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      toast.error("This browser cannot record video. Please open this page in Chrome (Android) or Safari (iPhone).");
+    setCameraProblem(null);
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      await cameraFail(window.isSecureContext ? { name: "NotSupportedError" } : null, "video");
       return;
     }
     const runId = ++runIdRef.current;
@@ -700,17 +976,14 @@ export default function KycPage() {
     let s: MediaStream | null = null;
     let lastErr: any = null;
     for (const c of attempts) {
-      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) { lastErr = err; }
+      try { s = await navigator.mediaDevices.getUserMedia(c); break; } catch (err) {
+        lastErr = err;
+        // A refusal must not trigger more popups.
+        if (isPermissionError(err)) break;
+      }
     }
     if (!s) {
-      if (lastErr?.name === "NotAllowedError" || lastErr?.name === "SecurityError") {
-        setCamPerm("denied");
-        toast.error("Camera permission is blocked. Please allow it (see the instructions on this page).");
-      } else if (lastErr?.name === "NotFoundError") {
-        toast.error("No camera found on this device.");
-      } else {
-        toast.error("The camera could not be started. Close other apps using the camera and try again.");
-      }
+      await cameraFail(lastErr, "video");
       return;
     }
     if (runId !== runIdRef.current) { s.getTracks().forEach((t) => t.stop()); return; }
@@ -739,8 +1012,8 @@ export default function KycPage() {
       try {
         recorder = new MediaRecorder(s);
       } catch {
-        toast.error("This browser cannot record video. Please open this page in Chrome (Android) or Safari (iPhone).");
         cancelVideoRecording();
+        await cameraFail({ name: "NotSupportedError" }, "video");
         return;
       }
     }
@@ -1031,7 +1304,7 @@ export default function KycPage() {
           <canvas ref={canvasRef} className="hidden" />
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => { stream?.getTracks().forEach(t => t.stop()); setActiveCamera(null); setOcrError(null); }}>
+            <Button variant="outline" className="flex-1" onClick={() => { captureRunRef.current++; setCapturing(false); stream?.getTracks().forEach(t => t.stop()); setActiveCamera(null); setOcrError(null); }}>
               Cancel
             </Button>
             {torchSupported && activeCamera !== "selfie" && (
@@ -1039,9 +1312,9 @@ export default function KycPage() {
                 {torchOn ? "Light: ON" : "Light"}
               </Button>
             )}
-            <Button className="flex-1" onClick={captureImage}>
+            <Button className="flex-1" onClick={captureImage} disabled={capturing || focusing}>
               <Camera className="h-4 w-4 mr-2" />
-              Capture
+              {capturing ? "Hold still..." : focusing ? "Focusing..." : "Capture"}
             </Button>
           </div>
         </div>
@@ -1052,6 +1325,7 @@ export default function KycPage() {
   // Captured image preview with verify option
   if (capturedImage && capturedKind) {
     const isFront = capturedKind === "front";
+    const isBlurry = capturedKind !== "selfie" && capturedBlur !== null && capturedBlur > BLUR_MAX;
     
     return (
       <div className="min-h-screen bg-background">
@@ -1070,6 +1344,20 @@ export default function KycPage() {
             <img src={capturedImage} alt="Captured" className="w-full block" />
           </div>
 
+          {capturedKind !== "selfie" && !isBlurry && (
+            <p className="text-xs text-muted-foreground text-center">
+              Check that all the small text (name, father's name, number, dates) is easy to read. If not, press Retake.
+            </p>
+          )}
+
+          {isBlurry && !ocrError && (
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-300 p-3 text-sm text-amber-700 text-center">
+              {isFront
+                ? "ℹ️ The photo is a little soft. Press Verify & Confirm — if the CNIC number can be read, it will be accepted. If not, you will be asked to retake it."
+                : "ℹ️ The photo is a little soft. If the card text is readable you can Confirm, otherwise press Retake."}
+            </div>
+          )}
+
           {isFront && ocrProcessing && (
             <div className="text-center text-sm text-primary py-2 flex items-center justify-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
@@ -1077,7 +1365,7 @@ export default function KycPage() {
             </div>
           )}
           
-          {isFront && ocrError && (
+          {ocrError && (
             <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-300 p-3 text-sm text-amber-700 text-center">
               ⚠️ {ocrError}
             </div>
@@ -1112,6 +1400,52 @@ export default function KycPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8">
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            const kind = (e.target.dataset.kind || "front") as "front" | "back" | "selfie";
+            e.target.value = "";
+            if (f) handleNativePhoto(f, kind);
+          }}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          capture="user"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) handleNativeVideo(f);
+          }}
+        />
+
+        {cameraProblem && (
+          <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/50 p-4 sm:items-center" role="dialog" aria-modal="true">
+            <div className="w-full max-w-md space-y-3 rounded-2xl border bg-card p-5 shadow-xl">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <p className="text-sm font-medium">{cameraProblem.message}</p>
+              </div>
+              <div className="grid gap-2">
+                {cameraProblem.canRetry && (
+                  <Button onClick={retryCamera}><RefreshCw className="mr-2 h-4 w-4" /> Try Again</Button>
+                )}
+                <Button variant="outline" onClick={openNativeCapture}>
+                  <Camera className="mr-2 h-4 w-4" /> Use Phone Camera
+                </Button>
+                <Button variant="ghost" onClick={() => setCameraProblem(null)}>Close</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Button variant="ghost" size="sm" className="mb-4 -ml-2" onClick={() => { try { sessionStorage.removeItem("givethra_kyc_return_to"); } catch { /* ignore */ } navigate({ to: returnTo as any }); }}>
           ← Back
         </Button>
@@ -1248,12 +1582,9 @@ export default function KycPage() {
             )}
 
             {camPerm !== "denied" && camPerm !== "granted" && (
-              <div className="rounded-xl border-2 border-blue-300 bg-blue-50 p-4 text-xs text-blue-900 space-y-2">
-                <p className="font-semibold">📷 Camera permission is required</p>
-                <p>Tap the button below, then tap <strong>Allow camera</strong> in the browser prompt. Microphone permission is not needed for document photos.</p>
-                <Button size="sm" className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { void requestCameraAccess(); }}>
-                  <Camera className="h-4 w-4" /> Allow camera now
-                </Button>
+              <div className="rounded-xl border border-blue-300 bg-blue-50 p-3 text-xs text-blue-800 flex items-center justify-between gap-3">
+                <span>📷 When your browser asks, please tap <strong>Allow</strong> for camera and microphone. Browser poochay to <strong>Allow</strong> dabayein.</span>
+                <Button size="sm" variant="outline" onClick={() => { requestCameraAccess(); }}>Allow</Button>
               </div>
             )}
 

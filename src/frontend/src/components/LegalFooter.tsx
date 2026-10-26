@@ -19,7 +19,7 @@ export default function LegalFooter() {
             <nav key={g.title} aria-label={g.title}>
               <h3 className="text-sm font-semibold mb-3">{g.title}</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                {g.links.map(([to, label]) => (
+                {g.links.map(([to, label]: readonly [string, string]) => (
                   <li key={to}><Link to={to} className="hover:text-primary">{label}</Link></li>
                 ))}
               </ul>

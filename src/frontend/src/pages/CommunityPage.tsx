@@ -30,6 +30,7 @@ import {
   Loader2,
   CheckCircle2,
   Share2,
+  MoreHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -44,6 +45,7 @@ import {
   followUser,
   unfollowUser,
   supportPost,
+  deleteCommunityPost,
 } from "@/lib/api";
 
 interface Post {
@@ -74,6 +76,7 @@ interface Comment {
   user_name: string;
   comment: string;
   created_at: string;
+  avatar_url?: string | null;
 }
 
 const COMMUNITY_POSTS_CACHE_KEY = "givethra:community-posts:v1";
@@ -172,7 +175,13 @@ function writeCachedCommunityPosts(posts: Post[]) {
 
 export default function CommunityPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isAdmin, isAssistant } = useAuth();
+  const canModerateCommunity =
+    isAdmin ||
+    isAssistant ||
+    new Set(["shoaibugti@gmail.com", "shoaibahmedbugti5@gmail.com"]).has(
+      String(user?.email || "").toLowerCase()
+    );
 
   // Feed tabs must always render the server's current ordering. Cached posts
   // are still written for resilience, but never shown as the initial ranking.
@@ -202,6 +211,7 @@ export default function CommunityPage() {
   // New post state
   const [newPost, setNewPost] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
   const visiblePosts = posts;
 
@@ -341,6 +351,7 @@ export default function CommunityPage() {
           likes_count: 0,
           comments_count: 0,
           is_liked: false,
+          avatar_url: user?.photo || null,
 
           // New Support Reaction
           support_count: 0,
@@ -365,6 +376,25 @@ export default function CommunityPage() {
       toast.error(error?.message || "Failed to post.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!window.confirm("Delete this community post and its engagement?")) return;
+    setDeletingPostId(postId);
+    try {
+      await deleteCommunityPost(postId);
+      setPosts((prev) => {
+        const next = prev.filter((post) => post.id !== postId);
+        writeCachedCommunityPosts(next);
+        return next;
+      });
+      toast.success("Post deleted.");
+      window.dispatchEvent(new CustomEvent("post-updated"));
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to delete post.");
+    } finally {
+      setDeletingPostId(null);
     }
   };
 
@@ -955,6 +985,19 @@ export default function CommunityPage() {
                         )}
                       </p>
                     </div>
+                    {canModerateCommunity && (
+                      <button
+                        type="button"
+                        aria-label="Moderate post"
+                        title="Delete post"
+                        onClick={() => void handleDeletePost(post.id)}
+                        disabled={deletingPostId === post.id}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {deletingPostId === post.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
+                        <span>Delete</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Post Content */}
@@ -1091,8 +1134,12 @@ export default function CommunityPage() {
                                 id={`comment-${comment.id}`}
                                 className="flex gap-3"
                               >
-                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                  <User className="h-4 w-4 text-muted-foreground" />
+                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                                  {comment.avatar_url ? (
+                                    <img src={comment.avatar_url} alt={comment.user_name || "User"} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                  )}
                                 </div>
 
                                 <div className="flex-1 min-w-0">

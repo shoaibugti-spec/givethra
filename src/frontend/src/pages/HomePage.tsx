@@ -5,6 +5,8 @@
 import InstallButton from "@/components/InstallButton";
 import CompletionCooldownBanner from "@/components/CompletionCooldownBanner";
 import Layout from "@/components/Layout";
+import SocialLinks from "@/components/SocialLinks";
+import { SiWhatsapp } from "react-icons/si";
 import HeroesWall from "@/components/HeroesWall";
 import HeroLeaderboard from "@/components/HeroLeaderboard";
 import KindnessWall from "@/components/KindnessWall";
@@ -39,9 +41,6 @@ import {
   Bell,
   Heart,
   FileText,
-  Facebook,
-  Instagram,
-  Linkedin,
   Mail,
   ChevronRight,
   MessageCircle,
@@ -93,10 +92,6 @@ import SlidingHomePanel from "@/components/SlidingHomePanel";
 
 // Support earnings conversion: 10,000 = $1.
 
-const FACEBOOK_URL =
-  "https://www.facebook.com/profile.php?id=61590715263595";
-const INSTAGRAM_URL =
-  "https://www.instagram.com/givethra.community";
 const WHATSAPP_URL =
   "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
 const SUPPORT_WHATSAPP_URL =
@@ -1009,9 +1004,9 @@ export default function HomePage() {
           rel="noopener noreferrer"
           aria-label="Open 24/7 WhatsApp support"
           title="24/7 WhatsApp Support"
-          className="fixed bottom-24 right-4 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-green-600 text-white shadow-xl ring-4 ring-white/80 transition-all hover:scale-105 hover:bg-green-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-300 md:bottom-6 md:right-6"
+          className="fixed bottom-24 right-4 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl ring-4 ring-white/80 transition-all hover:scale-105 hover:bg-[#1EBE5A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-300 md:bottom-6 md:right-6"
         >
-          <MessageCircle className="h-7 w-7" />
+          <SiWhatsapp className="h-8 w-8" />
           <span className="absolute -right-1 -top-2 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-black leading-none text-primary-foreground shadow-sm">24/7</span>
         </a>
 
@@ -1615,23 +1610,7 @@ export default function HomePage() {
               <h2 className="font-display text-lg font-bold text-foreground">Connect with Givethra</h2>
               <p className="text-sm text-muted-foreground">Follow us and reach out — we're here to help.</p>
             </div>
-            <div className="flex items-center justify-center gap-3">
-              <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a href="https://www.linkedin.com/company/givethra-org/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <Linkedin className="h-5 w-5" />
-              </a>
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp Channel" className="h-11 w-11 rounded-full bg-muted hover:bg-green-600 hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <MessageCircle className="h-5 w-5" />
-              </a>
-              <a href={`mailto:${CONTACT_EMAIL}`} aria-label="Email" className="h-11 w-11 rounded-full bg-muted hover:bg-primary hover:text-white flex items-center justify-center text-muted-foreground transition-colors">
-                <Mail className="h-5 w-5" />
-              </a>
-            </div>
+            <SocialLinks className="justify-center" />
             <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:underline">
               <MessageCircle className="h-4 w-4" /> Follow our WhatsApp Channel
             </a>
@@ -1643,7 +1622,7 @@ export default function HomePage() {
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-4 border-t border-border text-sm text-muted-foreground">
               <Link to="/about" className="hover:text-primary transition-colors">About</Link>
               <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
-              <Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-primary transition-colors">Terms</Link>
               <Link to="/community-guidelines" className="hover:text-primary transition-colors">Community Guidelines</Link>
               <Link to="/contact" className="hover:text-primary transition-colors">Contact Us</Link>

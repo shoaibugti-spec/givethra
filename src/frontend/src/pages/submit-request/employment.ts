@@ -31,7 +31,7 @@ export const EMPLOYMENT_OPTIONS = [
     label: "Unemployed / Housewife",
     description: "No current source of income",
     documents: [
-      { key: "statementUrl", label: "Last 6 Months Account Statement (If available)", required: false, hint: "Bank account, EasyPaisa, or JazzCash" },
+      { key: "statementUrl", label: "Last 6 Months Bank / Account Statement", required: true, hint: "Required for every applicant; submit a bank account, EasyPaisa, or JazzCash statement" },
       { key: "supportDeclarationUrl", label: "Household Provider Income Proof", required: true, hint: "Salary slip, pension proof, business proof, or other income evidence for the person responsible for household expenses" },
     ],
   },
