@@ -90,7 +90,8 @@ const CATEGORY_LIMITS: Record<
   }
 > = {
   "Widow & Elderly Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
-  "Child Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
+  "Child Support": { type: "fixed", amount: 2000, label: "Fixed Stipend" },
+  "Orphan Support": { type: "fixed", amount: 4000, label: "Fixed Orphan Support" },
   "Disability Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
   // 🔥 FIXED: Food & Groceries now fixed at Rs 6,000 (was max 12,000)
   "Food & Groceries": { type: "fixed", amount: 6000, label: "Fixed Rs 6,000 per family" },
@@ -125,6 +126,7 @@ const CATEGORIES = [
   "Medicines",
   "Food & Groceries",
   "Child Support",
+  "Orphan Support",
   "Widow & Elderly Support",
   "Disability Support",
   "Marriage Support",
@@ -440,7 +442,7 @@ const PERSONAL_PAYMENT_CATS = new Set([
   "Medicines",
 ]);
 
-const FIXED_STIPEND_CATS = new Set(["Child Support", "Widow & Elderly Support", "Disability Support"]);
+const FIXED_STIPEND_CATS = new Set(["Child Support", "Orphan Support", "Widow & Elderly Support", "Disability Support"]);
 
 const SKIP_FIELDS = new Set([
   "provider_name",
@@ -2140,8 +2142,8 @@ export default function SubmitRequestPage() {
         </div>
       );
     }
-    if (CHOICE_FIELDS[f.key]) {
-      const opts = CHOICE_FIELDS[f.key];
+    if (f.choices || CHOICE_FIELDS[f.key]) {
+      const opts = f.choices || CHOICE_FIELDS[f.key];
       return (
         <div key={f.key} className="space-y-2">
           <Label>{f.label} {f.required && "*"}</Label>
@@ -2156,27 +2158,6 @@ export default function SubmitRequestPage() {
                 }`}
               >
                 {opt}
-              </button>
-            ))}
-          </div>
-        </div>
-      );
-    }
-    if (f.choices) {
-      return (
-        <div key={f.key} className="space-y-2">
-          <Label>{f.label} {f.required && "*"}</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {f.choices.map((choice: string) => (
-              <button
-                key={choice}
-                type="button"
-                onClick={() => setCatFields((p) => ({ ...p, [f.key]: choice }))}
-                className={`px-2 py-2 rounded-lg border text-xs font-medium text-left ${
-                  catFields[f.key] === choice ? "bg-primary text-white border-primary" : "border-border"
-                }`}
-              >
-                {choice}
               </button>
             ))}
           </div>

@@ -68,4 +68,15 @@ describe("Requester Visit submission audit", () => {
     expect(standalone).toContain('minAmount: 1000, maxAmount: 30000');
     expect(worker).toContain("Marriage Support amount must be between Rs 1,000 and Rs 30,000");
   });
+
+  it("keeps standalone Child Support and Orphan Support separate with fixed amounts and parent-status rules", () => {
+    expect(standalone).toContain('"Child Support": { type: "fixed", amount: 2000');
+    expect(standalone).toContain('"Orphan Support": { type: "fixed", amount: 4000');
+    expect(standalone).toContain('"Orphan Support",');
+    expect(standalone).toContain('"Orphan Support", "Widow & Elderly Support"');
+    expect(standaloneCategories).toContain('choices: ["Both alive"]');
+    expect(standaloneCategories).toContain('choices: ["Father passed away", "Mother passed away", "Both passed away"]');
+    expect(standaloneCategories).toContain('key: "parents_proof"');
+    expect(standalone).toContain("const opts = f.choices || CHOICE_FIELDS[f.key];");
+  });
 });

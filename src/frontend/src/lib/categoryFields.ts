@@ -277,30 +277,42 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     oneCaseNote: "One case = ONE household's ration need.",
   },
 
-  // FIXED: Removed provider_name and provider_contact from Child Support
-  // because it has fixed stipend and payment receiver is handled separately
   "Child Support": {
     fields: [
-      { key: "sons", label: "Number of sons", type: "number" },
-      { key: "daughters", label: "Number of daughters", type: "number" },
-      { key: "parents_status", label: "Are the parents alive?", placeholder: "e.g. father passed away, mother alive", required: true },
-      JOB_FIELD,
+      { key: "child_name", label: "Child's name", placeholder: "Full name of the child", required: true },
+      { key: "child_age", label: "Child's age", placeholder: "Age in years", type: "number", required: true },
+      { key: "parents_status", label: "Parents status", choices: ["Both alive"], required: true },
     ],
     documents: [
-      // FIXED: Removed frc from here - it's now handled by extraConditionalDocs() based on gender
-      // { key: "frc", label: "Family Registration Certificate (FRC)", required: true, hint: "NADRA FRC showing family members" },
-      SALARY_DOC,
-      STATEMENT_DOC,
+      { key: "child_b_form", label: "B-Form / birth certificate", required: true, hint: "Clear photo of the child's B-Form or birth certificate" },
+      { key: "parents_proof", label: "Proof that both parents are alive", required: true, hint: "Upload documents supporting the selected parents status" },
     ],
     paymentNote: "This is a fixed monthly support. The amount is set by Givethra and paid directly to the guardian.",
     guide: [
-      "Enter the family details: number of sons, daughters, and parents' status.",
-      "Select gender and marital status in the form above.",
-      "Required documents (FRC, death certificates etc.) will be asked based on your gender selection.",
-      "Answer the job question, and attach a salary slip (if employed) or a 6-month bank/Easypaisa/JazzCash statement.",
+      "Enter the child's name and age; both parents must be alive for this category.",
+      "Upload the child's B-Form and proof matching the selected parents status.",
       ...COMMON_GUIDE_TAIL,
     ],
-    oneCaseNote: "One case = ONE household.",
+    oneCaseNote: "One case = ONE child.",
+  },
+
+  "Orphan Support": {
+    fields: [
+      { key: "child_name", label: "Child's name", placeholder: "Full name of the child", required: true },
+      { key: "child_age", label: "Child's age", placeholder: "Age in years", type: "number", required: true },
+      { key: "parents_status", label: "Which parent(s) passed away?", choices: ["Father passed away", "Mother passed away", "Both passed away"], required: true },
+    ],
+    documents: [
+      { key: "child_b_form", label: "B-Form / birth certificate", required: true, hint: "Clear photo of the child's B-Form or birth certificate" },
+      { key: "parents_proof", label: "Parent death certificate / death proof", required: true, hint: "Upload the death certificate matching the selected parent status" },
+    ],
+    paymentNote: "This is fixed monthly support for an orphan child, paid directly to the guardian.",
+    guide: [
+      "Enter the child's name and age; at least one parent must have passed away for this category.",
+      "Upload the child's B-Form and death proof matching the selected parents status.",
+      ...COMMON_GUIDE_TAIL,
+    ],
+    oneCaseNote: "One case = ONE child.",
   },
 
   // FIXED: Removed provider_name and provider_contact from Widow & Elderly
