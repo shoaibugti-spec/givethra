@@ -422,6 +422,9 @@ export default function KycPage() {
   const [capturing, setCapturing] = useState(false);
   const [focusing, setFocusing] = useState(false);
   const [focusHint, setFocusHint] = useState("");
+  const [focusFallbackAvailable, setFocusFallbackAvailable] = useState(false);
+  const [focusBypass, setFocusBypass] = useState(false);
+  const focusBypassRef = useRef(false);
   const [capturedBlur, setCapturedBlur] = useState<number | null>(null);
   const captureRunRef = useRef(0);
   const [torchSupported, setTorchSupported] = useState(false);
@@ -640,6 +643,9 @@ export default function KycPage() {
       const p = v.play?.();
       if (p && typeof p.catch === "function") p.catch(() => {});
       setFocusing(true);
+      focusBypassRef.current = false;
+      setFocusBypass(false);
+      setFocusFallbackAvailable(false);
       setFocusHint(activeCamera === "selfie"
         ? "Camera is settling — hold still for a moment."
         : "Checking focus — hold the phone steady and keep the whole CNIC inside the frame.");
@@ -648,7 +654,7 @@ export default function KycPage() {
       let cancelled = false;
       let selfieReadyTimer: ReturnType<typeof setTimeout> | undefined;
       const scanFocus = () => {
-        if (cancelled || activeCamera === "selfie") return;
+        if (cancelled || activeCamera === "selfie" || focusBypassRef.current) return;
         let sample: HTMLCanvasElement | null = null;
         let score = 1;
         try {
@@ -665,6 +671,7 @@ export default function KycPage() {
           sharpFrames++;
           if (sharpFrames >= 3) {
             setFocusing(false);
+            setFocusFallbackAvailable(false);
             setFocusHint("Image is clear and in focus — you can capture now.");
           } else {
             setFocusHint("Image is getting clear — keep the phone steady.");
@@ -677,6 +684,11 @@ export default function KycPage() {
       };
 
       const scanTimer = activeCamera === "selfie" ? undefined : setInterval(scanFocus, 350);
+      const fallbackTimer = activeCamera === "selfie" ? undefined : setTimeout(() => {
+        if (cancelled || focusBypassRef.current || sharpFrames >= 3) return;
+        setFocusFallbackAvailable(true);
+        setFocusHint("Focus could not be confirmed. Clean the lens or move slightly closer/farther; if the card text looks readable, you can use the fallback below.");
+      }, 8000);
       if (activeCamera === "selfie") {
         selfieReadyTimer = setTimeout(() => {
           if (cancelled) return;
@@ -687,6 +699,7 @@ export default function KycPage() {
       return () => {
         cancelled = true;
         if (scanTimer) clearInterval(scanTimer);
+        if (fallbackTimer) clearTimeout(fallbackTimer);
         if (selfieReadyTimer) clearTimeout(selfieReadyTimer);
       };
     }
@@ -709,6 +722,9 @@ export default function KycPage() {
   async function startPhotoCamera(target: string) {
     setCameraProblem(null);
     setFocusing(true);
+    setFocusFallbackAvailable(false);
+    setFocusBypass(false);
+    focusBypassRef.current = false;
     setFocusHint("Starting camera and checking focus...");
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -829,7 +845,7 @@ export default function KycPage() {
   }
 
   async function captureImage() {
-    if (capturing || focusing) return;
+    if (capturing || (focusing && !focusBypassRef.current)) return;
     setOcrError(null);
     setOcrFailed(false);
     setManualEntryAllowed(false);
@@ -1414,6 +1430,27 @@ export default function KycPage() {
             {focusHint || "Hold steady while the camera checks image focus."}
           </div>
 
+          {focusFallbackAvailable && focusing && !isSelfie && (
+            <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-center dark:bg-amber-950/20">
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                Some cameras cannot autofocus on close-up cards. You may continue, but review the captured image carefully; retake it if the CNIC text is not readable.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-amber-400"
+                onClick={() => {
+                  focusBypassRef.current = true;
+                  setFocusBypass(true);
+                  setFocusing(false);
+                  setFocusHint("Focus could not be confirmed. Capture only if the card text looks readable; you can review or retake the photo next.");
+                }}
+              >
+                My camera can't focus — try anyway
+              </Button>
+            </div>
+          )}
+
           <canvas ref={canvasRef} className="hidden" />
 
           <div className="flex gap-3">
@@ -1425,9 +1462,9 @@ export default function KycPage() {
                 {torchOn ? "Light: ON" : "Light"}
               </Button>
             )}
-            <Button className="flex-1" onClick={captureImage} disabled={capturing || focusing}>
+            <Button className="flex-1" onClick={captureImage} disabled={capturing || (focusing && !focusBypass)}>
               <Camera className="h-4 w-4 mr-2" />
-              {capturing ? "Hold still..." : focusing ? "Checking focus..." : "Capture"}
+              {capturing ? "Hold still..." : focusing ? "Checking focus..." : focusBypass ? "Capture anyway" : "Capture"}
             </Button>
           </div>
         </div>

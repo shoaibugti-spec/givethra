@@ -70,9 +70,18 @@ describe("submission and admin reliability", () => {
     expect(kycSource).toContain("setInterval(scanFocus, 350)");
     expect(kycSource).toContain("if (score <= BLUR_MAX)");
     expect(kycSource).toContain("sharpFrames >= 3");
-    expect(kycSource).toContain("if (capturing || focusing) return;");
+    expect(kycSource).toContain(
+      "if (capturing || (focusing && !focusBypassRef.current)) return;",
+    );
     expect(kycSource).toContain(
       "Image is clear and in focus — you can capture now.",
     );
+  });
+
+  it("offers an explicit fallback when a camera cannot autofocus", () => {
+    expect(kycSource).toContain("}, 8000);");
+    expect(kycSource).toContain("My camera can't focus — try anyway");
+    expect(kycSource).toContain("focusBypassRef.current = true;");
+    expect(kycSource).toContain("retake it if the CNIC text is not readable.");
   });
 });
