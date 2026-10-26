@@ -134,6 +134,16 @@ const CATEGORY_SLIDE_STYLE: Record<
     color: "text-emerald-600",
     bg: "bg-emerald-500/10",
   },
+  "Child Support": {
+    icon: Baby,
+    color: "text-cyan-700",
+    bg: "bg-cyan-500/10",
+  },
+  "Orphan Support": {
+    icon: Heart,
+    color: "text-violet-700",
+    bg: "bg-violet-500/10",
+  },
 };
 
 const ANNOUNCEMENT =
@@ -198,6 +208,7 @@ const FILTER_CATEGORIES = [
   "Medicines",
   "Food & Groceries",
   "Child Support",
+  "Orphan Support",
   "Widow & Elderly Support",
   "Disability Support",
   "Marriage Support",
@@ -220,6 +231,7 @@ const CATEGORY_SLIDE_MEDIA: Record<string, string> = {
   Medicines: "/assets/generated/category-medicines.jpg",
   "Food & Groceries": "/assets/generated/category-food-groceries.jpg",
   "Child Support": "/assets/generated/category-child-support.jpg",
+  "Orphan Support": "/assets/generated/category-orphan-support.jpg",
   "Widow & Elderly Support": "/assets/generated/category-widow-elderly.jpg",
   "Disability Support": "/assets/generated/category-disability-support.jpg",
   "Marriage Support": "/assets/generated/category-marriage-support.jpg",
@@ -234,7 +246,7 @@ const CATEGORY_SLIDE_MEDIA: Record<string, string> = {
 const CATEGORY_ICON: Record<string, typeof Battery> = {
   "Electricity Bill": Battery, "Gas Bill": Flame, "Water Bill": Droplets, "House Rent": Home,
   "School Fees": GraduationCap, "Education & Books": BookOpen, "Medical & Treatment": Stethoscope, Medicines: Pill,
-  "Food & Groceries": Apple, "Child Support": Baby, "Widow & Elderly Support": Heart, "Disability Support": Accessibility,
+  "Food & Groceries": Apple, "Child Support": Baby, "Orphan Support": Heart, "Widow & Elderly Support": Heart, "Disability Support": Accessibility,
   "Marriage Support": Gem, "Business / Work Help": ShoppingCart, "Home Repair": Wrench, "Funeral Expenses": Heart,
   "Livestock / Farming": Tractor, "Debt Relief": CreditCard, "Emergency Help": Siren,
 };
@@ -262,6 +274,7 @@ const CATEGORY_APPEAL: Record<string, string> = {
   Medicines: "Help a patient get their medicine 💊",
   "Food & Groceries": "Help fill an empty plate 🍚",
   "Child Support": "Help brighten a child's future 👶",
+  "Orphan Support": "Help an orphaned child build a brighter future 🤲",
   "Widow & Elderly Support": "Be a support for a widow or elder 🤲",
   "Disability Support": "Help someone live with dignity ♿",
   "Marriage Support": "Help a family celebrate with dignity 💍",
@@ -894,6 +907,18 @@ export default function HomePage() {
     navigate({ to: to as any });
   }
 
+  function startCategoryRequest(category: string) {
+    if (!isAuthenticated) {
+      navigate({ to: "/sign-in" });
+      return;
+    }
+    setSelectedCategory(category);
+    try {
+      localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category);
+    } catch {}
+    navigate({ to: "/submit-request" });
+  }
+
   function renderSlideContent() {
     if (currentSlide.type === "image") {
       return (
@@ -927,7 +952,25 @@ export default function HomePage() {
     }
 
     if (currentSlide.type === "category") {
-      return <img src={resolveMediaUrl(currentSlide.image)} alt="" loading="eager" draggable={false} onError={handleImageError} className="pointer-events-none h-full w-full select-none object-cover object-top" />;
+      return (
+        <div className="relative h-full w-full overflow-hidden">
+          <img src={resolveMediaUrl(currentSlide.image)} alt="" loading="eager" draggable={false} onError={handleImageError} className="pointer-events-none h-full w-full select-none object-cover object-top" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/35 to-transparent" />
+          <button
+            type="button"
+            aria-label={`Start ${currentSlide.category} help request`}
+            onClick={() => startCategoryRequest(currentSlide.category)}
+            className="absolute inset-y-0 left-0 flex w-full max-w-[78%] flex-col items-start justify-center gap-2 px-5 text-left text-white sm:max-w-[65%] sm:px-8"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/80">Help Now</span>
+            <span className="font-display text-xl font-extrabold leading-tight drop-shadow sm:text-3xl">{currentSlide.category}</span>
+            <span className="max-w-sm text-xs leading-relaxed text-white/90 sm:text-sm">{CATEGORY_APPEAL[currentSlide.category] || `Submit a verified ${currentSlide.category} case.`}</span>
+            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow sm:px-4 sm:py-2 sm:text-sm">
+              Submit this request <ChevronRight className="h-4 w-4" />
+            </span>
+          </button>
+        </div>
+      );
     }
 
     if (currentSlide.type === "action") {
@@ -1118,17 +1161,7 @@ export default function HomePage() {
                         key={category}
                         type="button"
                         aria-label={`Start ${category} help request`}
-                        onClick={() => {
-                          if (!isAuthenticated) {
-                            navigate({ to: "/sign-in" });
-                            return;
-                          }
-                          setSelectedCategory(category);
-                          try {
-                            localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category);
-                          } catch {}
-                          navigate({ to: "/submit-request" });
-                        }}
+                        onClick={() => startCategoryRequest(category)}
                         className={`group flex min-w-[100px] w-[100px] flex-col overflow-hidden rounded-2xl border bg-white text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[.98] snap-start ${
                           active ? "border-primary ring-2 ring-primary/40" : "border-slate-200"
                         }`}

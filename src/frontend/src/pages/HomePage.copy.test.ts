@@ -142,6 +142,17 @@ describe("homepage slider refinement", () => {
     expect(homePageSource).toContain('currentSlide.to');
   });
 
+  it("includes Child and Orphan Support slides and buttons that preselect the exact request category", () => {
+    expect(homePageSource).toContain('"Child Support",');
+    expect(homePageSource).toContain('"Orphan Support",');
+    expect(homePageSource).toContain('"Orphan Support": "/assets/generated/category-orphan-support.jpg"');
+    expect(homePageSource).toContain('"Orphan Support": "Help an orphaned child build a brighter future');
+    expect(homePageSource).toContain('aria-label={`Start ${currentSlide.category} help request`}');
+    expect(homePageSource).toContain('onClick={() => startCategoryRequest(currentSlide.category)}');
+    expect(homePageSource).toContain('localStorage.setItem("givethra_prefill_category", CATEGORY_FORM_NAME[category] || category)');
+    expect(homePageSource).toContain("FILTER_CATEGORIES.map((category)");
+  });
+
   it("speeds the automatic rotation moderately and removes the visible counter", () => {
     expect(homePageSource).toContain("}, 6000);");
     expect(homePageSource).not.toContain("slideIndex + 1");
