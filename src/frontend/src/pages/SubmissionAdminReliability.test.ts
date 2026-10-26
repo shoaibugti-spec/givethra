@@ -60,6 +60,17 @@ describe("submission and admin reliability", () => {
     expect(kycSource).toContain("formatCnicNumber(manualCnicNumber)");
   });
 
+  it("shows the OCR-read CNIC for correction before saving the captured photo", () => {
+    const successBranch = kycSource.split("if (number && isCnic) {")[1]?.split("} else {")[0] || "";
+    expect(successBranch).toContain("setOcrDetectedNumber(number)");
+    expect(successBranch).toContain("setManualCnicNumber(number.replace(/\\D/g, \"\"))");
+    expect(successBranch).not.toContain("finalizeCapture");
+    expect(kycSource).toContain("Is this the correct CNIC number?");
+    expect(kycSource).toContain("Review and correct the 13-digit CNIC number");
+    expect(kycSource).toContain("Confirm number & use photo");
+    expect(kycSource).toContain("if (isFront && ocrDetectedNumber) continueWithManualCnic();");
+  });
+
   it("does not display a new KYC form when the status check fails", () => {
     expect(kycSource).toContain("We couldn't verify your current KYC status.");
     expect(kycSource).toContain("Retry status check");

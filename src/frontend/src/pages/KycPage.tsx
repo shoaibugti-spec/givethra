@@ -417,6 +417,7 @@ export default function KycPage() {
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrStatus, setOcrStatus] = useState<string>("");
   const [ocrFailed, setOcrFailed] = useState(false);
+  const [ocrDetectedNumber, setOcrDetectedNumber] = useState<string | null>(null);
   const [manualEntryAllowed, setManualEntryAllowed] = useState(false);
   const [manualCnicNumber, setManualCnicNumber] = useState("");
   const [capturing, setCapturing] = useState(false);
@@ -848,6 +849,7 @@ export default function KycPage() {
     if (capturing || (focusing && !focusBypassRef.current)) return;
     setOcrError(null);
     setOcrFailed(false);
+    setOcrDetectedNumber(null);
     setManualEntryAllowed(false);
     setManualCnicNumber("");
     const kind = activeCamera as "front" | "back" | "selfie";
@@ -922,9 +924,10 @@ export default function KycPage() {
         setOcrStatus("");
 
         if (number && isCnic) {
-          setForm(p => ({ ...p, cnic_number: number }));
-          finalizeCapture(capturedKind, capturedCanvas);
-          toast.success(`CNIC number detected: ${number}. You can correct it manually if needed.`);
+          setOcrDetectedNumber(number);
+          setManualCnicNumber(number.replace(/\D/g, ""));
+          setManualEntryAllowed(false);
+          toast.success("CNIC number scanned. Review it below and correct any digit before confirming.");
         } else {
           setOcrFailed(true);
           setManualEntryAllowed(isCnic && !number);
@@ -961,7 +964,7 @@ export default function KycPage() {
     }
     setForm((current) => ({ ...current, cnic_number: formatted }));
     finalizeCapture("front", capturedCanvas);
-    toast.success("CNIC number saved. Our verification team will check it against your photo.");
+    toast.success("CNIC number confirmed. The photo is saved for verification review.");
   }
 
   function finalizeCapture(kind: "front" | "back" | "selfie", canvas: HTMLCanvasElement) {
@@ -1002,6 +1005,7 @@ export default function KycPage() {
       setCapturedBlur(null);
       setOcrError(null);
       setOcrFailed(false);
+      setOcrDetectedNumber(null);
       setManualEntryAllowed(false);
       setManualCnicNumber("");
 
@@ -1016,6 +1020,7 @@ export default function KycPage() {
     setCapturedBlur(null);
     setOcrError(null);
     setOcrFailed(false);
+    setOcrDetectedNumber(null);
     setManualEntryAllowed(false);
     setManualCnicNumber("");
     if (capturedKind) {
@@ -1486,7 +1491,9 @@ export default function KycPage() {
 
           {isFront && (
             <div className="rounded-xl bg-teal-500/10 border border-teal-500/20 p-3 text-sm text-teal-800 dark:text-teal-300">
-              ✅ Photo captured. Select "Verify & Confirm" to detect and fill the CNIC number. You can correct it manually if needed.
+              {ocrDetectedNumber
+                ? "✅ CNIC number read from your photo. Check every digit below, correct anything that is wrong, then confirm to use it."
+                : "✅ Photo captured. Select \"Verify & Confirm\" to detect the CNIC number. You can review and correct it before using it."}
             </div>
           )}
 
@@ -1512,6 +1519,28 @@ export default function KycPage() {
             <div className="text-center text-sm text-primary py-2 flex items-center justify-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
               {ocrStatus || "Reading the number from the photo..."}
+            </div>
+          )}
+
+          {isFront && ocrDetectedNumber && !ocrProcessing && (
+            <div className="space-y-3 rounded-xl border border-teal-300 bg-teal-50 p-4 dark:bg-teal-950/20">
+              <div>
+                <p className="text-sm font-semibold text-teal-900 dark:text-teal-200">Is this the correct CNIC number?</p>
+                <p className="mt-1 text-xs text-teal-800 dark:text-teal-300">We read <strong>{ocrDetectedNumber}</strong>. If any digit is wrong, edit the 13 digits below before confirming.</p>
+              </div>
+              <Input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={13}
+                aria-label="Review and correct the 13-digit CNIC number"
+                placeholder="13 CNIC digits"
+                value={manualCnicNumber}
+                onChange={(event) => setManualCnicNumber(event.target.value.replace(/\D/g, "").slice(0, 13))}
+              />
+              <p className="text-xs text-teal-800 dark:text-teal-300">
+                Formatted number: <strong>{formatCnicNumber(manualCnicNumber) || "enter all 13 digits"}</strong>
+              </p>
             </div>
           )}
           
@@ -1549,11 +1578,14 @@ export default function KycPage() {
             </Button>
             <Button 
               className="flex-1" 
-              onClick={verifyCapturedImage}
-              disabled={ocrProcessing}
+              onClick={() => {
+                if (isFront && ocrDetectedNumber) continueWithManualCnic();
+                else void verifyCapturedImage();
+              }}
+              disabled={ocrProcessing || Boolean(isFront && ocrDetectedNumber && !formatCnicNumber(manualCnicNumber))}
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
-              {ocrProcessing ? "Processing..." : isFront ? (ocrFailed ? "Try Reading Again" : "Verify & Confirm") : "Confirm"}
+              {ocrProcessing ? "Processing..." : isFront ? (ocrDetectedNumber ? "Confirm number & use photo" : ocrFailed ? "Try Reading Again" : "Verify & Confirm") : "Confirm"}
             </Button>
           </div>
 
