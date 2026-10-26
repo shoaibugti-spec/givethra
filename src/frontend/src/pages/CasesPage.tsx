@@ -17,6 +17,7 @@ import { Search, MapPin, CheckCircle2, SlidersHorizontal, X, Share2 } from "luci
 import { useState, useEffect } from "react";
 import { getApprovedCases } from "@/lib/api";
 import { shareCase } from "@/lib/caseSharing";
+import { isExpiredCaseRecord } from "@/lib/caseExpiry";
 import { toast } from "sonner";
 
 const CATEGORIES = [
@@ -121,7 +122,10 @@ export default function CasesPage() {
     setLoading(true);
     try {
       const data = await getApprovedCases();
-      setCases(data ?? []);
+      const liveCases = (Array.isArray(data) ? data : []).filter((item: any) =>
+        ["approved", "published", "active"].includes(String(item.status || "").toLowerCase()) && !isExpiredCaseRecord(item)
+      );
+      setCases(liveCases);
     } catch (err) {
       console.error("Failed to load cases:", err);
       setCases([]);

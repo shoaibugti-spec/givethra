@@ -26,7 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
 import { runUserGuide } from "@/lib/userGuide";
 import { orderCasesForViewer } from "@/lib/caseOrdering";
-import { isCasePastDeadline } from "@/lib/caseExpiry";
+import { isCasePastDeadline, isExpiredCaseRecord } from "@/lib/caseExpiry";
 import { handleImageError, resolveMediaUrl } from "@/lib/media";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -753,7 +753,12 @@ export default function HomePage() {
     setLoading(true);
     try {
       const data = await getApprovedCases();
-      if (requestId === casesLoadRequestRef.current) setCases(data ?? []);
+      if (requestId === casesLoadRequestRef.current) {
+        const liveCases = (Array.isArray(data) ? data : []).filter((item: any) =>
+          ["approved", "published", "active"].includes(String(item.status || "").toLowerCase()) && !isExpiredCaseRecord(item)
+        );
+        setCases(liveCases);
+      }
     } catch {
       // ignore
     } finally {

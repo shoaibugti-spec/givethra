@@ -721,7 +721,7 @@ export default function AdminPage() {
   const rejectedKycCount = kycList.filter((k) => normalizedAdminStatus(k.status) === "rejected").length;
 
   const pendingCases = caseList.filter((c) => normalizedAdminStatus(c.status) === "pending");
-  const approvedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "approved").length;
+  const approvedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "approved" && !isExpiredCaseRecord(c)).length;
   const rejectedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "rejected").length;
   const completedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "completed" && !isExpiredCaseRecord(c)).length;
   const expiredCasesCount = caseList.filter((c) => isExpiredCaseRecord(c)).length;

@@ -967,7 +967,7 @@ async function handleCases(request, env, user, url, parts, origin) {
       return json(row || {}, 200, origin);
     }
     if (parts[2] === "category-counts") {
-      const rows = await env.DB.prepare("SELECT category, COUNT(*) AS count FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') GROUP BY category").all();
+      const rows = await env.DB.prepare("SELECT category, COUNT(*) AS count FROM case_submissions WHERE lower(status) IN ('approved', 'published', 'active') AND (deadline IS NULL OR date(deadline) >= date('now')) GROUP BY category").all();
       const counts = Object.fromEntries((rows.results || []).filter((row) => row.category).map((row) => [row.category, Number(row.count || 0)]));
       return json(counts, 200, origin);
     }

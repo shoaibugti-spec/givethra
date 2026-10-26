@@ -46,6 +46,11 @@ describe("Admin payment review queues", () => {
     expect(source).toContain("Verified amount to pay the institute");
   });
 
+  it("keeps overdue and completed cases out of the Admin Approved queue", () => {
+    expect(source).toContain('normalizedAdminStatus(c.status) === "approved" && !isExpiredCaseRecord(c)');
+    expect(source).toContain('(isExpiredCaseRecord(c) ? "expired" : normalizedAdminStatus(c.status)) === statusFilter');
+  });
+
   it("keeps existing approval and rejection actions on pending cards", () => {
     expect(source).toContain("onConfirm={confirmResolution}");
     expect(source).toContain("onReject={rejectResolution}");

@@ -11,6 +11,11 @@ describe("case expiry dates", () => {
     expect(isCasePastDeadline("2026-10-25T23:59:00Z", "2026-10-26")).toBe(true);
   });
 
+  it("removes overdue approved cases from live status immediately", () => {
+    expect(isExpiredCaseRecord({ status: "approved", deadline: "2026-10-25" }, "2026-10-26")).toBe(true);
+    expect(isExpiredCaseRecord({ status: "published", deadline: "2026-10-26" }, "2026-10-26")).toBe(false);
+  });
+
   it("does not expire missing or invalid deadlines", () => {
     expect(isCasePastDeadline(null, "2026-10-26")).toBe(false);
     expect(isCasePastDeadline("not-a-date", "2026-10-26")).toBe(false);
