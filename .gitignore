@@ -6,6 +6,9 @@
 dist/
 build/
 *.dist
+/src/frontend/public/ocr/worker.min.js
+/src/frontend/public/ocr/TESSERACT-JS-LICENSE.md
+/src/frontend/public/ocr/core/
 
 # Environment variables
 .env

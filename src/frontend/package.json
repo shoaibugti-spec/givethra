@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "node scripts/prepare-release.mjs && vite build && cp env.json dist/env.json",
+    "dev": "node scripts/prepare-ocr-assets.mjs && vite",
+    "build": "node scripts/prepare-ocr-assets.mjs && node scripts/prepare-release.mjs && vite build && cp env.json dist/env.json",
     "deploy": "pnpm run build && pnpm exec wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

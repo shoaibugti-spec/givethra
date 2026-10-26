@@ -12,6 +12,7 @@ import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import Tesseract from "tesseract.js";
+import { formatCnicNumber, getKycOcrAssetPaths } from "@/lib/kycOcr";
 import {
   getKycSubmission,
   insertKycSubmission,
@@ -163,9 +164,12 @@ function meanBrightness(src: HTMLCanvasElement): number {
 
 // Reads the CNIC number with several differently prepared copies of the photo
 // and lets them vote, so one wrong digit in one pass is outvoted by the others.
+// All runtime assets are served from this site; no document image or OCR model
+// is fetched from a third-party CDN while verification runs.
 async function readCnicNumber(
   card: HTMLCanvasElement,
   onStep?: (step: number, total: number) => void,
+  onStatus?: (status: string) => void,
 ): Promise<{ number: string | null; isCnic: boolean }> {
   // [x, y, w, h, targetWidth, binarize]  (x/y/w/h as fractions of the card)
   const passes: Array<[number, number, number, number, number, boolean]> = [
@@ -174,33 +178,48 @@ async function readCnicNumber(
     [0, 0.45, 0.7, 0.4, 1600, false], // tight band around the number
     [0, 0.45, 0.7, 0.4, 1600, true],  // same band, black-and-white
   ];
-  const votes = new Map<string, { n: number; real: number }>();
-  let allText = "";
-  const pick = () => {
-    let best: { number: string; n: number; real: number } | null = null;
-    votes.forEach((v, number) => {
-      if (!best || v.n > best.n || (v.n === best.n && v.real > best.real)) best = { number, ...v };
-    });
-    return best as { number: string; n: number; real: number } | null;
-  };
-  for (let i = 0; i < passes.length; i++) {
-    onStep?.(i + 1, passes.length);
-    const [fx, fy, fw, fh, tw, bin] = passes[i];
-    const result = await Tesseract.recognize(toOcrCanvas(card, fx, fy, fw, fh, tw, bin), "eng");
-    const text = result.data.text || "";
-    allText += "\n" + text;
-    for (const f of findCnicAll(text)) {
-      const cur = votes.get(f.number);
-      votes.set(f.number, { n: (cur?.n ?? 0) + 1, real: Math.max(cur?.real ?? 0, f.real) });
+  const assetPaths = getKycOcrAssetPaths(import.meta.env.BASE_URL || "/");
+  onStatus?.("Preparing the local CNIC reader...");
+  const worker = await Tesseract.createWorker("eng", 1, {
+    ...assetPaths,
+    workerBlobURL: false,
+    gzip: true,
+    logger: (message) => {
+      if (message.status === "loading tesseract core") onStatus?.("Loading the CNIC reader...");
+      else if (message.status === "loading language traineddata") onStatus?.("Loading local OCR data...");
+    },
+  });
+  try {
+    const votes = new Map<string, { n: number; real: number }>();
+    let allText = "";
+    const pick = () => {
+      let best: { number: string; n: number; real: number } | null = null;
+      votes.forEach((v, number) => {
+        if (!best || v.n > best.n || (v.n === best.n && v.real > best.real)) best = { number, ...v };
+      });
+      return best as { number: string; n: number; real: number } | null;
+    };
+    for (let i = 0; i < passes.length; i++) {
+      onStep?.(i + 1, passes.length);
+      const [fx, fy, fw, fh, tw, bin] = passes[i];
+      const result = await worker.recognize(toOcrCanvas(card, fx, fy, fw, fh, tw, bin));
+      const text = result.data.text || "";
+      allText += "\n" + text;
+      for (const f of findCnicAll(text)) {
+        const cur = votes.get(f.number);
+        votes.set(f.number, { n: (cur?.n ?? 0) + 1, real: Math.max(cur?.real ?? 0, f.real) });
+      }
+      const best = pick();
+      // Stop early: two passes agree, or all 13 characters were genuine digits.
+      if (best && looksLikeCnic(allText) && (best.n >= 2 || best.real === 13)) {
+        return { number: best.number, isCnic: true };
+      }
     }
     const best = pick();
-    // Stop early: two passes agree, or all 13 characters were genuine digits.
-    if (best && looksLikeCnic(allText) && (best.n >= 2 || best.real === 13)) {
-      return { number: best.number, isCnic: true };
-    }
+    return { number: best ? best.number : null, isCnic: looksLikeCnic(allText) };
+  } finally {
+    await worker.terminate();
   }
-  const best = pick();
-  return { number: best ? best.number : null, isCnic: looksLikeCnic(allText) };
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +387,7 @@ export default function KycPage() {
   })();
   const [submission, setSubmission] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [docType, setDocType] = useState<"cnic" | "passport">("cnic");
   const [reapplying, setReapplying] = useState(false);
@@ -397,6 +417,8 @@ export default function KycPage() {
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrStatus, setOcrStatus] = useState<string>("");
   const [ocrFailed, setOcrFailed] = useState(false);
+  const [manualEntryAllowed, setManualEntryAllowed] = useState(false);
+  const [manualCnicNumber, setManualCnicNumber] = useState("");
   const [capturing, setCapturing] = useState(false);
   const [focusing, setFocusing] = useState(false);
   const [capturedBlur, setCapturedBlur] = useState<number | null>(null);
@@ -454,7 +476,7 @@ export default function KycPage() {
   // later when the user taps a camera button. A website cannot force-allow it:
   // the user must tap "Allow", and a previously blocked site can only be
   // unblocked in the browser settings (the page shows how).
-  const showForm = !!user && !isLoading && (!submission || reapplying);
+  const showForm = !!user && !isLoading && !loadError && (!submission || reapplying);
   useEffect(() => {
     if (!showForm) return;
     let cancelled = false;
@@ -568,6 +590,8 @@ export default function KycPage() {
       URL.revokeObjectURL(url);
       setOcrError(null);
       setOcrFailed(false);
+      setManualEntryAllowed(false);
+      setManualCnicNumber("");
       setCapturedBlur(kind === "selfie" ? null : blurOfCanvas(scaleCanvas(c, 800)));
       setCapturedImage(scaleCanvas(c, 1200).toDataURL("image/jpeg", 0.88));
       setCapturedCanvas(c);
@@ -625,8 +649,10 @@ export default function KycPage() {
     try {
       const data = await getKycSubmission(user.id);
       setSubmission(data ? { ...data, status: String(data.status || "none").trim().toLowerCase() } : null);
+      setLoadError(null);
     } catch (err) {
       console.error("Failed to load KYC submission", err);
+      setLoadError("We couldn't verify your current KYC status. Please retry; no new request has been started.");
     } finally {
       setIsLoading(false);
     }
@@ -755,6 +781,9 @@ export default function KycPage() {
   async function captureImage() {
     if (capturing) return;
     setOcrError(null);
+    setOcrFailed(false);
+    setManualEntryAllowed(false);
+    setManualCnicNumber("");
     const kind = activeCamera as "front" | "back" | "selfie";
     const runId = ++captureRunRef.current;
 
@@ -813,12 +842,15 @@ export default function KycPage() {
       setOcrProcessing(true);
       setOcrError(null);
       setOcrFailed(false);
-      setOcrStatus("Checking the photo...");
+      setManualEntryAllowed(false);
+      setOcrStatus("Preparing the local CNIC reader...");
       try {
         // The photo is NOT rejected for being slightly blurry or dim: older phones
         // often take soft photos. If the number can be read, the photo is accepted.
-        const { number, isCnic } = await readCnicNumber(capturedCanvas, (step, total) =>
-          setOcrStatus(`Reading the number from the photo... (${step}/${total})`),
+        const { number, isCnic } = await readCnicNumber(
+          capturedCanvas,
+          (step, total) => setOcrStatus(`Reading the number from the photo... (${step}/${total})`),
+          (status) => setOcrStatus(status),
         );
         setOcrProcessing(false);
         setOcrStatus("");
@@ -828,8 +860,8 @@ export default function KycPage() {
           finalizeCapture(capturedKind, capturedCanvas);
           toast.success(`CNIC number detected: ${number}. You can correct it manually if needed.`);
         } else {
-          // The photo is only accepted when a CNIC number is really read from a CNIC.
           setOcrFailed(true);
+          setManualEntryAllowed(isCnic && !number);
           setOcrError(
             number
               ? "This does not look like the front of a CNIC. Photograph the CNIC card itself, with the whole card inside the frame."
@@ -840,15 +872,30 @@ export default function KycPage() {
                   : "The CNIC number could not be read. Place the CNIC flat inside the frame, in good light, hold the phone steady for a second, and retake.",
           );
         }
-      } catch {
+      } catch (error) {
+        const details = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        console.error("CNIC OCR engine failed", details);
         setOcrProcessing(false);
         setOcrStatus("");
         setOcrFailed(true);
-        setOcrError("Automatic reading could not start (check your internet connection) — please try again.");
+        setManualEntryAllowed(true);
+        setOcrError("Automatic reading is unavailable right now. Your photo is still saved here. Retry, or enter the 13-digit CNIC manually; our verification team will review the photo.");
       }
     } else {
       finalizeCapture(capturedKind, capturedCanvas);
     }
+  }
+
+  function continueWithManualCnic() {
+    if (!capturedCanvas || capturedKind !== "front") return;
+    const formatted = formatCnicNumber(manualCnicNumber);
+    if (!formatted) {
+      toast.error("Enter all 13 CNIC digits exactly as printed on the card.");
+      return;
+    }
+    setForm((current) => ({ ...current, cnic_number: formatted }));
+    finalizeCapture("front", capturedCanvas);
+    toast.success("CNIC number saved. Our verification team will check it against your photo.");
   }
 
   function finalizeCapture(kind: "front" | "back" | "selfie", canvas: HTMLCanvasElement) {
@@ -889,6 +936,8 @@ export default function KycPage() {
       setCapturedBlur(null);
       setOcrError(null);
       setOcrFailed(false);
+      setManualEntryAllowed(false);
+      setManualCnicNumber("");
 
       toast.success(`${kind === "front" ? "CNIC Front" : kind === "back" ? "CNIC Back" : "Selfie"} captured successfully!`);
     }, "image/jpeg", 0.92);
@@ -901,6 +950,8 @@ export default function KycPage() {
     setCapturedBlur(null);
     setOcrError(null);
     setOcrFailed(false);
+    setManualEntryAllowed(false);
+    setManualCnicNumber("");
     if (capturedKind) {
       startPhotoCamera(capturedKind);
     }
@@ -1371,6 +1422,27 @@ export default function KycPage() {
             </div>
           )}
 
+          {isFront && manualEntryAllowed && (
+            <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <p className="text-sm text-foreground">
+                If the full CNIC front is clear, enter the number as printed. Keep the photo attached; our verification team will check it before approval.
+              </p>
+              <Input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={13}
+                aria-label="13-digit CNIC number"
+                placeholder="13-digit CNIC number"
+                value={manualCnicNumber}
+                onChange={(event) => setManualCnicNumber(event.target.value.replace(/\D/g, "").slice(0, 13))}
+              />
+              <Button className="w-full" onClick={continueWithManualCnic}>
+                Use Number & Continue
+              </Button>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={cancelCaptured} disabled={ocrProcessing}>
               <X className="h-4 w-4 mr-2" />
@@ -1461,6 +1533,13 @@ export default function KycPage() {
           <div className="text-center py-12 text-muted-foreground">Loading...</div>
         ) : !user ? (
           <div className="text-center py-12 text-muted-foreground">Please sign in first</div>
+        ) : loadError && (!submission || reapplying) ? (
+          <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-center dark:bg-amber-950/20">
+            <p className="mb-4 text-sm text-amber-800 dark:text-amber-200">{loadError}</p>
+            <Button onClick={() => { setIsLoading(true); void loadSubmission(); }}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Retry status check
+            </Button>
+          </div>
         ) : showStatusCard ? (
           <div className="bg-card border rounded-xl p-6 space-y-4">
             <div className={`flex items-center gap-2 px-4 py-3 rounded-lg ${statusConfig[submission.status]?.color}`}>
