@@ -19,6 +19,7 @@ export default function AdminDreamsPanel() {
   const [editingAccount, setEditingAccount] = useState<string>();
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
   const [tab, setTab] = useState<"products" | "submissions" | "accounts">("products");
 
   const load = async () => {
@@ -32,7 +33,7 @@ export default function AdminDreamsPanel() {
 
   useEffect(() => { void load(); }, []);
 
-  const pending = useMemo(() => participations.filter((p) => p.status === "pending_approval"), [participations]);
+  const pending = useMemo(() => participations.filter((p) => String(p.status || "").trim().toLowerCase() === "pending_approval"), [participations]);
   const set = (key: string, value: any) => setForm((f: any) => ({ ...f, [key]: value }));
   const setA = (key: string, value: any) => setAccount((f: any) => ({ ...f, [key]: value }));
 
@@ -82,13 +83,21 @@ export default function AdminDreamsPanel() {
   }
 
   async function review(p: any, status: string) {
+    if (reviewBusyId) return;
+    const enteredReason = status === "rejected" ? window.prompt("Rejection reason") : undefined;
+    if (enteredReason === null) return;
+    const reason = status === "rejected" ? enteredReason?.trim() || "Payment proof was not approved" : undefined;
+    setReviewBusyId(p.id);
     try {
-      const reason = status === "rejected" ? window.prompt("Rejection reason") || "Payment proof was not approved" : undefined;
-      await adminReviewDreamParticipation(p.id, { status, rejection_reason: reason });
+      const result = await adminReviewDreamParticipation(p.id, { status, rejection_reason: reason });
       toast.success(status === "approved" ? "Dream participation approved and registration generated" : "Submission rejected");
+      if ((result as any)?.notification_sent === false) toast.error("The decision was saved, but the user notification could not be sent.");
       await load();
     } catch (e: any) {
       toast.error(e?.message || "Review failed");
+      await load();
+    } finally {
+      setReviewBusyId(null);
     }
   }
 
@@ -272,10 +281,10 @@ export default function AdminDreamsPanel() {
                   {p.registration_number && <p className="mt-1 text-sm font-bold text-emerald-700">Registration: {p.registration_number}</p>}
                   {p.proof_url && <a href={p.proof_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-semibold text-primary underline">View payment receipt</a>}
                 </div>
-                {p.status === "pending_approval" && (
+                {String(p.status || "").trim().toLowerCase() === "pending_approval" && (
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => void review(p, "approved")}>Approve</Button>
-                    <Button size="sm" variant="outline" className="text-red-600" onClick={() => void review(p, "rejected")}>Reject</Button>
+                    <Button size="sm" disabled={reviewBusyId === p.id} onClick={() => void review(p, "approved")}>{reviewBusyId === p.id ? "Saving…" : "Approve"}</Button>
+                    <Button size="sm" variant="outline" className="text-red-600" disabled={reviewBusyId === p.id} onClick={() => void review(p, "rejected")}>Reject</Button>
                   </div>
                 )}
                 {(p.status === "approved" || p.status === "active") && (

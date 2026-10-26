@@ -248,6 +248,10 @@ function normalizedResolutionStatus(resolution: any): string {
   return String(resolution?.status ?? "").trim().toLowerCase();
 }
 
+function normalizedAdminStatus(value: unknown): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
 async function deleteStorageFiles(urls: (string | null | undefined)[]): Promise<{ ok: number; failed: number }> {
   const validUrls = urls.filter((u): u is string => !!u && u.startsWith("http"));
   if (validUrls.length === 0) return { ok: 0, failed: 0 };
@@ -338,6 +342,7 @@ export default function AdminPage() {
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<"all" | "pending_review" | "approved" | "rejected">("all");
   const [feedbackBusyId, setFeedbackBusyId] = useState<string | null>(null);
   const [kycBusyId, setKycBusyId] = useState<string | null>(null);
+  const [withdrawalBusyId, setWithdrawalBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -459,16 +464,18 @@ export default function AdminPage() {
     }
 
     const reviewedAt = new Date().toISOString();
-    await adminUpdateKyc(id, { status, reviewed_at: reviewedAt, reviewed_by: user?.email, rejection_reason: reason });
+    const result = await adminUpdateKyc(id, { status, reviewed_at: reviewedAt, reviewed_by: user?.email, rejection_reason: reason });
     // The Worker sends the approval/rejection notification. Avoid sending a
     // second notification from the browser and update only this KYC row
     // instead of reloading every Admin dashboard section.
     setKycList((current) => current.map((row) => row.id === id ? { ...row, status, reviewed_at: reviewedAt, reviewed_by: user?.email, rejection_reason: reason } : row));
+    if ((result as any)?.notification_sent === false) toast.error("KYC decision was saved, but the user notification could not be sent.");
     if (status === "re_kyc" && kyc.user_id) {
       await sendNotification(kyc.user_id, "kyc_re_kyc", "KYC Requires Re-submission 🔄", `Please resubmit your KYC with correct information. Reason: ${reason || "CNIC mismatch or missing details"}.`, "/kyc");
     }
     toast.success(`KYC ${status}!`);
     } catch (error: any) {
+      await loadData();
       toast.error(error?.message || "KYC update failed. Please try again.");
     } finally {
       setKycBusyId(null);
@@ -477,36 +484,24 @@ export default function AdminPage() {
 
   async function updateCase(id: string, status: string, reason = "") {
     const c = caseList.find((cs) => cs.id === id);
-    await adminUpdateCase(id, { status, reviewed_at: new Date().toISOString(), reviewed_by: user?.email, rejection_reason: reason });
-
-    if (status === "rejected" && c) {
-      await checkAndSuspendUser(c.user_id);
+    try {
+      await adminUpdateCase(id, { status, reviewed_at: new Date().toISOString(), reviewed_by: user?.email, rejection_reason: reason });
+      setCaseList((current) => current.map((row) => row.id === id ? { ...row, status, rejection_reason: reason } : row));
+      let notificationFailed = false;
+      try {
+        if (status === "rejected" && c) await checkAndSuspendUser(c.user_id);
+        if (c?.user_id && status === "approved") await sendNotification(c.user_id, "case_approved", "Case Approved ✅", `Your case "${c.title}" is now live for Heroes.`, "/my-cases");
+        else if (c?.user_id && status === "rejected") await sendNotification(c.user_id, "case_rejected", "Case Rejected", (reason ? `Reason: ${reason}. ` : "") + (c.was_free ? "Your free offer has been restored — you can submit again for free." : "Your 1 credit has been refunded — you can submit again."), "/my-cases");
+        else if (c?.user_id && status === "completed") await sendNotification(c.user_id, "case_completed", "Case Completed ✅", `Your case "${c.title}" has been marked as completed.`, "/my-cases");
+        else if (c?.user_id && status === "expired") await sendNotification(c.user_id, "case_expired", "Case Expired ⏰", `Your case "${c.title}" has expired. You can submit a new one.`, "/submit-request");
+      } catch (error) { notificationFailed = true; console.error("Case decision saved; follow-up notification or suspension failed", error); }
+      await loadData();
+      toast.success(`Case ${status} and removed from Pending.`);
+      if (notificationFailed) toast.error("The case decision was saved, but a notification or follow-up action needs attention.");
+    } catch (error: any) {
+      await loadData();
+      toast.error(error?.message || "Case review failed. Current status was refreshed.");
     }
-
-    if (c?.user_id) {
-      if (status === "approved") {
-        await sendNotification(c.user_id, "case_approved", "Case Approved ✅", `Your case "${c.title}" is now live for Heroes.`, "/my-cases");
-      } else if (status === "rejected") {
-        if (c.was_free) {
-          const off = await adminGetCategoryOffer(c.category);
-          if (off && off.used_count > 0) {
-            await adminUpsertCategoryOffer({ category: c.category, used_count: off.used_count - 1 });
-          }
-          await sendNotification(c.user_id, "case_rejected", "Case Rejected", (reason ? `Reason: ${reason}. ` : "") + "Your free offer has been restored — you can submit again for free.", "/my-cases");
-        } else {
-          const wallet = await adminGetWalletsByUser(c.user_id);
-          const newBalance = (wallet?.balance || 0) + 1;
-          await adminUpsertWallet(c.user_id, newBalance);
-          await sendNotification(c.user_id, "case_rejected", "Case Rejected", (reason ? `Reason: ${reason}. ` : "") + "Your 1 credit has been refunded — you can submit again.", "/my-cases");
-        }
-      } else if (status === "completed") {
-        await sendNotification(c.user_id, "case_completed", "Case Completed ✅", `Your case "${c.title}" has been marked as completed.`, "/my-cases");
-      } else if (status === "expired") {
-        await sendNotification(c.user_id, "case_expired", "Case Expired ⏰", `Your case "${c.title}" has expired. You can submit a new one.`, "/submit-request");
-      }
-    }
-    toast.success(`Case ${status}!`);
-    loadData();
   }
 
   async function updateFeedback(fbId: string, status: string, reason = "") {
@@ -521,16 +516,16 @@ export default function AdminPage() {
     try {
       await adminUpdateFeedback(fbId, { status, reviewed_at: reviewedAt, reviewed_by: user?.email, rejection_reason: reason });
       setFeedbacks((current) => current.map((item) => item.id === fbId ? { ...item, status, reviewed_at: reviewedAt, reviewed_by: user?.email, rejection_reason: reason } : item));
-      if (fb?.user_id && fb.case_id) {
-        if (status === "approved") {
-          await sendNotification(fb.user_id, "system", "Feedback Approved 🎉", "Your feedback is now live on the Givethra community wall. You can now submit a new case!", "/my-cases");
-        } else {
-          await sendNotification(fb.user_id, "system", "Feedback Needs Improvement", reason ? `Reason: ${reason}. Please re-record your video and message.` : "Please re-record your video and message, then resubmit.", `/cases/${fb.case_id}`);
-        }
-      }
+      let notificationFailed = false;
+      if (fb?.user_id && fb.case_id) try {
+        if (status === "approved") await sendNotification(fb.user_id, "system", "Feedback Approved 🎉", "Your feedback is now live on the Givethra community wall. You can now submit a new case!", "/my-cases");
+        else await sendNotification(fb.user_id, "system", "Feedback Needs Improvement", reason ? `Reason: ${reason}. Please re-record your video and message.` : "Please re-record your video and message, then resubmit.", `/cases/${fb.case_id}`);
+      } catch (error) { notificationFailed = true; console.error("Feedback decision saved; notification failed", error); }
       toast.success(status === "approved" ? "Feedback approved and published." : "Feedback rejected.");
+      if (notificationFailed) toast.error("The feedback decision was saved, but its notification could not be sent.");
     } catch (error: any) {
       console.error("Feedback update failed:", error);
+      await loadData();
       toast.error(`Feedback update failed: ${error?.message || "Please try again."}`);
     } finally {
       setFeedbackBusyId(null);
@@ -573,10 +568,7 @@ export default function AdminPage() {
     const isFundraising = isContributionResolution(res);
     try {
       await adminUpdateResolution(res.id, { status: "completed", admin_confirmed: true, admin_confirmed_at: new Date().toISOString(), completed_at: new Date().toISOString() });
-      const updates: any = { amount_collected: newCollected };
       const goalReached = amountNeeded > 0 && newCollected >= amountNeeded;
-      if (!isFundraising && (goalReached || amountNeeded === 0)) { updates.status = "completed"; }
-      await adminUpdateCase(c.id, updates);
       const notificationJobs: Promise<unknown>[] = [];
       if (res.hero_id) notificationJobs.push(sendNotification(res.hero_id, "case_completed", "Help verified! 🎉", `Givethra verified your help of ${sym(c.currency)} ${confirmedAmt} on "${c.title}". ${!isFundraising ? "You can now download your affidavit." : "Thank you for contributing!"}`, `/cases/${res.case_id}`));
       if (res.seeker_id) {
@@ -596,6 +588,7 @@ export default function AdminPage() {
       await loadData();
     } catch (error: any) {
       console.error("Help verification failed:", error);
+      await loadData();
       toast.error(`Failed to verify payment proof: ${error?.message || "Please try again."}`);
     }
   }
@@ -617,6 +610,7 @@ export default function AdminPage() {
       await loadData();
     } catch (error: any) {
       console.error("Help rejection failed:", error);
+      await loadData();
       toast.error(`Failed to reject payment proof: ${error?.message || "Please try again."}`);
     }
   }
@@ -652,13 +646,17 @@ export default function AdminPage() {
     const credits = (finalCredits ?? (dep.credits ?? dep.amount)) || 0;
     try {
       await adminUpdateDeposit(dep.id, { status: "approved", credits, reviewed_at: new Date().toISOString(), reviewed_by: user?.email });
-      if (dep.user_id) {
+      setDeposits((current) => current.map((row) => row.id === dep.id ? { ...row, status: "approved", credits } : row));
+      let notificationFailed = false;
+      if (dep.user_id) try {
         await sendNotification(dep.user_id, "credits_added", "Credits Added 💰", `${credits} credit(s) have been added to your wallet.`, "/wallet");
-      }
-      toast.success(`Approved! ${credits} credits added.`);
-      loadData();
+      } catch (error) { notificationFailed = true; console.error("Deposit approved; notification failed", error); }
+      await loadData();
+      toast.success(`Approved! ${credits} credits added and removed from Pending.`);
+      if (notificationFailed) toast.error("Deposit was approved, but the user notification could not be sent.");
     } catch (e: any) {
       console.error("Deposit approval failed:", e);
+      await loadData();
       toast.error(`Failed to approve deposit: ${e?.message || "Unknown error"}`);
     }
   }
@@ -679,30 +677,55 @@ export default function AdminPage() {
 
   async function rejectDeposit(id: string, reason: string) {
     const dep = deposits.find((d) => d.id === id);
-    await adminUpdateDeposit(id, { status: "rejected", reviewed_at: new Date().toISOString(), reviewed_by: user?.email, rejection_reason: reason });
-    if (dep?.user_id) {
-      await sendNotification(dep.user_id, "deposit_rejected", "Deposit Rejected", reason ? `Reason: ${reason}` : "Please check your payment proof and try again.", "/wallet");
+    try {
+      await adminUpdateDeposit(id, { status: "rejected", reviewed_at: new Date().toISOString(), reviewed_by: user?.email, rejection_reason: reason });
+      setDeposits((current) => current.map((row) => row.id === id ? { ...row, status: "rejected", rejection_reason: reason } : row));
+      let notificationFailed = false;
+      if (dep?.user_id) try {
+        await sendNotification(dep.user_id, "deposit_rejected", "Deposit Rejected", reason ? `Reason: ${reason}` : "Please check your payment proof and try again.", "/wallet");
+      } catch (error) { notificationFailed = true; console.error("Deposit rejected; notification failed", error); }
+      await loadData();
+      toast.success("Deposit rejected and removed from Pending.");
+      if (notificationFailed) toast.error("Deposit was rejected, but the user notification could not be sent.");
+    } catch (error: any) {
+      await loadData();
+      toast.error(error?.message || "Deposit rejection failed. Current status was refreshed.");
     }
-    toast.success("Deposit rejected.");
-    loadData();
   }
 
-  const pendingKyc = kycList.filter((k) => k.status === "pending");
-  const approvedKycCount = kycList.filter((k) => k.status === "approved").length;
-  const rejectedKycCount = kycList.filter((k) => k.status === "rejected").length;
+  async function reviewWithdrawal(withdrawal: any, status: "approved" | "rejected" | "completed", proof?: string) {
+    if (withdrawalBusyId) return;
+    setWithdrawalBusyId(withdrawal.id);
+    try {
+      const result = await adminUpdateWithdrawal(withdrawal.id, { status, ...(proof ? { payment_proof_url: proof } : {}) });
+      setWithdrawals((current) => current.map((row) => row.id === withdrawal.id ? { ...row, ...result, status } : row));
+      await loadData();
+      toast.success(`Withdrawal ${status} and removed from its previous review state.`);
+      if ((result as any)?.notification_sent === false) toast.error("The withdrawal decision was saved, but its user notification could not be sent.");
+    } catch (error: any) {
+      await loadData();
+      toast.error(error?.message || "Withdrawal review failed. Current status was refreshed.");
+    } finally {
+      setWithdrawalBusyId(null);
+    }
+  }
 
-  const pendingCases = caseList.filter((c) => c.status === "pending");
-  const approvedCasesCount = caseList.filter((c) => c.status === "approved").length;
-  const rejectedCasesCount = caseList.filter((c) => c.status === "rejected").length;
-  const completedCasesCount = caseList.filter((c) => c.status === "completed").length;
-  const expiredCasesCount = caseList.filter((c) => c.status === "expired").length;
+  const pendingKyc = kycList.filter((k) => normalizedAdminStatus(k.status) === "pending");
+  const approvedKycCount = kycList.filter((k) => normalizedAdminStatus(k.status) === "approved").length;
+  const rejectedKycCount = kycList.filter((k) => normalizedAdminStatus(k.status) === "rejected").length;
 
-  const pendingDeposits = deposits.filter((d) => d.status === "pending");
-  const approvedDepositsCount = deposits.filter((d) => d.status === "approved").length;
-  const rejectedDepositsCount = deposits.filter((d) => d.status === "rejected").length;
+  const pendingCases = caseList.filter((c) => normalizedAdminStatus(c.status) === "pending");
+  const approvedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "approved").length;
+  const rejectedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "rejected").length;
+  const completedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "completed").length;
+  const expiredCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "expired").length;
+
+  const pendingDeposits = deposits.filter((d) => normalizedAdminStatus(d.status) === "pending");
+  const approvedDepositsCount = deposits.filter((d) => normalizedAdminStatus(d.status) === "approved").length;
+  const rejectedDepositsCount = deposits.filter((d) => normalizedAdminStatus(d.status) === "rejected").length;
 
   const pendingResolutionStatuses = new Set(["pending", "pending_confirmation", "seeker_confirmed"]);
-  const pendingResolutions = resolutions.filter((r) => pendingResolutionStatuses.has(String(r.status || "").toLowerCase()));
+  const pendingResolutions = resolutions.filter((r) => pendingResolutionStatuses.has(normalizedResolutionStatus(r)));
   const pendingContributions = pendingResolutions.filter(isContributionResolution);
   const pendingDirectResolutions = pendingResolutions.filter((r) => !isContributionResolution(r));
   const pendingContributionCount = pendingContributions.length;
@@ -846,9 +869,9 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
               <TabsTrigger value="notify">Notify</TabsTrigger>
               <TabsTrigger value="offers">Offers {activeOffers > 0 && <span className="ml-1 bg-teal-500 text-white text-[10px] rounded-full px-1.5">{activeOffers}</span>}</TabsTrigger>
               <TabsTrigger value="support">Support {unreadSupport > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{unreadSupport}</span>}</TabsTrigger>
-              <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => f.status === "pending_review").length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => f.status === "pending_review").length}</span>}</TabsTrigger>
+              <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => ["pending", "pending_review"].includes(normalizedAdminStatus(f.status))).length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => ["pending", "pending_review"].includes(normalizedAdminStatus(f.status))).length}</span>}</TabsTrigger>
               <TabsTrigger value="suspensions">Suspensions {activeSuspensions > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{activeSuspensions}</span>}</TabsTrigger>
-              <TabsTrigger value="earnings-withdrawals">Earnings Withdrawals {withdrawals.filter(w => w.status === "pending").length > 0 && <span className="ml-1 bg-amber-500 text-white text-[10px] rounded-full px-1.5">{withdrawals.filter(w => w.status === "pending").length}</span>}</TabsTrigger>
+              <TabsTrigger value="earnings-withdrawals">Earnings Withdrawals {withdrawals.filter(w => normalizedAdminStatus(w.status) === "pending").length > 0 && <span className="ml-1 bg-amber-500 text-white text-[10px] rounded-full px-1.5">{withdrawals.filter(w => normalizedAdminStatus(w.status) === "pending").length}</span>}</TabsTrigger>
               <TabsTrigger value="donations">Donations</TabsTrigger>
               <TabsTrigger value="dreams">Dreams</TabsTrigger>
             </TabsList>
@@ -1099,7 +1122,17 @@ const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.cl
             </TabsContent>
             <TabsContent value="earnings-withdrawals" className="space-y-4 mt-4">
               <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 dark:bg-amber-950/10"><h2 className="text-xl font-bold">Earnings Withdrawals</h2><p className="mt-1 text-sm text-muted-foreground">This is separate from the Credits Wallet. Review the manual PKR payout and attach payment proof.</p></div>
-              <div className="grid gap-3">{withdrawals.length ? withdrawals.map((w: any) => <div key={w.id} className="rounded-xl border bg-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{w.full_name || w.email || w.user_id}</p><p className="text-xs text-muted-foreground">{w.amount_pkr} PKR · {w.bank_name} · {w.account_title} · {w.account_number}</p><p className="mt-1 text-[11px] text-muted-foreground">Requested {w.requested_at ? new Date(w.requested_at).toLocaleString() : "—"}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-bold capitalize">{w.status}</span></div>{w.payment_proof_url ? <a className="mt-2 inline-block text-xs font-semibold text-primary underline" href={w.payment_proof_url} target="_blank" rel="noreferrer">View payment proof</a> : null}{w.status === "pending" || w.status === "approved" ? <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" onClick={() => void adminUpdateWithdrawal(w.id, { status: "approved" }).then(loadData)}>Approve</Button><Button size="sm" variant="outline" onClick={() => void adminUpdateWithdrawal(w.id, { status: "rejected" }).then(loadData)}>Reject</Button><input placeholder="Payment proof URL" className="h-9 min-w-56 flex-1 rounded-md border bg-background px-3 text-xs" id={`proof-${w.id}`} /><Button size="sm" onClick={() => { const proof = (document.getElementById(`proof-${w.id}`) as HTMLInputElement)?.value.trim(); if (proof) void adminUpdateWithdrawal(w.id, { status: "completed", payment_proof_url: proof }).then(loadData); }}>Complete + Proof</Button></div> : null}</div>) : <p className="text-sm text-muted-foreground">No earnings withdrawal requests yet.</p>}</div>
+              <div className="grid gap-3">
+                {withdrawals.length ? withdrawals.map((w: any) => {
+                  const status = normalizedAdminStatus(w.status);
+                  return <div key={w.id} className="rounded-xl border bg-card p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{w.full_name || w.email || w.user_id}</p><p className="text-xs text-muted-foreground">{w.amount_pkr} PKR · {w.bank_name} · {w.account_title} · {w.account_number}</p><p className="mt-1 text-[11px] text-muted-foreground">Requested {w.requested_at ? new Date(w.requested_at).toLocaleString() : "—"}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-bold capitalize">{w.status}</span></div>
+                    {w.payment_proof_url ? <a className="mt-2 inline-block text-xs font-semibold text-primary underline" href={w.payment_proof_url} target="_blank" rel="noreferrer">View payment proof</a> : null}
+                    {status === "pending" && <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" disabled={withdrawalBusyId === w.id} onClick={() => void reviewWithdrawal(w, "approved")}>Approve</Button><Button size="sm" variant="outline" disabled={withdrawalBusyId === w.id} onClick={() => void reviewWithdrawal(w, "rejected")}>Reject</Button></div>}
+                    {status === "approved" && <div className="mt-3 flex flex-wrap gap-2"><input placeholder="Payment proof URL" className="h-9 min-w-56 flex-1 rounded-md border bg-background px-3 text-xs" id={`proof-${w.id}`} disabled={withdrawalBusyId === w.id} /><Button size="sm" disabled={withdrawalBusyId === w.id} onClick={() => { const proof = (document.getElementById(`proof-${w.id}`) as HTMLInputElement)?.value.trim(); if (proof) void reviewWithdrawal(w, "completed", proof); }}>Complete + Proof</Button></div>}
+                  </div>;
+                }) : <p className="text-sm text-muted-foreground">No earnings withdrawal requests yet.</p>}
+              </div>
             </TabsContent>
           </Tabs>
         )}
@@ -1162,12 +1195,12 @@ function KycSearchBox({ kycList, onUpdate, cnicCounts, profileMap, busyId }: any
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const sortedKyc = [...kycList].sort((a: any, b: any) => {
     const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
-    return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+    return (order[normalizedAdminStatus(a.status)] ?? 3) - (order[normalizedAdminStatus(b.status)] ?? 3);
   });
   const query = search.trim().toLowerCase();
   const digits = search.replace(/\D/g, "");
   const filtered = sortedKyc.filter((k: any) => {
-    const statusMatches = statusFilter === "all" || String(k.status || "").toLowerCase() === statusFilter;
+    const statusMatches = statusFilter === "all" || normalizedAdminStatus(k.status) === statusFilter;
     if (!statusMatches) return false;
     if (!query) return true;
     const email = profileMap?.[k.user_id]?.email || k.email || "";
@@ -1202,12 +1235,12 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
   const [search, setSearch] = useState("");
   const sortedCases = [...caseList].sort((a, b) => {
     const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2, completed: 3, expired: 4 };
-    return (order[a.status] ?? 5) - (order[b.status] ?? 5);
+    return (order[normalizedAdminStatus(a.status)] ?? 5) - (order[normalizedAdminStatus(b.status)] ?? 5);
   });
 
   const filteredByStatus = statusFilter === "all" 
     ? sortedCases 
-    : sortedCases.filter((c: any) => c.status === statusFilter);
+    : sortedCases.filter((c: any) => normalizedAdminStatus(c.status) === statusFilter);
 
   const query = search.trim().toLowerCase();
   const digits = search.replace(/\D/g, "");
@@ -1233,7 +1266,7 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
           >
             {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
             <span className="ml-1 text-[10px] opacity-70">
-              ({caseList.filter((c: any) => status === "all" || c.status === status).length})
+              ({caseList.filter((c: any) => status === "all" || normalizedAdminStatus(c.status) === status).length})
             </span>
           </button>
         ))}

@@ -1938,15 +1938,28 @@ async function handleRequest(request, env, ctx) {
         if (!donation) return json({ error: "Donation not found" }, 404, origin);
         const body = await readJson(request); const nextStatus = String(body?.status || "").toLowerCase();
         if (!["approved", "rejected", "completed"].includes(nextStatus)) return json({ error: "Invalid donation status" }, 400, origin);
-        if (donation.status === "approved" && nextStatus === "rejected") return json({ error: "Approved contributions cannot be rejected" }, 409, origin);
-        const existingCredit = await env.DB.prepare("SELECT id FROM contribution_ledger WHERE donation_id = ? AND entry_type = 'credit' LIMIT 1").bind(donation.id).first();
-        if (!existingCredit && ["approved", "completed"].includes(nextStatus)) {
-          await env.DB.prepare("INSERT INTO contribution_ledger (id,donation_id,user_id,entry_type,amount,currency,note,created_at,created_by) VALUES (?,?,?,?,?,?,?,?,?)").bind(id(), donation.id, donation.user_id, "credit", Number(donation.amount), donation.currency, "Approved community contribution", now(), user.user_id).run();
-        }
+        const expectedStatus = nextStatus === "completed" ? "approved" : "pending";
+        if (String(donation.status || "").toLowerCase() !== expectedStatus) return json({ error: "This contribution has already been reviewed. Refresh the queue to see its current status." }, 409, origin);
         const reviewedAt = now();
-        await env.DB.prepare("UPDATE donations SET status = ?, admin_notes = ?, rejection_reason = ?, reviewed_at = ?, reviewed_by = ?, completed_at = ? WHERE id = ?").bind(nextStatus, body?.admin_notes || null, nextStatus === "rejected" ? String(body?.rejection_reason || "Not approved") : null, reviewedAt, user.user_id, nextStatus === "completed" ? reviewedAt : donation.completed_at, donation.id).run();
-        await env.DB.prepare("INSERT INTO contribution_status_history (id,donation_id,from_status,to_status,note,changed_at,changed_by) VALUES (?,?,?,?,?,?,?)").bind(id(), donation.id, donation.status, nextStatus, body?.admin_notes || null, reviewedAt, user.user_id).run();
-        return json(await env.DB.prepare("SELECT * FROM donations WHERE id = ?").bind(donation.id).first(), 200, origin);
+        const statements = [env.DB.prepare("UPDATE donations SET status = ?, admin_notes = ?, rejection_reason = ?, reviewed_at = ?, reviewed_by = ?, completed_at = ? WHERE id = ? AND lower(COALESCE(status,'')) = ?")
+          .bind(nextStatus, body?.admin_notes || null, nextStatus === "rejected" ? String(body?.rejection_reason || "Not approved") : null, reviewedAt, user.user_id, nextStatus === "completed" ? reviewedAt : donation.completed_at, donation.id, expectedStatus)];
+        if (["approved", "completed"].includes(nextStatus)) {
+          statements.push(env.DB.prepare(`INSERT INTO contribution_ledger (id,donation_id,user_id,entry_type,amount,currency,note,created_at,created_by)
+            SELECT ?,d.id,d.user_id,'credit',d.amount,d.currency,'Approved community contribution',?,? FROM donations d
+            WHERE d.id=? AND lower(d.status)=? AND d.reviewed_at=?
+              AND NOT EXISTS (SELECT 1 FROM contribution_ledger l WHERE l.donation_id=d.id AND l.entry_type='credit')`)
+            .bind(id(), donation.id, user.user_id, donation.id, nextStatus, reviewedAt));
+        }
+        statements.push(env.DB.prepare(`INSERT INTO contribution_status_history (id,donation_id,from_status,to_status,note,changed_at,changed_by)
+          SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM donations WHERE id=? AND lower(status)=? AND reviewed_at=?)`)
+          .bind(id(), donation.id, expectedStatus, nextStatus, body?.admin_notes || null, reviewedAt, user.user_id, donation.id, nextStatus, reviewedAt));
+        const batchResults = await env.DB.batch(statements);
+        if (Number(batchResults?.[0]?.meta?.changes || 0) !== 1) return json({ error: "This contribution was already reviewed by another admin. Refresh the queue." }, 409, origin);
+        let notificationSent = true;
+        try {
+          await sendNotification(env, donation.user_id, nextStatus === "rejected" ? "donation_rejected" : "donation_approved", nextStatus === "rejected" ? "Contribution proof needs correction" : "Contribution approved", nextStatus === "rejected" ? `Your contribution was not approved. ${String(body?.rejection_reason || "Please check the proof and contact support if needed.")}` : "Your community contribution was verified. Thank you for helping.", "/my-supports");
+        } catch (error) { notificationSent = false; console.error("Donation review notification failed after saved decision", error); }
+        return json({ ...(await env.DB.prepare("SELECT * FROM donations WHERE id = ?").bind(donation.id).first()), notification_sent: notificationSent }, 200, origin);
       }
     }
     if (parts[1] === "admin" && parts[2] === "contribution-spending") {
@@ -2354,15 +2367,24 @@ async function handleRequest(request, env, ctx) {
           const proof = body?.payment_proof_url ? String(body.payment_proof_url).trim() : null;
           const row = await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first();
           if (!row) return json({ error: "Withdrawal request not found" }, 404, origin);
-          await env.DB.prepare(
-            "UPDATE withdrawal_requests SET status = ?, payment_proof_url = COALESCE(?, payment_proof_url), reviewed_by = ?, reviewed_at = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE completed_at END WHERE id = ?"
-          ).bind(status, proof, user.user_id, now(), status, now(), parts[3]).run();
-          if (status === "completed" && String(row.status || "").toLowerCase() !== "completed") {
-            await env.DB.prepare(
-              "UPDATE earnings_wallets SET balance_pkr = MAX(0, balance_pkr - ?), updated_at = ? WHERE user_id = ?"
-            ).bind(Number(row.amount_pkr), now(), row.user_id).run();
+          const source = status === "completed" ? "lower(COALESCE(status,'')) = 'approved'" : status === "rejected" ? "lower(COALESCE(status,'')) IN ('pending','approved')" : "lower(COALESCE(status,'')) = 'pending'";
+          const reviewedAt = now();
+          const statements = [env.DB.prepare(
+            `UPDATE withdrawal_requests SET status = ?, payment_proof_url = COALESCE(?, payment_proof_url), reviewed_by = ?, reviewed_at = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE completed_at END WHERE id = ? AND ${source}`
+          ).bind(status, proof, user.user_id, reviewedAt, status, reviewedAt, parts[3])];
+          if (status === "completed") {
+            statements.push(env.DB.prepare(`UPDATE earnings_wallets SET balance_pkr = MAX(0, balance_pkr - ?), updated_at = ?
+              WHERE user_id = ? AND EXISTS (SELECT 1 FROM withdrawal_requests WHERE id = ? AND status = 'completed' AND reviewed_at = ?)`)
+              .bind(Number(row.amount_pkr), reviewedAt, row.user_id, parts[3], reviewedAt));
           }
-          return json(await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first(), 200, origin);
+          const results = await env.DB.batch(statements);
+          if (Number(results?.[0]?.meta?.changes || 0) !== 1) return json({ error: "This withdrawal has already been reviewed or is not in a valid status. Refresh the queue." }, 409, origin);
+          let notificationSent = true;
+          try {
+            const messages = { approved: ["Withdrawal approved", "Your earnings withdrawal was approved and is being processed."], rejected: ["Withdrawal needs attention", "Your withdrawal request was rejected. Please contact support if you need help."], completed: ["Withdrawal paid", "Your earnings withdrawal has been marked as paid."] };
+            await sendNotification(env, row.user_id, "withdrawal_" + status, messages[status][0], messages[status][1], "/earnings");
+          } catch (error) { notificationSent = false; console.error("Withdrawal review notification failed after saved decision", error); }
+          return json({ ...(await env.DB.prepare("SELECT * FROM withdrawal_requests WHERE id = ?").bind(parts[3]).first()), notification_sent: notificationSent }, 200, origin);
         }
         return json({ error: "Method not allowed" }, 405, origin);
       }
@@ -2456,11 +2478,33 @@ async function handleRequest(request, env, ctx) {
           }
           const fields = allowed.filter((field) => values[field] !== undefined);
           const params = fields.map((field) => values[field]);
-          await env.DB.prepare(`UPDATE deposits SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...params, recordId).run();
-          if (requestedStatus === "approved" && current.status !== "approved") {
+          if (["approved", "rejected"].includes(requestedStatus)) {
+            if (String(current.status || "").toLowerCase() !== "pending") return json({ error: "This deposit has already been reviewed. Refresh the queue to see its current status." }, 409, origin);
             const credits = Number(values.credits ?? current.credits ?? current.amount ?? 0);
             if (!Number.isFinite(credits) || credits < 0) return json({ error: "Invalid deposit credits" }, 400, origin);
-            await addCredits(env, current.user_id, credits, 'deposit', `Deposit #${recordId} approved`, recordId);
+            const reviewedAt = values.reviewed_at || now();
+            values.reviewed_at = reviewedAt;
+            const update = `UPDATE deposits SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ? AND lower(COALESCE(status,'')) = 'pending'`;
+            if (requestedStatus === "approved") {
+              const transactionId = id();
+              const results = await env.DB.batch([
+                env.DB.prepare(update).bind(...fields.map((field) => values[field]), recordId),
+                env.DB.prepare(`INSERT INTO wallets (user_id,balance,updated_at)
+                  SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM deposits WHERE id=? AND lower(status)='approved' AND reviewed_at=?)
+                  ON CONFLICT(user_id) DO UPDATE SET balance=balance+excluded.balance,updated_at=excluded.updated_at`)
+                  .bind(current.user_id, credits, reviewedAt, recordId, reviewedAt),
+                env.DB.prepare(`INSERT INTO credit_transactions (id,user_id,amount,type,description,reference_id,status,created_at,updated_at)
+                  SELECT ?,?,?, 'deposit', ?, ?, 'completed', ?, ?
+                  WHERE EXISTS (SELECT 1 FROM deposits WHERE id=? AND lower(status)='approved' AND reviewed_at=?)`)
+                  .bind(transactionId, current.user_id, credits, `Deposit #${recordId} approved`, recordId, reviewedAt, reviewedAt, recordId, reviewedAt),
+              ]);
+              if (Number(results?.[0]?.meta?.changes || 0) !== 1) return json({ error: "This deposit was already reviewed by another admin. Refresh the queue." }, 409, origin);
+            } else {
+              const result = await env.DB.prepare(update).bind(...fields.map((field) => values[field]), recordId).run();
+              if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "This deposit was already reviewed by another admin. Refresh the queue." }, 409, origin);
+            }
+          } else {
+            await env.DB.prepare(`UPDATE deposits SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...params, recordId).run();
           }
           return json(await env.DB.prepare("SELECT * FROM deposits WHERE id = ?").bind(recordId).first(), 200, origin);
         }
@@ -2490,13 +2534,23 @@ async function handleRequest(request, env, ctx) {
           const values = pick(body, allowed);
           if (values.status !== undefined) {
             values.status = String(values.status).trim().toLowerCase();
-            if (!["pending", "approved", "rejected"].includes(values.status)) {
+            if (!["pending", "approved", "rejected", "re_kyc", "duplicate"].includes(values.status)) {
               return json({ error: "Invalid KYC status" }, 400, origin);
             }
           }
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No KYC fields to update" }, 400, origin);
-          await env.DB.prepare(`UPDATE kyc_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          let notificationSent = true;
+          const kycUpdate = `UPDATE kyc_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`;
+          if (["approved", "rejected", "duplicate"].includes(values.status)) {
+            const result = await env.DB.prepare(`${kycUpdate} AND lower(COALESCE(status,'')) = 'pending'`).bind(...fields.map((field) => values[field]), recordId).run();
+            if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "This KYC application has already been reviewed. Refresh the queue to see its current status." }, 409, origin);
+          } else if (values.status === "re_kyc") {
+            const result = await env.DB.prepare(`${kycUpdate} AND lower(COALESCE(status,'')) = 'approved'`).bind(...fields.map((field) => values[field]), recordId).run();
+            if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "Re-KYC can only be requested for a currently approved application." }, 409, origin);
+          } else {
+            await env.DB.prepare(kycUpdate).bind(...fields.map((field) => values[field]), recordId).run();
+          }
           if (values.status !== undefined) {
             const effectiveKyc = await env.DB.prepare(
               `SELECT lower(status) AS status FROM kyc_submissions
@@ -2506,6 +2560,7 @@ async function handleRequest(request, env, ctx) {
             await env.DB.prepare("UPDATE users SET kyc_status = ?, updated_at = ? WHERE user_id = ?")
               .bind(String(values.status || effectiveKyc?.status || "none").toLowerCase(), now(), current.user_id).run();
             if (String(current.status || "").trim().toLowerCase() !== values.status) {
+              try {
               if (values.status === "approved") {
                 await sendNotification(
                   env,
@@ -2526,9 +2581,13 @@ async function handleRequest(request, env, ctx) {
                   "/kyc"
                 );
               }
+              } catch (error) {
+                notificationSent = false;
+                console.error("KYC review notification failed after saved decision", error);
+              }
             }
           }
-          return json(await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
+          return json({ ...(await env.DB.prepare("SELECT * FROM kyc_submissions WHERE id = ?").bind(recordId).first()), notification_sent: notificationSent }, 200, origin);
         }
         if (parts[2] === "cases" && recordId) {
           const body = await readJson(request);
@@ -2537,9 +2596,32 @@ async function handleRequest(request, env, ctx) {
           const allowed = ["status", "amount_collected", "reviewed_at", "reviewed_by", "rejection_reason"];
           if (parts[4] === "close") allowed.push("closed_by_admin", "paid_receipt_url");
           const values = pick(body, allowed);
+          const reviewStatus = String(values.status || "").toLowerCase();
+          if (["approved", "rejected"].includes(reviewStatus)) {
+            values.status = reviewStatus;
+            values.reviewed_at = values.reviewed_at || now();
+            values.reviewed_by = values.reviewed_by || user.email;
+          }
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No case fields to update" }, 400, origin);
-          await env.DB.prepare(`UPDATE case_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          const caseUpdate = `UPDATE case_submissions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`;
+          if (["approved", "rejected"].includes(reviewStatus)) {
+            const statements = [env.DB.prepare(`${caseUpdate} AND lower(COALESCE(status,'')) = 'pending'`).bind(...fields.map((field) => values[field]), recordId)];
+            if (reviewStatus === "rejected" && current.was_free) {
+              statements.push(env.DB.prepare(`UPDATE category_offers SET used_count=MAX(0,COALESCE(used_count,0)-1) WHERE category=?
+                AND EXISTS (SELECT 1 FROM case_submissions WHERE id=? AND status='rejected' AND reviewed_at=?)`)
+                .bind(current.category, recordId, values.reviewed_at));
+            } else if (reviewStatus === "rejected") {
+              statements.push(env.DB.prepare(`INSERT INTO wallets (user_id,balance,updated_at)
+                SELECT ?,1,? WHERE EXISTS (SELECT 1 FROM case_submissions WHERE id=? AND status='rejected' AND reviewed_at=?)
+                ON CONFLICT(user_id) DO UPDATE SET balance=balance+1,updated_at=excluded.updated_at`)
+                .bind(current.user_id, values.reviewed_at, recordId, values.reviewed_at));
+            }
+            const results = await env.DB.batch(statements);
+            if (Number(results?.[0]?.meta?.changes || 0) !== 1) return json({ error: "This case has already been reviewed. Refresh the queue to see its current status." }, 409, origin);
+          } else {
+            await env.DB.prepare(caseUpdate).bind(...fields.map((field) => values[field]), recordId).run();
+          }
           await syncUserCaseCounters(env, current.user_id);
           return json(await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(recordId).first(), 200, origin);
         }
@@ -2553,16 +2635,50 @@ async function handleRequest(request, env, ctx) {
           const values = pick(body, allowed);
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No feedback fields to update" }, 400, origin);
-          await env.DB.prepare(`UPDATE feedbacks SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          if (["approved", "rejected"].includes(requestedStatus)) {
+            const result = await env.DB.prepare(`UPDATE feedbacks SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ? AND lower(COALESCE(status,'pending_review')) IN ('pending','pending_review')`).bind(...fields.map((field) => values[field]), recordId).run();
+            if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "This feedback has already been reviewed. Refresh the queue to see its current status." }, 409, origin);
+          } else {
+            await env.DB.prepare(`UPDATE feedbacks SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          }
           return json(await env.DB.prepare("SELECT * FROM feedbacks WHERE id = ?").bind(recordId).first(), 200, origin);
         }
         if (parts[2] === "resolutions" && recordId) {
           const body = await readJson(request);
+          const current = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first();
+          if (!current) return json({ error: "Payment proof not found" }, 404, origin);
           const allowed = ["status", "admin_confirmed", "admin_confirmed_at", "completed_at", "notes"];
           const values = pick(body, allowed);
           const fields = allowed.filter((field) => values[field] !== undefined);
           if (!fields.length) return json({ error: "No resolution fields to update" }, 400, origin);
-          await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          if (["completed", "disputed"].includes(String(values.status || "").toLowerCase())) {
+            const updateResolution = `UPDATE case_resolutions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ? AND lower(COALESCE(status,'')) IN ('pending','pending_confirmation','seeker_confirmed')`;
+            if (String(values.status).toLowerCase() === "completed" && [1, "1", true, "true"].includes(values.admin_confirmed)) {
+              const amount = Number(current.seeker_confirmed_amount ?? current.amount_paid ?? 0);
+              if (!Number.isFinite(amount) || amount < 0) return json({ error: "Payment proof has an invalid amount" }, 400, origin);
+              const fundraising = ["givethra", "contribution", "partial", "fundraising"].includes(String(current.paid_to ?? current.payment_type ?? "").trim().toLowerCase());
+              const reviewedAt = values.admin_confirmed_at || now();
+              values.admin_confirmed_at = reviewedAt;
+              if (values.completed_at === undefined) values.completed_at = reviewedAt;
+              if (!fields.includes("admin_confirmed_at")) fields.push("admin_confirmed_at");
+              if (!fields.includes("completed_at")) fields.push("completed_at");
+              const resolvedFields = fields;
+              const statements = [env.DB.prepare(`UPDATE case_resolutions SET ${resolvedFields.map((field) => `${field} = ?`).join(", ")} WHERE id = ? AND lower(COALESCE(status,'')) IN ('pending','pending_confirmation','seeker_confirmed')`)
+                .bind(...resolvedFields.map((field) => values[field]), recordId)];
+              statements.push(env.DB.prepare(`UPDATE case_submissions SET amount_collected=COALESCE(amount_collected,0)+?,
+                status=CASE WHEN ?=0 OR COALESCE(amount_collected,0)+? >= COALESCE(amount_needed,0)
+                  THEN CASE WHEN ?=1 THEN status ELSE 'completed' END ELSE status END
+                WHERE id=? AND EXISTS (SELECT 1 FROM case_resolutions WHERE id=? AND lower(status)='completed' AND admin_confirmed=1 AND admin_confirmed_at=?)`)
+                .bind(amount, fundraising ? 1 : 0, amount, fundraising ? 1 : 0, current.case_id, recordId, reviewedAt));
+              const results = await env.DB.batch(statements);
+              if (Number(results?.[0]?.meta?.changes || 0) !== 1) return json({ error: "This payment proof has already been reviewed. Refresh the queue to see its current status." }, 409, origin);
+            } else {
+              const result = await env.DB.prepare(updateResolution).bind(...fields.map((field) => values[field]), recordId).run();
+              if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "This payment proof has already been reviewed. Refresh the queue to see its current status." }, 409, origin);
+            }
+          } else {
+            await env.DB.prepare(`UPDATE case_resolutions SET ${fields.map((field) => `${field} = ?`).join(", ")} WHERE id = ?`).bind(...fields.map((field) => values[field]), recordId).run();
+          }
           const updated = await env.DB.prepare("SELECT * FROM case_resolutions WHERE id = ?").bind(recordId).first();
           if (updated && String(updated.status || "").toLowerCase() === "completed" && [1, "1", true, "true"].includes(updated.admin_confirmed)) {
             await synchronizeCompletedCase(env, recordId);
@@ -3136,26 +3252,37 @@ async function handleDreams(request, env, user, url, parts, origin) {
       if (!participation) return json({ error: "Participation not found" }, 404, origin);
       const body = await readJson(request); const next = String(body?.status || '').toLowerCase();
       if (!["approved","rejected","completed","cancelled"].includes(next)) return json({ error: "Invalid status" }, 400, origin);
-      if (next === "approved" && String(participation.status).toLowerCase() !== "approved") {
+      if (["approved", "rejected"].includes(next)) {
+        if (String(participation.status || "").toLowerCase() !== "pending_approval") return json({ error: "This Dream payment has already been reviewed. Refresh the queue to see its current status." }, 409, origin);
         const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM dream_participations WHERE dream_id=? AND lower(status) IN ('approved','active','completed')").bind(participation.dream_id).first();
         const dream = await env.DB.prepare("SELECT dream_price,participant_capacity FROM dreams WHERE id=?").bind(participation.dream_id).first();
-        if (Number(count?.count || 0) >= Number(dream?.participant_capacity || 0)) return json({ error: "Participant capacity has been reached" }, 409, origin);
-        const registration = `GT-DREAM-${String(Date.now()).slice(-6)}${Math.floor(Math.random()*10)}`;
+        if (next === "approved" && Number(count?.count || 0) >= Number(dream?.participant_capacity || 0)) return json({ error: "Participant capacity has been reached" }, 409, origin);
+        const registration = next === "approved" ? `GT-DREAM-${String(Date.now()).slice(-6)}${Math.floor(Math.random()*10)}` : participation.registration_number || null;
         const changedAt = now();
-        await env.DB.batch([
-          env.DB.prepare("UPDATE dream_participations SET status='approved',registration_number=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(registration,user.user_id,changedAt,changedAt,parts[3]),
-          env.DB.prepare("INSERT INTO dream_participation_history (id,participation_id,dream_id,user_id,from_status,to_status,note,registration_number,changed_by,changed_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id(),parts[3],participation.dream_id,participation.user_id,participation.status,"approved",`Participation approved. Registration number: ${registration}`,registration,user.user_id,changedAt),
-        ]);
-        if (Number(participation.credit_award || 0) > 0) await addCredits(env, participation.user_id, Number(participation.credit_award), "dream_participation", `Givethra Credit for ${participation.dream_name}`, parts[3]);
-        await sendNotification(env, participation.user_id, "dream_approved", "Dream Participation Approved", `Your participation in “${participation.dream_name}” is approved. Registration number: ${registration}. Your Givethra Credit has been credited.`, `/dreams/${participation.dream_id}`);
-      } else if (next === "rejected") {
         const reason = String(body?.rejection_reason || "Payment proof was not approved").trim().slice(0,2000);
-        const changedAt = now();
-        await env.DB.batch([
-          env.DB.prepare("UPDATE dream_participations SET status='rejected',rejection_reason=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=?").bind(reason,user.user_id,changedAt,changedAt,parts[3]),
-          env.DB.prepare("INSERT INTO dream_participation_history (id,participation_id,dream_id,user_id,from_status,to_status,note,registration_number,changed_by,changed_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id(),parts[3],participation.dream_id,participation.user_id,participation.status,"rejected",`Participation rejected. Reason: ${reason}`,participation.registration_number || null,user.user_id,changedAt),
-        ]);
-        await sendNotification(env, participation.user_id, "dream_rejected", "Dream Participation Rejected", `Your participation in “${participation.dream_name}” was rejected. Reason: ${reason}`, `/dreams/${participation.dream_id}`);
+        const approved = next === "approved";
+        const capacityPredicate = approved ? ` AND (SELECT COUNT(*) FROM dream_participations WHERE dream_id=? AND lower(status) IN ('approved','active','completed')) < COALESCE((SELECT participant_capacity FROM dreams WHERE id=?),0)` : "";
+        const statements = [env.DB.prepare(`UPDATE dream_participations SET status=?,registration_number=?,rejection_reason=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE id=? AND lower(COALESCE(status,''))='pending_approval'${capacityPredicate}`)
+          .bind(next, registration, approved ? null : reason, user.user_id, changedAt, changedAt, parts[3], ...(approved ? [participation.dream_id, participation.dream_id] : [])),
+        env.DB.prepare(`INSERT INTO dream_participation_history (id,participation_id,dream_id,user_id,from_status,to_status,note,registration_number,changed_by,changed_at)
+          SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM dream_participations WHERE id=? AND status=? AND reviewed_at=?)`)
+          .bind(id(), parts[3], participation.dream_id, participation.user_id, participation.status, next, approved ? `Participation approved. Registration number: ${registration}` : `Participation rejected. Reason: ${reason}`, registration, user.user_id, changedAt, parts[3], next, changedAt)];
+        if (approved && Number(participation.credit_award || 0) > 0) {
+          statements.push(env.DB.prepare(`INSERT INTO wallets (user_id,balance,updated_at)
+            SELECT p.user_id,d.credit_award,? FROM dream_participations p JOIN dreams d ON d.id=p.dream_id WHERE p.id=? AND p.status='approved' AND p.reviewed_at=?
+            ON CONFLICT(user_id) DO UPDATE SET balance=balance+excluded.balance,updated_at=excluded.updated_at`).bind(changedAt, parts[3], changedAt));
+          statements.push(env.DB.prepare(`INSERT INTO credit_transactions (id,user_id,amount,type,description,reference_id,status,created_at,updated_at)
+            SELECT ?,p.user_id,d.credit_award,'dream_participation',?,?, 'completed',?,? FROM dream_participations p JOIN dreams d ON d.id=p.dream_id
+            WHERE p.id=? AND p.status='approved' AND p.reviewed_at=?`).bind(id(), `Givethra Credit for ${participation.dream_name}`, parts[3], changedAt, changedAt, parts[3], changedAt));
+        }
+        const results = await env.DB.batch(statements);
+        if (Number(results?.[0]?.meta?.changes || 0) !== 1) return json({ error: approved ? "This Dream was just reviewed or participant capacity has been reached. Refresh the queue." : "This Dream payment was already reviewed. Refresh the queue." }, 409, origin);
+        let notificationSent = true;
+        try {
+          if (approved) await sendNotification(env, participation.user_id, "dream_approved", "Dream Participation Approved", `Your participation in “${participation.dream_name}” is approved. Registration number: ${registration}. Your Givethra Credit has been credited.`, `/dreams/${participation.dream_id}`);
+          else await sendNotification(env, participation.user_id, "dream_rejected", "Dream Participation Rejected", `Your participation in “${participation.dream_name}” was rejected. Reason: ${reason}`, `/dreams/${participation.dream_id}`);
+        } catch (error) { notificationSent = false; console.error("Dream review notification failed after saved decision", error); }
+        return json({ ...(await env.DB.prepare("SELECT * FROM dream_participations WHERE id=?").bind(parts[3]).first()), notification_sent: notificationSent }, 200, origin);
       } else {
         const changedAt = now();
         await env.DB.batch([
