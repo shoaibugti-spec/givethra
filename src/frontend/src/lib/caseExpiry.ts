@@ -29,7 +29,5 @@ export function isExpiredCaseRecord(
   if (status === "expired") return true;
   const publishedStatuses = new Set(["approved", "published", "active", "open", "in_progress", "live"]);
   if (publishedStatuses.has(status) && isCasePastDeadline(caseRecord.deadline, today)) return true;
-  const closedValue = String(caseRecord.closed_by_admin ?? "").trim().toLowerCase();
-  const closedByAdmin = closedValue === "1" || closedValue === "true";
-  return status === "completed" && closedByAdmin && isCasePastDeadline(caseRecord.deadline, today);
+  return false;
 }

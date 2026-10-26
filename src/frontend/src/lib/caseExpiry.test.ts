@@ -28,9 +28,9 @@ describe("case expiry dates", () => {
     expect(isCasePastDeadline("not-a-date", "2026-10-26")).toBe(false);
   });
 
-  it("keeps an expired case in history after Admin paid and closed it", () => {
+  it("keeps explicit Expired cases expired but preserves paid completed cases after their deadline", () => {
     expect(isExpiredCaseRecord({ status: "expired" }, "2026-10-26")).toBe(true);
-    expect(isExpiredCaseRecord({ status: "completed", closed_by_admin: 1, deadline: "2026-10-25" }, "2026-10-26")).toBe(true);
-    expect(isExpiredCaseRecord({ status: "completed", closed_by_admin: 0, deadline: "2026-10-25" }, "2026-10-26")).toBe(false);
+    expect(isExpiredCaseRecord({ status: "completed", closed_by_admin: 1, deadline: "2026-09-30" }, "2026-10-26")).toBe(false);
+    expect(isExpiredCaseRecord({ status: "completed", closed_by_admin: 0, deadline: "2026-09-30" }, "2026-10-26")).toBe(false);
   });
 });
