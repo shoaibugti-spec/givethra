@@ -28,7 +28,7 @@ import {
   getCasesByIds,
 } from "@/lib/api";
 import { isTrulyCompletedHelp, isContributionResolution } from "@/lib/resolutionStatus";
-import { isCasePastDeadline } from "@/lib/caseExpiry";
+import { isCasePastDeadline, isExpiredCaseRecord } from "@/lib/caseExpiry";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$", PKR: "Rs", SAR: "SAR", AED: "AED", GBP: "£", EUR: "€", INR: "₹",
@@ -53,7 +53,7 @@ type HelpRecord = {
   transactionId: string;
   receiptUrl: string | null;
   helpType: "contribution" | "direct" | "unlock";
-  helpStatus: "completed" | "pending" | "rejected";
+  helpStatus: "completed" | "pending" | "rejected" | "expired";
   isApproved: boolean;
   completedAt: string | null;
   hasAffidavit: boolean;
@@ -74,7 +74,7 @@ export default function MyCasesPage() {
   const [activeTab, setActiveTab] = useState<"mycases" | "myhelp">("mycases");
   const [myCaseStatusFilter, setMyCaseStatusFilter] = useState("completed");
   const [helpTypeFilter, setHelpTypeFilter] = useState<"all" | "contribution" | "direct">("all");
-  const [helpStatusFilter, setHelpStatusFilter] = useState<"all" | "pending" | "completed" | "rejected">("all");
+  const [helpStatusFilter, setHelpStatusFilter] = useState<"all" | "pending" | "completed" | "rejected" | "expired">("all");
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -157,7 +157,10 @@ export default function MyCasesPage() {
         const isApproved = isTrulyCompletedHelp(resolution);
         const isContribution = isContributionResolution(resolution);
         const rawStatus = String(resolution.status || "").toLowerCase();
-        const helpStatus: HelpRecord["helpStatus"] = isApproved
+        const expiredContribution = isContribution && isApproved && isExpiredCaseRecord(c, utcToday);
+        const helpStatus: HelpRecord["helpStatus"] = expiredContribution
+          ? "expired"
+          : isApproved
           ? "completed"
           : ["rejected", "disputed"].includes(rawStatus)
           ? "rejected"
@@ -325,11 +328,12 @@ export default function MyCasesPage() {
     const cfg = statusConfig[r.helpStatus] ?? statusConfig.pending;
     const s = sym(r.currency);
     const isCompleted = r.helpStatus === "completed";
+    const isExpired = r.helpStatus === "expired";
     const isRejected = r.helpStatus === "rejected";
     const typeLabel = r.helpType === "contribution" ? "🤝 Contribution" : r.helpType === "unlock" ? "🔓 Unlock Only" : "🦸 Direct Help";
 
     return (
-      <div className={`rounded-xl border p-4 space-y-3 ${isRejected ? "border-red-300 bg-red-50/50 dark:bg-red-950/10" : isCompleted ? "border-green-300 bg-green-50/50 dark:bg-green-950/10" : "bg-card"}`}>
+      <div className={`rounded-xl border p-4 space-y-3 ${isRejected ? "border-red-300 bg-red-50/50 dark:bg-red-950/10" : isExpired ? "border-amber-300 bg-amber-50/50" : isCompleted ? "border-green-300 bg-green-50/50 dark:bg-green-950/10" : "bg-card"}`}>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.color}`}>
@@ -345,13 +349,14 @@ export default function MyCasesPage() {
           {r.amount > 0 && (
             <p className="text-xs font-medium text-foreground">{s} {r.amount} {r.currency}</p>
           )}
+          {isExpired && <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">This case expired. Your verified contribution remains in your history; its proof and affidavit are still available.</p>}
           {r.transactionId && r.transactionId !== "N/A" && (
             <p className="text-xs text-muted-foreground">TXN: <span className="font-mono">{r.transactionId}</span></p>
           )}
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {isCompleted && r.hasAffidavit && (
+          {r.isApproved && r.hasAffidavit && (
             <Button
               size="sm"
               className="flex-1 gap-1.5 bg-green-600 hover:bg-green-700 text-white min-w-[120px]"
@@ -360,7 +365,7 @@ export default function MyCasesPage() {
               <FileText className="h-3.5 w-3.5" /> View Affidavit
             </Button>
           )}
-          {isCompleted && r.receiptUrl && (
+          {r.isApproved && r.receiptUrl && (
             <Button
               size="sm"
               variant="outline"
@@ -395,6 +400,7 @@ export default function MyCasesPage() {
   function displayCaseStatus(c: any) {
     const status = String(c.status || "").toLowerCase();
     const publishedStatuses = ["approved", "published", "active", "open", "in_progress"];
+    if (isExpiredCaseRecord(c, utcToday)) return "expired";
     if (publishedStatuses.includes(status) && isCasePastDeadline(c.deadline, utcToday)) return "expired";
     return status;
   }
@@ -446,7 +452,7 @@ export default function MyCasesPage() {
                   <TabsTrigger value="rejected">Rejected</TabsTrigger>
                   <TabsTrigger value="approved">Approved</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
-                  <TabsTrigger value="expired">Expired</TabsTrigger>
+                  <TabsTrigger value="expired">Expired ({myCases.filter((c) => displayCaseStatus(c) === "expired").length})</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -473,11 +479,12 @@ export default function MyCasesPage() {
               </Tabs>
 
               <Tabs value={helpStatusFilter} onValueChange={(v) => setHelpStatusFilter(v as any)} className="w-full">
-                <TabsList className="grid grid-cols-4 w-full">
+                <TabsList className="grid grid-cols-5 w-full">
                   <TabsTrigger value="all">All Status</TabsTrigger>
                   <TabsTrigger value="pending">Pending</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
                   <TabsTrigger value="rejected">Rejected</TabsTrigger>
+                  <TabsTrigger value="expired">Expired ({helpRecords.filter((r) => r.helpStatus === "expired").length})</TabsTrigger>
                 </TabsList>
               </Tabs>
 

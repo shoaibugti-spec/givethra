@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import AdminDonationsPanel from "@/components/AdminDonationsPanel";
 import AdminDreamsPanel from "@/components/AdminDreamsPanel";
+import { isExpiredCaseRecord } from "@/lib/caseExpiry";
 import {
   adminGetAllKyc,
   adminGetAllCases,
@@ -616,6 +617,10 @@ export default function AdminPage() {
   }
 
   async function markAsPaidAndClose(c: any, receiptUrl: string) {
+    if (!String(receiptUrl || c.paid_receipt_url || "").trim()) {
+      toast.error("Upload the institute payment receipt before closing this case.");
+      return;
+    }
     try {
       await adminCloseCase(c.id, { status: "completed", closed_by_admin: true, paid_receipt_url: receiptUrl || null });
       if (c.user_id) {
@@ -633,7 +638,8 @@ export default function AdminPage() {
     const trimmed = String(reason || "").trim();
     if (!trimmed) { toast.error("Please provide a reason before returning this case."); return; }
     try {
-      await adminCloseCase(c.id, { status: "approved", closed_by_admin: false, rejection_reason: trimmed, paid_receipt_url: null });
+      const nextStatus = isExpiredCaseRecord(c) ? "expired" : "approved";
+      await adminCloseCase(c.id, { status: nextStatus, closed_by_admin: false, rejection_reason: trimmed, paid_receipt_url: null });
       toast.success("Pay & Close request returned for review.");
       loadData();
     } catch (error: any) {
@@ -717,8 +723,8 @@ export default function AdminPage() {
   const pendingCases = caseList.filter((c) => normalizedAdminStatus(c.status) === "pending");
   const approvedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "approved").length;
   const rejectedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "rejected").length;
-  const completedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "completed").length;
-  const expiredCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "expired").length;
+  const completedCasesCount = caseList.filter((c) => normalizedAdminStatus(c.status) === "completed" && !isExpiredCaseRecord(c)).length;
+  const expiredCasesCount = caseList.filter((c) => isExpiredCaseRecord(c)).length;
 
   const pendingDeposits = deposits.filter((d) => normalizedAdminStatus(d.status) === "pending");
   const approvedDepositsCount = deposits.filter((d) => normalizedAdminStatus(d.status) === "approved").length;
@@ -747,14 +753,15 @@ export default function AdminPage() {
   const paidCases = caseList.filter((c) => !c.was_free);
 
   const readyToClose = caseList.filter((c) => {
-    if (!['approved', 'expired'].includes(String(c.status || '').toLowerCase())) return false;
+    if (!["approved", "expired"].includes(String(c.status || '').toLowerCase())) return false;
     const needed = Number(c.amount_needed ?? 0);
     const collected = Number(c.amount_collected ?? 0);
-    return needed > 0 && collected >= needed && !c.closed_by_admin;
+    const expiredPartialFunding = String(c.status || '').toLowerCase() === "expired" && collected > 0;
+    return needed > 0 && !c.closed_by_admin && !c.rejection_reason && (collected >= needed || expiredPartialFunding);
   });
 
   const paidPayClose = caseList.filter((c) => c.status === "completed" && c.closed_by_admin);
-const rejectedPayClose = caseList.filter((c) => c.status === "approved" && !c.closed_by_admin && c.rejection_reason);
+  const rejectedPayClose = caseList.filter((c) => ["approved", "expired"].includes(String(c.status || "").toLowerCase()) && !c.closed_by_admin && c.rejection_reason);
   
   const usersList = profiles.map((p) => {
     const uid = p.user_id;
@@ -1235,12 +1242,14 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
   const [search, setSearch] = useState("");
   const sortedCases = [...caseList].sort((a, b) => {
     const order: Record<string, number> = { pending: 0, approved: 1, rejected: 2, completed: 3, expired: 4 };
-    return (order[normalizedAdminStatus(a.status)] ?? 5) - (order[normalizedAdminStatus(b.status)] ?? 5);
+    const statusA = isExpiredCaseRecord(a) ? "expired" : normalizedAdminStatus(a.status);
+    const statusB = isExpiredCaseRecord(b) ? "expired" : normalizedAdminStatus(b.status);
+    return (order[statusA] ?? 5) - (order[statusB] ?? 5);
   });
 
   const filteredByStatus = statusFilter === "all" 
     ? sortedCases 
-    : sortedCases.filter((c: any) => normalizedAdminStatus(c.status) === statusFilter);
+    : sortedCases.filter((c: any) => (isExpiredCaseRecord(c) ? "expired" : normalizedAdminStatus(c.status)) === statusFilter);
 
   const query = search.trim().toLowerCase();
   const digits = search.replace(/\D/g, "");
@@ -1266,7 +1275,7 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
           >
             {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
             <span className="ml-1 text-[10px] opacity-70">
-              ({caseList.filter((c: any) => status === "all" || normalizedAdminStatus(c.status) === status).length})
+              ({caseList.filter((c: any) => status === "all" || (isExpiredCaseRecord(c) ? "expired" : normalizedAdminStatus(c.status)) === status).length})
             </span>
           </button>
         ))}
@@ -1281,7 +1290,7 @@ function CaseSearchBox({ caseList, onUpdate, resolutions, profileMap, cnicByUser
         filtered.map((c: any) => (
           <CaseCard
             key={c.id}
-            c={c}
+            c={isExpiredCaseRecord(c) ? { ...c, status: "expired" } : c}
             onUpdate={onUpdate}
             resolutions={resolutions[c.id] ?? []}
             profileMap={profileMap}
@@ -2176,17 +2185,25 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
 
   const paidReceiptUrl = c.paid_receipt_url;
   const isExpired = String(c.status || '').toLowerCase() === 'expired';
+  const amountNeeded = Number(c.amount_needed || 0);
+  const amountCollected = Number(c.amount_collected || 0);
+  const goalShortfall = Math.max(amountNeeded - amountCollected, 0);
 
   return (
     <div className="rounded-xl border-2 border-teal-300 bg-card p-4 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isExpired ? "bg-amber-100 text-amber-700" : "bg-teal-100 text-teal-700"}`}>{isExpired ? "DEADLINE PASSED — FUNDS READY" : "GOAL REACHED 🎉"}</span>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isExpired ? "bg-amber-100 text-amber-700" : "bg-teal-100 text-teal-700"}`}>{isExpired ? (amountCollected >= amountNeeded ? "DEADLINE PASSED — GOAL REACHED" : "EXPIRED — PARTIAL CONTRIBUTIONS") : "GOAL REACHED 🎉"}</span>
         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{c.category}</span>
         {c.closed_by_admin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">PAID</span>}
         {c.rejection_reason && c.status !== "completed" && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">REJECTED</span>}
       </div>
       <p className="font-semibold text-sm">{c.title}</p>
-      <p className="text-xs text-teal-600 font-medium">Raised: {s} {c.amount_collected} of {s} {c.amount_needed} ✅{isExpired ? " · Case deadline passed" : ""}</p>
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs space-y-1">
+        <p className="font-semibold text-foreground">Verified contributions: {s} {amountCollected} of {s} {amountNeeded}</p>
+        {amountCollected > 0 && <p className="font-semibold text-amber-800">Verified amount to pay the institute: {s} {amountCollected} {cur}</p>}
+        {goalShortfall > 0 && <p className="text-amber-800">Below the fundraising goal by: {s} {goalShortfall} {cur}</p>}
+        {isExpired && <p className="text-amber-800">This expired case had verified contributions and is kept here for payment and closure. The receipt will remain in the case history.</p>}
+      </div>
 
       <div className="rounded-lg bg-muted/40 border border-border p-2.5 text-xs space-y-0.5">
         <p className="font-semibold flex items-center gap-1"><Users className="h-3 w-3" /> Seeker</p>
@@ -2221,7 +2238,7 @@ function PayCloseCard({ c, profileMap, onClose, onReject }: any) {
           <Input type="file" accept="image/*,.pdf" onChange={(e) => uploadReceipt(e.target.files?.[0] ?? null)} className="text-sm" />
           {uploading && <p className="text-xs text-amber-600">⏳ Uploading...</p>}
           {receiptUrl && <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Receipt uploaded</p>}
-          <Button type="button" size="sm" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={closing || uploading}
+          <Button type="button" size="sm" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={closing || uploading || (!receiptUrl && !paidReceiptUrl)}
             onClick={async () => { setClosing(true); await onClose(c, receiptUrl); setClosing(false); }}>
             <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve & Mark as Paid
           </Button>

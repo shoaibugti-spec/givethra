@@ -38,10 +38,12 @@ describe("Admin payment review queues", () => {
     expect(source).toContain("Rejection reason: {r.rejection_reason || r.notes || \"Not provided\"}");
   });
 
-  it("limits Pay & Close to approved or expired fully funded cases that are not already closed", () => {
+  it("allows expired partial contributions into Pay & Close but excludes zero-help expiries", () => {
     expect(source).toContain("const readyToClose = caseList.filter((c) => {");
-    expect(source).toContain("['approved', 'expired'].includes(String(c.status || '').toLowerCase())");
-    expect(source).toContain("needed > 0 && collected >= needed && !c.closed_by_admin");
+    expect(source).toContain('!["approved", "expired"].includes(String(c.status || \'\').toLowerCase())');
+    expect(source).toContain('const expiredPartialFunding = String(c.status || \'\').toLowerCase() === "expired" && collected > 0;');
+    expect(source).toContain("collected >= needed || expiredPartialFunding");
+    expect(source).toContain("Verified amount to pay the institute");
   });
 
   it("keeps existing approval and rejection actions on pending cards", () => {

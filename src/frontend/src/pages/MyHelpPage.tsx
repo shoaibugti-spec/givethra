@@ -24,6 +24,7 @@ import {
   getCasesByIds,
 } from "@/lib/api";
 import { isTrulyCompletedHelp, isContributionResolution, resolutionDisplayStatus } from "@/lib/resolutionStatus";
+import { isExpiredCaseRecord } from "@/lib/caseExpiry";
 import { toast } from "sonner";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -140,7 +141,7 @@ export default function MyHelpPage() {
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<any[]>([]);
   const [filterType, setFilterType] = useState<"all" | "contribution" | "direct">("all");
-  const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "completed" | "rejected">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "completed" | "rejected" | "expired">("all");
 
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
@@ -200,7 +201,8 @@ export default function MyHelpPage() {
         const resolutionStatus = String(resolution?.status || "").trim().toLowerCase();
         const isApproved = isTrulyCompletedHelp(resolution) || resolutionStatus === "completed" || String(caseRecord.status || "").toLowerCase() === "completed";
         const isContribution = isContributionResolution(resolution);
-        const statusDisplay = isApproved ? "completed" : resolutionDisplayStatus(resolution);
+        const expiredContribution = isContribution && isApproved && isExpiredCaseRecord(caseRecord);
+        const statusDisplay = expiredContribution ? "expired" : isApproved ? "completed" : resolutionDisplayStatus(resolution);
 
         recordList.push({
           id: resolution.id,
@@ -300,6 +302,7 @@ export default function MyHelpPage() {
     pending: { icon: <Clock className="h-3.5 w-3.5" />, label: "Pending", color: "bg-orange-100 text-orange-700" },
     rejected: { icon: <XCircle className="h-3.5 w-3.5" />, label: "Rejected", color: "bg-red-100 text-red-700" },
     completed: { icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "Completed", color: "bg-green-100 text-green-700" },
+    expired: { icon: <Calendar className="h-3.5 w-3.5" />, label: "Expired", color: "bg-amber-100 text-amber-800" },
   };
 
   return (
@@ -332,11 +335,12 @@ export default function MyHelpPage() {
                 </TabsList>
               </Tabs>
               <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
-                <TabsList className="grid grid-cols-4 w-full">
+                <TabsList className="grid grid-cols-5 w-full">
                   <TabsTrigger value="all">All Status</TabsTrigger>
                   <TabsTrigger value="pending">Pending</TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
                   <TabsTrigger value="rejected">Rejected</TabsTrigger>
+                  <TabsTrigger value="expired">Expired</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -352,9 +356,12 @@ export default function MyHelpPage() {
                   const cur = record.currency || "PKR";
                   const s = sym(cur);
                   const isCompleted = record.status === "completed";
+                  const isExpired = record.status === "expired";
                   const isRejected = record.status === "rejected";
                   const isUnlockOnly = record.isUnlockOnly;
-                  const outcomeMessage = isUnlockOnly
+                  const outcomeMessage = isExpired
+                    ? "This case expired after your verified contribution. Your contribution record, payment proof, and affidavit remain available here."
+                    : isUnlockOnly
                     ? "🤲 Newborn Hero — you unlocked this case and took the first step toward helping."
                     : record.type === "contribution"
                       ? "🌱 Young Hero — your contribution joined other kind hearts and helped complete this case. May Allah accept your share."
@@ -456,11 +463,11 @@ export default function MyHelpPage() {
                   }
 
                   // paid_completed (Payment Proof + Affidavit)
-                  if (record.type === "contribution" && isCompleted) {
+                  if (record.type === "contribution" && (isCompleted || isExpired)) {
                     return (
                       <div
                         key={record.id}
-                        className="rounded-xl border p-4 space-y-3 border-green-300 bg-green-50/50 dark:bg-green-950/10"
+                        className={`rounded-xl border p-4 space-y-3 ${isExpired ? "border-amber-300 bg-amber-50/50" : "border-green-300 bg-green-50/50 dark:bg-green-950/10"}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-1.5 flex-1 min-w-0">

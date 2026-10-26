@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCasePastDeadline } from "./caseExpiry";
+import { isCasePastDeadline, isExpiredCaseRecord } from "./caseExpiry";
 
 describe("case expiry dates", () => {
   it("keeps a case available through its deadline date", () => {
@@ -14,5 +14,11 @@ describe("case expiry dates", () => {
   it("does not expire missing or invalid deadlines", () => {
     expect(isCasePastDeadline(null, "2026-10-26")).toBe(false);
     expect(isCasePastDeadline("not-a-date", "2026-10-26")).toBe(false);
+  });
+
+  it("keeps an expired case in history after Admin paid and closed it", () => {
+    expect(isExpiredCaseRecord({ status: "expired" }, "2026-10-26")).toBe(true);
+    expect(isExpiredCaseRecord({ status: "completed", closed_by_admin: 1, deadline: "2026-10-25" }, "2026-10-26")).toBe(true);
+    expect(isExpiredCaseRecord({ status: "completed", closed_by_admin: 0, deadline: "2026-10-25" }, "2026-10-26")).toBe(false);
   });
 });

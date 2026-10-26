@@ -858,16 +858,37 @@ async function handleKyc(request, env, user, url, parts, origin) {
 
 async function expireDueCases(env) {
   if (!env?.DB) return;
-  // Deadlines are stored as YYYY-MM-DD. Expire only still-open published cases;
-  // completed/closed cases must remain completed for payment and feedback history.
+  // Deadlines are stored as YYYY-MM-DD. Expire only published/open cases;
+  // completed/closed cases remain completed for payment and feedback history.
   const today = new Date().toISOString().slice(0, 10);
-  await env.DB.prepare(
-    `UPDATE case_submissions
-     SET status = 'expired'
-     WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active')
+  const due = await env.DB.prepare(
+    `SELECT id, user_id, title FROM case_submissions
+     WHERE lower(COALESCE(status, '')) IN ('approved', 'published', 'active', 'open', 'in_progress')
        AND deadline IS NOT NULL AND date(deadline) < date(?)
        AND COALESCE(closed_by_admin, 0) = 0`
-  ).bind(today).run();
+  ).bind(today).all();
+  const affectedUsers = new Set();
+  for (const item of due.results || []) {
+    const result = await env.DB.prepare(
+      `UPDATE case_submissions SET status = 'expired'
+       WHERE id = ? AND lower(COALESCE(status, '')) IN ('approved', 'published', 'active', 'open', 'in_progress')
+         AND deadline IS NOT NULL AND date(deadline) < date(?)
+         AND COALESCE(closed_by_admin, 0) = 0`
+    ).bind(item.id, today).run();
+    if (Number(result?.meta?.changes || 0) !== 1) continue;
+    if (item.user_id) affectedUsers.add(String(item.user_id));
+    if (item.user_id) {
+      try {
+        await sendNotification(env, item.user_id, "case_expired", "Your case has expired", `Your case “${item.title || "Help request"}” reached its expiry date and has been moved to My Cases → Expired. You can submit a new request.`, "/my-cases");
+      } catch (error) {
+        console.error("Case expired; requester notification failed", item.id, error);
+      }
+    }
+  }
+  for (const userId of affectedUsers) {
+    try { await syncUserCaseCounters(env, userId); }
+    catch (error) { console.error("Case expired; requester counters could not be synchronized", userId, error); }
+  }
 }
 
 function decodeCaseRow(row) {
@@ -898,8 +919,12 @@ async function handleCases(request, env, user, url, parts, origin) {
       if (!ids.length) return json([], 200, origin);
       const placeholders = ids.map(() => "?").join(", ");
       const publicVisitor = !user;
-      const visibility = isAdmin(user) || publicVisitor ? " AND lower(status) IN ('approved', 'published', 'active', 'completed')" : " AND (user_id = ? OR lower(status) IN ('approved', 'published', 'active', 'completed'))";
-      const params = isAdmin(user) || publicVisitor ? ids : [...ids, user.user_id];
+      const visibility = isAdmin(user) ? "" : publicVisitor
+        ? " AND lower(status) IN ('approved', 'published', 'active', 'completed')"
+        : ` AND (user_id = ? OR lower(status) IN ('approved', 'published', 'active', 'completed')
+            OR (lower(status) = 'expired' AND (EXISTS (SELECT 1 FROM case_unlocks u WHERE u.case_id=case_submissions.id AND u.hero_id=?)
+              OR EXISTS (SELECT 1 FROM case_resolutions r WHERE r.case_id=case_submissions.id AND r.hero_id=?))))`;
+      const params = isAdmin(user) || publicVisitor ? ids : [...ids, user.user_id, user.user_id, user.user_id];
       const rows = await env.DB.prepare(`SELECT * FROM case_submissions WHERE id IN (${placeholders})${visibility}`).bind(...params).all();
       const found = new Map((rows.results || []).map((row) => [row.id, decodeCaseRow(row)]));
       return json(ids.map((value) => found.get(value)).filter(Boolean), 200, origin);
@@ -920,7 +945,7 @@ async function handleCases(request, env, user, url, parts, origin) {
       const status = String(row.status || "").toLowerCase();
       let allowed = isAdmin(user) || row.user_id === user.user_id || ["approved", "published", "active"].includes(status);
 
-      if (!allowed && status === "completed" && user?.user_id) {
+      if (!allowed && ["completed", "expired"].includes(status) && user?.user_id) {
         const access = await env.DB.prepare(
           `SELECT 1 AS allowed FROM case_unlocks WHERE case_id = ? AND hero_id = ?
            UNION ALL
@@ -2619,6 +2644,20 @@ async function handleRequest(request, env, ctx) {
             }
             const results = await env.DB.batch(statements);
             if (Number(results?.[0]?.meta?.changes || 0) !== 1) return json({ error: "This case has already been reviewed. Refresh the queue to see its current status." }, 409, origin);
+          } else if (parts[4] === "close" && reviewStatus === "completed" && values.closed_by_admin) {
+            const currentStatus = String(current.status || "").toLowerCase();
+            const collected = Number(current.amount_collected || 0);
+            const receiptUrl = String(values.paid_receipt_url || current.paid_receipt_url || "").trim();
+            if (!["approved", "expired"].includes(currentStatus) || current.closed_by_admin) {
+              return json({ error: "This case is no longer eligible for Pay & Close." }, 409, origin);
+            }
+            if (Number(current.amount_needed || 0) <= 0 || collected <= 0) {
+              return json({ error: "Pay & Close is only available when verified contributions exist." }, 409, origin);
+            }
+            if (!receiptUrl) return json({ error: "Upload the institute payment receipt before closing this case." }, 400, origin);
+            const result = await env.DB.prepare(`${caseUpdate} AND lower(COALESCE(status,'')) IN ('approved','expired') AND COALESCE(closed_by_admin,0)=0`)
+              .bind(...fields.map((field) => values[field]), recordId).run();
+            if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "This case was already closed by another administrator. Refresh to see the latest status." }, 409, origin);
           } else {
             await env.DB.prepare(caseUpdate).bind(...fields.map((field) => values[field]), recordId).run();
           }
