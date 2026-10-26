@@ -421,6 +421,7 @@ export default function KycPage() {
   const [manualCnicNumber, setManualCnicNumber] = useState("");
   const [capturing, setCapturing] = useState(false);
   const [focusing, setFocusing] = useState(false);
+  const [focusHint, setFocusHint] = useState("");
   const [capturedBlur, setCapturedBlur] = useState<number | null>(null);
   const captureRunRef = useRef(0);
   const [torchSupported, setTorchSupported] = useState(false);
@@ -630,17 +631,64 @@ export default function KycPage() {
     return false;
   }
 
-  // Attach the stream once the <video> element exists (more reliable than a timer).
+  // Attach the stream once the <video> element exists. Document capture stays
+  // disabled until several consecutive live frames inside the guide are sharp.
   useEffect(() => {
     const v = videoRef.current;
     if (activeCamera && stream && v) {
       v.srcObject = stream;
       const p = v.play?.();
       if (p && typeof p.catch === "function") p.catch(() => {});
-      // Give the camera a moment to settle its focus before a photo is allowed.
       setFocusing(true);
-      const t = setTimeout(() => setFocusing(false), 1200);
-      return () => clearTimeout(t);
+      setFocusHint(activeCamera === "selfie"
+        ? "Camera is settling — hold still for a moment."
+        : "Checking focus — hold the phone steady and keep the whole CNIC inside the frame.");
+
+      let sharpFrames = 0;
+      let cancelled = false;
+      let selfieReadyTimer: ReturnType<typeof setTimeout> | undefined;
+      const scanFocus = () => {
+        if (cancelled || activeCamera === "selfie") return;
+        let sample: HTMLCanvasElement | null = null;
+        let score = 1;
+        try {
+          // Match the 800 px scale used to calibrate BLUR_MAX on captured cards.
+          sample = grabFrame(800);
+          if (sample) score = blurOfCanvas(sample);
+        } catch {
+          score = 1;
+        } finally {
+          if (sample) { sample.width = 0; sample.height = 0; }
+        }
+
+        if (score <= BLUR_MAX) {
+          sharpFrames++;
+          if (sharpFrames >= 3) {
+            setFocusing(false);
+            setFocusHint("Image is clear and in focus — you can capture now.");
+          } else {
+            setFocusHint("Image is getting clear — keep the phone steady.");
+          }
+        } else {
+          sharpFrames = 0;
+          setFocusing(true);
+          setFocusHint("Still focusing — hold steady, flatten the CNIC, and improve the light if needed.");
+        }
+      };
+
+      const scanTimer = activeCamera === "selfie" ? undefined : setInterval(scanFocus, 350);
+      if (activeCamera === "selfie") {
+        selfieReadyTimer = setTimeout(() => {
+          if (cancelled) return;
+          setFocusing(false);
+          setFocusHint("Camera is ready — you can capture now.");
+        }, 1200);
+      }
+      return () => {
+        cancelled = true;
+        if (scanTimer) clearInterval(scanTimer);
+        if (selfieReadyTimer) clearTimeout(selfieReadyTimer);
+      };
     }
   }, [activeCamera, stream]);
 
@@ -660,6 +708,8 @@ export default function KycPage() {
 
   async function startPhotoCamera(target: string) {
     setCameraProblem(null);
+    setFocusing(true);
+    setFocusHint("Starting camera and checking focus...");
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
         throw new DOMException("Camera API unavailable", "NotSupportedError");
@@ -779,7 +829,7 @@ export default function KycPage() {
   }
 
   async function captureImage() {
-    if (capturing) return;
+    if (capturing || focusing) return;
     setOcrError(null);
     setOcrFailed(false);
     setManualEntryAllowed(false);
@@ -1352,6 +1402,18 @@ export default function KycPage() {
             )
           )}
 
+          <div
+            role="status"
+            aria-live="polite"
+            className={`rounded-lg border p-3 text-center text-sm ${
+              !focusing
+                ? "border-teal-300 bg-teal-50 text-teal-800 dark:bg-teal-950/20 dark:text-teal-300"
+                : "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-300"
+            }`}
+          >
+            {focusHint || "Hold steady while the camera checks image focus."}
+          </div>
+
           <canvas ref={canvasRef} className="hidden" />
 
           <div className="flex gap-3">
@@ -1365,7 +1427,7 @@ export default function KycPage() {
             )}
             <Button className="flex-1" onClick={captureImage} disabled={capturing || focusing}>
               <Camera className="h-4 w-4 mr-2" />
-              {capturing ? "Hold still..." : focusing ? "Focusing..." : "Capture"}
+              {capturing ? "Hold still..." : focusing ? "Checking focus..." : "Capture"}
             </Button>
           </div>
         </div>

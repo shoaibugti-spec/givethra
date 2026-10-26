@@ -65,4 +65,14 @@ describe("submission and admin reliability", () => {
     expect(kycSource).toContain("Retry status check");
     expect(kycSource).toContain("!loadError && (!submission || reapplying)");
   });
+
+  it("only allows CNIC capture after repeated clear live focus samples", () => {
+    expect(kycSource).toContain("setInterval(scanFocus, 350)");
+    expect(kycSource).toContain("if (score <= BLUR_MAX)");
+    expect(kycSource).toContain("sharpFrames >= 3");
+    expect(kycSource).toContain("if (capturing || focusing) return;");
+    expect(kycSource).toContain(
+      "Image is clear and in focus — you can capture now.",
+    );
+  });
 });
