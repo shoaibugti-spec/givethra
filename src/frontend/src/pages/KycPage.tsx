@@ -895,18 +895,26 @@ export default function KycPage() {
     setCapturedCanvas(best);
     setCapturedKind(kind);
 
+    // Start reading the front photo immediately so the user does not need an
+    // extra "Verify & Confirm" tap before reviewing the detected number.
+    if (kind === "front") void verifyCapturedImage(best, kind, bestBlur);
+
     stream?.getTracks().forEach(t => t.stop());
     setStream(null);
     setActiveCamera(null);
   }
 
-  async function verifyCapturedImage() {
-    if (!capturedCanvas || !capturedKind) {
+  async function verifyCapturedImage(
+    imageCanvas: HTMLCanvasElement | null = capturedCanvas,
+    imageKind: "front" | "back" | "selfie" | null = capturedKind,
+    imageBlur: number | null = capturedBlur,
+  ) {
+    if (!imageCanvas || !imageKind) {
       toast.error("Pehle tasveer capture karein.");
       return;
     }
 
-    if (capturedKind === "front") {
+    if (imageKind === "front") {
       setOcrProcessing(true);
       setOcrError(null);
       setOcrFailed(false);
@@ -916,7 +924,7 @@ export default function KycPage() {
         // The photo is NOT rejected for being slightly blurry or dim: older phones
         // often take soft photos. If the number can be read, the photo is accepted.
         const { number, isCnic } = await readCnicNumber(
-          capturedCanvas,
+          imageCanvas,
           (step, total) => setOcrStatus(`Reading the number from the photo... (${step}/${total})`),
           (status) => setOcrStatus(status),
         );
@@ -934,9 +942,9 @@ export default function KycPage() {
           setOcrError(
             number
               ? "This does not look like the front of a CNIC. Photograph the CNIC card itself, with the whole card inside the frame."
-              : capturedBlur !== null && capturedBlur > BLUR_MAX
+              : imageBlur !== null && imageBlur > BLUR_MAX
                 ? BLUR_MESSAGE
-                : meanBrightness(capturedCanvas) < 55
+                : meanBrightness(imageCanvas) < 55
                   ? "The CNIC number could not be read because the photo is too dark. Move to a bright place (or use the flashlight button) and retake it."
                   : "The CNIC number could not be read. Place the CNIC flat inside the frame, in good light, hold the phone steady for a second, and retake.",
           );
@@ -951,7 +959,7 @@ export default function KycPage() {
         setOcrError("Automatic reading is unavailable right now. Your photo is still saved here. Retry, or enter the 13-digit CNIC manually; our verification team will review the photo.");
       }
     } else {
-      finalizeCapture(capturedKind, capturedCanvas);
+      finalizeCapture(imageKind, imageCanvas);
     }
   }
 
@@ -1493,7 +1501,7 @@ export default function KycPage() {
             <div className="rounded-xl bg-teal-500/10 border border-teal-500/20 p-3 text-sm text-teal-800 dark:text-teal-300">
               {ocrDetectedNumber
                 ? "✅ CNIC number read from your photo. Check every digit below, correct anything that is wrong, then confirm to use it."
-                : "✅ Photo captured. Select \"Verify & Confirm\" to detect the CNIC number. You can review and correct it before using it."}
+                : "✅ Photo captured. We are reading the CNIC number automatically. Check the photo and confirm or correct the number when it appears."}
             </div>
           )}
 

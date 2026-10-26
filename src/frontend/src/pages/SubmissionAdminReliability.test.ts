@@ -62,6 +62,8 @@ describe("submission and admin reliability", () => {
 
   it("shows the OCR-read CNIC for correction before saving the captured photo", () => {
     const successBranch = kycSource.split("if (number && isCnic) {")[1]?.split("} else {")[0] || "";
+    const captureFunction = kycSource.split("async function captureImage()")[1]?.split("async function verifyCapturedImage(")[0] || "";
+    expect(captureFunction).toContain("if (kind === \"front\") void verifyCapturedImage(best, kind, bestBlur);");
     expect(successBranch).toContain("setOcrDetectedNumber(number)");
     expect(successBranch).toContain("setManualCnicNumber(number.replace(/\\D/g, \"\"))");
     expect(successBranch).not.toContain("finalizeCapture");
