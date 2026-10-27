@@ -7,7 +7,7 @@ const workerSource = fs.readFileSync(path.join(process.cwd(), "worker.js"), "utf
 describe("deposits authentication safety", () => {
   it("guards private API routes before dispatching route-specific user access", () => {
     const apiIndex = workerSource.indexOf('if (parts[0] === "api") {');
-    const guardIndex = workerSource.indexOf('if (!user) return json({ error: "Authentication required", code: "AUTH_REQUIRED" }, 401, origin);', apiIndex);
+    const guardIndex = workerSource.indexOf('if (!user && !anonymousReadAllowed) return json({ error: "Authentication required", code: "AUTH_REQUIRED" }, 401, origin);', apiIndex);
     const dispatchIndex = workerSource.indexOf('if (parts[1] === "user-search"', apiIndex);
 
     expect(apiIndex).toBeGreaterThan(-1);
