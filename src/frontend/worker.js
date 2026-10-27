@@ -1895,6 +1895,7 @@ async function handleRequest(request, env, ctx) {
   }
 
   if (parts[0] === "api") {
+    if (!user) return json({ error: "Authentication required", code: "AUTH_REQUIRED" }, 401, origin);
     if (parts[1] === "user-search" && request.method === "GET") {
       if (!user) return json({ error: "Authentication required" }, 401, origin);
       const rawQuery = String(url.searchParams.get("q") || "").trim().replace(/^@+/, "");
