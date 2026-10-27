@@ -867,7 +867,6 @@ function caseCalendarDate() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 async function expireDueCases(env) {
-async function expireDueCases(env) {
   if (!env?.DB) return;
   // Deadlines are stored as YYYY-MM-DD. Expire only published/open cases;
   // completed/closed cases remain completed for payment and feedback history.
