@@ -2073,6 +2073,7 @@ async function handleRequest(request, env, ctx) {
     }
 
     if (parts[1] === "deposits") {
+      if (!user) return json({ error: "Authentication required", code: "AUTH_REQUIRED" }, 401, origin);
       if (request.method === "GET") {
         const target = url.searchParams.get("user_id") || user.user_id;
         if (!canAccessUser(user, target)) return json({ error: "Forbidden" }, 403, origin);
