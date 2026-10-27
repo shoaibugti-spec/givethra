@@ -866,7 +866,7 @@ function caseCalendarDate() {
   const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
   return `${values.year}-${values.month}-${values.day}`;
 }
-__name(caseCalendarDate, "caseCalendarDate");
+async function expireDueCases(env) {
 async function expireDueCases(env) {
   if (!env?.DB) return;
   // Deadlines are stored as YYYY-MM-DD. Expire only published/open cases;
