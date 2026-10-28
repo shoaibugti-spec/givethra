@@ -12,6 +12,7 @@ import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { RoleProvider, useRole } from "@/contexts/RoleContext";
 import {
+  Navigate,
   Outlet,
   RouterProvider,
   createRootRoute,
@@ -31,11 +32,6 @@ const HomePage = lazy(() =>
 );
 const RoleSelectionPage = lazy(() =>
   import("@/pages/RoleSelectionPage").catch(() => ({
-    default: () => <div>Failed to load page</div>,
-  }))
-);
-const SignUpPage = lazy(() =>
-  import("@/pages/SignUpPage").catch(() => ({
     default: () => <div>Failed to load page</div>,
   }))
 );
@@ -434,11 +430,8 @@ const homeRoute = createRoute({
 const signUpRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sign-up",
-  component: () => (
-    <Suspense fallback={<PageLoader />}>
-      <SignUpPage />
-    </Suspense>
-  ),
+  // There is no separate sign-up: old links to /sign-up go to the one sign-in.
+  component: () => <Navigate to="/sign-in" replace />,
 });
 const signInRoute = createRoute({
   getParentRoute: () => rootRoute,
