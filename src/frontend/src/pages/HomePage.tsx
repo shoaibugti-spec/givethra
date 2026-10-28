@@ -75,6 +75,7 @@ import {
   getApprovedCases,
   getCategoryCounts,
   getKycStatus,
+  getKycSubmission,
   getWallet,
   getUnlockCount,
   getUnreadNotificationsCount,
@@ -90,6 +91,7 @@ import {
   unfollowUser,
 } from "@/lib/api";
 import SlidingHomePanel from "@/components/SlidingHomePanel";
+import KycGateSheet from "@/components/KycGateSheet";
 
 // Support earnings conversion: 10,000 = $1.
 
@@ -598,7 +600,7 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isInitializing, showOneTap, user } = useAuth();
   const { role } = useRole();
 
   const [cases, setCases] = useState<any[]>([]);
@@ -608,6 +610,9 @@ export default function HomePage() {
   const [notifCount, setNotifCount] = useState(0);
 
   const [kycStatus, setKycStatus] = useState<string>("none");
+  const [kycLoaded, setKycLoaded] = useState(false);
+  const [kycSheetOpen, setKycSheetOpen] = useState(false);
+  const [kycRejectionReason, setKycRejectionReason] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
   const [unlockCount, setUnlockCount] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
@@ -722,6 +727,31 @@ export default function HomePage() {
     }
   }, [isAuthenticated, user]);
 
+  // Guests: Google's bottom sheet with the browser's Google accounts appears
+  // by itself 4 seconds after the home page opens (no need to press Sign in).
+  useEffect(() => {
+    if (isInitializing || isAuthenticated) return;
+    const timer = window.setTimeout(() => showOneTap(), 4000);
+    return () => window.clearTimeout(timer);
+  }, [isInitializing, isAuthenticated, showOneTap]);
+
+  // Signed-in users who are not KYC-approved see the KYC sheet 3 seconds after
+  // the home page opens (once per browser session for each status), after the
+  // WhatsApp welcome card is closed so the two never overlap.
+  useEffect(() => {
+    if (!isAuthenticated || !kycLoaded || showWhatsAppWelcome) return;
+    if (kycStatus !== "none" && kycStatus !== "rejected") return;
+    const marker = `${user?.id}:${kycStatus}`;
+    try {
+      if (sessionStorage.getItem("givethra_kyc_sheet_seen") === marker) return;
+    } catch { /* storage blocked: show it once per page load */ }
+    const timer = window.setTimeout(() => {
+      setKycSheetOpen(true);
+      try { sessionStorage.setItem("givethra_kyc_sheet_seen", marker); } catch { /* ignore */ }
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [isAuthenticated, kycLoaded, kycStatus, showWhatsAppWelcome, user?.id]);
+
   async function loadNotifCount() {
     if (!user?.id) return;
     try {
@@ -730,11 +760,36 @@ export default function HomePage() {
     } catch {}
   }
 
+  // Reads the KYC status (and the rejection reason when rejected). Returns null
+  // when the status could not be loaded, so a network problem is never treated
+  // as "not verified".
+  async function refreshKycStatus(): Promise<string | null> {
+    if (!user?.id) return null;
+    try {
+      const kyc = await getKycStatus(user.id);
+      const status = String(kyc?.status ?? "none").trim().toLowerCase();
+      setKycStatus(status);
+      if (status === "rejected") {
+        try {
+          const submission = await getKycSubmission(user.id);
+          setKycRejectionReason(submission?.rejection_reason || kyc?.rejection_reason || null);
+        } catch {
+          setKycRejectionReason(kyc?.rejection_reason || null);
+        }
+      } else {
+        setKycRejectionReason(null);
+      }
+      setKycLoaded(true);
+      return status;
+    } catch {
+      return null;
+    }
+  }
+
   async function loadGuideStatus() {
     if (!user?.id) return;
     try {
-      const kyc = await getKycStatus(user.id);
-      setKycStatus(kyc?.status ?? "none");
+      await refreshKycStatus();
       const wallet = await getWallet(user.id);
       setBalance(wallet?.balance ?? 0);
     } catch {}
@@ -912,9 +967,22 @@ export default function HomePage() {
     navigate({ to: to as any });
   }
 
-  function startCategoryRequest(category: string) {
+  function startKyc() {
+    setKycSheetOpen(false);
+    try { sessionStorage.setItem("givethra_kyc_return_to", "/home"); } catch { /* ignore */ }
+    navigate({ to: "/kyc" });
+  }
+
+  async function startCategoryRequest(category: string) {
     if (!isAuthenticated) {
       navigate({ to: "/sign-in" });
+      return;
+    }
+    // KYC comes first: only an approved user reaches the case form.
+    let status: string | null = kycLoaded ? kycStatus : await refreshKycStatus();
+    if (status === null) status = "approved"; // status unavailable: the server still enforces KYC
+    if (status !== "approved") {
+      setKycSheetOpen(true);
       return;
     }
     setSelectedCategory(category);
@@ -1038,6 +1106,13 @@ export default function HomePage() {
   return (
     <Layout>
       <div className="bg-background pb-20 md:pb-0">
+        <KycGateSheet
+          open={kycSheetOpen && kycStatus !== "approved"}
+          status={kycStatus === "rejected" ? "rejected" : kycStatus === "pending" ? "pending" : "none"}
+          rejectionReason={kycRejectionReason}
+          onClose={() => setKycSheetOpen(false)}
+          onStart={startKyc}
+        />
         {showWhatsAppWelcome && (
           <div className="pointer-events-none fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-4 sm:items-center">
             <div role="dialog" aria-modal="true" aria-labelledby="whatsapp-welcome-title" className="pointer-events-auto relative w-full max-w-sm rounded-2xl border border-green-200 bg-card p-5 shadow-2xl dark:border-green-900">
