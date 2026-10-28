@@ -8,7 +8,7 @@ import { useEffect } from "react";
 
 export default function SignInPage() {
   const navigate = useNavigate();
-  const { loginWithGoogle, isLoggingIn, isAuthenticated, loginError, setRole: setAuthRole } = useAuth();
+  const { loginWithGoogle, showOneTap, googleFallbackVisible, isLoggingIn, isAuthenticated, isInitializing, setRole: setAuthRole } = useAuth();
   const { setRole: setSelectedRole } = useRole();
   const redirect = new URLSearchParams(window.location.search).get("redirect");
 
@@ -19,6 +19,14 @@ export default function SignInPage() {
       setAuthRole(selected === "requester" ? "help_seeker" : "hero");
     }
   }, [setAuthRole, setSelectedRole]);
+
+  // Google's bottom sheet with the browser's own Google accounts appears by
+  // itself 3 seconds after this page opens (auto-selects when only one account).
+  useEffect(() => {
+    if (isInitializing || isAuthenticated) return;
+    const timer = window.setTimeout(() => showOneTap(), 3000);
+    return () => window.clearTimeout(timer);
+  }, [isInitializing, isAuthenticated, showOneTap]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -41,6 +49,7 @@ export default function SignInPage() {
           <CardDescription>Sign in to continue to your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!googleFallbackVisible && (
           <Button
             onClick={loginWithGoogle}
             disabled={isLoggingIn}
@@ -61,14 +70,11 @@ export default function SignInPage() {
               </>
             )}
           </Button>
+          )}
+          {/* Only appears if Google's account sheet cannot open; it then replaces the button above, so there is always exactly one Google button. */}
           <div id="google-account-chooser-fallback" className="hidden min-h-11 w-full justify-center" aria-live="polite" />
           <div className="grid grid-cols-2 gap-2 text-center text-xs"><div className="rounded-xl border border-border bg-muted/30 p-3"><strong className="block text-foreground">Support</strong><span className="text-muted-foreground">Help verified people</span></div><div className="rounded-xl border border-border bg-muted/30 p-3"><strong className="block text-foreground">Earnings</strong><span className="text-muted-foreground">Earn from your posts</span></div></div>
           <p className="text-center text-sm font-medium text-primary">Support others, become eligible, earn through your own posts, and use your separate Earnings Wallet.</p>
-          {loginError && (
-            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
-              {loginError}
-            </p>
-          )}
           <div className="space-y-4 border-t border-border pt-5 text-center text-xs text-muted-foreground"><div className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-teal-50 p-4"><p className="text-2xl">📱</p><p className="mt-1 font-bold text-foreground">Get the Givethra Android App</p><p className="mt-1">Verified cases, anytime — right on your phone.</p><a href="/Givethra.apk" download="Givethra.apk" className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"><Download className="h-4 w-4" />Download App</a></div><div className="grid grid-cols-2 gap-2 text-[11px]"><span className="rounded-lg bg-emerald-50 p-2 text-emerald-700">Verified &amp; Secure</span><span className="rounded-lg bg-sky-50 p-2 text-sky-700">100% Transparency</span><span className="rounded-lg bg-rose-50 p-2 text-rose-700">Compassion Driven by Humanity</span><span className="rounded-lg bg-amber-50 p-2 text-amber-700">Global Community</span><span className="rounded-lg bg-violet-50 p-2 text-violet-700">Help Beyond Borders</span><span className="rounded-lg bg-teal-50 p-2 text-teal-700">Safe &amp; Private</span></div><div className="space-y-2"><p className="font-semibold text-foreground">Connect with Givethra</p><p>Follow us and reach out — we're here to help.</p><div className="flex justify-center gap-4"><a href="https://wa.me/message/42CJXLUYEI2KM1?src=qr" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-green-600"><MessageCircle className="h-4 w-4" />Get WhatsApp Support 24/7</a><a href="mailto:info@givethra.org" className="inline-flex items-center gap-1 text-primary"><Mail className="h-4 w-4" />info@givethra.org</a></div></div><nav className="flex flex-wrap justify-center gap-x-3 gap-y-1"><Link to="/about">About</Link><Link to="/faq">FAQ</Link><Link to="/privacy">Privacy Policy</Link><Link to="/terms">Terms</Link><Link to="/community-guidelines">Community Guidelines</Link><Link to="/contact">Contact Us</Link></nav><p>© {new Date().getFullYear()} Givethra. All rights reserved.</p><p className="italic">“Be the reason someone believes in kindness.”</p><p className="font-semibold text-foreground">givethra.org</p></div>
         </CardContent>
       </Card>
