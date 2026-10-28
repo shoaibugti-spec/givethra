@@ -1176,7 +1176,9 @@ export default function KycPage() {
     recordTimerRef.current = setInterval(() => {
       sec++;
       setVideoTimer(sec);
-      if (sec === 2) grabAutoSelfie();
+      // Several tries: on some laptops the first frames are still black/empty.
+      // grabAutoSelfie never overwrites a selfie that already exists.
+      if (sec === 2 || sec === 5 || sec === 9) grabAutoSelfie();
       if (sec >= 15) {
         clearRecordTimer();
         try { if (recorder.state !== "inactive") recorder.stop(); } catch { /* ignore */ }
@@ -1218,12 +1220,56 @@ export default function KycPage() {
     return /^\d{13}$/.test(cleaned);
   }
 
+  // Last-resort selfie: a still frame taken from the recorded face video.
+  function selfieFromVideoFile(file: File): Promise<File | null> {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement("video");
+      let finished = false;
+      const done = (f: File | null) => {
+        if (finished) return;
+        finished = true;
+        URL.revokeObjectURL(url);
+        resolve(f);
+      };
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "auto";
+      v.onerror = () => done(null);
+      v.onloadeddata = () => { try { v.currentTime = 1; } catch { done(null); } };
+      v.onseeked = () => {
+        try {
+          if (!v.videoWidth) { done(null); return; }
+          const c = document.createElement("canvas");
+          c.width = v.videoWidth;
+          c.height = v.videoHeight;
+          c.getContext("2d")?.drawImage(v, 0, 0);
+          c.toBlob((blob) => done(blob ? new File([blob], "selfie.jpg", { type: "image/jpeg" }) : null), "image/jpeg", 0.92);
+        } catch { done(null); }
+      };
+      window.setTimeout(() => done(null), 6000);
+      v.src = url;
+    });
+  }
+
   async function handleSubmit() {
     if (!form.full_name) { toast.error("Full name is required"); return; }
     if (!videoFile) { toast.error("Please record a 15-second face video"); return; }
 
+    // The verification team always needs a selfie, for CNIC and for Passport.
+    // For Passport there is no separate selfie button: it comes from the video.
+    let selfieFile = selfie;
+    if (!selfieFile) {
+      selfieFile = await selfieFromVideoFile(videoFile);
+      if (selfieFile) setSelfie(selfieFile);
+    }
+    if (!selfieFile) {
+      toast.error("Your face could not be captured from the video. Please re-record the video with your full face clearly visible in good light.");
+      return;
+    }
+
     if (docType === "cnic") {
-      if (!form.cnic_number || !cnicFront || !cnicBack || !selfie) {
+      if (!form.cnic_number || !cnicFront || !cnicBack) {
         toast.error("All CNIC fields, photos and selfie are required");
         return;
       }
@@ -1245,10 +1291,12 @@ export default function KycPage() {
       if (docType === "cnic") {
         frontUrl = await uploadFile(cnicFront!, `${uid}/cnic_front_${stamp}`);
         backUrl = await uploadFile(cnicBack!, `${uid}/cnic_back_${stamp}`);
-        selfieUrl = await uploadFile(selfie!, `${uid}/selfie_${stamp}`);
       } else {
         passportUrl = await uploadFile(passportFile!, `${uid}/passport_${stamp}`);
       }
+      // Selfie is uploaded for both document types (it was skipped for Passport before,
+      // which made the server answer "A valid selfie and face video are required").
+      selfieUrl = await uploadFile(selfieFile!, `${uid}/selfie_${stamp}`);
 
       const payload: any = {
         user_id: uid,
@@ -1920,7 +1968,7 @@ export default function KycPage() {
               {videoBlob ? (
                 <div className="space-y-2">
                   <video src={videoBlob} controls className="w-full rounded-lg border max-h-40" />
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => { setVideoBlob(null); setVideoFile(null); }}>Re-record</Button>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => { setVideoBlob(null); setVideoFile(null); if (docType === "passport") { setSelfie(null); setSelfiePreview(null); } }}>Re-record</Button>
                 </div>
               ) : (
                 <div className="space-y-1.5">
