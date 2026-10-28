@@ -35,6 +35,10 @@ interface AuthContextValue {
   isLoggingIn: boolean;
   loginError: string | null;
   loginWithGoogle: () => void;
+  /** Shows Google's bottom-sheet account chooser (One Tap). Fails silently. */
+  showOneTap: () => void;
+  /** True when One Tap is unavailable and the official Google button replaced ours. */
+  googleFallbackVisible: boolean;
   logout: () => void;
   role: UserRole;
   setRole: (role: UserRole) => void;
@@ -156,6 +160,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const googlePromptRetryRef = useRef(0);
   const googlePromptTimerRef = useRef<number | null>(null);
   const googleLoginTimerRef = useRef<number | null>(null);
+  const oneTapInFlightRef = useRef(false);
+  const [googleFallbackVisible, setGoogleFallbackVisible] = useState(false);
 
   useEffect(() => {
     clearLegacyBrowserState();
@@ -291,6 +297,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // One shared initialisation for both the button flow and the automatic
+  // One Tap sheet. auto_select lets Google sign a returning user in without a
+  // tap when only one Google account is signed in on the browser.
+  const initializeGoogle = useCallback((googleIdentity: any) => {
+    if (googleInitializedRef.current) return;
+    googleIdentity.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: (response: { credential?: string }) => {
+        if (response?.credential) {
+          setIsLoggingIn(true);
+          void finishGoogleLogin(response.credential);
+        } else {
+          setIsLoggingIn(false);
+        }
+      },
+      auto_select: true,
+      cancel_on_tap_outside: false,
+      context: "signin",
+      use_fedcm_for_prompt: true,
+      itp_support: true,
+    });
+    googleInitializedRef.current = true;
+  }, [finishGoogleLogin]);
+
+  const showOneTap = useCallback(async () => {
+    if (oneTapInFlightRef.current || !GOOGLE_CLIENT_ID) return;
+    oneTapInFlightRef.current = true;
+    try {
+      await ensureGoogleIdentityServices();
+      const googleIdentity = (window as any).google;
+      if (!googleIdentity?.accounts?.id) {
+        oneTapInFlightRef.current = false;
+        return;
+      }
+      initializeGoogle(googleIdentity);
+      googleIdentity.accounts.id.prompt((notification: any) => {
+        // Never show an error for the automatic sheet. If Google hides it
+        // (user closed it before, cool-down, unsupported browser) the normal
+        // "Sign in with Google" button still works.
+        if (
+          notification?.isDismissedMoment?.() ||
+          notification?.isNotDisplayed?.() ||
+          notification?.isSkippedMoment?.()
+        ) {
+          oneTapInFlightRef.current = false;
+        }
+      });
+    } catch {
+      oneTapInFlightRef.current = false;
+    }
+  }, [initializeGoogle]);
+
   const loginWithGoogle = useCallback(async () => {
     if (isLoggingIn) return;
     clearLegacyBrowserState();
@@ -319,25 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (!googleInitializedRef.current) {
-      googleIdentity.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: (response: { credential?: string }) => {
-          if (response?.credential) {
-            void finishGoogleLogin(response.credential);
-          } else {
-            setLoginError("Google did not return a sign-in credential. Please try again.");
-            setIsLoggingIn(false);
-          }
-        },
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        context: "signin",
-        use_fedcm_for_prompt: true,
-        itp_support: true,
-      });
-      googleInitializedRef.current = true;
-    }
+    initializeGoogle(googleIdentity);
     const openGooglePrompt = () => {
       googleIdentity.accounts.id.prompt((notification: any) => {
         const unavailable = notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.();
@@ -347,6 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (fallback && !fallback.dataset.rendered) {
             fallback.dataset.rendered = "1";
             fallback.classList.remove("hidden");
+            setGoogleFallbackVisible(true);
             googleIdentity.accounts.id.renderButton(fallback, {
               type: "standard",
               theme: "outline",
@@ -384,9 +425,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       });
     }, 60000);
-  }, [finishGoogleLogin, isLoggingIn]);
+  }, [finishGoogleLogin, initializeGoogle, isLoggingIn]);
 
   const handleLogout = useCallback(async () => {
+    // Stop Google from silently signing the same user straight back in.
+    try { (window as any).google?.accounts?.id?.disableAutoSelect?.(); } catch { }
     safeLocalRemove("auth_token");
     safeLocalRemove("user_email");
     safeLocalRemove(ROLE_KEY);
@@ -417,6 +460,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoggingIn,
     loginError,
     loginWithGoogle,
+    showOneTap,
+    googleFallbackVisible,
     logout: handleLogout,
     role,
     setRole,
@@ -442,6 +487,8 @@ export function useAuth(): AuthContextValue {
       isLoggingIn: false,
       loginError: null,
       loginWithGoogle: () => undefined,
+      showOneTap: () => undefined,
+      googleFallbackVisible: false,
       logout: () => undefined,
       role: null,
       setRole: () => undefined,
