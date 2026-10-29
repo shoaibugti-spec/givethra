@@ -433,21 +433,21 @@ export default function AdminPage() {
 
   const cnicCounts: Record<string, number> = {};
   for (const k of kycList) {
-    if (k.status === "rejected" || k.status === "duplicate") continue;
+    if (["rejected", "duplicate"].includes(normalizedAdminStatus(k.status))) continue;
     const c = cleanCnic(k.cnic_number);
     if (c) cnicCounts[c] = (cnicCounts[c] ?? 0) + 1;
   }
 
   async function updateKyc(id: string, status: string, reason = "", action: "approve" | "reject" | "re_kyc" | "duplicate" = "approve") {
     const kyc = kycList.find((k) => k.id === id);
-    if (!kyc || kycBusyId === id) return;
+    if (!kyc || kycBusyId) return;
     setKycBusyId(id);
 
     try {
       if (action === "duplicate") {
       const cnic = cleanCnic(kyc.cnic_number);
       if (!cnic) { toast.error("No CNIC found to check duplicates"); return; }
-      const duplicateFound = kycList.some((k) => k.cnic_number === kyc.cnic_number && k.status === "approved" && k.id !== id);
+      const duplicateFound = kycList.some((k) => cleanCnic(k.cnic_number) === cnic && normalizedAdminStatus(k.status) === "approved" && k.id !== id);
       if (duplicateFound) {
         await adminUpdateKyc(id, { status: "duplicate", reviewed_at: new Date().toISOString(), reviewed_by: user?.email, rejection_reason: `Duplicate KYC - CNIC: ${kyc.cnic_number}` });
         await adminUpdateProfile(kyc.user_id, { is_suspended: true, suspended_reason: `Duplicate KYC detected (CNIC: ${kyc.cnic_number})`, suspended_at: new Date().toISOString() });
@@ -456,7 +456,7 @@ export default function AdminPage() {
         await adminUpsertUserSuspension({ user_id: kyc.user_id, suspension_count: newCount, is_active: true, suspended_at: new Date().toISOString(), rejection_count_at_suspension: 0 });
         await sendNotification(kyc.user_id, "system", "🚫 Account Suspended (Duplicate KYC)", `Your account has been suspended because a duplicate KYC submission was detected with the same CNIC (${kyc.cnic_number}). If you believe this is an error, please contact support.`, "/support");
         toast.success("KYC marked as duplicate and user banned.");
-        loadData();
+        await loadData();
         return;
       } else {
         toast.error("No approved KYC with this CNIC found to mark as duplicate.");
@@ -551,7 +551,7 @@ export default function AdminPage() {
       await adminUpdateProfile(userId, { is_suspended: false, suspended_reason: null });
       await sendNotification(userId, "system", "Account Unlocked by Givethra", "Givethra has unlocked your account. Please submit cases carefully.", "/dashboard");
       toast.success("User unlocked successfully!");
-      loadData();
+      await loadData();
     } catch (err) {
       toast.error("Failed to unlock user.");
       console.error(err);
@@ -569,6 +569,7 @@ export default function AdminPage() {
     const isFundraising = isContributionResolution(res);
     try {
       await adminUpdateResolution(res.id, { status: "completed", admin_confirmed: true, admin_confirmed_at: new Date().toISOString(), completed_at: new Date().toISOString() });
+      setResolutions((current) => current.map((row) => row.id === res.id ? { ...row, status: "completed", admin_confirmed: true } : row));
       const goalReached = amountNeeded > 0 && newCollected >= amountNeeded;
       const notificationJobs: Promise<unknown>[] = [];
       if (res.hero_id) notificationJobs.push(sendNotification(res.hero_id, "case_completed", "Help verified! 🎉", `Givethra verified your help of ${sym(c.currency)} ${confirmedAmt} on "${c.title}". ${!isFundraising ? "You can now download your affidavit." : "Thank you for contributing!"}`, `/cases/${res.case_id}`));
@@ -599,6 +600,7 @@ export default function AdminPage() {
     if (!trimmedReason) { toast.error("Please provide a rejection reason."); return; }
     try {
       await adminUpdateResolution(res.id, { status: "disputed", admin_confirmed: false, notes: trimmedReason });
+      setResolutions((current) => current.map((row) => row.id === res.id ? { ...row, status: "disputed", admin_confirmed: false, notes: trimmedReason } : row));
       if (res.hero_id) {
         try {
           await sendNotification(res.hero_id, "help_rejected", "Help proof needs correction", `Givethra could not verify your payment proof. Reason: ${trimmedReason}`, `/cases/${res.case_id}`);
@@ -623,11 +625,12 @@ export default function AdminPage() {
     }
     try {
       await adminCloseCase(c.id, { status: "completed", closed_by_admin: true, paid_receipt_url: receiptUrl || null });
+      setCaseList((current) => current.map((row) => row.id === c.id ? { ...row, status: "completed", closed_by_admin: true, paid_receipt_url: receiptUrl || null } : row));
       if (c.user_id) {
         await sendNotification(c.user_id, "case_completed", "Your bill is paid! 🎉", `Wonderful news! Many kind people came together and your case "${c.title}" is fully helped. Givethra has paid the institute. You can view the receipt on your case. May Allah bless everyone who helped. 🤲`, `/cases/${c.id}`);
       }
       toast.success("Case marked as PAID and closed! Seeker notified.");
-      loadData();
+      await loadData();
     } catch (error: any) {
       console.error("Pay & Close failed:", error);
       toast.error(`Failed to close case: ${error?.message || "Please try again."}`);
@@ -640,8 +643,9 @@ export default function AdminPage() {
     try {
       const nextStatus = isExpiredCaseRecord(c) ? "expired" : "approved";
       await adminCloseCase(c.id, { status: nextStatus, closed_by_admin: false, rejection_reason: trimmed, paid_receipt_url: null });
+      setCaseList((current) => current.map((row) => row.id === c.id ? { ...row, status: nextStatus, closed_by_admin: false, rejection_reason: trimmed, paid_receipt_url: null } : row));
       toast.success("Pay & Close request returned for review.");
-      loadData();
+      await loadData();
     } catch (error: any) {
       console.error("Pay & Close rejection failed:", error);
       toast.error(`Failed to return case: ${error?.message || "Please try again."}`);
@@ -746,9 +750,9 @@ export default function AdminPage() {
   const completedCaseFeedbacks = feedbacks.filter((f) => !!f.case_id);
   const visibleFeedbacks = completedCaseFeedbacks.filter((fb) => { const q = feedbackSearch.trim().toLowerCase(); if (!q) return true; const c = caseList.find((cs) => cs.id === fb.case_id); const p = profileMap[fb.user_id]; return [fb.id, fb.case_id, fb.user_id, fb.first_name, fb.text_message, c?.title, p?.full_name, p?.email].some((v) => String(v || "").toLowerCase().includes(q)); });
 
-  const approvedCases = caseList.filter((c) => c.status === "approved");
-  const completedCases = caseList.filter((c) => c.status === "completed");
-  const approvedKyc = kycList.filter((k) => k.status === "approved");
+  const approvedCases = caseList.filter((c) => normalizedAdminStatus(c.status) === "approved");
+  const completedCases = caseList.filter((c) => normalizedAdminStatus(c.status) === "completed");
+  const approvedKyc = kycList.filter((k) => normalizedAdminStatus(k.status) === "approved");
   const freeCases = caseList.filter((c) => c.was_free);
   const paidCases = caseList.filter((c) => !c.was_free);
 
@@ -760,7 +764,7 @@ export default function AdminPage() {
     return needed > 0 && !c.closed_by_admin && !c.rejection_reason && (collected >= needed || expiredPartialFunding);
   });
 
-  const paidPayClose = caseList.filter((c) => c.status === "completed" && c.closed_by_admin);
+  const paidPayClose = caseList.filter((c) => normalizedAdminStatus(c.status) === "completed" && c.closed_by_admin);
   const rejectedPayClose = caseList.filter((c) => ["approved", "expired"].includes(String(c.status || "").toLowerCase()) && !c.closed_by_admin && c.rejection_reason);
   
   const usersList = profiles.map((p) => {
@@ -1822,11 +1826,12 @@ function CaseCard({ c, onUpdate, resolutions, profileMap }: any) {
 function KycCard({ kyc, onUpdate, dupCount, busy = false }: any) {
   const [reason, setReason] = useState("");
   const isDuplicate = dupCount > 1;
-  const isPending = kyc.status === "pending";
-  const isApproved = kyc.status === "approved";
-  const isReKyc = kyc.status === "re_kyc";
-  const isDuplicateStatus = kyc.status === "duplicate";
-  const isRejected = kyc.status === "rejected";
+  const normalizedStatus = normalizedAdminStatus(kyc.status);
+  const isPending = normalizedStatus === "pending";
+  const isApproved = normalizedStatus === "approved";
+  const isReKyc = normalizedStatus === "re_kyc";
+  const isDuplicateStatus = normalizedStatus === "duplicate";
+  const isRejected = normalizedStatus === "rejected";
 
   return (
     <div className={`rounded-xl border bg-card p-4 space-y-3 ${isDuplicate && isPending ? "border-red-300" : ""}`}>

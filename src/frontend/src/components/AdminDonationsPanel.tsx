@@ -29,6 +29,7 @@ export default function AdminDonationsPanel() {
     setBusy(true);
     try {
       const result = await adminUpdateDonation(id, { status });
+      setDonations((current) => current.map((item) => item.id === id ? { ...item, status } : item));
       toast.success(`Contribution ${status} and removed from Pending`);
       if ((result as any)?.notification_sent === false) toast.error("The decision was saved, but the donor notification could not be sent.");
       await load();

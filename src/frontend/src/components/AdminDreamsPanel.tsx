@@ -90,6 +90,7 @@ export default function AdminDreamsPanel() {
     setReviewBusyId(p.id);
     try {
       const result = await adminReviewDreamParticipation(p.id, { status, rejection_reason: reason });
+      setParticipations((current) => current.map((item) => item.id === p.id ? { ...item, status, rejection_reason: reason } : item));
       toast.success(status === "approved" ? "Dream participation approved and registration generated" : "Submission rejected");
       if ((result as any)?.notification_sent === false) toast.error("The decision was saved, but the user notification could not be sent.");
       await load();
