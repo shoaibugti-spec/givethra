@@ -50,12 +50,14 @@ describe("Requester Visit submission audit", () => {
     expect(wizard).toContain("formData.isOrphan");
   });
 
-  it("uses fixed Rs 3,000 Emergency and Rs 8,000 Livestock/Farming amounts everywhere", () => {
+  it("uses fixed Rs 3,000 Emergency and Rs 10,000 Livestock/Farming amounts everywhere", () => {
     expect(constantsSource).toContain('"Emergency Help": { type: "fixed", amount: 3000');
-    expect(constantsSource).toContain('"Livestock / Farming": { type: "fixed", amount: 8000');
-    expect(amountStep).toContain("const fixedAmount = getFixedAmount(category);");
+    expect(constantsSource).toContain('"Livestock / Farming": { type: "fixed", amount: 10000');
+    expect(constantsSource).toContain('"Education, Books & Admission": { type: "verified", label: "Admission: manual amount · Books/Uniform: fixed Rs 3,000"');
+    expect(constantsSource).toContain("isEducationFixedAmount");
+    expect(amountStep).toContain("const fixedAmount = getFixedAmount(category, formData);");
     expect(amountStep).toContain("readOnly={isFixed}");
-    expect(submitCase).toContain("const fixedAmount = getFixedAmount(category);");
+    expect(submitCase).toContain("const fixedAmount = getFixedAmount(category, formData);");
     expect(worker).toContain('"Marriage Support amount must be between Rs 1,000 and Rs 30,000');
   });
 
@@ -71,7 +73,7 @@ describe("Requester Visit submission audit", () => {
 
   it("keeps standalone Child Support and Orphan Support separate with fixed amounts and parent-status rules", () => {
     expect(standalone).toContain('"Child Support": { type: "fixed", amount: 2000');
-    expect(standalone).toContain('"Orphan Support": { type: "fixed", amount: 4000');
+    expect(standalone).toContain('"Orphan Support": { type: "fixed", amount: 3000');
     expect(standalone).toContain('"Orphan Support",');
     expect(standalone).toContain('"Orphan Support", "Widow & Elderly Support"');
     expect(standaloneCategories).toContain('choices: ["Both alive"]');

@@ -20,26 +20,26 @@ export const CATEGORY_LIMITS: Record<
     label: string;
   }
 > = {
-  "Widow & Elderly Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
+  "Widow & Elderly Support": { type: "fixed", amount: 3000, label: "Fixed Stipend" },
   "Child Support": { type: "fixed", amount: 2000, label: "Fixed Stipend" },
-  "Orphan Support": { type: "fixed", amount: 4000, label: "Fixed Orphan Support" },
-  "Disability Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
+  "Orphan Support": { type: "fixed", amount: 3000, label: "Fixed Orphan Support" },
+  "Disability Support": { type: "fixed", amount: 3000, label: "Fixed Stipend" },
   "Emergency Help": { type: "fixed", amount: 3000, label: "Fixed Emergency Help" },
-  "Livestock / Farming": { type: "fixed", amount: 8000, label: "Fixed Farming Help" },
+  "Livestock / Farming": { type: "fixed", amount: 10000, label: "Fixed Farming Help" },
   "Electricity Bill": { type: "verified", label: "1 Month Verified Bill" },
   "Gas Bill": { type: "verified", label: "1 Month Verified Bill" },
   "Water Bill": { type: "verified", label: "1 Month Verified Bill" },
   "House Rent": { type: "verified", label: "1 Month Verified Rent" },
   "School, College & University Fees": { type: "verified", label: "1 Student / 1 Month Verified Fee" },
-  "Education, Books & Admission": { type: "verified", label: "Verified Cost" },
-  "Food & Groceries": { type: "max", maxAmount: 12000, label: "Max Rs 12,000 per family" },
-  "Medicines": { type: "verified", label: "Verified Prescription Cost" },
+  "Education, Books & Admission": { type: "verified", label: "Admission: manual amount · Books/Uniform: fixed Rs 3,000" },
+  "Food & Groceries": { type: "fixed", amount: 6000, label: "Fixed Rs 6,000 per family" },
+  "Medicines": { type: "fixed", amount: 3000, label: "Fixed Medicine Help" },
   "Medical & Treatment": { type: "verified", label: "Verified Treatment Bill" },
-  "Home Repair": { type: "max", maxAmount: 18000, label: "Max Rs 18,000" },
+  "Home Repair": { type: "fixed", amount: 10000, label: "Fixed Home Repair Help" },
   "Debt Relief": { type: "debt_percentage", percentage: 5, maxAmount: 25000, label: "5% of debt (max Rs 25,000)" },
-  "Business / Work Help": { type: "max", maxAmount: 20000, label: "Rs 8,000–20,000" },
+  "Business / Work Help": { type: "fixed", amount: 10000, label: "Fixed Business / Work Help" },
   "Marriage Support": { type: "max", minAmount: 1000, maxAmount: 30000, label: "Rs 1,000–30,000 for one selected marriage item" },
-  "Funeral Expenses": { type: "verified", label: "Verified Need" },
+  "Funeral Expenses": { type: "fixed", amount: 5000, label: "Fixed Funeral Help" },
 };
 
 export const CATEGORIES = [
@@ -104,7 +104,7 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
 export const MAX_FREE_CASES = 2;
 export const MAX_REJECTIONS_BEFORE_SUSPENSION = 5;
 export const UNLOCK_CREDITS_REQUIRED = 5;
-export const DISABILITY_STIPEND_AMOUNT = 6000;
+export const DISABILITY_STIPEND_AMOUNT = 3000;
 
 export const UTILITY_CATS: Record<string, { companies: { name: string; ref: string; refHint: string }[] }> = {
   "Electricity Bill": { companies: ELECTRICITY_COMPANIES },
@@ -303,8 +303,15 @@ export const COUNTER_FIELDS = new Set(["sons", "daughters"]);
 // ===== HELPERS =====
 export function isEasyCat(cat: string) { return !!UTILITY_CATS[cat] || !!LIST_CATS[cat]; }
 export function getCategoryLimit(category: string) { return CATEGORY_LIMITS[category] || null; }
+export function isEducationFixedAmount(formData: any): boolean {
+  return formData?.category === "Education, Books & Admission" && ["books", "uniform"].includes(formData?.eduSubType || formData?.catFields?.edu_sub_type);
+}
 export function isFixedAmountCategory(category: string): boolean { const limit = getCategoryLimit(category); return limit?.type === "fixed"; }
-export function getFixedAmount(category: string): number | null { const limit = getCategoryLimit(category); return limit?.type === "fixed" ? limit.amount || null : null; }
+export function getFixedAmount(category: string, formData?: any): number | null {
+  if (isEducationFixedAmount({ ...formData, category })) return 3000;
+  const limit = getCategoryLimit(category);
+  return limit?.type === "fixed" ? limit.amount || null : null;
+}
 export function getMaxAmount(category: string): number | null { const limit = getCategoryLimit(category); if (limit?.type === "max") return limit.maxAmount || null; if (limit?.type === "debt_percentage") return limit.maxAmount || null; return null; }
 export function getMinAmount(category: string): number | null { return getCategoryLimit(category)?.minAmount || null; }
 export function isDebtPercentageCategory(category: string): boolean { const limit = getCategoryLimit(category); return limit?.type === "debt_percentage"; }

@@ -89,10 +89,10 @@ const CATEGORY_LIMITS: Record<
     label: string;
   }
 > = {
-  "Widow & Elderly Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
+  "Widow & Elderly Support": { type: "fixed", amount: 3000, label: "Fixed Stipend" },
   "Child Support": { type: "fixed", amount: 2000, label: "Fixed Stipend" },
-  "Orphan Support": { type: "fixed", amount: 4000, label: "Fixed Orphan Support" },
-  "Disability Support": { type: "fixed", amount: 6000, label: "Fixed Stipend" },
+  "Orphan Support": { type: "fixed", amount: 3000, label: "Fixed Orphan Support" },
+  "Disability Support": { type: "fixed", amount: 3000, label: "Fixed Stipend" },
   // 🔥 FIXED: Food & Groceries now fixed at Rs 6,000 (was max 12,000)
   "Food & Groceries": { type: "fixed", amount: 6000, label: "Fixed Rs 6,000 per family" },
   "Electricity Bill": { type: "verified", label: "1 Month Verified Bill" },
@@ -100,16 +100,16 @@ const CATEGORY_LIMITS: Record<
   "Water Bill": { type: "verified", label: "1 Month Verified Bill" },
   "House Rent": { type: "verified", label: "1 Month Verified Rent" },
   "School, College & University Fees": { type: "verified", label: "1 Student / 1 Month Verified Fee" },
-  "Education, Books & Admission": { type: "verified", label: "Verified Cost" },
-  "Medicines": { type: "verified", label: "Verified Prescription Cost" },
+  "Education, Books & Admission": { type: "verified", label: "Admission: manual amount · Books/Uniform: fixed Rs 3,000" },
+  "Medicines": { type: "fixed", amount: 3000, label: "Fixed Medicine Help" },
   "Medical & Treatment": { type: "verified", label: "Verified Treatment Bill" },
-  "Home Repair": { type: "max", maxAmount: 18000, label: "Max Rs 18,000" },
+  "Home Repair": { type: "fixed", amount: 10000, label: "Fixed Home Repair Help" },
   "Debt Relief": { type: "debt_percentage", percentage: 5, maxAmount: 25000, label: "5% of debt (max Rs 25,000)" },
-  "Business / Work Help": { type: "max", maxAmount: 20000, label: "Rs 8,000–20,000" },
+  "Business / Work Help": { type: "fixed", amount: 10000, label: "Fixed Business / Work Help" },
   "Marriage Support": { type: "max", minAmount: 1000, maxAmount: 30000, label: "Rs 1,000–30,000 for one selected marriage item" },
-  "Funeral Expenses": { type: "verified", label: "Verified Need" },
-  "Livestock / Farming": { type: "verified", label: "Verified Need" },
-  "Emergency Help": { type: "verified", label: "Verified Need" },
+  "Funeral Expenses": { type: "fixed", amount: 5000, label: "Fixed Funeral Help" },
+  "Livestock / Farming": { type: "fixed", amount: 10000, label: "Fixed Farming Help" },
+  "Emergency Help": { type: "fixed", amount: 3000, label: "Fixed Emergency Help" },
 };
 
 // ============================================================
@@ -419,7 +419,7 @@ const LIST_CATS: Record<
 function isEasyCat(cat: string) {
   return !!UTILITY_CATS[cat] || !!LIST_CATS[cat];
 }
-const DISABILITY_STIPEND_AMOUNT = 6000;
+const DISABILITY_STIPEND_AMOUNT = 3000;
 const PROPERTY_RELEVANT_CATS = new Set([
   "Electricity Bill",
   "Gas Bill",
@@ -712,11 +712,13 @@ export default function SubmitRequestPage() {
   // ============================================================
   const isFixedAmount = (cat: string) => {
     if (cat === "Disability Support" && disabilityMode === "stipend") return true;
+    if (cat === "Education, Books & Admission" && ["books", "uniform"].includes(eduSubType)) return true;
     return isFixedAmountCategory(cat);
   };
 
   const getFixedAmountValue = (cat: string): number | null => {
     if (cat === "Disability Support" && disabilityMode === "stipend") return DISABILITY_STIPEND_AMOUNT;
+    if (cat === "Education, Books & Admission" && ["books", "uniform"].includes(eduSubType)) return 3000;
     return getFixedAmount(cat);
   };
 
@@ -751,7 +753,7 @@ export default function SubmitRequestPage() {
         setAmount(fixedVal.toString());
       }
     }
-  }, [category, disabilityMode]);
+  }, [category, disabilityMode, eduSubType]);
 
   // ===== LOAD USER STATS =====
   async function loadUserStats() {

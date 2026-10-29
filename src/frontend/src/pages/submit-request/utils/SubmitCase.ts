@@ -14,7 +14,7 @@ export async function submitCase(formData: any, userId: string, isFree: boolean)
   let finalAmount = 0;
   const category = formData.category;
 
-  const fixedAmount = getFixedAmount(category);
+  const fixedAmount = getFixedAmount(category, formData);
   if (fixedAmount != null) {
     finalAmount = fixedAmount;
   } else if (category === "Debt Relief") {

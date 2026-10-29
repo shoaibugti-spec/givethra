@@ -18,7 +18,7 @@ export default function StepAmount({
   const maxLimit = getMaxLimit(category);
   const minAmount = getMinAmount(category);
   const limitInfo = getCategoryLimit(category);
-  const fixedAmount = getFixedAmount(category);
+  const fixedAmount = getFixedAmount(category, formData);
   const isFixed = fixedAmount != null;
   const amountNum = parseFloat(value) || 0;
   const overMax = maxLimit != null && amountNum > maxLimit;

@@ -188,7 +188,7 @@ export function validateStep(stepId: string, formData: any): string | null {
     case "amount": {
       if (isDebtCategory(formData.category)) return null;
       const value = Number(formData.amount);
-      const fixedAmount = getFixedAmount(formData.category);
+      const fixedAmount = getFixedAmount(formData.category, formData);
       if (fixedAmount != null) return value === fixedAmount ? null : `Amount is fixed at Rs ${fixedAmount.toLocaleString()}`;
       if (!Number.isFinite(value) || value <= 0) return "Please enter the amount needed";
       const min = getMinAmount(formData.category);
