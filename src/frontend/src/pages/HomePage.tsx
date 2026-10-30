@@ -75,7 +75,6 @@ import {
   getApprovedCases,
   getCategoryCounts,
   getKycStatus,
-  getKycSubmission,
   getWallet,
   getUnlockCount,
   getUnreadNotificationsCount,
@@ -91,7 +90,6 @@ import {
   unfollowUser,
 } from "@/lib/api";
 import SlidingHomePanel from "@/components/SlidingHomePanel";
-import KycGateSheet from "@/components/KycGateSheet";
 
 // Support earnings conversion: 10,000 = $1.
 
@@ -101,52 +99,6 @@ const SUPPORT_WHATSAPP_URL =
   "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 const WELCOME_POPUP_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const CONTACT_EMAIL = "info@givethra.org";
-
-const CATEGORY_SLIDE_STYLE: Record<
-  string,
-  { icon: typeof Battery; color: string; bg: string }
-> = {
-  "Electricity Bill": {
-    icon: Battery,
-    color: "text-amber-600",
-    bg: "bg-amber-500/10",
-  },
-  "Gas Bill": {
-    icon: Flame,
-    color: "text-orange-600",
-    bg: "bg-orange-500/10",
-  },
-  "Water Bill": {
-    icon: Droplets,
-    color: "text-sky-600",
-    bg: "bg-sky-500/10",
-  },
-  "School Fees": {
-    icon: GraduationCap,
-    color: "text-indigo-600",
-    bg: "bg-indigo-500/10",
-  },
-  "Medical & Treatment": {
-    icon: Stethoscope,
-    color: "text-rose-600",
-    bg: "bg-rose-500/10",
-  },
-  "Business / Work Help": {
-    icon: ShoppingCart,
-    color: "text-emerald-600",
-    bg: "bg-emerald-500/10",
-  },
-  "Child Support": {
-    icon: Baby,
-    color: "text-cyan-700",
-    bg: "bg-cyan-500/10",
-  },
-  "Orphan Support": {
-    icon: Heart,
-    color: "text-violet-700",
-    bg: "bg-violet-500/10",
-  },
-};
 
 const ANNOUNCEMENT =
   "🎉 Big Offer for Everyone! Complete your KYC and submit your FIRST CASE completely FREE — no fee! After review & approval, Heroes will help you. Start now at givethra.org 🤲   •   🎉 Heroes: Your first 3 helps are FREE! After that, 1 credit per help. Become a Hero and change lives today.";
@@ -257,13 +209,6 @@ const CATEGORY_FORM_NAME: Record<string, string> = {
   "School Fees": "School, College & University Fees",
   "Education & Books": "Education, Books & Admission",
 };
-
-const HELP_NOW_CATEGORY_SLIDES = FILTER_CATEGORIES.map((category) => ({
-  key: `category_${category}`,
-  category,
-  to: "/submit-request",
-  style: CATEGORY_SLIDE_STYLE[category] || { icon: Gift, color: "text-teal-600", bg: "bg-teal-600" },
-}));
 
 const CATEGORY_APPEAL: Record<string, string> = {
   "Electricity Bill": "Help bring light back to a home 💡",
@@ -600,7 +545,7 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { isAuthenticated, isInitializing, showOneTap, user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { role } = useRole();
 
   const [cases, setCases] = useState<any[]>([]);
@@ -610,12 +555,8 @@ export default function HomePage() {
   const [notifCount, setNotifCount] = useState(0);
 
   const [kycStatus, setKycStatus] = useState<string>("none");
-  const [kycLoaded, setKycLoaded] = useState(false);
-  const [kycSheetOpen, setKycSheetOpen] = useState(false);
-  const [kycRejectionReason, setKycRejectionReason] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
   const [unlockCount, setUnlockCount] = useState(0);
-  const [slideIndex, setSlideIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [homeMode, setHomeMode] = useState<"support" | "earning">(() => {
     if (typeof window === "undefined" || window.location.pathname === "/") return "support";
@@ -727,31 +668,6 @@ export default function HomePage() {
     }
   }, [isAuthenticated, user]);
 
-  // Guests: Google's bottom sheet with the browser's Google accounts appears
-  // by itself 4 seconds after the home page opens (no need to press Sign in).
-  useEffect(() => {
-    if (isInitializing || isAuthenticated) return;
-    const timer = window.setTimeout(() => showOneTap(), 4000);
-    return () => window.clearTimeout(timer);
-  }, [isInitializing, isAuthenticated, showOneTap]);
-
-  // Signed-in users who are not KYC-approved see the KYC sheet 3 seconds after
-  // the home page opens (once per browser session for each status), after the
-  // WhatsApp welcome card is closed so the two never overlap.
-  useEffect(() => {
-    if (!isAuthenticated || !kycLoaded || showWhatsAppWelcome) return;
-    if (kycStatus !== "none" && kycStatus !== "rejected") return;
-    const marker = `${user?.id}:${kycStatus}`;
-    try {
-      if (sessionStorage.getItem("givethra_kyc_sheet_seen") === marker) return;
-    } catch { /* storage blocked: show it once per page load */ }
-    const timer = window.setTimeout(() => {
-      setKycSheetOpen(true);
-      try { sessionStorage.setItem("givethra_kyc_sheet_seen", marker); } catch { /* ignore */ }
-    }, 3000);
-    return () => window.clearTimeout(timer);
-  }, [isAuthenticated, kycLoaded, kycStatus, showWhatsAppWelcome, user?.id]);
-
   async function loadNotifCount() {
     if (!user?.id) return;
     try {
@@ -760,36 +676,11 @@ export default function HomePage() {
     } catch {}
   }
 
-  // Reads the KYC status (and the rejection reason when rejected). Returns null
-  // when the status could not be loaded, so a network problem is never treated
-  // as "not verified".
-  async function refreshKycStatus(): Promise<string | null> {
-    if (!user?.id) return null;
-    try {
-      const kyc = await getKycStatus(user.id);
-      const status = String(kyc?.status ?? "none").trim().toLowerCase();
-      setKycStatus(status);
-      if (status === "rejected") {
-        try {
-          const submission = await getKycSubmission(user.id);
-          setKycRejectionReason(submission?.rejection_reason || kyc?.rejection_reason || null);
-        } catch {
-          setKycRejectionReason(kyc?.rejection_reason || null);
-        }
-      } else {
-        setKycRejectionReason(null);
-      }
-      setKycLoaded(true);
-      return status;
-    } catch {
-      return null;
-    }
-  }
-
   async function loadGuideStatus() {
     if (!user?.id) return;
     try {
-      await refreshKycStatus();
+      const kyc = await getKycStatus(user.id);
+      setKycStatus(kyc?.status ?? "none");
       const wallet = await getWallet(user.id);
       setBalance(wallet?.balance ?? 0);
     } catch {}
@@ -834,70 +725,6 @@ export default function HomePage() {
       // The published cases remain visible even if the count endpoint is unavailable.
     }
   }
-
-  const HAND_SLIDE = {
-    key: "hero",
-    type: "image" as const,
-    image: "/assets/generated/hero-givethra.dim_1200x500.jpg",
-  };
-
-  const guideSlides: any[] = [];
-  guideSlides.push(HAND_SLIDE);
-
-  guideSlides.push(
-    ...HELP_NOW_CATEGORY_SLIDES.map((slide) => ({
-      key: slide.key,
-      type: "category" as const,
-      category: slide.category,
-      icon: CATEGORY_ICON[slide.category] || slide.style.icon,
-      image: CATEGORY_SLIDE_MEDIA[slide.category],
-      title: slide.category,
-      desc: CATEGORY_APPEAL[slide.category] || `Submit a verified ${slide.category} case.`,
-      cta: "Submit this case",
-      to: slide.to,
-      color: slide.style.color,
-      bg: slide.style.bg,
-    }))
-  );
-
-  const sliderTouchStart = useRef<number | null>(null);
-
-  function handleSliderTouchStart(event: React.TouchEvent<HTMLDivElement>) {
-    sliderTouchStart.current = event.changedTouches[0]?.clientX ?? null;
-  }
-
-  function handleSliderTouchEnd(event: React.TouchEvent<HTMLDivElement>) {
-    const start = sliderTouchStart.current;
-    const end = event.changedTouches[0]?.clientX;
-    sliderTouchStart.current = null;
-
-    if (start == null || end == null || guideSlides.length <= 1) {
-      return;
-    }
-
-    const delta = end - start;
-    if (Math.abs(delta) < 40) return;
-
-    setSlideIndex(
-      (prev) => (prev + (delta < 0 ? 1 : guideSlides.length - 1)) % guideSlides.length
-    );
-  }
-
-  useEffect(() => {
-    if (guideSlides.length <= 1) return;
-
-    const t = setInterval(() => {
-      setSlideIndex((prev) => (prev + 1) % guideSlides.length);
-    }, 3000); // 3 seconds per slide
-
-    return () => clearInterval(t);
-  }, [guideSlides.length]);
-
-  useEffect(() => {
-    if (slideIndex >= guideSlides.length) {
-      setSlideIndex(0);
-    }
-  }, [guideSlides.length, slideIndex]);
 
   const countries = Array.from(
     new Set(cases.map((c) => c.country).filter(Boolean))
@@ -957,32 +784,9 @@ export default function HomePage() {
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   }
 
-  const currentSlide = guideSlides[slideIndex] ?? HAND_SLIDE;
-
-  function goToProtectedAction(to: string) {
+  function startCategoryRequest(category: string) {
     if (!isAuthenticated) {
       navigate({ to: "/sign-in" });
-      return;
-    }
-    navigate({ to: to as any });
-  }
-
-  function startKyc() {
-    setKycSheetOpen(false);
-    try { sessionStorage.setItem("givethra_kyc_return_to", "/home"); } catch { /* ignore */ }
-    navigate({ to: "/kyc" });
-  }
-
-  async function startCategoryRequest(category: string) {
-    if (!isAuthenticated) {
-      navigate({ to: "/sign-in" });
-      return;
-    }
-    // KYC comes first: only an approved user reaches the case form.
-    let status: string | null = kycLoaded ? kycStatus : await refreshKycStatus();
-    if (status === null) status = "approved"; // status unavailable: the server still enforces KYC
-    if (status !== "approved") {
-      setKycSheetOpen(true);
       return;
     }
     setSelectedCategory(category);
@@ -992,127 +796,9 @@ export default function HomePage() {
     navigate({ to: "/submit-request" });
   }
 
-  function renderSlideContent() {
-    if (currentSlide.type === "image") {
-      return (
-        <img
-          src={resolveMediaUrl(currentSlide.image)}
-          alt="Givethra"
-          onError={handleImageError}
-          className="h-full w-full object-cover object-top"
-        />
-      );
-    }
-
-    if (currentSlide.type === "announce") {
-      return (
-        <button
-          type="button"
-          onClick={() => goToProtectedAction(currentSlide.to)}
-          className="w-full h-full bg-gradient-to-br from-primary to-primary/80 text-white flex flex-col items-center justify-center text-center px-6 gap-2 cursor-pointer"
-        >
-          <span className="text-4xl">🎉</span>
-          <div className="text-2xl md:text-3xl font-black tracking-wide">First Case FREE! 🎉</div>
-          <p className="text-sm font-semibold opacity-90">Complete your KYC & submit your first request with zero fees</p>
-          <p className="text-sm max-w-sm leading-relaxed opacity-95">
-            Complete your KYC and submit your <strong>first case completely FREE</strong> — no fee!
-          </p>
-          <span className="inline-flex items-center gap-1 text-sm font-bold bg-white/20 rounded-full px-4 py-1.5 mt-1">
-            Complete your KYC now <ChevronRight className="h-4 w-4" />
-          </span>
-        </button>
-      );
-    }
-
-    if (currentSlide.type === "category") {
-      return (
-        <div className="relative h-full w-full overflow-hidden">
-          <img src={resolveMediaUrl(currentSlide.image)} alt="" loading="eager" draggable={false} onError={handleImageError} className="pointer-events-none h-full w-full select-none object-cover object-top" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/35 to-transparent" />
-          <button
-            type="button"
-            aria-label={`Start ${currentSlide.category} help request`}
-            onClick={() => startCategoryRequest(currentSlide.category)}
-            className="absolute inset-y-0 left-0 flex w-full max-w-[78%] flex-col items-start justify-center gap-2 px-5 text-left text-white sm:max-w-[65%] sm:px-8"
-          >
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/80">Help Now</span>
-            <span className="font-display text-xl font-extrabold leading-tight drop-shadow sm:text-3xl">{currentSlide.category}</span>
-            <span className="max-w-sm text-xs leading-relaxed text-white/90 sm:text-sm">{CATEGORY_APPEAL[currentSlide.category] || `Submit a verified ${currentSlide.category} case.`}</span>
-            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow sm:px-4 sm:py-2 sm:text-sm">
-              Submit this request <ChevronRight className="h-4 w-4" />
-            </span>
-          </button>
-        </div>
-      );
-    }
-
-    if (currentSlide.type === "action") {
-      return (
-        <button
-          type="button"
-          onClick={() => goToProtectedAction(currentSlide.to)}
-          className="w-full h-full bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer hover:from-muted/30 transition-colors"
-        >
-          <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}>
-            <currentSlide.icon className={`h-8 w-8 ${currentSlide.color}`} />
-          </div>
-          <h3 className="font-display text-xl font-bold text-foreground">{currentSlide.title}</h3>
-          <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{currentSlide.desc}</p>
-          <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">
-            {currentSlide.cta} <ChevronRight className="h-4 w-4" />
-          </span>
-        </button>
-      );
-    }
-
-    if (currentSlide.type === "guide" && currentSlide.image) {
-      return (
-        <div className="relative h-full w-full overflow-hidden bg-slate-950">
-          <img src={resolveMediaUrl(currentSlide.image)} alt="Identity verification" loading="eager" onError={handleImageError} className="absolute inset-0 h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-transparent" />
-          <div className="relative z-10 flex h-full max-w-[72%] flex-col justify-center gap-2 px-5 text-white md:max-w-[58%] md:px-8">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/30 ring-1 ring-white/20">
-              <ShieldCheck className="h-5 w-5 text-violet-200" />
-            </div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">Secure verification</p>
-            <h3 className="font-display text-lg font-bold leading-tight md:text-2xl">Complete Your KYC to Submit Your Case</h3>
-            <p className="text-xs leading-relaxed text-white/85 md:text-sm">Verify your identity with CNIC photos, selfie and a short video.</p>
-            <button type="button" onClick={() => goToProtectedAction(currentSlide.to)} className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-lg active:scale-95">
-              Start verification <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <button
-        type="button"
-        onClick={() => goToProtectedAction(currentSlide.to)}
-        className="w-full h-full bg-gradient-to-br from-card to-muted/40 flex flex-col items-center justify-center text-center px-6 gap-3 cursor-pointer"
-      >
-        <div className={`h-16 w-16 rounded-2xl ${currentSlide.bg} flex items-center justify-center`}>
-          <currentSlide.icon className={`h-8 w-8 ${currentSlide.color}`} />
-        </div>
-        <h3 className="font-display text-xl font-bold text-foreground">{currentSlide.title}</h3>
-        <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{currentSlide.desc}</p>
-        <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary mt-1">
-          {currentSlide.cta || "Tap to continue"} <ChevronRight className="h-4 w-4" />
-        </span>
-      </button>
-    );
-  }
-
   return (
     <Layout>
       <div className="bg-background pb-20 md:pb-0">
-        <KycGateSheet
-          open={kycSheetOpen && kycStatus !== "approved"}
-          status={kycStatus === "rejected" ? "rejected" : kycStatus === "pending" ? "pending" : "none"}
-          rejectionReason={kycRejectionReason}
-          onClose={() => setKycSheetOpen(false)}
-          onStart={startKyc}
-        />
         {showWhatsAppWelcome && (
           <div className="pointer-events-none fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-4 sm:items-center">
             <div role="dialog" aria-modal="true" aria-labelledby="whatsapp-welcome-title" className="pointer-events-auto relative w-full max-w-sm rounded-2xl border border-green-200 bg-card p-5 shadow-2xl dark:border-green-900">
@@ -1157,182 +843,127 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* --- UPDATED HERO & CATEGORY SECTION (NoBroker Style) --- */}
-        <section className="relative overflow-hidden bg-card border-b border-border">
-          <div className="relative mx-auto max-w-7xl px-4 pt-6 pb-6 md:py-8 flex flex-col items-center gap-6">
-            
-            {/* SMART BUTTONS ABOVE SLIDER */}
-            <div className="flex w-full max-w-6xl flex-col gap-3 mb-2">
-              <button
-                type="button"
-                aria-label="Shop Dream Now — Givethra Dreams"
-                onClick={() => navigate({ to: "/dreams" })}
-                className="group relative h-20 w-full overflow-hidden rounded-2xl bg-teal-800 text-left shadow-md shadow-teal-200 transition-all hover:scale-[1.01] active:scale-[0.99] sm:h-24"
-              >
-                <img
-                  src={resolveMediaUrl("/dreams-products-banner.jpg")}
-                  alt="Shop Dream Now — Givethra Dreams"
-                  onError={handleImageError}
-                  className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.03]"
-                />
-                <span className="absolute inset-0 bg-gradient-to-r from-teal-950/60 via-teal-900/15 to-teal-950/35" />
-                <span className="absolute inset-y-0 left-4 flex max-w-[60%] items-center gap-2 text-base font-extrabold leading-tight text-white drop-shadow sm:left-7 sm:max-w-none sm:text-2xl">
-                  <Sparkles className="h-6 w-6 shrink-0 sm:h-7 sm:w-7" />
-                  <span>Shop Dream Now</span>
-                </span>
-                <span className="absolute bottom-2 right-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-extrabold text-teal-800 shadow sm:bottom-3 sm:right-5 sm:px-3 sm:text-xs">
-                  Givethra Dreams <ChevronRight className="ml-0.5 inline h-3.5 w-3.5" />
-                </span>
-              </button>
-              <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                size="lg"
-                onClick={() => navigate({ to: "/become-hero" })}
-                className="h-14 flex-1 rounded-2xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-base sm:text-lg shadow-sm shadow-amber-200 transition-all hover:scale-[1.01] active:scale-[0.99]"
-              >
-                <Heart className="h-5 w-5 sm:h-6 sm:w-6 mr-2" /> Become a Hero (Help Others)
-              </Button>
-              <Button
-                size="lg"
-                onClick={() => navigate({ to: "/need-help" })}
-                className="h-14 flex-1 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base sm:text-lg shadow-sm shadow-blue-200 transition-all hover:scale-[1.01] active:scale-[0.99]"
-              >
-                <FileText className="h-5 w-5 sm:h-6 sm:w-6 mr-2" /> Request Help (Requester)
-              </Button>
+                {/* --- HERO ROW: 2 action buttons + horizontal category cards --- */}
+        <section className="bg-card border-b border-border">
+          <div className="mx-auto max-w-7xl space-y-2.5 px-3 py-3">
+            <div className="flex h-[212px] gap-2">
+              {/* Left: two stacked action buttons */}
+              <div className="flex w-[104px] shrink-0 flex-col gap-2 sm:w-[132px]">
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/become-hero" })}
+                  className="flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 px-2 text-center text-white shadow-sm transition active:scale-[0.97]"
+                >
+                  <Heart className="h-6 w-6 text-red-400" fill="currentColor" />
+                  <span className="text-[13px] font-extrabold leading-tight">Become<br />A Hero</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/need-help" })}
+                  className="flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 px-2 text-center text-amber-950 shadow-sm transition active:scale-[0.97]"
+                >
+                  <FileText className="h-6 w-6" />
+                  <span className="text-[13px] font-extrabold leading-tight">Request<br />Help</span>
+                </button>
+              </div>
+
+              {/* Right: category cards (same box size, swipe sideways) */}
+              <div className="flex min-w-0 flex-1 snap-x snap-mandatory gap-2 overflow-x-auto scrollbar-hide">
+                {FILTER_CATEGORIES.map((category) => {
+                  const image = CATEGORY_SLIDE_MEDIA[category] || "/assets/generated/help-livelihood.jpg";
+                  const active = selectedCategory === category;
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      aria-label={`Start ${category} help request`}
+                      onClick={() => startCategoryRequest(category)}
+                      className={`relative h-full w-[152px] shrink-0 snap-start overflow-hidden rounded-2xl bg-slate-900 text-left text-white shadow-sm transition active:scale-[0.98] sm:w-[190px] ${active ? "ring-2 ring-primary" : ""}`}
+                    >
+                      <img
+                        src={resolveMediaUrl(image)}
+                        alt=""
+                        loading="lazy"
+                        draggable={false}
+                        onError={handleImageError}
+                        className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+                      />
+                      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent" />
+                      <span className="absolute inset-x-0 bottom-0 flex flex-col gap-1 p-2.5">
+                        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/75">Help Now</span>
+                        <span className="text-[15px] font-extrabold leading-tight drop-shadow">{category}</span>
+                        <span className="line-clamp-2 text-[10px] leading-snug text-white/85">{CATEGORY_APPEAL[category]}</span>
+                        <span className="mt-1 inline-flex w-fit items-center gap-0.5 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-900 shadow">
+                          Submit this request <ChevronRight className="h-3 w-3" />
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* 1. MAIN SLIDER (Full Image, No Dots) */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.65, delay: 0.15 }}
-              className="relative w-full max-w-6xl"
+            {/* Shop Dream banner */}
+            <button
+              type="button"
+              aria-label="Shop Dream Now — Givethra Dreams"
+              onClick={() => navigate({ to: "/dreams" })}
+              className="group relative block h-16 w-full overflow-hidden rounded-2xl bg-teal-800 text-left shadow-sm transition active:scale-[0.99] sm:h-20"
             >
-              <div
-                id="givethra-help-slider"
-                className="relative h-56 sm:h-72 md:h-[400px] w-full overflow-hidden rounded-3xl shadow-lg touch-pan-y bg-muted"
-                onTouchStart={handleSliderTouchStart}
-                onTouchEnd={handleSliderTouchEnd}
-              >
-                {renderSlideContent()}
-              </div>
-            </motion.div>
-
-            {/* 2. CATEGORY CARDS (NoBroker Style) */}
-            <div className="w-full max-w-6xl mt-2">
-              <div className="mb-4 text-center">
-                <h2 className="text-base md:text-lg font-bold text-foreground">
-                  Select a Category &amp; Submit Your Help Request
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Tap a category to start your help request.</p>
-              </div>
-
-              {/* Horizontal Scroll Container */}
-              <div className="relative">
-                <div className="flex gap-2.5 overflow-x-auto pb-4 scrollbar-hide snap-x">
-                  {FILTER_CATEGORIES.map((category) => {
-                    const Icon = CATEGORY_ICON[category] || MoreHorizontal;
-                    const active = selectedCategory === category;
-                    const image = CATEGORY_SLIDE_MEDIA[category] || "/assets/generated/help-livelihood.jpg";
-                    
-                    return (
-                      <button
-                        key={category}
-                        type="button"
-                        aria-label={`Start ${category} help request`}
-                        onClick={() => startCategoryRequest(category)}
-                        className={`group flex min-w-[100px] w-[100px] flex-col overflow-hidden rounded-2xl border bg-white text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[.98] snap-start ${
-                          active ? "border-primary ring-2 ring-primary/40" : "border-slate-200"
-                        }`}
-                      >
-                        {/* Image at top */}
-                        <div className="relative h-14 w-full overflow-hidden bg-slate-100 sm:h-16">
-                          <img
-                            src={resolveMediaUrl(image)}
-                            alt={category}
-                            onError={handleImageError}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        </div>
-
-                        {/* Text & Icon at bottom */}
-                        <div className="flex flex-1 flex-col items-center justify-between p-1.5">
-                          <span className="text-[9px] font-bold leading-tight text-slate-800 line-clamp-2 h-6 flex items-center justify-center">
-                            {category}
-                          </span>
-                          
-                          {/* Separate Icon Button */}
-                          <span
-                            className={`mt-1 flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
-                              active ? "bg-primary text-white" : "bg-primary/10 text-primary group-hover:bg-primary/20"
-                            }`}
-                          >
-                            <Icon className="h-3.5 w-3.5" />
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Dots Indicator below the Category Slider */}
-                <div className="flex justify-center gap-1.5 mt-1">
-                  {guideSlides.map((slide, i) => (
-                    <span
-                      key={slide.key}
-                      aria-label={`Slide ${i + 1} of ${guideSlides.length}`}
-                      className={`h-1.5 rounded-full transition-all ${
-                        i === slideIndex ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/30"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
+              <img
+                src={resolveMediaUrl("/dreams-products-banner.jpg")}
+                alt=""
+                onError={handleImageError}
+                className="h-full w-full object-cover object-center"
+              />
+              <span className="absolute inset-0 bg-gradient-to-r from-teal-950/60 via-teal-900/15 to-teal-950/35" />
+              <span className="absolute inset-y-0 left-4 flex items-center gap-2 text-base font-extrabold text-white drop-shadow sm:text-xl">
+                <Sparkles className="h-5 w-5 shrink-0" />
+                <span>Shop Dream Now</span>
+              </span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-extrabold text-teal-800 shadow sm:text-xs">
+                Givethra Dreams <ChevronRight className="ml-0.5 inline h-3 w-3" />
+              </span>
+            </button>
           </div>
         </section>
-        {/* --- END OF UPDATED HERO & CATEGORY SECTION --- */}
+        {/* --- END HERO ROW --- */}
+
+
 
         {/* NOTE: WhatsApp Section has been moved below KindnessWall as requested */}
 
-        {/* Active Cases Search & Filters Section */}
-        <section className="bg-background border-b border-border py-4 px-4">
-          <div className="max-w-7xl mx-auto space-y-3">
-            {/* Title added here as requested */}
-            <div className="mb-2">
-              <h2 className="font-display text-lg font-bold text-foreground">Active Cases – Become a Hero and Help People</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Search and filter through all verified cases that need support right now.</p>
-            </div>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input
-                type="text"
-                placeholder="Search hospital, school, city, title..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 h-11"
-              />
-            </div>
-
-            <div className="flex gap-2">
+                {/* Compact search + filter + sort (one line) and category chips */}
+        <section className="border-b border-border bg-background px-3 py-2">
+          <div className="mx-auto max-w-7xl space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search hospital, school, city..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-10 pl-8 text-sm"
+                />
+              </div>
               <Button
+                type="button"
                 variant="outline"
+                size="icon"
+                aria-label="Filters"
                 onClick={() => setShowFilters(!showFilters)}
-                className="gap-2 flex-1"
+                className="relative h-10 w-10 shrink-0"
               >
                 <SlidersHorizontal className="h-4 w-4" />
-                Filters {activeFilterCount > 0 && (
-                  <span className="bg-primary text-white text-[10px] rounded-full px-1.5">
+                {activeFilterCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white">
                     {activeFilterCount}
                   </span>
                 )}
               </Button>
-
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="h-10 w-[118px] shrink-0 px-2 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1346,48 +977,49 @@ export default function HomePage() {
             </div>
 
             {showFilters && (
-              <div className="rounded-2xl border bg-card p-5 space-y-4">
+              <div className="space-y-3 rounded-2xl border bg-card p-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Filters</h3>
+                  <h3 className="text-sm font-semibold">Filters</h3>
                   {activeFilterCount > 0 && (
-                    <button onClick={resetFilters} className="text-xs text-red-600 flex items-center gap-1">
+                    <button onClick={resetFilters} className="flex items-center gap-1 text-xs text-red-600">
                       <X className="h-3 w-3" /> Clear all
                     </button>
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-xs">Country</Label>
-                  <Select value={filterCountry} onValueChange={(v) => { setFilterCountry(v); setFilterCity("all"); }}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      <SelectItem value="all">All Countries</SelectItem>
-                      {countries.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Country</Label>
+                    <Select value={filterCountry} onValueChange={(v) => { setFilterCountry(v); setFilterCity("all"); }}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        <SelectItem value="all">All Countries</SelectItem>
+                        {countries.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">City</Label>
+                    <Select value={filterCity} onValueChange={setFilterCity} disabled={filterCountry === "all"}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder={filterCountry === "all" ? "Select country first" : "All cities"} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        <SelectItem value="all">All Cities</SelectItem>
+                        {cities.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-xs">City</Label>
-                  <Select value={filterCity} onValueChange={setFilterCity} disabled={filterCountry === "all"}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={filterCountry === "all" ? "Select country first" : "All cities"} />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      <SelectItem value="all">All Cities</SelectItem>
-                      {cities.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label className="text-xs">Category</Label>
                   <Select value={filterCat} onValueChange={setFilterCat}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent className="max-h-60">
                       <SelectItem value="all">All Categories</SelectItem>
                       {FILTER_CATEGORIES.map((c) => (
@@ -1397,65 +1029,49 @@ export default function HomePage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label className="text-xs">Urgency</Label>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                    <button
-                      type="button"
-                      onClick={() => setFilterUrgency("all")}
-                      className={`px-1 py-2 rounded-lg border text-xs font-medium ${
-                        filterUrgency === "all" ? "bg-primary text-white border-primary" : "border-border"
-                      }`}
-                    >
-                      All
-                    </button>
-                    {URGENCIES.map((u) => (
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {["all", ...URGENCIES].map((u) => (
                       <button
                         key={u}
                         type="button"
                         onClick={() => setFilterUrgency(u)}
-                        className={`px-1 py-2 rounded-lg border text-xs font-medium ${
-                          filterUrgency === u ? "bg-primary text-white border-primary" : "border-border"
+                        className={`rounded-lg border px-1 py-1.5 text-[11px] font-medium ${
+                          filterUrgency === u ? "border-primary bg-primary text-white" : "border-border"
                         }`}
                       >
-                        {u}
+                        {u === "all" ? "All" : u}
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
             )}
-          </div>
-        </section>
 
-        {/* Category Counts Section */}
-        <section className="bg-muted/30 border-b border-border py-4 px-4">
-          <div className="max-w-7xl mx-auto">
-            <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">
-              Tap a category to filter cases
-            </p>
-
-            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-1">
+            {/* Category chips: one slim row, categories with cases come first */}
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
               {orderedCategories.map((cat) => {
                 const count = Number(categoryCounts[cat] || 0);
                 const active = filterCat === cat;
                 return (
                   <button
                     key={cat}
+                    type="button"
                     onClick={() => selectCategory(cat)}
-                    className={`group relative flex flex-col items-center shrink-0 min-w-[76px] rounded-2xl border p-2.5 transition-all ${
+                    className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold transition-colors ${
                       active
-                        ? "border-primary bg-primary/10 ring-2 ring-primary/20 shadow-sm"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : count > 0
-                          ? "border-primary/20 bg-card shadow-sm hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
-                          : "border-transparent hover:bg-muted"
+                          ? "border-primary/30 bg-card text-foreground"
+                          : "border-border bg-muted/40 text-muted-foreground"
                     }`}
                   >
-                    <span className={`mb-1 flex h-10 w-10 items-center justify-center rounded-full text-xl ${active || count > 0 ? "bg-primary/10" : "bg-muted/60"}`}>
-                      {CATEGORY_EMOJI[cat] ?? "📌"}
-                    </span>
-                    <span className={`text-sm font-extrabold ${count > 0 ? "text-primary" : "text-foreground"}`}>{count}</span>
-                    <span className="mt-0.5 text-[10px] font-semibold text-muted-foreground text-center leading-tight">{cat}</span>
+                    <span className="text-sm leading-none">{CATEGORY_EMOJI[cat] ?? "📌"}</span>
+                    <span className="whitespace-nowrap">{cat}</span>
+                    <span className={`rounded-full px-1.5 text-[10px] font-extrabold leading-4 ${
+                      active ? "bg-white/25 text-white" : count > 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    }`}>{count}</span>
                   </button>
                 );
               })}
@@ -1463,34 +1079,34 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section ref={resultsRef} className="py-8 px-4 bg-background scroll-mt-32">
-          <div className="max-w-7xl mx-auto space-y-5">
+        <section ref={resultsRef} className="scroll-mt-28 bg-background px-3 py-3">
+          <div className="mx-auto max-w-7xl space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold">
+              <h2 className="font-display text-base font-bold">
                 {filterCat !== "all" ? `${filterCat} Cases` : "Verified Cases"}
-                <span className="ml-2 text-sm text-muted-foreground font-normal">({filtered.length})</span>
+                <span className="ml-1.5 text-sm font-semibold text-primary">({filtered.length})</span>
               </h2>
               {activeFilterCount > 0 && (
-                <button onClick={resetFilters} className="text-xs text-primary font-semibold">
+                <button onClick={resetFilters} className="text-xs font-semibold text-primary">
                   Clear filters
                 </button>
               )}
             </div>
 
             {loading ? (
-              <div className="text-center py-16 text-muted-foreground">Loading...</div>
+              <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
             ) : filtered.length === 0 ? (
-              <div className="text-center py-16 rounded-xl border border-dashed border-border bg-muted/20">
-                <p className="text-foreground font-semibold">No cases found.</p>
-                <p className="text-muted-foreground text-sm mt-1">Try changing your filters or location.</p>
+              <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-center">
+                <p className="text-sm font-semibold text-foreground">No cases found.</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Try changing your filters or location.</p>
                 {activeFilterCount > 0 && (
-                  <Button variant="outline" size="sm" className="mt-4" onClick={resetFilters}>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={resetFilters}>
                     Clear Filters
                   </Button>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {filtered.map((c, i) => {
                   const cur = c.currency || "USD";
                   const s = sym(cur);
@@ -1499,132 +1115,98 @@ export default function HomePage() {
                   const percent = needed > 0 ? Math.min(Math.round((collected / needed) * 100), 100) : 0;
                   const remaining = Math.max(needed - collected, 0);
                   const displayCategory = normalizePublishedCategory(c.category);
-                  const appeal = CATEGORY_APPEAL[displayCategory] ?? "Be someone's hope today 🤲";
                   const selfieUrl = typeof c.selfie_url === "string" && c.selfie_url.trim() ? c.selfie_url : null;
                   const requesterName = String(c.full_name || c.display_name || "Verified requester").trim();
                   const isDone = needed > 0 && collected >= needed;
+                  const daysLeft = c.deadline ? daysUntilCaseDeadline(c.deadline, utcToday) : null;
 
                   return (
                     <motion.div
                       key={c.id}
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: Math.min(i * 0.05, 0.4) }}
+                      transition={{ delay: Math.min(i * 0.04, 0.3) }}
                     >
                       <div
-                        className="rounded-2xl border border-border bg-card overflow-hidden cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all h-full flex flex-col"
+                        className="flex h-full cursor-pointer flex-col gap-2 rounded-2xl border border-border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-md"
                         onClick={() => navigate({ to: "/cases/$id", params: { id: c.id } })}
                       >
-                        {selfieUrl && (
-                          <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-card to-teal-50 px-4 pt-4">
-                            <div className="flex items-center gap-3 rounded-2xl border border-primary/10 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
-                              <img
-                                src={resolveMediaUrl(selfieUrl)}
-                                alt={`${requesterName} selfie`}
-                                loading="lazy"
-                                onError={handleImageError}
-                                className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-md"
+                        <div className="flex items-center gap-2">
+                          {selfieUrl && (
+                            <img
+                              src={resolveMediaUrl(selfieUrl)}
+                              alt={`${requesterName} selfie`}
+                              loading="lazy"
+                              onError={handleImageError}
+                              className="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-primary/20"
+                            />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="flex items-center gap-1 truncate text-xs font-bold text-foreground">
+                              {selfieUrl && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                              <span className="truncate">{selfieUrl ? requesterName : `${CATEGORY_EMOJI[displayCategory] ?? "📌"} ${displayCategory}`}</span>
+                            </p>
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              {selfieUrl ? `${CATEGORY_EMOJI[displayCategory] ?? "📌"} ${displayCategory}` : `${c.city}, ${c.country}`}
+                            </p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              c.urgency === "Emergency" ? "bg-red-100 text-red-700" :
+                              c.urgency === "High" ? "bg-orange-100 text-orange-700" : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {c.urgency}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-foreground">{c.title}</h3>
+                          {c.short_description && (
+                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{c.short_description}</p>
+                          )}
+                        </div>
+
+                        {needed > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-primary">{s} {needed} <span className="font-medium text-muted-foreground">{cur}</span></span>
+                              <span className="text-muted-foreground">{isDone ? "Fully helped 🎉" : `${percent}% · ${s} ${remaining} left`}</span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                              <div
+                                className={`h-1.5 rounded-full transition-all ${isDone ? "bg-green-500" : "bg-primary"}`}
+                                style={{ width: `${percent}%` }}
                               />
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
-                                  <ShieldCheck className="h-3.5 w-3.5" /> Verified requester
-                                </div>
-                                <p className="mt-1 truncate text-sm font-bold text-foreground">{requesterName}</p>
-                                <p className="text-[11px] text-muted-foreground">Identity verified for this help request</p>
-                              </div>
                             </div>
                           </div>
                         )}
-                        <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-4 border-b border-border">
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold bg-card text-primary px-2.5 py-1 rounded-full border border-primary/20">
-                              <span>{CATEGORY_EMOJI[displayCategory] ?? "📌"}</span>
-                              {displayCategory}
-                            </span>
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                c.urgency === "Emergency" ? "bg-red-100 text-red-700" :
-                                c.urgency === "High" ? "bg-orange-100 text-orange-700" : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {c.urgency}
-                            </span>
-                          </div>
-                          <p className="text-sm font-bold text-foreground leading-snug">{appeal}</p>
-                        </div>
 
-                        <div className="p-4 space-y-3 flex-1 flex flex-col">
-                          <div>
-                            <h3 className="font-bold text-lg leading-snug line-clamp-2 text-foreground">{c.title}</h3>
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{c.short_description}</p>
-                            {c.description && (
-                              <div className="mt-3 rounded-xl bg-primary/5 px-3 py-2.5">
-                                <p className="text-[10px] font-bold uppercase tracking-wide text-primary">Case story</p>
-                                <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-relaxed text-foreground/80">{c.description}</p>
-                              </div>
+                        <div className="mt-auto flex items-center gap-2 pt-1">
+                          <div className="min-w-0 flex-1 text-[11px] text-muted-foreground">
+                            {selfieUrl && (
+                              <span className="flex items-center gap-1 truncate">
+                                <MapPin className="h-3 w-3 shrink-0" /> {c.city}, {c.country}
+                              </span>
+                            )}
+                            {daysLeft != null && daysLeft >= 0 && (
+                              <span className={`font-bold ${daysLeft <= 3 ? "text-red-600" : "text-amber-600"}`}>
+                                ⏳ {daysLeft === 0 ? "Expires TODAY!" : daysLeft === 1 ? "1 day left" : `${daysLeft} days left`}
+                              </span>
                             )}
                           </div>
-
-                          {needed > 0 && (
-                            <div className="flex items-baseline gap-1.5">
-                              <span className="text-2xl font-black text-primary">{s} {needed}</span>
-                              <span className="text-xs font-medium text-muted-foreground">{cur} needed</span>
-                            </div>
-                          )}
-
-                          {needed > 0 && (
-                            <div className="space-y-1.5">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="font-bold text-green-600">{s} {collected} raised</span>
-                                <span className="text-muted-foreground">{isDone ? "Fully helped 🎉" : `${percent}%`}</span>
-                              </div>
-                              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                                <div
-                                  className={`h-2 rounded-full transition-all ${isDone ? "bg-green-500" : "bg-primary"}`}
-                                  style={{ width: `${percent}%` }}
-                                />
-                              </div>
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="text-muted-foreground">Goal: <strong className="text-foreground">{s} {needed}</strong></span>
-                                {!isDone && <span className="text-primary font-semibold">{s} {remaining} left</span>}
-                              </div>
-                            </div>
-                          )}
-
-                          {c.deadline && (() => {
-                            const daysLeft = daysUntilCaseDeadline(c.deadline, utcToday);
-                            if (daysLeft == null || daysLeft < 0) return null;
-                            return (
-                              <div
-                                className={`text-xs font-bold px-2 py-1 rounded-lg text-center ${
-                                  daysLeft <= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                                }`}
-                              >
-                                ⏳ {daysLeft === 0 ? "Expires TODAY!" : daysLeft === 1 ? "1 day left!" : `${daysLeft} days left to help!`}
-                              </div>
-                            );
-                          })()}
-
-                          <div className="mt-auto space-y-3 border-t border-border pt-3">
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <MapPin className="h-3 w-3" />
-                              {c.city}, {c.country}
-                            </span>
-                            <button
-                              type="button"
-                              aria-label={`Help now with ${c.title || "this case"}`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                navigate({ to: "/cases/$id", params: { id: c.id } });
-                              }}
-                              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-extrabold text-primary-foreground shadow-md transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                            >
-                              <Heart className="h-4 w-4" fill="currentColor" />
-                              Help Now
-                              <ChevronRight className="h-4 w-4" />
-                            </button>
-                            <p className="text-center text-[11px] text-muted-foreground">View full case details and choose how to help</p>
-                          </div>
+                          <button
+                            type="button"
+                            aria-label={`Help now with ${c.title || "this case"}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              navigate({ to: "/cases/$id", params: { id: c.id } });
+                            }}
+                            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-extrabold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[.97]"
+                          >
+                            <Heart className="h-3.5 w-3.5" fill="currentColor" />
+                            Help Now
+                          </button>
                         </div>
                       </div>
                     </motion.div>
@@ -1635,7 +1217,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <HeroLeaderboard />
+<HeroLeaderboard />
         <HeroesWall />
         <KindnessWall />
 
