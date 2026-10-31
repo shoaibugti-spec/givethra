@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { getHelpMeCameraConstraints, resetHelpMeCameraZoom } from "./helpmeCamera";
+
+const recorderSource = readFileSync(new URL("../pages/HelpMeCreatePage.tsx", import.meta.url), "utf8");
 
 describe("Help Me camera framing", () => {
   it.each(["user", "environment"] as const)("requests portrait framing for the %s camera", (facing) => {
@@ -46,5 +49,11 @@ describe("Help Me camera framing", () => {
       applyConstraints: vi.fn().mockRejectedValue(new Error("unsupported constraint")),
     } as unknown as MediaStreamTrack;
     await expect(resetHelpMeCameraZoom(track)).resolves.toBeUndefined();
+  });
+
+  it("uses the zoom-safe constraints and displays the full live camera frame", () => {
+    expect(recorderSource).toContain("getHelpMeCameraConstraints(mode)");
+    expect(recorderSource).toContain("resetHelpMeCameraZoom(track)");
+    expect(recorderSource).toContain("object-contain");
   });
 });

@@ -3,7 +3,6 @@
 // Android Chrome and desktop webcams. Steps: check -> record -> preview -> details -> done.
 import { useAuth } from "@/contexts/AuthContext";
 import { HelpMeError, PAY_METHODS, formatMoney, helpme, niceGoal, pickRecorderMime, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
-import { getHelpMeCameraConstraints, resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RefreshCw, RotateCcw, ShieldAlert, Square, Video } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -109,13 +108,12 @@ export default function HelpMeCreatePage() {
     try {
       let stream: MediaStream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia(getHelpMeCameraConstraints(mode));
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode, width: { ideal: 480 }, height: { ideal: 854 } }, audio: true });
       } catch (e) {
         if ((e as DOMException)?.name === "OverconstrainedError" || (e as DOMException)?.name === "NotFoundError") {
           stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         } else throw e;
       }
-      await Promise.all(stream.getVideoTracks().map((track) => resetHelpMeCameraZoom(track)));
       streamRef.current = stream;
       setFacing(mode);
       setStep("record");
@@ -286,7 +284,7 @@ export default function HelpMeCreatePage() {
               </div>
             ) : (
               <>
-                <video ref={liveRef} playsInline muted autoPlay className={`absolute inset-0 h-full w-full bg-black object-contain ${facing === "user" ? "-scale-x-100" : ""}`} />
+                <video ref={liveRef} playsInline muted autoPlay className={`absolute inset-0 h-full w-full bg-black object-cover ${facing === "user" ? "-scale-x-100" : ""}`} />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
                 <div className="relative z-10 mt-2 flex justify-center">
                   <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-extrabold tabular-nums">{recording && <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />}{seconds}s / {cfg?.max_seconds ?? 20}s</span>
