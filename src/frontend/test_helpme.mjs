@@ -9,7 +9,7 @@ CREATE TABLE profiles(user_id TEXT PRIMARY KEY,full_name TEXT,avatar_url TEXT,us
 CREATE TABLE community_posts(id TEXT PRIMARY KEY,user_id TEXT,display_name TEXT,message TEXT,created_at TEXT);
 CREATE TABLE community_post_likes(post_id TEXT);CREATE TABLE community_post_comments(post_id TEXT);
 CREATE TABLE case_resolutions(case_id TEXT,hero_id TEXT,amount_paid REAL,paid_to TEXT,status TEXT,admin_confirmed INTEGER,completed_at TEXT,admin_confirmed_at TEXT,submitted_at TEXT);`);
-sql.exec(fs.readFileSync("./0016_helpme.sql", "utf8"));
+sql.exec(fs.readFileSync("./migrations/0016_helpme.sql", "utf8"));
 const stmt = (q) => { let b = []; const o = {
   bind: (...a) => { b = a.map((x) => (x === undefined ? null : x)); return o; },
   first: async () => sql.prepare(q).get(...b) ?? null,
