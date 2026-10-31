@@ -20,5 +20,11 @@ database_id = "5ad1094c-3288-4519-aeec-0446d82126f6"
 binding = "UPLOADS"
 bucket_name = "givethra-user-uploads"
 
+# NEW: separate private bucket for Help Me videos (never make the UPLOADS bucket public).
+# Videos are streamed through the Worker on the same domain, so no custom domain is needed.
+[[r2_buckets]]
+binding = "HELPME_VIDEOS"
+bucket_name = "givethra-helpme-videos"
+
 [vars]
 GOOGLE_CLIENT_ID = "588032676735-6aa3hj5b990sa5hcn6qltvj10581od9p.apps.googleusercontent.com"
