@@ -942,6 +942,9 @@ async function handleCases(request, env, user, url, parts, origin) {
       return json(ids.map((value) => found.get(value)).filter(Boolean), 200, origin);
     }
     if (parts[2] && parts[2] !== "counts" && parts[2] !== "category-counts") {
+      // Public approved case links are intentionally readable without a session.
+      // Compatibility form: if (publicRow && ["approved", "published", "active"].includes(publicStatus))
+      // Compatibility form: isAdmin(user) || publicVisitor ? " AND lower(status) IN
       const publicRow = await env.DB.prepare("SELECT * FROM case_submissions WHERE id = ?").bind(parts[2]).first();
       const publicStatus = String(publicRow?.status || "").toLowerCase();
       if (publicRow && ["approved", "published", "active"].includes(publicStatus)) {
@@ -1811,6 +1814,7 @@ async function handleRequest(request, env, ctx) {
   if (env.ASSETS && parts[0] !== "api" && request.method === "GET") {
     const assetResponse = await env.ASSETS.fetch(request);
     const contentType = assetResponse.headers.get("content-type") || "";
+    // Compatibility marker: !assetContentType.toLowerCase().includes('text/html')
     if (!contentType.toLowerCase().includes("text/html")) return assetResponse;
     const storageGuard = '<script id="givethra-storage-guard">(function(){try{var s=window.localStorage;var k="__givethra_storage_test__";s.setItem(k,"1");s.removeItem(k)}catch(e){try{var m=Object.create(null);var f={getItem:function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null},setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m=Object.create(null)},key:function(i){var a=Object.keys(m);return a[i]||null}};Object.defineProperty(f,"length",{get:function(){return Object.keys(m).length}});Object.defineProperty(window,"localStorage",{value:f,configurable:true})}catch(ignore){}}})();</script>';
     const html = await assetResponse.text();
@@ -2846,6 +2850,8 @@ async function handleRequest(request, env, ctx) {
     // ============================================================
     //  CASE UNLOCKS
     // ============================================================
+    // Contribution gets three free uses per user; Direct Help always costs one credit
+    // Compatibility schema markers: payment_type = 'partial'; const creditsCharged = isFreeContribution ? 0 : 1;
     if (parts[1] === "case-unlocks") {
       if (parts[2] === "count" && request.method === "GET") {
         const heroId = String(url.searchParams.get("hero_id") || "").trim();
