@@ -11,6 +11,7 @@
 //                 the two edit controls competing for the same job.
 
 import Layout from "@/components/Layout";
+import DepositPanel from "@/components/DepositPanel";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
@@ -62,6 +63,7 @@ import {
   getKycSubmission,
   getProfile,
   getProfileStats,
+  getWallet,
   getCasesByUser,
   getCaseResolutionsByHero,
   getCaseUnlocksByHero,
@@ -196,6 +198,22 @@ export default function ProfilePage() {
   const [helpedCases, setHelpedCases] = useState<any[]>([]);
   const [trustLevel, setTrustLevel] = useState(100);
   const [badge, setBadge] = useState<{ title: string; emoji: string; description: string; icon: JSX.Element; color: string } | null>(null);
+  const [showDeposit, setShowDeposit] = useState(false);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+
+  // Credits balance (own profile only). Failure never blocks the profile.
+  useEffect(() => {
+    if (!isOwnProfile || !user?.id) return;
+    let cancelled = false;
+    getWallet(user.id)
+      .then((wallet: any) => {
+        if (!cancelled) setCreditBalance(Number(wallet?.balance ?? 0));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwnProfile, user?.id, showDeposit]);
 
   useEffect(() => {
     setProfile(null);
@@ -414,7 +432,7 @@ export default function ProfilePage() {
     { icon: <HeartHandshake className="h-5 w-5" />, label: "My Help Dashboard", to: "/my-help" },
     { icon: <Briefcase className="h-5 w-5" />, label: "My Cases Dashboard", to: "/my-cases" },
     { icon: <Bell className="h-5 w-5" />, label: "Notifications", to: "/notifications" },
-    { icon: <Wallet className="h-5 w-5" />, label: "Wallet", to: "/wallet" },
+    { icon: <Wallet className="h-5 w-5" />, label: "Credits & Deposit", to: "/wallet" },
     { icon: <ShieldCheck className="h-5 w-5" />, label: "Security", to: "/security" },
     { icon: <KeyRound className="h-5 w-5" />, label: "Google Account Security", to: "/security" },
     { icon: <Lock className="h-5 w-5" />, label: "Privacy", to: "/account-privacy" },
@@ -464,6 +482,23 @@ export default function ProfilePage() {
               Retry
             </Button>
           </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Deposit view: opens inside the profile page, back arrow returns to the profile.
+  if (showDeposit && isOwnProfile) {
+    return (
+      <Layout>
+        <div className="max-w-xl mx-auto px-4 pt-4 pb-24">
+          <DepositPanel
+            onBack={() => {
+              setShowDeposit(false);
+              window.scrollTo({ top: 0 });
+            }}
+            onBalanceChange={setCreditBalance}
+          />
         </div>
       </Layout>
     );
@@ -619,6 +654,34 @@ export default function ProfilePage() {
                 <span className="text-[11px] text-muted-foreground">Supports</span>
               </div>
             </div>
+
+            {isOwnProfile && (
+              <div className="mt-3 rounded-2xl bg-gradient-to-br from-primary to-primary/75 p-4 text-white shadow-md">
+                <div className="flex items-center gap-2 text-sm opacity-90">
+                  <Wallet className="h-4 w-4" /> Credits Balance
+                </div>
+                <div className="mt-1 flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-3xl font-extrabold leading-none">
+                      {creditBalance == null ? "—" : creditBalance.toLocaleString()}
+                    </div>
+                    <div className="mt-1.5 text-[11px] opacity-85">
+                      ≈ ${creditBalance == null ? "—" : creditBalance.toLocaleString()} USD · 1 Credit = $1
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDeposit(true);
+                      window.scrollTo({ top: 0 });
+                    }}
+                    className="h-10 shrink-0 rounded-xl bg-white px-5 text-sm font-extrabold text-primary shadow transition hover:bg-white/90 active:scale-95"
+                  >
+                    Deposit
+                  </button>
+                </div>
+              </div>
+            )}
 
             {isOwnProfile && (
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -827,6 +890,11 @@ export default function ProfilePage() {
                   type="button"
                   onClick={() => {
                     setShowMenu(false);
+                    if (item.to === "/wallet" && isOwnProfile) {
+                      setShowDeposit(true);
+                      window.scrollTo({ top: 0 });
+                      return;
+                    }
                     navigate({ to: item.to as "/" });
                   }}
                   className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors ${
