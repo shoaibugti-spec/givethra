@@ -3208,7 +3208,7 @@ async function helpMeShareDocument(request, env, url, parts) {
   if (!env.ASSETS || request.method !== "GET" || parts[0] !== "share" || parts[1] !== "helpme" || !parts[2]) return null;
   const appealId = decodeURIComponent(parts[2]);
   const appeal = await env.DB.prepare(
-    `SELECT id, description, status, video_key, video_content_type, video_deleted_at, expires_at
+    `SELECT id, description, status, video_key, video_content_type, video_deleted_at, expires_at, currency, goal_local, raised_local
      FROM helpme_appeals
      WHERE id = ? AND status IN ('published','helped') AND video_deleted_at IS NULL
        AND (expires_at IS NULL OR expires_at > ?)
@@ -3221,8 +3221,9 @@ async function helpMeShareDocument(request, env, url, parts) {
 
   const documentResponse = await env.ASSETS.fetch(new Request(new URL("/", url), request));
   let html = await documentResponse.text();
-  const title = `Help Me on Givethra`;
-  const description = String(appeal.description || "A person is asking for direct support through Givethra.").replace(/\s+/g, " ").trim().slice(0, 300);
+  const title = `Help Me · ${String(appeal.currency || "USD")} ${Number(appeal.goal_local || 0).toLocaleString()}`;
+  const shortDescription = String(appeal.description || "A person is asking for direct support through Givethra.").replace(/\s+/g, " ").trim().slice(0, 220);
+  const description = `${shortDescription} · Goal ${String(appeal.currency || "USD")} ${Number(appeal.goal_local || 0).toLocaleString()}`.slice(0, 300);
   let hasPoster = false;
   try { hasPoster = Boolean(await env.HELPME_VIDEOS?.head(`thumbs/${appealId}.jpg`)); } catch {}
   const image = hasPoster

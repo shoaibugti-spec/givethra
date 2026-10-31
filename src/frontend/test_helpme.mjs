@@ -82,7 +82,7 @@ assert.ok([...store.keys()].some((k) => k.startsWith("v/")) && ![...store.keys()
 r = await call(null, "GET", `/api/helpme/thumbnail/${appealId}`); assert.equal(r.status, 200);
 assert.ok(store.has(`thumbs/${appealId}.jpg`) && !store.has(`pending/${uploadId}.jpg`));
 r = await call(null, "GET", "/api/helpme/feed"); assert.equal(r.body.items.length, 1); const it = r.body.items[0];
-assert.ok(it.video_url.startsWith("/api/helpme/media/v/")); assert.equal(JSON.stringify(it).includes("03001234567"), false); assert.equal(it.percent, 0);
+assert.ok(it.video_url.startsWith("/api/helpme/media/v/")); assert.equal(it.thumbnail_url, `/api/helpme/thumbnail/${appealId}`); assert.equal(JSON.stringify(it).includes("03001234567"), false); assert.equal(it.percent, 0);
 // same-domain video stream: public guest can fetch an approved video, but not a pending/unknown key
 { const u = new URL("https://givethra.org" + it.video_url); const res = await handleHelpMe(new Request(u, { method: "GET", headers: { Range: "bytes=0-3" } }), env, {}, null, u, u.pathname.split("/").filter(Boolean), "https://givethra.org", h); assert.equal(res.status, 206); assert.equal(res.headers.get("Accept-Ranges"), "bytes"); }
 { const u = new URL("https://givethra.org/api/helpme/media/pending/x.mp4"); const res = await handleHelpMe(new Request(u), env, {}, null, u, u.pathname.split("/").filter(Boolean), "https://givethra.org", h); assert.equal(res.status, 404); }

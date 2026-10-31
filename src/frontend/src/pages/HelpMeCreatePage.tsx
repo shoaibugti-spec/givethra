@@ -59,6 +59,8 @@ export default function HelpMeCreatePage() {
   const elapsedRef = useRef(0);
   const lastTickRef = useRef(0);
   const durationRef = useRef(0);
+  const drawFrameRef = useRef<number | null>(null);
+  const canvasStreamRef = useRef<MediaStream | null>(null);
 
   const maxMs = (cfg?.max_seconds ?? 20) * 1000;
   const minStopMs = (cfg?.min_stop_seconds ?? 12) * 1000;
@@ -134,20 +136,59 @@ export default function HelpMeCreatePage() {
     }
   }
 
-  function startRecording() {
+  async function startRecording() {
     const stream = streamRef.current;
     if (!stream) return;
+    let recordingStream = stream;
+    let recordVideo: HTMLVideoElement | null = null;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 720;
+      canvas.height = 1280;
+      const context = canvas.getContext("2d");
+      if (!context || typeof canvas.captureStream !== "function") throw new Error("Portrait recording is unavailable");
+      recordVideo = document.createElement("video");
+      recordVideo.srcObject = stream;
+      recordVideo.muted = true;
+      recordVideo.playsInline = true;
+      await recordVideo.play();
+      const draw = () => {
+        context.fillStyle = "#000";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        if (recordVideo && recordVideo.videoWidth > 0 && recordVideo.videoHeight > 0) {
+          const scale = Math.min(canvas.width / recordVideo.videoWidth, canvas.height / recordVideo.videoHeight);
+          const width = recordVideo.videoWidth * scale;
+          const height = recordVideo.videoHeight * scale;
+          context.drawImage(recordVideo, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+        }
+        drawFrameRef.current = requestAnimationFrame(draw);
+      };
+      const portraitStream = canvas.captureStream(30);
+      stream.getAudioTracks().forEach((track) => portraitStream.addTrack(track));
+      canvasStreamRef.current = portraitStream;
+      recordingStream = portraitStream;
+      draw();
+    } catch {
+      // Older browsers can still use the original stream; modern mobile browsers use the portrait canvas above.
+      recordVideo = null;
+      canvasStreamRef.current = null;
+    }
     const mime = pickRecorderMime();
     let rec: MediaRecorder;
     try {
-      rec = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 800000, audioBitsPerSecond: 64000 });
+      rec = new MediaRecorder(recordingStream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 800000, audioBitsPerSecond: 64000 });
     } catch {
-      try { rec = new MediaRecorder(stream); } catch { setCamError("Recording is not supported on this browser."); return; }
+      try { rec = new MediaRecorder(recordingStream); } catch { setCamError("Recording is not supported on this browser."); return; }
     }
     chunksRef.current = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
     rec.onstop = () => {
       clearTimer();
+      if (drawFrameRef.current !== null) cancelAnimationFrame(drawFrameRef.current);
+      drawFrameRef.current = null;
+      canvasStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
+      canvasStreamRef.current = null;
+      if (recordVideo) recordVideo.srcObject = null;
       const type = (rec.mimeType || mime || "video/mp4").split(";")[0];
       const out = new Blob(chunksRef.current, { type: type.startsWith("video/webm") ? "video/webm" : "video/mp4" });
       durationRef.current = elapsedRef.current;
@@ -302,7 +343,7 @@ export default function HelpMeCreatePage() {
                   {!recording ? (
                     <>
                       <button type="button" onClick={() => void openCamera(facing === "user" ? "environment" : "user")} aria-label="Flip camera" className="flex h-12 w-12 items-center justify-center rounded-full bg-black/55 active:scale-95"><RefreshCw className="h-5 w-5" /></button>
-                      <button type="button" onClick={startRecording} aria-label="Start recording" className="flex h-[74px] w-[74px] items-center justify-center rounded-full border-4 border-white active:scale-95"><span className="h-14 w-14 rounded-full bg-red-500" /></button>
+                      <button type="button" onClick={() => void startRecording()} aria-label="Start recording" className="flex h-[74px] w-[74px] items-center justify-center rounded-full border-4 border-white active:scale-95"><span className="h-14 w-14 rounded-full bg-red-500" /></button>
                       <div className="w-12" />
                     </>
                   ) : (
@@ -323,7 +364,9 @@ export default function HelpMeCreatePage() {
 
         {step === "preview" && (
           <div className="flex flex-1 flex-col px-4 pb-6">
-            <video src={previewUrl} controls playsInline className="mx-auto max-h-[68dvh] w-full rounded-2xl bg-black object-contain" />
+            <div className="mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-2xl bg-black">
+              <video src={previewUrl} controls playsInline className="h-full w-full object-contain" />
+            </div>
             <p className="mt-3 text-center text-xs text-gray-300">Watch and listen to your recording. Is it clear?</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button type="button" onClick={retake} className="flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 py-3 text-sm font-bold active:scale-95"><RotateCcw className="h-4 w-4" /> Retake</button>
