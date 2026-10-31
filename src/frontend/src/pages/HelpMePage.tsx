@@ -11,7 +11,7 @@ import { toast } from "sonner";
 type Entry = { type: "intro" } | { type: "appeal"; a: Appeal };
 let configCache: HelpMeConfig | null = null;
 
-function ReelVideo({ src, active, near, muted, paused }: { src: string; active: boolean; near: boolean; muted: boolean; paused: boolean }) {
+function ReelVideo({ src, poster, active, near, muted, paused }: { src: string; poster?: string; active: boolean; near: boolean; muted: boolean; paused: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [waiting, setWaiting] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -53,7 +53,8 @@ function ReelVideo({ src, active, near, muted, paused }: { src: string; active: 
         onPlaying={() => { setWaiting(false); setFailed(false); }}
         onError={() => setFailed(true)}
         onContextMenu={(e) => e.preventDefault()}
-        className="absolute inset-0 h-full w-full bg-black object-cover"
+        poster={poster}
+        className="absolute inset-0 h-full w-full bg-black object-contain"
       />
       {active && waiting && !failed && <div className="absolute inset-0 z-[5] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-white/70" /></div>}
       {failed && (
@@ -228,8 +229,9 @@ export default function HelpMePage() {
 
   async function share(a: Appeal) {
     const url = buildHelpMeShareUrl(a.id);
+    const caption = `${a.description.trim().slice(0, 110)} · Goal ${formatMoney(a.goal_local, a.currency)}`;
     try {
-      if (navigator.share) await navigator.share({ title: "Help Me", text: a.description.slice(0, 120), url });
+      if (navigator.share) await navigator.share({ title: `Help Me · ${formatMoney(a.goal_local, a.currency)}`, text: caption, url });
       else { await navigator.clipboard.writeText(url); toast.success("Link copied"); }
       void helpme.share(a.id);
     } catch (e) {
@@ -288,7 +290,7 @@ export default function HelpMePage() {
               ) : (
                 <Card
                   a={e.a} cfg={cfg} vCur={vCur}
-                  active={i === active && visible} near={i === active || i === active + 1}
+                  poster={e.a.thumbnail_url || undefined} active={i === active && visible} near={i === active || i === active + 1}
                   muted={muted} paused={paused}
                   onTap={() => setPaused((p) => !p)}
                   onPray={() => togglePray(e.a)} onRepost={() => toggleRepost(e.a)} onShare={() => share(e.a)}

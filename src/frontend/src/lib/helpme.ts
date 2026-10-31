@@ -104,6 +104,7 @@ export interface Appeal {
   helped: boolean;
   description: string;
   video_url: string | null;
+  thumbnail_url: string | null;
   currency: string;
   goal_local: number;
   raised_local: number;
