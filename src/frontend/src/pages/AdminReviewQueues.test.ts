@@ -57,4 +57,26 @@ describe("Admin payment review queues", () => {
     expect(source).toContain('status: "completed", admin_confirmed: true');
     expect(source).toContain('status: "disputed", admin_confirmed: false');
   });
+
+  it("shows pending review badges for Help Me videos, Dreams submissions, and Donations", () => {
+    expect(source).toContain("countPendingHelpMeVideos(helpMeResult.value)");
+    expect(source).toContain("countPendingHelpMeProofs(helpMeResult.value)");
+    expect(source).toContain("countOpenHelpMeReports(helpMeResult.value)");
+    expect(source).toContain("countPendingDreamSubmissions(asRows(dreamResult.value))");
+    expect(source).toContain("countPendingDonationReviews(asRows(donationResult.value))");
+    expect(source).toContain('TabsTrigger value="helpme">Help Me');
+    expect(source).toContain('TabsTrigger value="dreams">Dreams');
+    expect(source).toContain('TabsTrigger value="donations">Donations');
+    expect(source).toContain("{pendingHelpMeVideos}");
+    expect(source).toContain("{pendingHelpMeProofs}");
+    expect(source).toContain("{pendingHelpMeReports}");
+    expect(source).toContain("{pendingDreamSubmissions}");
+    expect(source).toContain("{pendingDonationReviews}");
+  });
+
+  it("does not label self-managed suspensions or notifications as pending review", () => {
+    expect(source).toContain('<TabsTrigger value="notify">Notify</TabsTrigger>');
+    expect(source).toContain('<TabsTrigger value="suspensions">Suspensions</TabsTrigger>');
+    expect(source).not.toContain('value="suspensions">Suspensions {activeSuspensions');
+  });
 });

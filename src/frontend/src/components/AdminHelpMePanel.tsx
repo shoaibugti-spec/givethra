@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 type Section = "appeals" | "proofs" | "reports" | "settings";
 
-export default function AdminHelpMePanel() {
+export default function AdminHelpMePanel({ onQueueChanged }: { onQueueChanged?: () => void | Promise<void> } = {}) {
   const [section, setSection] = useState<Section>("appeals");
   const [q, setQ] = useState<{ appeals: any[]; helps: any[]; reports: any[] } | null>(null);
   const [cfg, setCfg] = useState<HelpMeConfig | null>(null);
@@ -43,7 +43,12 @@ export default function AdminHelpMePanel() {
 
   async function run(key: string, fn: () => Promise<unknown>, ok: string) {
     setBusy(key);
-    try { await fn(); toast.success(ok); await load(); } catch (e) { toast.error(e instanceof Error ? e.message : "Action failed"); } finally { setBusy(""); }
+    try { await fn(); toast.success(ok); await load(); await onQueueChanged?.(); } catch (e) { toast.error(e instanceof Error ? e.message : "Action failed"); } finally { setBusy(""); }
+  }
+
+  async function refreshQueue() {
+    await load();
+    await onQueueChanged?.();
   }
 
   async function loadVideo(id: string) {
@@ -63,7 +68,7 @@ export default function AdminHelpMePanel() {
         {tabBtn("proofs", "Payment proofs", q?.helps.length)}
         {tabBtn("reports", "Reports", q?.reports.length)}
         {tabBtn("settings", "FX & settings")}
-        <Button type="button" variant="outline" size="sm" onClick={() => void load()} className="ml-auto"><RefreshCw className="mr-1 h-3.5 w-3.5" />Refresh</Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => void refreshQueue()} className="ml-auto"><RefreshCw className="mr-1 h-3.5 w-3.5" />Refresh</Button>
       </div>
       {loading && !q && <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div>}
 

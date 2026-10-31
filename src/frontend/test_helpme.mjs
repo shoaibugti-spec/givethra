@@ -68,7 +68,9 @@ r = await call(sara, "POST", "/api/helpme/appeals", { upload_id: up2, descriptio
 r = await call(null, "GET", "/api/helpme/feed"); assert.equal(r.body.items.length, 0);
 r = await call(omar, "GET", `/api/helpme/appeals/${appealId}/payment`); assert.equal(r.status, 404);
 r = await call(omar, "GET", `/api/helpme/admin/queue`); assert.equal(r.status, 403);
+r = await call(omar, "GET", `/api/helpme/admin/counts`); assert.equal(r.status, 403);
 r = await call(admin, "GET", `/api/helpme/video/${appealId}`); assert.equal(r.status, 200);
+r = await call(admin, "GET", `/api/helpme/admin/counts`); assert.deepEqual(r.body, { pending_videos: 1, pending_payment_proofs: 0, open_reports: 0 });
 r = await call(admin, "GET", `/api/helpme/admin/queue`); assert.equal(r.body.appeals.length, 1);
 r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: "approve" }); assert.equal(r.status, 200);
 r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: "approve" }); assert.equal(r.status, 409);
@@ -97,6 +99,7 @@ r = await call(omar, "POST", `/api/helpme/appeals/${appealId}/help`, { amount: 1
 r = await call(omar, "POST", `/api/helpme/appeals/${appealId}/help`, { amount: 100, trx_id: "TX123456", proof_url: proof }); assert.equal(r.status, 201); const h1 = r.body.id;
 r = await call(sara, "POST", `/api/helpme/appeals/${appealId}/help`, { amount: 480, trx_id: "tx-123456", proof_url: proof }); assert.equal(r.body.code, "TRX_USED");
 r = await call(sara, "POST", `/api/helpme/appeals/${appealId}/help`, { amount: 480, trx_id: "ZZ998877", proof_url: proof }); assert.equal(r.status, 201); const h2 = r.body.id;
+r = await call(admin, "GET", `/api/helpme/admin/counts`); assert.deepEqual(r.body, { pending_videos: 0, pending_payment_proofs: 2, open_reports: 0 });
 r = await call(admin, "PUT", `/api/helpme/admin/help/${h1}`, { action: "approve", amount: 100 }); assert.equal(r.status, 200); assert.equal(r.body.appeal_status, "published");
 r = await call(admin, "PUT", `/api/helpme/admin/help/${h1}`, { action: "approve" }); assert.equal(r.status, 409);
 r = await call(null, "GET", "/api/helpme/feed"); assert.equal(r.body.items[0].percent, 17);
@@ -124,6 +127,7 @@ r = await call(sara, "GET", `/api/helpme/users/u3`); assert.equal(r.body.reposts
 sql.prepare("UPDATE helpme_appeals SET status='published', helped_at=NULL WHERE id=?").run(appealId);
 for (const u of ["a", "b", "c", "d", "e"]) await call({ user_id: u, email: u + "@x" }, "POST", "/api/helpme/reports", { target_type: "appeal", target_id: appealId, reason: "bad" });
 assert.equal(sql.prepare("SELECT status FROM helpme_appeals WHERE id=?").get(appealId).status, "under_review");
+r = await call(admin, "GET", "/api/helpme/admin/counts"); assert.deepEqual(r.body, { pending_videos: 0, pending_payment_proofs: 0, open_reports: 1 });
 r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: "restore" }); assert.equal(r.body.status, "published");
 // reject deletes video + scrubs account
 r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: "reject", reason: "Not clear" }); assert.equal(r.body.status, "rejected");

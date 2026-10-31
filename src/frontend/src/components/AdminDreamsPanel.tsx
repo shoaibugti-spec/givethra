@@ -9,7 +9,7 @@ const emptyForm = { name: "", category: "Car", description: "", image_url: "", a
 const emptyAccount = { label: "", method: "Bank Transfer", account_title: "", account_number: "", instructions: "", is_active: true };
 const money = (v: any) => `PKR ${Number(v || 0).toLocaleString()}`;
 
-export default function AdminDreamsPanel() {
+export default function AdminDreamsPanel({ onQueueChanged }: { onQueueChanged?: () => void | Promise<void> } = {}) {
   const [dreams, setDreams] = useState<any[]>([]);
   const [participations, setParticipations] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -94,6 +94,7 @@ export default function AdminDreamsPanel() {
       toast.success(status === "approved" ? "Dream participation approved and registration generated" : "Submission rejected");
       if ((result as any)?.notification_sent === false) toast.error("The decision was saved, but the user notification could not be sent.");
       await load();
+      await onQueueChanged?.();
     } catch (e: any) {
       toast.error(e?.message || "Review failed");
       await load();

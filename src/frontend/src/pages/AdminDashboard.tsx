@@ -11,13 +11,15 @@ import {
   ChevronDown, Wallet, Mail, Calendar, Send, ArrowLeft, Gift, AlertTriangle, Building2, Copy,
   Megaphone, HandCoins, Eye, User, Search, Paperclip, Loader2, X, RotateCw, Ban, MessageCircle,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import AdminDonationsPanel from "@/components/AdminDonationsPanel";
 import AdminDreamsPanel from "@/components/AdminDreamsPanel";
 import AdminHelpMePanel from "@/components/AdminHelpMePanel";
 import { isExpiredCaseRecord } from "@/lib/caseExpiry";
+import { helpme } from "@/lib/helpme";
+import { countOpenHelpMeReports, countPendingDonationReviews, countPendingDreamSubmissions, countPendingHelpMeProofs, countPendingHelpMeVideos } from "@/lib/adminReviewCounts";
 import {
   adminGetAllKyc,
   adminGetAllCases,
@@ -50,6 +52,8 @@ import {
   adminDeleteFiles,
   adminBroadcastNotification,
   uploadFileToStorage,
+  adminGetDonations,
+  adminGetDreamParticipations,
 } from "@/lib/api";
 
 const ADMIN_EMAILS = new Set([
@@ -334,6 +338,11 @@ export default function AdminPage() {
   const [suspensions, setSuspensions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadSupport, setUnreadSupport] = useState(0);
+  const [pendingHelpMeVideos, setPendingHelpMeVideos] = useState<number | null>(null);
+  const [pendingHelpMeProofs, setPendingHelpMeProofs] = useState<number | null>(null);
+  const [pendingHelpMeReports, setPendingHelpMeReports] = useState<number | null>(null);
+  const [pendingDreamSubmissions, setPendingDreamSubmissions] = useState<number | null>(null);
+  const [pendingDonationReviews, setPendingDonationReviews] = useState<number | null>(null);
   const [resolutionView, setResolutionView] = useState<"pending" | "rejected" | "completed">("pending");
   const [resolutionSearch, setResolutionSearch] = useState("");
   const [feedbackSearch, setFeedbackSearch] = useState("");
@@ -346,13 +355,28 @@ export default function AdminPage() {
   const [kycBusyId, setKycBusyId] = useState<string | null>(null);
   const [withdrawalBusyId, setWithdrawalBusyId] = useState<string | null>(null);
 
+  const refreshSubmissionCounts = useCallback(async () => {
+    const [helpMeResult, dreamResult, donationResult] = await Promise.allSettled([
+      helpme.admin.counts(),
+      adminGetDreamParticipations(),
+      adminGetDonations(),
+    ]);
+    if (helpMeResult.status === "fulfilled") setPendingHelpMeVideos(countPendingHelpMeVideos(helpMeResult.value));
+    if (helpMeResult.status === "fulfilled") setPendingHelpMeProofs(countPendingHelpMeProofs(helpMeResult.value));
+    if (helpMeResult.status === "fulfilled") setPendingHelpMeReports(countOpenHelpMeReports(helpMeResult.value));
+    if (dreamResult.status === "fulfilled") setPendingDreamSubmissions(countPendingDreamSubmissions(asRows(dreamResult.value)));
+    if (donationResult.status === "fulfilled") setPendingDonationReviews(countPendingDonationReviews(asRows(donationResult.value)));
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) { navigate({ to: "/sign-in" }); return; }
     if (!ADMIN_EMAILS.has(String(user?.email || "").toLowerCase())) { navigate({ to: "/" }); return; }
     loadData();
+    void refreshSubmissionCounts();
     const interval = setInterval(() => { loadSupportMessages(); }, 5000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, user]);
+    const reviewCountInterval = setInterval(() => { void refreshSubmissionCounts(); }, 30000);
+    return () => { clearInterval(interval); clearInterval(reviewCountInterval); };
+  }, [isAuthenticated, user, navigate, refreshSubmissionCounts]);
 
   async function loadData() {
     setLoading(true);
@@ -882,23 +906,23 @@ export default function AdminPage() {
               <TabsTrigger value="offers">Offers {activeOffers > 0 && <span className="ml-1 bg-teal-500 text-white text-[10px] rounded-full px-1.5">{activeOffers}</span>}</TabsTrigger>
               <TabsTrigger value="support">Support {unreadSupport > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{unreadSupport}</span>}</TabsTrigger>
               <TabsTrigger value="feedback">Feedback {feedbacks.filter((f) => ["pending", "pending_review"].includes(normalizedAdminStatus(f.status))).length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{feedbacks.filter((f) => ["pending", "pending_review"].includes(normalizedAdminStatus(f.status))).length}</span>}</TabsTrigger>
-              <TabsTrigger value="suspensions">Suspensions {activeSuspensions > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{activeSuspensions}</span>}</TabsTrigger>
+              <TabsTrigger value="suspensions">Suspensions</TabsTrigger>
               <TabsTrigger value="earnings-withdrawals">Earnings Withdrawals {withdrawals.filter(w => normalizedAdminStatus(w.status) === "pending").length > 0 && <span className="ml-1 bg-amber-500 text-white text-[10px] rounded-full px-1.5">{withdrawals.filter(w => normalizedAdminStatus(w.status) === "pending").length}</span>}</TabsTrigger>
-              <TabsTrigger value="donations">Donations</TabsTrigger>
-              <TabsTrigger value="dreams">Dreams</TabsTrigger>
-              <TabsTrigger value="helpme">Help Me</TabsTrigger>
+              <TabsTrigger value="donations">Donations {pendingDonationReviews !== null && pendingDonationReviews > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{pendingDonationReviews}</span>}</TabsTrigger>
+              <TabsTrigger value="dreams">Dreams {pendingDreamSubmissions !== null && pendingDreamSubmissions > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">{pendingDreamSubmissions}</span>}</TabsTrigger>
+              <TabsTrigger value="helpme">Help Me {pendingHelpMeVideos !== null && pendingHelpMeVideos > 0 && <span title="Videos awaiting approval" className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5">V {pendingHelpMeVideos}</span>}{pendingHelpMeProofs !== null && pendingHelpMeProofs > 0 && <span title="Payment proofs awaiting review" className="ml-1 bg-amber-500 text-white text-[10px] rounded-full px-1.5">P {pendingHelpMeProofs}</span>}{pendingHelpMeReports !== null && pendingHelpMeReports > 0 && <span title="Open user reports" className="ml-1 bg-orange-500 text-white text-[10px] rounded-full px-1.5">R {pendingHelpMeReports}</span>}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="donations" className="space-y-4 mt-4">
-              <AdminDonationsPanel />
+              <AdminDonationsPanel onQueueChanged={refreshSubmissionCounts} />
             </TabsContent>
 
             <TabsContent value="dreams" className="space-y-4 mt-4">
-              <AdminDreamsPanel />
+              <AdminDreamsPanel onQueueChanged={refreshSubmissionCounts} />
             </TabsContent>
 
             <TabsContent value="helpme" className="space-y-4 mt-4">
-              <AdminHelpMePanel />
+              <AdminHelpMePanel onQueueChanged={refreshSubmissionCounts} />
             </TabsContent>
 
             <TabsContent value="overview" className="space-y-4 mt-4">

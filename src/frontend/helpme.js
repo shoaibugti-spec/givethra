@@ -443,6 +443,19 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     const no = adminOnly();
     if (no) return no;
 
+    if (method === "GET" && parts[3] === "counts") {
+      const [videos, proofs, reports] = await Promise.all([
+        db.prepare("SELECT COUNT(*) AS count FROM helpme_appeals WHERE status = 'pending_review'").first(),
+        db.prepare("SELECT COUNT(*) AS count FROM helpme_help WHERE status = 'pending'").first(),
+        db.prepare("SELECT COUNT(DISTINCT target_type || ':' || target_id) AS count FROM helpme_reports WHERE status = 'open'").first(),
+      ]);
+      return json({
+        pending_videos: Number(videos?.count || 0),
+        pending_payment_proofs: Number(proofs?.count || 0),
+        open_reports: Number(reports?.count || 0),
+      }, 200, origin);
+    }
+
     if (method === "GET" && parts[3] === "queue") {
       const appeals = await db.prepare(`SELECT a.*, COALESCE(NULLIF(TRIM(p.full_name), ''), u.full_name, u.email) AS owner_name, u.email AS owner_email, (SELECT COUNT(*) FROM helpme_reports r WHERE r.target_type='appeal' AND r.target_id=a.id AND r.status='open') AS open_reports
         FROM helpme_appeals a JOIN users u ON u.user_id = a.user_id LEFT JOIN profiles p ON p.user_id = a.user_id

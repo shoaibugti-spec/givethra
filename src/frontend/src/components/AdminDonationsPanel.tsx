@@ -8,7 +8,7 @@ import { adminGetContributionSpending, adminGetDonations, adminSpendContribution
 
 const money = (value: number) => `PKR ${Number(value || 0).toLocaleString()}`;
 
-export default function AdminDonationsPanel() {
+export default function AdminDonationsPanel({ onQueueChanged }: { onQueueChanged?: () => void | Promise<void> } = {}) {
   const [donations, setDonations] = useState<any[]>([]);
   const [spending, setSpending] = useState<any[]>([]);
   const [caseId, setCaseId] = useState("");
@@ -31,8 +31,9 @@ export default function AdminDonationsPanel() {
       const result = await adminUpdateDonation(id, { status });
       setDonations((current) => current.map((item) => item.id === id ? { ...item, status } : item));
       toast.success(`Contribution ${status} and removed from Pending`);
-      if ((result as any)?.notification_sent === false) toast.error("The decision was saved, but the donor notification could not be sent.");
+      if ((result as any)?.notification_sent === false) toast.error("The decision was saved, but the user notification could not be sent.");
       await load();
+      await onQueueChanged?.();
     }
     catch (e: any) { await load(); toast.error(e?.message || "Update failed; current status was refreshed"); }
     finally { setBusy(false); }

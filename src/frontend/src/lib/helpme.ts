@@ -212,6 +212,7 @@ export const helpme = {
     }),
   admin: {
     queue: () => call<any>("admin/queue"),
+    counts: () => call<{ pending_videos: number; pending_payment_proofs: number; open_reports: number }>("admin/counts"),
     appeal: (id: string, action: string, reason?: string) => call(`admin/appeals/${encodeURIComponent(id)}`, { method: "PUT", json: { action, reason } }),
     help: (id: string, action: string, amount?: number, reason?: string) => call(`admin/help/${encodeURIComponent(id)}`, { method: "PUT", json: { action, amount, reason } }),
     fx: (currency: string, per_usd: number) => call("admin/fx", { method: "PUT", json: { currency, per_usd } }),
