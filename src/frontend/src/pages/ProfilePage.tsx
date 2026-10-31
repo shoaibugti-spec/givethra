@@ -11,6 +11,7 @@
 //                 the two edit controls competing for the same job.
 
 import Layout from "@/components/Layout";
+import { helpme } from "@/lib/helpme";
 import DepositPanel from "@/components/DepositPanel";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -214,6 +215,15 @@ export default function ProfilePage() {
       cancelled = true;
     };
   }, [isOwnProfile, user?.id, showDeposit]);
+
+  // Help Me totals (verified payments, PKR-equivalent). Failure never blocks the profile.
+  const [helpMeStats, setHelpMeStats] = useState<{ helped_count: number; helped_pkr: number; received_count: number; received_pkr: number } | null>(null);
+  useEffect(() => {
+    if (!profileUserId) return;
+    let cancelled = false;
+    helpme.stats(profileUserId).then((s) => { if (!cancelled) setHelpMeStats(s); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [profileUserId]);
 
   useEffect(() => {
     setProfile(null);
@@ -700,9 +710,9 @@ export default function ProfilePage() {
                   <div className="mb-3 flex items-center gap-2 font-semibold text-primary"><HeartHandshake className="h-4 w-4" /> My Help</div>
                   <div className="grid grid-cols-2 gap-2 text-center">
                     <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.totalUnlocks}</strong><span className="text-[10px] text-muted-foreground">Total Unlocks</span></div>
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.directHelps}</strong><span className="text-[10px] text-muted-foreground">Direct Helps</span></div>
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.directHelps + (helpMeStats?.helped_count || 0)}</strong><span className="text-[10px] text-muted-foreground">Direct Helps</span></div>
                     <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.contributions}</strong><span className="text-[10px] text-muted-foreground">Contributions</span></div>
-                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.totalAmountHelped}</strong><span className="text-[10px] text-muted-foreground">Total Amount Helped</span></div>
+                    <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{heroStats.totalAmountHelped + (helpMeStats?.helped_pkr || 0)}</strong><span className="text-[10px] text-muted-foreground">Total Amount Helped</span></div>
                   </div>
                 </> : <>
                   <div className="mb-3 flex items-center gap-2 font-semibold text-primary"><Briefcase className="h-4 w-4" /> My Cases</div>
@@ -711,7 +721,7 @@ export default function ProfilePage() {
                     <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalApproved}</strong><span className="text-[10px] text-muted-foreground">Approved</span></div>
                     <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalRejected}</strong><span className="text-[10px] text-muted-foreground">Rejected</span></div>
                     <div className="rounded-xl bg-card p-3"><strong className="block text-xl">{requesterStats.totalCompleted}</strong><span className="text-[10px] text-muted-foreground">Completed</span></div>
-                    <div className="col-span-2 rounded-xl bg-card p-3"><strong className="block text-xl text-green-600">{requesterStats.totalHelpReceived}</strong><span className="text-[10px] text-muted-foreground">Total Help Received</span></div>
+                    <div className="col-span-2 rounded-xl bg-card p-3"><strong className="block text-xl text-green-600">{requesterStats.totalHelpReceived + (helpMeStats?.received_pkr || 0)}</strong><span className="text-[10px] text-muted-foreground">Total Help Received</span></div>
                   </div>
                 </>}
               </div>
