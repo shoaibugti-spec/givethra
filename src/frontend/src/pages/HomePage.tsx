@@ -7,9 +7,6 @@ import CompletionCooldownBanner from "@/components/CompletionCooldownBanner";
 import Layout from "@/components/Layout";
 import SocialLinks from "@/components/SocialLinks";
 import { SiWhatsapp } from "react-icons/si";
-import HeroesWall from "@/components/HeroesWall";
-import HeroLeaderboard from "@/components/HeroLeaderboard";
-import KindnessWall from "@/components/KindnessWall";
 import { CATEGORY_EMOJI } from "@/components/CategoryPill";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
@@ -238,29 +235,6 @@ const URGENCIES = [
   "Medium",
   "High",
   "Emergency",
-];
-
-const TRUST_BADGES = [
-  {
-    icon: MailCheck,
-    label: "Email Verified",
-    color: "text-emerald-600",
-  },
-  {
-    icon: Phone,
-    label: "Mobile Verified",
-    color: "text-blue-600",
-  },
-  {
-    icon: BadgeCheck,
-    label: "Identity Verified",
-    color: "text-violet-600",
-  },
-  {
-    icon: Building2,
-    label: "Institution Verified",
-    color: "text-orange-600",
-  },
 ];
 
 function relativePostTime(value: unknown) {
@@ -931,7 +905,6 @@ export default function HomePage() {
 
 
 
-        {/* NOTE: WhatsApp Section has been moved below KindnessWall as requested */}
 
                 {/* Compact search + filter + sort (one line) and category chips */}
         <section className="border-b border-border bg-background px-3 py-2">
@@ -1217,12 +1190,8 @@ export default function HomePage() {
           </div>
         </section>
 
-<HeroLeaderboard />
-        <HeroesWall />
-        <KindnessWall />
-
-        {/* --- WHATSAPP SECTION RELOCATED HERE (Below KindnessWall, Above App Download) --- */}
-        <section className="py-6 px-4 bg-background border-b border-border">
+{/* --- WhatsApp links --- */}
+        <section className="py-4 px-4 bg-background border-b border-border">
           <div className="max-w-7xl mx-auto flex items-center justify-center gap-6 flex-wrap">
             <a
               href={WHATSAPP_URL}
@@ -1246,68 +1215,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="py-8 px-4 bg-background border-y border-border">
-          <div className="mx-auto max-w-3xl rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-teal-50 p-6 text-center shadow-sm">
-            <p className="text-2xl">📱</p><h2 className="mt-2 font-display text-xl font-bold">Get the Givethra Android App</h2><p className="mt-1 text-sm text-muted-foreground">Verified cases, anytime — right on your phone.</p><a href="/Givethra.apk" download="Givethra.apk" className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">Download App</a><div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4"><span>Verified &amp; Secure</span><span>100% Transparency</span><span>Compassion</span><span>Global Community</span><span>Safe &amp; Private</span><span>Your Data is Protected</span></div>
-          </div>
-        </section>
-        <section className="py-8 px-4 bg-muted/30 border-y border-border">
-          <div className="max-w-7xl mx-auto">
-            <h2 className="font-display text-lg font-bold mb-5 text-center">Built on Trust &amp; Verification</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {TRUST_BADGES.map(({ icon: Icon, label, color }, i) => (
-                <motion.div
-                  key={label}
-                  initial={{ opacity: 0, y: 16 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-3 rounded-xl bg-card border border-border p-3"
-                >
-                  <div className="h-9 w-9 rounded-lg bg-card flex items-center justify-center shrink-0">
-                    <Icon className={`h-5 w-5 ${color}`} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1">
-                      <BadgeCheck className="h-3 w-3 text-emerald-500" />
-                      <span className="text-xs font-semibold">{label}</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">Verified</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="py-10 px-4 bg-background">
-          <div className="max-w-4xl mx-auto space-y-6">
-            <h2 className="font-display text-lg font-bold text-center">How Givethra Works</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { step: "01", title: "Request Help", desc: "Complete KYC and submit your first case FREE with documents.", emoji: "📝" },
-                { step: "02", title: "Get Verified", desc: "Our team reviews documents and approves your case for Heroes.", emoji: "✅" },
-                { step: "03", title: "Receive Direct Support", desc: "Heroes unlock your case and pay institutions directly.", emoji: "🌟" },
-              ].map(({ step, title, desc, emoji }, i) => (
-                <motion.div
-                  key={step}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.12 }}
-                  className="relative flex flex-col items-center text-center gap-3 rounded-xl bg-card border border-border p-5"
-                >
-                  <span className="absolute -top-3 left-4 text-xs font-black text-primary/30">{step}</span>
-                  <span className="text-3xl">{emoji}</span>
-                  <h3 className="font-bold text-sm">{title}</h3>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="py-10 px-4 bg-card border-t border-border">
+        <section className="py-6 px-4 bg-card border-t border-border">
           <div className="max-w-2xl mx-auto text-center space-y-5">
             <div className="space-y-1">
               <h2 className="font-display text-lg font-bold text-foreground">Connect with Givethra</h2>
