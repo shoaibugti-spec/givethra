@@ -1,0 +1,50 @@
+import { describe, expect, it, vi } from "vitest";
+import { getHelpMeCameraConstraints, resetHelpMeCameraZoom } from "./helpmeCamera";
+
+describe("Help Me camera framing", () => {
+  it.each(["user", "environment"] as const)("requests portrait framing for the %s camera", (facing) => {
+    const constraints = getHelpMeCameraConstraints(facing);
+    expect(constraints.audio).toBe(true);
+    expect(constraints.video).toMatchObject({
+      facingMode: { exact: facing },
+      width: { ideal: 720 },
+      height: { ideal: 1280 },
+      aspectRatio: { ideal: 9 / 16 },
+    });
+  });
+
+  it("resets a supported camera to its natural 1x zoom", async () => {
+    const applyConstraints = vi.fn().mockResolvedValue(undefined);
+    const track = {
+      getCapabilities: () => ({ zoom: { min: 1, max: 4 } }),
+      applyConstraints,
+    } as unknown as MediaStreamTrack;
+
+    await resetHelpMeCameraZoom(track);
+
+    expect(applyConstraints).toHaveBeenCalledWith({ advanced: [{ zoom: 1 }] });
+  });
+
+  it("uses the lowest available zoom when a device cannot reach 1x", async () => {
+    const applyConstraints = vi.fn().mockResolvedValue(undefined);
+    const track = {
+      getCapabilities: () => ({ zoom: { min: 1.5, max: 4 } }),
+      applyConstraints,
+    } as unknown as MediaStreamTrack;
+
+    await resetHelpMeCameraZoom(track);
+
+    expect(applyConstraints).toHaveBeenCalledWith({ advanced: [{ zoom: 1.5 }] });
+  });
+
+  it("keeps working when zoom controls are unavailable or rejected", async () => {
+    const unsupportedTrack = {} as MediaStreamTrack;
+    await expect(resetHelpMeCameraZoom(unsupportedTrack)).resolves.toBeUndefined();
+
+    const track = {
+      getCapabilities: () => ({ zoom: { min: 1, max: 4 } }),
+      applyConstraints: vi.fn().mockRejectedValue(new Error("unsupported constraint")),
+    } as unknown as MediaStreamTrack;
+    await expect(resetHelpMeCameraZoom(track)).resolves.toBeUndefined();
+  });
+});
