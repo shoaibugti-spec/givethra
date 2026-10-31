@@ -32,6 +32,7 @@ export default function SignInPage() {
     if (isAuthenticated) {
       if (redirect === "/need-help") navigate({ to: "/need-help" });
       else if (redirect === "/community") navigate({ to: "/community" });
+      else if (redirect === "/helpme" || redirect === "/helpme/new" || redirect === "/helpme/my") navigate({ to: redirect });
       else navigate({ to: "/home" });
     }
   }, [isAuthenticated, navigate, redirect]);
