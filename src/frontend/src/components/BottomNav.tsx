@@ -1,7 +1,7 @@
 // src/frontend/src/components/BottomNav.tsx
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, LayoutList, User, Wallet, HeartHandshake } from "lucide-react";
+import { Home, LayoutList, User, BarChart3, HeartHandshake } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getCommunityPosts } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,7 +34,7 @@ export default function BottomNav() {
     { to: "/home", label: "Home", icon: Home, ocid: "bottom_nav.home" },
     { to: "/my-help", label: "My Help", icon: HeartHandshake, ocid: "bottom_nav.my_help" },
     { to: "/my-cases", label: "My Cases", icon: LayoutList, ocid: "bottom_nav.my_cases" },
-    { to: "/wallet", label: "Wallet", icon: Wallet, ocid: "bottom_nav.wallet" },
+    { to: "/walls", label: "Walls", icon: BarChart3, ocid: "bottom_nav.walls" },
     { to: "/profile/me", label: "Profile", icon: User, ocid: "bottom_nav.profile" },
   ];
 
@@ -42,7 +42,12 @@ export default function BottomNav() {
     <nav aria-label="Bottom navigation" data-ocid="bottom_nav" className="fixed inset-x-0 bottom-0 z-50 touch-manipulation bg-card border-t border-border md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="flex min-h-16 items-stretch">
         {navItems.map(({ to, label, icon: Icon, ocid }) => {
-          const active = to === "/home" ? currentPath === "/" || currentPath === "/home" : currentPath === to || currentPath.startsWith(`${to}/`);
+          const active =
+            to === "/home"
+              ? currentPath === "/" || currentPath === "/home"
+              : to === "/walls"
+                ? ["/walls", "/heroes-wall", "/kindness-wall"].includes(currentPath)
+                : currentPath === to || currentPath.startsWith(`${to}/`);
           return <Link key={to} to={to} data-ocid={ocid} aria-label={label} aria-current={active ? "page" : undefined} className={cn("relative flex min-h-16 flex-1 touch-manipulation select-none flex-col items-center justify-center gap-0.5 transition-colors", active ? "text-primary" : "text-muted-foreground hover:text-foreground")}><div className={cn("flex h-8 w-8 items-center justify-center rounded-full", active && "bg-primary/10")}><Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 1.8} /></div><span className={cn("text-[10px] font-medium leading-none", active && "text-primary")}>{label}</span></Link>;
         })}
       </div>
