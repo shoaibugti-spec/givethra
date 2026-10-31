@@ -21,7 +21,7 @@ import {
   KeyRound,
   HeartHandshake,
   LayoutList,
-  Wallet,
+  BarChart3,
   Compass,
   Sparkles,
   LifeBuoy,
@@ -735,7 +735,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="mt-4 grid grid-cols-2 gap-2.5">
                 <DrawerTile to="/my-help" icon={HeartHandshake} label="My Help" active={isRouteActive("/my-help")} onNavigate={closeMenu} />
                 <DrawerTile to="/my-cases" icon={LayoutList} label="My Cases" active={isRouteActive("/my-cases")} onNavigate={closeMenu} />
-                <DrawerTile to="/wallet" icon={Wallet} label="Wallet" active={isRouteActive("/wallet")} onNavigate={closeMenu} />
+                <DrawerTile to="/walls" icon={BarChart3} label="Walls" active={isRouteActive("/walls")} onNavigate={closeMenu} />
                 <DrawerTile to="/notifications" icon={Bell} label="Notifications" badge={notifCount > 0 ? (notifCount > 99 ? "99+" : notifCount) : null} active={isRouteActive("/notifications")} onNavigate={closeMenu} />
               </div>
             )}
