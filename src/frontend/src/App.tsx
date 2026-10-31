@@ -234,13 +234,19 @@ const DreamDetailPage = lazy(() =>
 // plain white generic spinner should never appear between pages.
 const PageLoader = () => <AppLoadingScreen />;
 
+// Help Me (short video appeals). Full-screen pages: no app header and no bottom navigation.
+const HelpMePage = lazy(() => import("@/pages/HelpMePage"));
+const HelpMeCreatePage = lazy(() => import("@/pages/HelpMeCreatePage"));
+const HelpMeMyPage = lazy(() => import("@/pages/HelpMeMyPage"));
+const HelpMeUserPage = lazy(() => import("@/pages/HelpMeUserPage"));
+
 // Shown only if BottomNav itself crashes. Uses plain <a href> links so the
 // navigation still works even when the router/JS state is unhealthy.
 function BottomNavFallback() {
   const items = [
     { href: "/home", label: "Home" },
-    { href: "/my-help", label: "My Help" },
-    { href: "/my-cases", label: "My Cases" },
+    { href: "/my-cases", label: "Cases/Helps" },
+    { href: "/helpme", label: "Help Me" },
     { href: "/walls", label: "Walls" },
     { href: "/profile/me", label: "Profile" },
   ];
@@ -314,6 +320,9 @@ const ROLE_OPTIONAL_PATHS = new Set([
   "/dreams",
   "/cases",
   "/payment-proof",
+  "/helpme",
+  "/helpme/new",
+  "/helpme/my",
 ]);
 const ROLE_OPTIONAL_PREFIXES = [
   "/cases/",
@@ -321,6 +330,7 @@ const ROLE_OPTIONAL_PREFIXES = [
   "/affidavit/",
   "/dreams/",
   "/profile/",
+  "/helpme/",
 ];
 
 import BottomNav from "@/components/BottomNav";
@@ -809,6 +819,43 @@ const dreamDetailRoute = createRoute({
   ),
 });
 
+const helpMeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/helpme",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <HelpMePage />
+    </Suspense>
+  ),
+});
+const helpMeNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/helpme/new",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <HelpMeCreatePage />
+    </Suspense>
+  ),
+});
+const helpMeMyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/helpme/my",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <HelpMeMyPage />
+    </Suspense>
+  ),
+});
+const helpMeUserRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/helpme/u/$userId",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <HelpMeUserPage />
+    </Suspense>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   homeRoute,
@@ -858,6 +905,10 @@ const routeTree = rootRoute.addChildren([
   wallsRoute,
   dreamsRoute,
   dreamDetailRoute,
+  helpMeRoute,
+  helpMeNewRoute,
+  helpMeMyRoute,
+  helpMeUserRoute,
 ]);
 
 const router = createRouter({ routeTree });
