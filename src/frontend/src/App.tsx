@@ -214,6 +214,11 @@ const KindnessWallPage = lazy(() =>
     default: () => <div>Failed to load page</div>,
   }))
 );
+const WallsPage = lazy(() =>
+  import("@/pages/WallsPage").catch(() => ({
+    default: () => <div>Failed to load page</div>,
+  }))
+);
 const DreamsPage = lazy(() =>
   import("@/pages/DreamsPage").catch(() => ({
     default: () => <div>Failed to load page</div>,
@@ -236,7 +241,7 @@ function BottomNavFallback() {
     { href: "/home", label: "Home" },
     { href: "/my-help", label: "My Help" },
     { href: "/my-cases", label: "My Cases" },
-    { href: "/wallet", label: "Wallet" },
+    { href: "/walls", label: "Walls" },
     { href: "/profile/me", label: "Profile" },
   ];
   return (
@@ -305,6 +310,7 @@ const ROLE_OPTIONAL_PATHS = new Set([
   "/community",
   "/heroes-wall",
   "/kindness-wall",
+  "/walls",
   "/dreams",
   "/cases",
   "/payment-proof",
@@ -775,6 +781,15 @@ const kindnessWallRoute = createRoute({
     </Suspense>
   ),
 });
+const wallsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/walls",
+  component: () => (
+    <Suspense fallback={<PageLoader />}>
+      <WallsPage />
+    </Suspense>
+  ),
+});
 const dreamsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dreams",
@@ -840,6 +855,7 @@ const routeTree = rootRoute.addChildren([
   communityRoute,
   heroesWallRoute,
   kindnessWallRoute,
+  wallsRoute,
   dreamsRoute,
   dreamDetailRoute,
 ]);
