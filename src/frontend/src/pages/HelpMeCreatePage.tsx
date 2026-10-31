@@ -4,6 +4,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { HelpMeError, PAY_METHODS, formatMoney, helpme, niceGoal, pickRecorderMime, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
 import { getHelpMeCameraConstraints, resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
+import { captureHelpMeThumbnail } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RefreshCw, RotateCcw, ShieldAlert, Square, Video } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -219,6 +220,12 @@ export default function HelpMeCreatePage() {
         setProgress(1);
         uid = await helpme.uploadVideo(blob, setProgress);
         setUploadId(uid);
+      }
+      try {
+        const thumbnail = await captureHelpMeThumbnail(blob);
+        await helpme.uploadThumbnail(uid, thumbnail);
+      } catch (thumbnailError) {
+        console.warn("Help Me poster could not be uploaded; the appeal will still be submitted.", thumbnailError);
       }
       await helpme.createAppeal({
         upload_id: uid, description: desc.trim(), account_country: country, pay_method: method,

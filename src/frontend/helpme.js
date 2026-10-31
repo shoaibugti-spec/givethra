@@ -14,10 +14,17 @@ const DEFAULTS = {
 const MAX_SECONDS = 20;
 const MIN_STOP_SECONDS = 12;
 const MAX_VIDEO_BYTES = 6 * 1024 * 1024;
+const MAX_THUMBNAIL_BYTES = 1024 * 1024;
 const VIDEO_TYPES = { "video/webm": "webm", "video/mp4": "mp4" };
 const DAY = 86400000;
 const FEED_PAGE = 8;
 const PROOF_PREFIX = "https://givethra.org/uploads/helpme-proofs/";
+
+function pendingPosterKey(videoKey) {
+  return typeof videoKey === "string" && videoKey.startsWith("pending/") && /\.(mp4|webm)$/i.test(videoKey)
+    ? videoKey.replace(/\.(mp4|webm)$/i, ".jpg")
+    : null;
+}
 
 // Account country -> currency. Unknown countries fall back to USD.
 const COUNTRY_CURRENCY = {
@@ -143,6 +150,22 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return row ? json(card(row), 200, origin) : json({ error: "This appeal is not available", code: "NOT_FOUND" }, 404, origin);
   }
 
+  // Posters are private while staged and are only served after the matching video is published.
+  if (method === "GET" && sub === "thumbnail" && parts[3]) {
+    const appealId = String(parts[3]);
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(appealId)) return json({ error: "Thumbnail not found" }, 404, origin);
+    const appeal = await db.prepare("SELECT status, video_deleted_at, expires_at FROM helpme_appeals WHERE id = ? AND status IN ('published','helped')").bind(appealId).first();
+    if (!appeal || appeal.video_deleted_at || (appeal.expires_at && new Date(appeal.expires_at).getTime() <= Date.now())) return json({ error: "Thumbnail not found" }, 404, origin);
+    const object = await env.HELPME_VIDEOS?.get(`thumbs/${appealId}.jpg`);
+    if (!object) return json({ error: "Thumbnail not found" }, 404, origin);
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set("Content-Type", "image/jpeg");
+    headers.set("Cache-Control", "public, max-age=3600, s-maxage=3600");
+    headers.set("X-Content-Type-Options", "nosniff");
+    return new Response(object.body, { headers });
+  }
+
   if (method === "GET" && sub === "users" && parts[3]) {
     const v = viewerCols();
     const mine = await db.prepare(`SELECT ${cardSelect}${v.sql} ${cardFrom} WHERE a.user_id = ? AND a.status IN ('published','helped') AND a.video_deleted_at IS NULL ORDER BY COALESCE(a.helped_at, a.published_at) DESC LIMIT 50`).bind(...v.binds, parts[3]).all();
@@ -214,6 +237,25 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   // ───────────── EVERYTHING BELOW NEEDS SIGN-IN ─────────────
   const denied = need();
   if (denied) return denied;
+
+  // Store a small poster next to the pending video. It stays inaccessible until admin approval.
+  if (method === "POST" && sub === "upload-thumbnail" && parts[3]) {
+    const uploadId = String(parts[3]);
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(uploadId)) return json({ error: "Invalid upload" }, 400, origin);
+    const type = String(request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+    if (type !== "image/jpeg") return json({ error: "Only JPEG thumbnails are accepted", code: "BAD_THUMBNAIL_TYPE" }, 415, origin);
+    const declaredSize = Number(request.headers.get("Content-Length") || 0);
+    if (declaredSize > MAX_THUMBNAIL_BYTES) return json({ error: "Thumbnail is too large", code: "THUMBNAIL_TOO_LARGE" }, 413, origin);
+    const upload = await db.prepare("SELECT id FROM helpme_uploads WHERE id = ? AND user_id = ? AND used_appeal_id IS NULL").bind(uploadId, user.user_id).first();
+    if (!upload) return json({ error: "Recording not found", code: "UPLOAD_MISSING" }, 404, origin);
+    const image = await request.arrayBuffer();
+    const bytes = new Uint8Array(image);
+    if (!bytes.length || bytes.length > MAX_THUMBNAIL_BYTES) return json({ error: "Thumbnail is too large or empty", code: "THUMBNAIL_TOO_LARGE" }, 413, origin);
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) return json({ error: "Invalid JPEG thumbnail", code: "BAD_THUMBNAIL_TYPE" }, 415, origin);
+    if (!env.HELPME_VIDEOS) return json({ error: "Video storage is temporarily unavailable" }, 503, origin);
+    await env.HELPME_VIDEOS.put(`pending/${uploadId}.jpg`, image, { httpMetadata: { contentType: "image/jpeg" } });
+    return json({ ok: true }, 201, origin);
+  }
 
   // ---- owner/admin private video stream (supports Range so seeking works) ----
   if (method === "GET" && sub === "video" && parts[3]) {
@@ -477,7 +519,11 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
       const a = await db.prepare("SELECT * FROM helpme_appeals WHERE id = ?").bind(parts[4]).first();
       if (!a) return json({ error: "Appeal not found" }, 404, origin);
       const ts = now();
-      const deleteVideo = async () => { try { await env.HELPME_VIDEOS.delete(a.video_key); } catch (e) { console.error("HelpMe video delete failed", e); } };
+      const deleteVideo = async () => {
+        try { await env.HELPME_VIDEOS.delete(a.video_key); } catch (e) { console.error("HelpMe video delete failed", e); }
+        const posterKey = pendingPosterKey(a.video_key) || `thumbs/${a.id}.jpg`;
+        try { await env.HELPME_VIDEOS.delete(posterKey); } catch (e) { console.error("HelpMe poster delete failed", e); }
+      };
 
       if (action === "approve") {
         if (a.status !== "pending_review") return json({ error: "This appeal was already reviewed. Refresh the queue." }, 409, origin);
@@ -487,10 +533,22 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
         const ext = VIDEO_TYPES[a.video_content_type] || "mp4";
         const liveKey = `v/${a.id}.${ext}`;
         await env.HELPME_VIDEOS.put(liveKey, object.body, { httpMetadata: { contentType: a.video_content_type, cacheControl: "public, max-age=31536000, immutable" } });
+        const stagedPosterKey = pendingPosterKey(a.video_key);
+        let posterPublished = false;
+        if (stagedPosterKey) {
+          try {
+            const poster = await env.HELPME_VIDEOS.get(stagedPosterKey);
+            if (poster) {
+              await env.HELPME_VIDEOS.put(`thumbs/${a.id}.jpg`, poster.body, { httpMetadata: { contentType: "image/jpeg", cacheControl: "public, max-age=3600" } });
+              posterPublished = true;
+            }
+          } catch (e) { console.error("HelpMe poster publish failed", e); }
+        }
         const r = await db.prepare("UPDATE helpme_appeals SET status='published', video_key=?, published_at=?, expires_at=?, reviewed_by=?, reviewed_at=?, rejection_reason=NULL WHERE id=? AND status='pending_review'")
           .bind(liveKey, ts, new Date(Date.now() + dayMs(S.retention_days)).toISOString(), user.user_id, ts, a.id).run();
-        if (!Number(r?.meta?.changes || 0)) { try { await env.HELPME_VIDEOS.delete(liveKey); } catch {} return json({ error: "This appeal was already reviewed. Refresh the queue." }, 409, origin); }
+        if (!Number(r?.meta?.changes || 0)) { try { await env.HELPME_VIDEOS.delete(liveKey); if (posterPublished) await env.HELPME_VIDEOS.delete(`thumbs/${a.id}.jpg`); } catch {} return json({ error: "This appeal was already reviewed. Refresh the queue." }, 409, origin); }
         try { await env.HELPME_VIDEOS.delete(a.video_key); } catch {}
+        if (stagedPosterKey) try { await env.HELPME_VIDEOS.delete(stagedPosterKey); } catch {}
         await notify(a.user_id, "helpme_published", "Your Help Me appeal is live", "Your video appeal was approved and is now visible to heroes.", "/helpme");
         return json({ ok: true, status: "published" }, 200, origin);
       }
@@ -617,18 +675,22 @@ export async function helpmeDailyCleanup(env) {
   const old = await env.DB.prepare("SELECT id, video_key FROM helpme_appeals WHERE status IN ('published','helped','under_review') AND expires_at IS NOT NULL AND expires_at <= ? AND video_deleted_at IS NULL LIMIT 100").bind(ts).all();
   for (const a of old.results || []) {
     try { await env.HELPME_VIDEOS.delete(a.video_key); } catch (e) { console.error("HelpMe expiry delete failed", a.id, e); continue; }
+    try { await env.HELPME_VIDEOS.delete(`thumbs/${a.id}.jpg`); } catch {}
     await env.DB.prepare("UPDATE helpme_appeals SET status='expired', video_deleted_at=?, pay_account_number='', pay_account_title='' WHERE id=?").bind(ts, a.id).run();
   }
   // 2. Appeals nobody reviewed in time.
   const stale = await env.DB.prepare("SELECT id, user_id, video_key FROM helpme_appeals WHERE status='pending_review' AND created_at <= ? LIMIT 100").bind(new Date(Date.now() - dayMs(pendingDays)).toISOString()).all();
   for (const a of stale.results || []) {
     try { await env.HELPME_VIDEOS.delete(a.video_key); } catch {}
+    const posterKey = pendingPosterKey(a.video_key);
+    if (posterKey) try { await env.HELPME_VIDEOS.delete(posterKey); } catch {}
     await env.DB.prepare("UPDATE helpme_appeals SET status='rejected', rejection_reason='Not reviewed in time. Please record again.', video_deleted_at=?, pay_account_number='', pay_account_title='' WHERE id=? AND status='pending_review'").bind(ts, a.id).run();
   }
   // 3. Recordings that were never turned into an appeal.
   const orphans = await env.DB.prepare("SELECT id, video_key FROM helpme_uploads WHERE used_appeal_id IS NULL AND created_at <= ? LIMIT 200").bind(new Date(Date.now() - DAY).toISOString()).all();
   for (const o of orphans.results || []) {
     try { await env.HELPME_VIDEOS.delete(o.video_key); } catch {}
+    try { await env.HELPME_VIDEOS.delete(`pending/${o.id}.jpg`); } catch {}
     await env.DB.prepare("DELETE FROM helpme_uploads WHERE id=?").bind(o.id).run();
   }
   // 4. Old upload bookkeeping rows.

@@ -5,6 +5,10 @@
 const BASE = typeof window !== "undefined" ? window.location.origin : "https://givethra.org";
 const RETURN_PATH_KEY = "givethra_helpme_return_path";
 
+export function buildHelpMeShareUrl(appealId: string, origin = BASE): string {
+  return new URL(`/share/helpme/${encodeURIComponent(appealId)}`, origin).toString();
+}
+
 function safeHelpMeReturnPath(value: string): string | null {
   if (!value.startsWith("/") || value.startsWith("//")) return null;
   try {
@@ -209,6 +213,12 @@ export const helpme = {
         else reject(new HelpMeError(payload?.error || `Upload failed (HTTP ${xhr.status}).`, xhr.status, payload?.code, payload || {}));
       };
       xhr.send(blob);
+    }),
+  uploadThumbnail: (uploadId: string, blob: Blob) =>
+    call<{ ok: true }>(`upload-thumbnail/${encodeURIComponent(uploadId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "image/jpeg" },
+      body: blob,
     }),
   admin: {
     queue: () => call<any>("admin/queue"),

@@ -1748,6 +1748,16 @@ async function handleRequest(request, env, ctx) {
     }
   }
 
+  // Help Me video links need crawler-readable image/video metadata while humans use the existing reel route.
+  if (parts[0] === "share" && parts[1] === "helpme" && parts[2] && request.method === "GET") {
+    try {
+      const preview = await helpMeShareDocument(request, env, url, parts);
+      if (preview) return preview;
+    } catch (error) {
+      console.error("Help Me share metadata failed", error);
+    }
+  }
+
   // Public case share links get case-specific Open Graph/Twitter metadata.
   if (parts[0] === "share" && parts[1] === "cases" && parts[2] && request.method === "GET") {
     try {
@@ -3185,6 +3195,55 @@ async function caseShareDocument(request, env, url, parts) {
   const headers = new Headers(documentResponse.headers);
   headers.set("content-type", "text/html; charset=UTF-8");
   headers.set("cache-control", "public, max-age=300, s-maxage=900");
+  return new Response(html, { status: documentResponse.status, headers });
+}
+
+async function helpMeShareDocument(request, env, url, parts) {
+  if (!env.ASSETS || request.method !== "GET" || parts[0] !== "share" || parts[1] !== "helpme" || !parts[2]) return null;
+  const appealId = decodeURIComponent(parts[2]);
+  const appeal = await env.DB.prepare(
+    `SELECT id, description, status, video_key, video_content_type, video_deleted_at, expires_at
+     FROM helpme_appeals
+     WHERE id = ? AND status IN ('published','helped') AND video_deleted_at IS NULL
+       AND (expires_at IS NULL OR expires_at > ?)
+     LIMIT 1`
+  ).bind(appealId, new Date().toISOString()).first();
+  if (!appeal) return new Response("This Help Me appeal is no longer available.", { status: 404, headers: { "content-type": "text/plain; charset=UTF-8", "cache-control": "no-store" } });
+
+  const pageUrl = new URL(`/share/helpme/${encodeURIComponent(appealId)}`, url.origin).toString();
+  if (!isSocialCrawler(request)) return Response.redirect(new URL(`/helpme?v=${encodeURIComponent(appealId)}`, url.origin), 302);
+
+  const documentResponse = await env.ASSETS.fetch(new Request(new URL("/", url), request));
+  let html = await documentResponse.text();
+  const title = `Help Me on Givethra`;
+  const description = String(appeal.description || "A person is asking for direct support through Givethra.").replace(/\s+/g, " ").trim().slice(0, 300);
+  let hasPoster = false;
+  try { hasPoster = Boolean(await env.HELPME_VIDEOS?.head(`thumbs/${appealId}.jpg`)); } catch {}
+  const image = hasPoster
+    ? new URL(`/api/helpme/thumbnail/${encodeURIComponent(appealId)}`, url.origin).toString()
+    : new URL("/givethra-splash-logo.png", url.origin).toString();
+  const imageType = hasPoster ? "image/jpeg" : "image/png";
+  const videoPath = String(appeal.video_key || "").split("/").map(encodeURIComponent).join("/");
+  const video = new URL(`/api/helpme/media/${videoPath}`, url.origin).toString();
+  const videoType = String(appeal.video_content_type || (video.endsWith(".webm") ? "video/webm" : "video/mp4"));
+  html = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
+  const replacements = [
+    ["description", description], ["og:title", title], ["og:description", description],
+    ["og:type", "video.other"], ["og:url", pageUrl], ["og:image", image], ["og:image:secure_url", image], ["og:image:type", imageType],
+    ["og:image:alt", "Help Me video thumbnail"], ["og:video", video],
+    ["og:video:url", video], ["og:video:secure_url", video], ["og:video:type", videoType],
+    ["twitter:card", "summary_large_image"], ["twitter:title", title],
+    ["twitter:description", description], ["twitter:image", image],
+  ];
+  for (const [property, value] of replacements) {
+    const attribute = property.startsWith("og:") ? `property="${property}"` : `name="${property}"`;
+    const tag = `<meta ${attribute} content="${escapeHtml(value)}">`;
+    const pattern = new RegExp(`<meta ${attribute}[^>]*>`, "i");
+    html = pattern.test(html) ? html.replace(pattern, tag) : html.replace(/<\/head>/i, `  ${tag}\n</head>`);
+  }
+  const headers = new Headers(documentResponse.headers);
+  headers.set("content-type", "text/html; charset=UTF-8");
+  headers.set("cache-control", "public, max-age=60, s-maxage=300");
   return new Response(html, { status: documentResponse.status, headers });
 }
 

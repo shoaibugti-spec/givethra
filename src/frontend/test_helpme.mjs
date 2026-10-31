@@ -48,6 +48,7 @@ for (const [i, n] of [["u1", "Ali"], ["u2", "Sara"], ["u3", "Omar"], ["u4", "Zed
 }
 const ali = { user_id: "u1", email: "u1@x", kyc_status: "approved" }, sara = { user_id: "u2", email: "u2@x", kyc_status: "approved" }, omar = { user_id: "u3", email: "u3@x", kyc_status: "approved" }, zed = { user_id: "u4", email: "u4@x", kyc_status: "none" };
 const video = Buffer.alloc(2_000_000, 1);
+const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x01]);
 
 let r = await call(null, "GET", "/api/helpme/config"); assert.equal(r.status, 200); assert.equal(r.body.goal_usd_cents, 210);
 r = await call(zed, "GET", "/api/helpme/eligibility"); assert.equal(r.body.code, "KYC_REQUIRED");
@@ -55,10 +56,13 @@ r = await call(ali, "POST", "/api/helpme/upload", null, { body: Buffer.alloc(10)
 r = await call(ali, "POST", "/api/helpme/upload", null, { body: Buffer.alloc(7_000_000), type: "video/webm" }); assert.equal(r.status, 413);
 r = await call(ali, "POST", "/api/helpme/upload", null, { body: video, type: "video/webm;codecs=vp8" }); assert.equal(r.status, 201);
 const uploadId = r.body.upload_id;
+r = await call(sara, "POST", `/api/helpme/upload-thumbnail/${uploadId}`, null, { body: jpeg, type: "image/jpeg" }); assert.equal(r.status, 404);
+r = await call(ali, "POST", `/api/helpme/upload-thumbnail/${uploadId}`, null, { body: jpeg, type: "image/jpeg" }); assert.equal(r.status, 201);
 const pay = { account_country: "PK", pay_method: "Easypaisa", pay_account_title: "Ali Khan", pay_account_number: "03001234567" };
 r = await call(ali, "POST", "/api/helpme/appeals", { upload_id: uploadId, description: "Call me on 03001234567", ...pay }); assert.equal(r.body.code, "CONTACT_IN_DESCRIPTION");
 r = await call(ali, "POST", "/api/helpme/appeals", { upload_id: uploadId, description: "I need help with school fees for my kids", ...pay }); assert.equal(r.status, 201); assert.equal(r.body.goal_local, 580); assert.equal(r.body.currency, "PKR");
 const appealId = r.body.id;
+r = await call(null, "GET", `/api/helpme/thumbnail/${appealId}`); assert.equal(r.status, 404);
 r = await call(ali, "GET", "/api/helpme/eligibility"); assert.equal(r.body.code, "ACTIVE_APPEAL");
 r = await call(ali, "POST", "/api/helpme/upload", null, { body: video, type: "video/webm" }); assert.equal(r.status, 409);
 // another user cannot reuse the account
@@ -75,6 +79,8 @@ r = await call(admin, "GET", `/api/helpme/admin/queue`); assert.equal(r.body.app
 r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: "approve" }); assert.equal(r.status, 200);
 r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: "approve" }); assert.equal(r.status, 409);
 assert.ok([...store.keys()].some((k) => k.startsWith("v/")) && ![...store.keys()].some((k) => k.startsWith("pending/") && k.includes(uploadId)));
+r = await call(null, "GET", `/api/helpme/thumbnail/${appealId}`); assert.equal(r.status, 200);
+assert.ok(store.has(`thumbs/${appealId}.jpg`) && !store.has(`pending/${uploadId}.jpg`));
 r = await call(null, "GET", "/api/helpme/feed"); assert.equal(r.body.items.length, 1); const it = r.body.items[0];
 assert.ok(it.video_url.startsWith("/api/helpme/media/v/")); assert.equal(JSON.stringify(it).includes("03001234567"), false); assert.equal(it.percent, 0);
 // same-domain video stream: public guest can fetch an approved video, but not a pending/unknown key
@@ -132,18 +138,21 @@ r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: 
 // reject deletes video + scrubs account
 r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: "reject", reason: "Not clear" }); assert.equal(r.body.status, "rejected");
 assert.equal([...store.keys()].some((k) => k.startsWith("v/")), false);
+assert.equal(store.has(`thumbs/${appealId}.jpg`), false);
 assert.equal(sql.prepare("SELECT pay_account_number n FROM helpme_appeals WHERE id=?").get(appealId).n, "");
 // rejected user can retry right away (3-day gap does not apply to rejected)
 sql.prepare("UPDATE helpme_appeals SET helped_at=NULL").run();
 r = await call(ali, "GET", "/api/helpme/eligibility"); assert.equal(r.body.can_post, true);
 // expiry cleanup
 r = await call(ali, "POST", "/api/helpme/upload", null, { body: video, type: "video/mp4" }); const up3 = r.body.upload_id;
+r = await call(ali, "POST", `/api/helpme/upload-thumbnail/${up3}`, null, { body: jpeg, type: "image/jpeg" }); assert.equal(r.status, 201);
 r = await call(ali, "POST", "/api/helpme/appeals", { upload_id: up3, description: "Second appeal for rent help", ...pay }); const a2 = r.body.id;
 await call(admin, "PUT", `/api/helpme/admin/appeals/${a2}`, { action: "approve" });
 sql.prepare("UPDATE helpme_appeals SET expires_at='2020-01-01T00:00:00.000Z' WHERE id=?").run(a2);
 await helpmeDailyCleanup(env);
 const x = sql.prepare("SELECT status, pay_account_number n, video_deleted_at d FROM helpme_appeals WHERE id=?").get(a2);
 assert.equal(x.status, "expired"); assert.ok(x.d); assert.equal(x.n, ""); assert.equal([...store.keys()].some((k) => k.startsWith("v/")), false);
+assert.equal(store.has(`thumbs/${a2}.jpg`), false);
 // orphan upload cleanup
 r = await call(sara, "POST", "/api/helpme/upload", null, { body: video, type: "video/mp4" });
 sql.prepare("UPDATE helpme_uploads SET created_at='2020-01-01T00:00:00.000Z' WHERE used_appeal_id IS NULL").run();

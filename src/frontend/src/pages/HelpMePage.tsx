@@ -2,7 +2,7 @@
 // Full-screen vertical reel of short video appeals. Immersive: no app header, no bottom navigation.
 import { useAuth } from "@/contexts/AuthContext";
 import { CommentsSheet, HelpSheet, ReportSheet } from "@/components/HelpMeSheets";
-import { compact, consumeHelpMeReturnPath, convert, formatMoney, helpme, viewerCurrency, type Appeal, type HelpMeConfig } from "@/lib/helpme";
+import { buildHelpMeShareUrl, compact, consumeHelpMeReturnPath, convert, formatMoney, helpme, viewerCurrency, type Appeal, type HelpMeConfig } from "@/lib/helpme";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, BadgeCheck, CheckCircle2, Flag, HandHeart, Loader2, MessageCircle, Pause, Plus, Repeat2, Share2, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -95,7 +95,7 @@ export default function HelpMePage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [active, setActive] = useState(0);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [paused, setPaused] = useState(false);
   const [visible, setVisible] = useState(true);
   const [cfg, setCfg] = useState<HelpMeConfig | null>(configCache);
@@ -227,7 +227,7 @@ export default function HelpMePage() {
   }
 
   async function share(a: Appeal) {
-    const url = `${window.location.origin}/helpme?v=${a.id}`;
+    const url = buildHelpMeShareUrl(a.id);
     try {
       if (navigator.share) await navigator.share({ title: "Help Me", text: a.description.slice(0, 120), url });
       else { await navigator.clipboard.writeText(url); toast.success("Link copied"); }
