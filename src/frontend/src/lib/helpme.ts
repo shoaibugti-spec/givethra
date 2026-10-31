@@ -3,6 +3,39 @@
 // same domain (/api/helpme/...), so no extra domain, CORS or CSP change is needed.
 
 const BASE = typeof window !== "undefined" ? window.location.origin : "https://givethra.org";
+const RETURN_PATH_KEY = "givethra_helpme_return_path";
+
+function safeHelpMeReturnPath(value: string): string | null {
+  if (!value.startsWith("/") || value.startsWith("//")) return null;
+  try {
+    const url = new URL(value, BASE);
+    if (url.origin !== BASE || url.pathname === "/helpme" || url.pathname.startsWith("/helpme/")) return null;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Remember the internal screen that launched Help Me; never store external or Help Me routes. */
+export function rememberHelpMeReturnPath(value: string): void {
+  try {
+    const safe = safeHelpMeReturnPath(value);
+    if (safe) window.sessionStorage.setItem(RETURN_PATH_KEY, safe);
+  } catch {
+    // Storage can be disabled; Help Me will use the safe home fallback.
+  }
+}
+
+/** Consume the saved in-app destination once, preventing stale or external back targets. */
+export function consumeHelpMeReturnPath(): string | null {
+  try {
+    const value = window.sessionStorage.getItem(RETURN_PATH_KEY);
+    window.sessionStorage.removeItem(RETURN_PATH_KEY);
+    return value ? safeHelpMeReturnPath(value) : null;
+  } catch {
+    return null;
+  }
+}
 
 function token(): string | null {
   try {

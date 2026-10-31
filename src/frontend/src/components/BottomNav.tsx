@@ -5,6 +5,7 @@ import { Home, User, BarChart3, HeartHandshake, HandHeart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getCommunityPosts } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { rememberHelpMeReturnPath } from "@/lib/helpme";
 
 const LAST_SEEN_KEY = "givethra_my_help_posts_seen_at";
 
@@ -35,6 +36,7 @@ export default function BottomNav() {
       to="/helpme"
       data-ocid="bottom_nav.helpme"
       aria-label="Help Me"
+      onClick={() => rememberHelpMeReturnPath(`${window.location.pathname}${window.location.search}${window.location.hash}`)}
       className="relative flex min-h-16 flex-1 touch-manipulation select-none flex-col items-center justify-end pb-1.5"
     >
       <span className="absolute -top-7 flex h-16 w-16 animate-[pulse_2.6s_ease-in-out_infinite] items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/40 ring-4 ring-card transition-transform active:scale-95">

@@ -44,6 +44,7 @@ import RoleSwitcher from "@/components/RoleSwitcher";
 import SocialLinks from "@/components/SocialLinks";
 import { SiWhatsapp } from "react-icons/si";
 import { loadHelpImpact, formatAmount, type HelpImpact } from "@/lib/helpStats";
+import { rememberHelpMeReturnPath } from "@/lib/helpme";
 
 const ADMIN_EMAIL = "shoaibahmedbugti5@gmail.com";
 const WHATSAPP_SUPPORT_URL = "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
@@ -574,7 +575,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
             <NavLink to="/cases">Browse Cases</NavLink>
             <NavLink to="/dreams">Dreams</NavLink>
-            <NavLink to="/helpme">Help Me</NavLink>
+            <NavLink to="/helpme" onClick={() => rememberHelpMeReturnPath(`${window.location.pathname}${window.location.search}${window.location.hash}`)}>Help Me</NavLink>
             <NavLink to="/donation">Contribute</NavLink>
             {isAuthenticated && <NavLink to="/my-help">My Help</NavLink>}
             {isAuthenticated && <NavLink to="/my-cases">My Cases</NavLink>}

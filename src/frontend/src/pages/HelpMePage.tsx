@@ -2,7 +2,7 @@
 // Full-screen vertical reel of short video appeals. Immersive: no app header, no bottom navigation.
 import { useAuth } from "@/contexts/AuthContext";
 import { CommentsSheet, HelpSheet, ReportSheet } from "@/components/HelpMeSheets";
-import { compact, convert, formatMoney, helpme, viewerCurrency, type Appeal, type HelpMeConfig } from "@/lib/helpme";
+import { compact, consumeHelpMeReturnPath, convert, formatMoney, helpme, viewerCurrency, type Appeal, type HelpMeConfig } from "@/lib/helpme";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, BadgeCheck, CheckCircle2, Flag, HandHeart, Loader2, MessageCircle, Pause, Plus, Repeat2, Share2, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -198,8 +198,8 @@ export default function HelpMePage() {
   }, [flush]);
 
   function goBack() {
-    if (window.history.length > 1) window.history.back();
-    else navigate({ to: "/home" });
+    const returnPath = consumeHelpMeReturnPath();
+    navigate({ to: (returnPath || "/home") as never, replace: true });
   }
 
   function startCreate() {

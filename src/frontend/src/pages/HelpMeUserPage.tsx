@@ -23,7 +23,7 @@ export default function HelpMeUserPage() {
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950 text-white" style={{ height: "100dvh" }}>
       <div className="mx-auto w-full max-w-[520px] px-4 pb-10" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
-        <button type="button" onClick={() => (window.history.length > 1 ? window.history.back() : navigate({ to: "/helpme" }))} aria-label="Back" className="mb-3 flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 active:scale-95"><ArrowLeft className="h-4 w-4" /></button>
+        <button type="button" onClick={() => navigate({ to: "/helpme", replace: true })} aria-label="Back" className="mb-3 flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 active:scale-95"><ArrowLeft className="h-4 w-4" /></button>
         {!data && !error && <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 animate-spin text-emerald-400" /></div>}
         {error && <p className="rounded-xl bg-red-500/15 p-4 text-sm text-red-200">{error}</p>}
         {data && (
