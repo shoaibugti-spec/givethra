@@ -12,6 +12,7 @@ import { toast } from "sonner";
 type Entry = { type: "intro" } | { type: "appeal"; a: Appeal };
 let configCache: HelpMeConfig | null = null;
 const posterChecked = new Set<string>(); // one backfill attempt per appeal per page load
+let adminViewer = false; // set when the signed-in user can open the admin API (may add missing posters to any appeal)
 
 function ReelVideo({ src, poster, active, near, muted, paused, backfillId, thumbUrl }: { src: string; poster?: string; active: boolean; near: boolean; muted: boolean; paused: boolean; backfillId?: string; thumbUrl?: string | null }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -108,6 +109,11 @@ function IntroCard({ signedIn, onCreate }: { signedIn: boolean; onCreate: () => 
 export default function HelpMePage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const [, setAdminTick] = useState(0);
+  useEffect(() => {
+    if (!isAuthenticated || adminViewer) return;
+    helpme.admin.counts().then(() => { adminViewer = true; setAdminTick((n) => n + 1); }).catch(() => undefined);
+  }, [isAuthenticated]);
   const [tab, setTab] = useState<"need" | "helped">("need");
   const [items, setItems] = useState<Appeal[]>([]);
   const [pinned, setPinned] = useState<Appeal | null>(null);
@@ -341,7 +347,7 @@ function Card(p: {
   const raisedEq = convert(a.raised_local, a.currency, p.vCur, p.cfg);
   return (
     <>
-      {a.video_url ? <ReelVideo src={a.video_url} active={p.active} near={p.near} muted={p.muted} paused={p.paused} backfillId={a.is_owner ? a.id : undefined} thumbUrl={a.thumbnail_url} /> : <div className="absolute inset-0 bg-slate-900" />}
+      {a.video_url ? <ReelVideo src={a.video_url} active={p.active} near={p.near} muted={p.muted} paused={p.paused} backfillId={a.is_owner || adminViewer ? a.id : undefined} thumbUrl={a.thumbnail_url} /> : <div className="absolute inset-0 bg-slate-900" />}
       <div className="pointer-events-none absolute inset-0 z-[6] bg-gradient-to-b from-black/55 via-transparent to-black/90" />
       <button type="button" aria-label="Play or pause" onClick={p.onTap} className="absolute inset-0 z-10 h-full w-full" />
       {p.paused && p.active && <div className="pointer-events-none absolute inset-0 z-[12] flex items-center justify-center"><div className="rounded-full bg-black/50 p-5"><Pause className="h-9 w-9" /></div></div>}
