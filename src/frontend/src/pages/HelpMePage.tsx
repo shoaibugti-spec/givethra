@@ -16,6 +16,7 @@ function ReelVideo({ src, poster, active, near, muted, paused }: { src: string; 
   const [waiting, setWaiting] = useState(true);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [portrait, setPortrait] = useState(true); // vertical videos fill the whole screen; landscape ones stay uncropped
 
   useEffect(() => {
     const v = ref.current;
@@ -52,9 +53,10 @@ function ReelVideo({ src, poster, active, near, muted, paused }: { src: string; 
         onCanPlay={() => setWaiting(false)}
         onPlaying={() => { setWaiting(false); setFailed(false); }}
         onError={() => setFailed(true)}
+        onLoadedMetadata={(e) => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight) setPortrait(v.videoWidth / v.videoHeight < 0.8); }}
         onContextMenu={(e) => e.preventDefault()}
         poster={poster}
-        className="absolute inset-0 h-full w-full bg-black object-contain"
+        className={`absolute inset-0 h-full w-full bg-black ${portrait ? "object-cover" : "object-contain"}`}
       />
       {active && waiting && !failed && <div className="absolute inset-0 z-[5] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-white/70" /></div>}
       {failed && (
