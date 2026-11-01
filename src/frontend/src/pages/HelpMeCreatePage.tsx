@@ -3,7 +3,7 @@
 // Android Chrome and desktop webcams. Steps: check -> record -> preview -> details -> done.
 import { useAuth } from "@/contexts/AuthContext";
 import { HelpMeError, PAY_METHODS, formatMoney, helpme, niceGoal, pickRecorderMime, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
-import { getHelpMeCameraConstraints, resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
+import { resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
 import { captureHelpMeThumbnail } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RefreshCw, RotateCcw, ShieldAlert, Square, Video } from "lucide-react";
@@ -11,6 +11,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { toast } from "sonner";
 
 type Step = "check" | "blocked" | "intro" | "record" | "preview" | "details" | "done";
+// Reel size: always vertical 9:16.
+const REEL_W = 720;
+const REEL_H = 1280;
+function portraitConstraints(mode: "user" | "environment"): MediaStreamConstraints {
+  return {
+    video: { facingMode: { ideal: mode }, width: { ideal: REEL_W }, height: { ideal: REEL_H }, aspectRatio: { ideal: 9 / 16 }, frameRate: { ideal: 30, max: 30 } },
+    audio: { echoCancellation: true, noiseSuppression: true },
+  };
+}
 const CONTACT_RE = /@|https?:\/\/|www\.|\d{7,}|whats?app|telegram|signal|wechat|\bimo\b|e-?mail/i;
 
 function useCountdown(iso?: string) {
@@ -112,7 +121,7 @@ export default function HelpMeCreatePage() {
     try {
       let stream: MediaStream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia(getHelpMeCameraConstraints(mode));
+        stream = await navigator.mediaDevices.getUserMedia(portraitConstraints(mode));
       } catch (e) {
         if ((e as DOMException)?.name === "OverconstrainedError" || (e as DOMException)?.name === "NotFoundError") {
           stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -143,8 +152,8 @@ export default function HelpMeCreatePage() {
     let recordVideo: HTMLVideoElement | null = null;
     try {
       const canvas = document.createElement("canvas");
-      canvas.width = 720;
-      canvas.height = 1280;
+      canvas.width = REEL_W;
+      canvas.height = REEL_H;
       const context = canvas.getContext("2d");
       if (!context || typeof canvas.captureStream !== "function") throw new Error("Portrait recording is unavailable");
       recordVideo = document.createElement("video");
@@ -156,7 +165,7 @@ export default function HelpMeCreatePage() {
         context.fillStyle = "#000";
         context.fillRect(0, 0, canvas.width, canvas.height);
         if (recordVideo && recordVideo.videoWidth > 0 && recordVideo.videoHeight > 0) {
-          const scale = Math.min(canvas.width / recordVideo.videoWidth, canvas.height / recordVideo.videoHeight);
+          const scale = Math.max(canvas.width / recordVideo.videoWidth, canvas.height / recordVideo.videoHeight); // cover: fill the vertical frame
           const width = recordVideo.videoWidth * scale;
           const height = recordVideo.videoHeight * scale;
           context.drawImage(recordVideo, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
@@ -325,7 +334,7 @@ export default function HelpMeCreatePage() {
         )}
 
         {step === "record" && (
-          <div className="relative flex flex-1 flex-col">
+          <div className="relative flex flex-1 flex-col items-center justify-center">
             {camError ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
                 <ShieldAlert className="h-10 w-10 text-amber-400" />
@@ -334,7 +343,8 @@ export default function HelpMeCreatePage() {
               </div>
             ) : (
               <>
-                <video ref={liveRef} playsInline muted autoPlay className={`absolute inset-0 h-full w-full bg-black object-contain ${facing === "user" ? "-scale-x-100" : ""}`} />
+                <div className="relative mx-auto flex w-full shrink-0 flex-col overflow-hidden bg-black" style={{ aspectRatio: "9 / 16", maxHeight: "calc(100dvh - 64px)", maxWidth: "calc((100dvh - 64px) * 9 / 16)" }}>
+                <video ref={liveRef} playsInline muted autoPlay className={`absolute inset-0 h-full w-full bg-black object-cover ${facing === "user" ? "-scale-x-100" : ""}`} />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
                 <div className="relative z-10 mt-2 flex justify-center">
                   <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-extrabold tabular-nums">{recording && <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />}{seconds}s / {cfg?.max_seconds ?? 20}s</span>
@@ -357,6 +367,7 @@ export default function HelpMeCreatePage() {
                     </>
                   )}
                 </div>
+                </div>
               </>
             )}
           </div>
@@ -365,7 +376,7 @@ export default function HelpMeCreatePage() {
         {step === "preview" && (
           <div className="flex flex-1 flex-col px-4 pb-6">
             <div className="mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-2xl bg-black">
-              <video src={previewUrl} controls playsInline className="h-full w-full object-contain" />
+              <video src={previewUrl} controls playsInline className="h-full w-full object-cover" />
             </div>
             <p className="mt-3 text-center text-xs text-gray-300">Watch and listen to your recording. Is it clear?</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
