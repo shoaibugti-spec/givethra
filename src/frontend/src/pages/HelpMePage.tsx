@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { CommentsSheet, HelpSheet, ReportSheet } from "@/components/HelpMeSheets";
 import { buildHelpMeShareUrl, compact, consumeHelpMeReturnPath, convert, formatMoney, helpme, viewerCurrency, type Appeal, type HelpMeConfig } from "@/lib/helpme";
+import { posterFromVideo } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, BadgeCheck, CheckCircle2, Flag, HandHeart, Loader2, MessageCircle, Pause, Plus, Repeat2, Share2, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -10,8 +11,9 @@ import { toast } from "sonner";
 
 type Entry = { type: "intro" } | { type: "appeal"; a: Appeal };
 let configCache: HelpMeConfig | null = null;
+const posterChecked = new Set<string>(); // one backfill attempt per appeal per page load
 
-function ReelVideo({ src, poster, active, near, muted, paused }: { src: string; poster?: string; active: boolean; near: boolean; muted: boolean; paused: boolean }) {
+function ReelVideo({ src, poster, active, near, muted, paused, backfillId, thumbUrl }: { src: string; poster?: string; active: boolean; near: boolean; muted: boolean; paused: boolean; backfillId?: string; thumbUrl?: string | null }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [waiting, setWaiting] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -37,6 +39,22 @@ function ReelVideo({ src, poster, active, near, muted, paused }: { src: string; 
       }
     }
   }, [active, paused, near, attempt]);
+
+  // Owner's older videos have no share poster: build it once from the frame that is already playing.
+  useEffect(() => {
+    if (!backfillId || !thumbUrl || !active || waiting || posterChecked.has(backfillId)) return;
+    const t = window.setTimeout(async () => {
+      posterChecked.add(backfillId);
+      try {
+        const head = await fetch(thumbUrl, { method: "GET", cache: "no-store" });
+        if (head.ok) return;
+        const v = ref.current;
+        if (!v || !v.videoWidth) return;
+        await helpme.backfillPoster(backfillId, await posterFromVideo(v));
+      } catch { /* best effort */ }
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, [backfillId, thumbUrl, active, waiting]);
 
   if (!near) return <div className="absolute inset-0 bg-black" />;
   return (
@@ -323,7 +341,7 @@ function Card(p: {
   const raisedEq = convert(a.raised_local, a.currency, p.vCur, p.cfg);
   return (
     <>
-      {a.video_url ? <ReelVideo src={a.video_url} active={p.active} near={p.near} muted={p.muted} paused={p.paused} /> : <div className="absolute inset-0 bg-slate-900" />}
+      {a.video_url ? <ReelVideo src={a.video_url} active={p.active} near={p.near} muted={p.muted} paused={p.paused} backfillId={a.is_owner ? a.id : undefined} thumbUrl={a.thumbnail_url} /> : <div className="absolute inset-0 bg-slate-900" />}
       <div className="pointer-events-none absolute inset-0 z-[6] bg-gradient-to-b from-black/55 via-transparent to-black/90" />
       <button type="button" aria-label="Play or pause" onClick={p.onTap} className="absolute inset-0 z-10 h-full w-full" />
       {p.paused && p.active && <div className="pointer-events-none absolute inset-0 z-[12] flex items-center justify-center"><div className="rounded-full bg-black/50 p-5"><Pause className="h-9 w-9" /></div></div>}
