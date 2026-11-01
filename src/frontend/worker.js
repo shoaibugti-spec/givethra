@@ -1761,8 +1761,8 @@ async function handleRequest(request, env, ctx) {
     }
   }
 
-  // Public case share links get case-specific Open Graph/Twitter metadata.
-  if (parts[0] === "share" && parts[1] === "cases" && parts[2] && request.method === "GET") {
+  // Public case links get case-specific Open Graph/Twitter metadata.
+  if (((parts[0] === "share" && parts[1] === "cases" && parts[2]) || (parts[0] === "cases" && parts[1])) && request.method === "GET") {
     try {
       const preview = await caseShareDocument(request, env, url, parts);
       if (preview) return preview;
@@ -3155,11 +3155,14 @@ function isSocialCrawler(request) {
 }
 
 async function caseShareDocument(request, env, url, parts) {
-  if (!env.ASSETS || request.method !== "GET" || parts[0] !== "share" || parts[1] !== "cases" || !parts[2]) return null;
-  const caseId = decodeURIComponent(parts[2]);
+  const isSharePath = parts[0] === "share" && parts[1] === "cases";
+  const isDirectCasePath = parts[0] === "cases";
+  const casePathId = isSharePath ? parts[2] : parts[1];
+  if (!env.ASSETS || request.method !== "GET" || (!isSharePath && !isDirectCasePath) || !casePathId) return null;
+  const caseId = decodeURIComponent(casePathId);
   const caseRow = await env.DB.prepare(
     `SELECT id, title, short_description, description, why_help, category,
-            amount_needed, amount_collected, currency, selfie_url, city, country,
+            amount_needed, amount_collected, currency, selfie_url, video_url, photo_urls, city, country,
             status
      FROM case_submissions
      WHERE id = ? AND lower(COALESCE(status, '')) IN ('approved', 'published', 'active', 'completed')
@@ -3168,7 +3171,7 @@ async function caseShareDocument(request, env, url, parts) {
   if (!caseRow) return null;
 
   const pageUrl = new URL(`/cases/${encodeURIComponent(caseId)}`, url.origin).toString();
-  if (!isSocialCrawler(request)) return Response.redirect(pageUrl, 302);
+  if (!isSocialCrawler(request)) return isSharePath ? Response.redirect(pageUrl, 302) : null;
 
   const documentResponse = await env.ASSETS.fetch(new Request(new URL("/", url), request));
   const document = await documentResponse.text();
@@ -3184,7 +3187,18 @@ async function caseShareDocument(request, env, url, parts) {
     ? `Contributed ${symbol} ${collected.toLocaleString()} of ${symbol} ${needed.toLocaleString()}; ${symbol} ${Math.max(needed - collected, 0).toLocaleString()} remains.`
     : "Contributions are welcome.";
   const description = `${story} ${progress} You can contribute any amount or pay the complete fee directly.`;
-  const image = caseRow.selfie_url ? new URL(String(caseRow.selfie_url), url.origin).toString() : `${url.origin}/1780969153797.png`;
+  let photoImage = "";
+  if (caseRow.photo_urls) {
+    try {
+      const photos = typeof caseRow.photo_urls === "string" ? JSON.parse(caseRow.photo_urls) : caseRow.photo_urls;
+      const values = Array.isArray(photos) ? photos : Object.values(photos || {});
+      photoImage = String(values.find((value) => typeof value === "string" && value.trim()) || "").trim();
+    } catch { /* preserve the selfie fallback for legacy records */ }
+  }
+  const image = (caseRow.selfie_url || photoImage)
+    ? new URL(String(caseRow.selfie_url || photoImage), url.origin).toString()
+    : `${url.origin}/1780969153797.png`;
+  const video = caseRow.video_url ? new URL(String(caseRow.video_url), url.origin).toString() : "";
   let html = document.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
   const replacements = [
     ["description", description], ["og:title", title], ["og:description", description],
@@ -3192,6 +3206,9 @@ async function caseShareDocument(request, env, url, parts) {
     ["og:image:width", "640"], ["og:image:height", "640"],
     ["twitter:card", "summary_large_image"], ["twitter:title", title], ["twitter:description", description], ["twitter:image", image],
   ];
+  if (video) {
+    replacements.push(["og:video", video], ["og:video:url", video], ["og:video:secure_url", video]);
+  }
   for (const [property, value] of replacements) {
     const attribute = property.startsWith("og:") ? `property="${property}"` : `name="${property}"`;
     const tag = `<meta ${attribute} content="${escapeHtml(value)}">`;
