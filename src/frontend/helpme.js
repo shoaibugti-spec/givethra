@@ -239,6 +239,25 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   const denied = need();
   if (denied) return denied;
 
+  // Backfill: owner/admin can add the share poster for a LIVE appeal that has none (older videos). Never overwrites.
+  if (method === "POST" && sub === "poster-backfill" && parts[3]) {
+    const appealId = String(parts[3]);
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(appealId)) return json({ error: "Invalid appeal" }, 400, origin);
+    const type = String(request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+    if (type !== "image/jpeg") return json({ error: "Only JPEG thumbnails are accepted", code: "BAD_THUMBNAIL_TYPE" }, 415, origin);
+    const a = await db.prepare("SELECT user_id, status, video_deleted_at FROM helpme_appeals WHERE id = ? AND status IN ('published','helped')").bind(appealId).first();
+    if (!a || a.video_deleted_at) return json({ error: "Appeal not found" }, 404, origin);
+    if (a.user_id !== user.user_id && !isAdmin(user)) return json({ error: "Not allowed" }, 403, origin);
+    if (!env.HELPME_VIDEOS) return json({ error: "Video storage is temporarily unavailable" }, 503, origin);
+    if (await env.HELPME_VIDEOS.head(`thumbs/${appealId}.jpg`)) return json({ ok: true, existing: true }, 200, origin);
+    const image = await request.arrayBuffer();
+    const bytes = new Uint8Array(image);
+    if (!bytes.length || bytes.length > MAX_THUMBNAIL_BYTES) return json({ error: "Thumbnail is too large or empty", code: "THUMBNAIL_TOO_LARGE" }, 413, origin);
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) return json({ error: "Invalid JPEG thumbnail", code: "BAD_THUMBNAIL_TYPE" }, 415, origin);
+    await env.HELPME_VIDEOS.put(`thumbs/${appealId}.jpg`, image, { httpMetadata: { contentType: "image/jpeg", cacheControl: "public, max-age=3600" } });
+    return json({ ok: true }, 201, origin);
+  }
+
   // Store a small poster next to the pending video. It stays inaccessible until admin approval.
   if (method === "POST" && sub === "upload-thumbnail" && parts[3]) {
     const uploadId = String(parts[3]);
