@@ -12,8 +12,9 @@ export function getHelpMeCameraConstraints(facing: HelpMeCameraFacing): MediaStr
       width: { ideal: 720 },
       height: { ideal: 1280 },
       aspectRatio: { ideal: 9 / 16 },
+      frameRate: { ideal: 30, max: 30 },
     },
-    audio: true,
+    audio: { echoCancellation: true, noiseSuppression: true },
   };
 }
 

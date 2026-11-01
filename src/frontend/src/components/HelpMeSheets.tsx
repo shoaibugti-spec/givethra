@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Check, Copy, ImagePlus, Loader2, Send, Trash2, X, Flag, ClipboardPaste, ShieldCheck } from "lucide-react";
 import { uploadFileToStorage } from "@/lib/api";
-import { compressImage, formatMoney, helpme, type Appeal, type HelpComment, type PaymentInfo } from "@/lib/helpme";
+import { compressImage, displayHelpMePaymentMethod, formatMoney, helpme, type Appeal, type HelpComment, type PaymentInfo } from "@/lib/helpme";
 
 export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   useEffect(() => {
@@ -155,7 +155,7 @@ export function HelpSheet({ appeal, onClose, onDone }: { appeal: Appeal | null; 
             Send the money directly to this person with the method below, then attach your screenshot and transaction ID. Givethra never holds the money.
           </p>
           <div className="space-y-2">
-            <CopyRow label={`Method${info.bank_name ? " / Bank" : ""}`} value={info.bank_name ? `${info.pay_method} · ${info.bank_name}` : info.pay_method} />
+            <CopyRow label="Transfer type" value={displayHelpMePaymentMethod(info.pay_method)} />
             <CopyRow label="Account title" value={info.account_title} />
             <CopyRow label="Account number" value={info.account_number} />
           </div>

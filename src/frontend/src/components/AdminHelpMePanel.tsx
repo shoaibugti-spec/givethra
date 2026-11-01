@@ -1,7 +1,7 @@
 // src/frontend/src/components/AdminHelpMePanel.tsx
 // Admin tab for Help Me: appeals queue, payment-proof queue, reports, FX rates and settings.
 import { Button } from "@/components/ui/button";
-import { formatMoney, helpme, type HelpMeConfig } from "@/lib/helpme";
+import { displayHelpMePaymentMethod, formatMoney, helpme, type HelpMeConfig } from "@/lib/helpme";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -82,7 +82,7 @@ export default function AdminHelpMePanel({ onQueueChanged }: { onQueueChanged?: 
                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${a.status === "under_review" ? "bg-orange-100 text-orange-700" : "bg-amber-100 text-amber-700"}`}>{a.status === "under_review" ? `Under review · ${a.open_reports} reports` : "Pending"}</span>
               </div>
               <p className="text-muted-foreground">{a.description}</p>
-              <p className="text-xs">Goal: <b>{formatMoney(a.goal_local, a.currency)}</b> · {a.pay_method} {a.pay_bank_name ? `· ${a.pay_bank_name}` : ""} · {a.pay_account_title} · <span className="font-mono">{a.pay_account_number}</span></p>
+              <p className="text-xs">Goal: <b>{formatMoney(a.goal_local, a.currency)}</b> · {displayHelpMePaymentMethod(a.pay_method)} · {a.pay_account_title} · <span className="font-mono">{a.pay_account_number}</span></p>
               {video[a.id] ? <video src={video[a.id]} controls playsInline className="max-h-80 w-full rounded-lg bg-black" /> : <Button type="button" variant="outline" size="sm" onClick={() => loadVideo(a.id)}>Load video</Button>}
               <input value={reasons[a.id] || ""} onChange={(e) => setReasons((r) => ({ ...r, [a.id]: e.target.value }))} placeholder="Reason (for reject / remove)" className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs" />
               <div className="flex flex-wrap gap-2">

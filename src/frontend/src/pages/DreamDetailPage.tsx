@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import {
   createDreamParticipation, getDream, getDreamParticipationHistory, getDreamPaymentAccounts, uploadFileToStorage,
 } from "@/lib/api";
+import { handleImageError } from "@/lib/media";
+import { resolveDreamProductImage } from "@/lib/dreamProductImage";
 import { Dream, money, marketValue } from "@/pages/DreamsPage";
 
 type Account = { id: string; label: string; method: string; account_title?: string; account_number: string; instructions?: string };
@@ -139,7 +141,7 @@ export default function DreamDetailPage() {
               <div className="overflow-hidden rounded-2xl border border-border bg-white p-2.5 shadow-sm md:rounded-3xl md:p-3">
                 <div className="relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-teal-50 via-white to-amber-50 md:min-h-[420px] md:rounded-2xl">
                   {dream.image_url ? (
-                    <img src={dream.image_url} alt={dream.name} className="h-full max-h-[480px] w-full object-contain" />
+                    <img src={resolveDreamProductImage(dream.image_url)} alt={dream.name} onError={handleImageError} className="h-full max-h-[480px] w-full object-contain" />
                   ) : (
                     <span className="text-sm font-semibold text-teal-700">Product image coming soon</span>
                   )}

@@ -20,6 +20,7 @@ const DB = { prepare: stmt, batch: async (list) => { sql.exec("BEGIN"); try { co
 const store = new Map();
 const R2 = {
   put: async (k, body, opts) => { const chunks = []; if (body && body.getReader) { const r = body.getReader(); for (;;) { const { value, done } = await r.read(); if (done) break; chunks.push(value); } } else if (body) chunks.push(body); store.set(k, { data: Buffer.concat(chunks.map((c) => Buffer.from(c))), ct: opts?.httpMetadata?.contentType }); },
+  head: async (k) => { const x = store.get(k); return x ? { size: x.data.length, writeHttpMetadata() {} } : null; },
   get: async (k, o) => { const x = store.get(k); if (!x) return null; return { size: x.data.length, body: new Blob([x.data]).stream(), writeHttpMetadata() {}, httpEtag: "e", range: o?.range?.get?.("range") ? { offset: 0, length: 4 } : undefined }; },
   delete: async (k) => { store.delete(k); },
 };
@@ -80,6 +81,7 @@ r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: 
 r = await call(admin, "PUT", `/api/helpme/admin/appeals/${appealId}`, { action: "approve" }); assert.equal(r.status, 409);
 assert.ok([...store.keys()].some((k) => k.startsWith("v/")) && ![...store.keys()].some((k) => k.startsWith("pending/") && k.includes(uploadId)));
 r = await call(null, "GET", `/api/helpme/thumbnail/${appealId}`); assert.equal(r.status, 200);
+r = await call(null, "HEAD", `/api/helpme/thumbnail/${appealId}`); assert.equal(r.status, 200);
 assert.ok(store.has(`thumbs/${appealId}.jpg`) && !store.has(`pending/${uploadId}.jpg`));
 r = await call(null, "GET", "/api/helpme/feed"); assert.equal(r.body.items.length, 1); const it = r.body.items[0];
 assert.ok(it.video_url.startsWith("/api/helpme/media/v/")); assert.equal(it.thumbnail_url, `/api/helpme/thumbnail/${appealId}`); assert.equal(JSON.stringify(it).includes("03001234567"), false); assert.equal(it.percent, 0);

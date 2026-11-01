@@ -2,8 +2,8 @@
 // Create a video appeal: LIVE CAMERA ONLY (no file picker, no gallery). Works on iPhone Safari,
 // Android Chrome and desktop webcams. Steps: check -> record -> preview -> details -> done.
 import { useAuth } from "@/contexts/AuthContext";
-import { HelpMeError, PAY_METHODS, formatMoney, helpme, niceGoal, pickRecorderMime, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
-import { resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
+import { HelpMeError, isValidHelpMeAccountIdentifier, PAY_METHODS, formatMoney, helpme, niceGoal, pickRecorderMime, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
+import { getHelpMeCameraConstraints, resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
 import { captureHelpMeThumbnail } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RefreshCw, RotateCcw, ShieldAlert, Square, Video } from "lucide-react";
@@ -14,12 +14,6 @@ type Step = "check" | "blocked" | "intro" | "record" | "preview" | "details" | "
 // Reel size: always vertical 9:16.
 const REEL_W = 720;
 const REEL_H = 1280;
-function portraitConstraints(mode: "user" | "environment"): MediaStreamConstraints {
-  return {
-    video: { facingMode: { ideal: mode }, width: { ideal: REEL_W }, height: { ideal: REEL_H }, aspectRatio: { ideal: 9 / 16 }, frameRate: { ideal: 30, max: 30 } },
-    audio: { echoCancellation: true, noiseSuppression: true },
-  };
-}
 const CONTACT_RE = /@|https?:\/\/|www\.|\d{7,}|whats?app|telegram|signal|wechat|\bimo\b|e-?mail/i;
 
 function useCountdown(iso?: string) {
@@ -56,7 +50,6 @@ export default function HelpMeCreatePage() {
   const [desc, setDesc] = useState("");
   const [country, setCountry] = useState("PK");
   const [method, setMethod] = useState("");
-  const [bank, setBank] = useState("");
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
 
@@ -121,7 +114,7 @@ export default function HelpMeCreatePage() {
     try {
       let stream: MediaStream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia(portraitConstraints(mode));
+        stream = await navigator.mediaDevices.getUserMedia(getHelpMeCameraConstraints(mode));
       } catch (e) {
         if ((e as DOMException)?.name === "OverconstrainedError" || (e as DOMException)?.name === "NotFoundError") {
           stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -165,7 +158,7 @@ export default function HelpMeCreatePage() {
         context.fillStyle = "#000";
         context.fillRect(0, 0, canvas.width, canvas.height);
         if (recordVideo && recordVideo.videoWidth > 0 && recordVideo.videoHeight > 0) {
-          const scale = Math.max(canvas.width / recordVideo.videoWidth, canvas.height / recordVideo.videoHeight); // cover: fill the vertical frame
+          const scale = Math.min(canvas.width / recordVideo.videoWidth, canvas.height / recordVideo.videoHeight); // contain: preserve the full camera frame without cropping
           const width = recordVideo.videoWidth * scale;
           const height = recordVideo.videoHeight * scale;
           context.drawImage(recordVideo, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
@@ -262,7 +255,7 @@ export default function HelpMeCreatePage() {
     if (!blob) return;
     if (desc.trim().length < 10) return setFormError("Please describe your need in 2-3 short lines (at least 10 characters).");
     if (CONTACT_RE.test(desc)) return setFormError("Please remove phone numbers, e-mail and links from the description. Payment details go in the boxes below.");
-    if (title.trim().length < 2 || !/^[A-Za-z0-9 \-+_./]{5,40}$/.test(number.trim())) return setFormError("Enter the account title and a valid account number (letters, numbers, - + _ . / only).");
+    if (title.trim().length < 2 || !isValidHelpMeAccountIdentifier(number)) return setFormError("Enter the account title and a valid account, IBAN or wallet identifier.");
     setBusy(true);
     try {
       let uid = uploadId;
@@ -279,7 +272,7 @@ export default function HelpMeCreatePage() {
       }
       await helpme.createAppeal({
         upload_id: uid, description: desc.trim(), account_country: country, pay_method: method,
-        pay_bank_name: bank.trim(), pay_account_title: title.trim(), pay_account_number: number.trim(), duration_ms: Math.round(durationRef.current),
+        pay_bank_name: "", pay_account_title: title.trim(), pay_account_number: number.trim(), duration_ms: Math.round(durationRef.current),
       });
       setStep("done");
       toast.success("Sent for review");
@@ -344,7 +337,7 @@ export default function HelpMeCreatePage() {
             ) : (
               <>
                 <div className="relative mx-auto flex w-full shrink-0 flex-col overflow-hidden bg-black" style={{ aspectRatio: "9 / 16", maxHeight: "calc(100dvh - 64px)", maxWidth: "calc((100dvh - 64px) * 9 / 16)" }}>
-                <video ref={liveRef} playsInline muted autoPlay className={`absolute inset-0 h-full w-full bg-black object-cover ${facing === "user" ? "-scale-x-100" : ""}`} />
+                <video ref={liveRef} playsInline muted autoPlay className={`absolute inset-0 h-full w-full bg-black object-contain ${facing === "user" ? "-scale-x-100" : ""}`} />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
                 <div className="relative z-10 mt-2 flex justify-center">
                   <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-extrabold tabular-nums">{recording && <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />}{seconds}s / {cfg?.max_seconds ?? 20}s</span>
@@ -376,7 +369,7 @@ export default function HelpMeCreatePage() {
         {step === "preview" && (
           <div className="flex flex-1 flex-col px-4 pb-6">
             <div className="mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-2xl bg-black">
-              <video src={previewUrl} controls playsInline className="h-full w-full object-cover" />
+              <video src={previewUrl} controls playsInline className="h-full w-full object-contain" />
             </div>
             <p className="mt-3 text-center text-xs text-gray-300">Watch and listen to your recording. Is it clear?</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
@@ -396,14 +389,13 @@ export default function HelpMeCreatePage() {
                 {countries.map((c) => <option key={c} value={c}>{regionName(c)}</option>)}
               </select>
             </Field>
-            <Field label="Payment method">
+            <Field label="Preferred transfer type">
               <div className="flex flex-wrap gap-2">
                 {methods.map((m) => <button key={m} type="button" onClick={() => setMethod(m)} className={`rounded-full border px-3.5 py-1.5 text-xs font-bold ${method === m ? "border-emerald-400 bg-emerald-500 text-white" : "border-white/20 bg-white/5 text-gray-200"}`}>{m}</button>)}
               </div>
             </Field>
-            <Field label="Bank name (if any)"><input value={bank} onChange={(e) => setBank(e.target.value)} maxLength={60} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" /></Field>
             <Field label="Account title"><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" /></Field>
-            <Field label="Account number / mobile account"><input value={number} onChange={(e) => setNumber(e.target.value)} maxLength={40} inputMode="text" className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 font-mono text-sm outline-none focus:border-emerald-400" /></Field>
+            <Field label="Account number, IBAN or wallet ID"><input value={number} onChange={(e) => setNumber(e.target.value)} maxLength={40} inputMode="text" className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 font-mono text-sm outline-none focus:border-emerald-400" /></Field>
             {goal !== null && cfg && (
               <div className="rounded-xl bg-lime-500 px-3 py-2 text-center text-xs font-extrabold text-black">Goal: {formatMoney(goal, currency)}{currency !== "USD" && ` (≈ $${(cfg.goal_usd_cents / 100).toFixed(2)})`}</div>
             )}

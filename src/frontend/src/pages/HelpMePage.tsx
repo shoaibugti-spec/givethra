@@ -19,8 +19,6 @@ function ReelVideo({ src, poster, active, near, muted, paused, backfillId, thumb
   const [waiting, setWaiting] = useState(true);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [portrait, setPortrait] = useState(true); // vertical videos fill the whole screen; landscape ones stay uncropped
-
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
@@ -72,10 +70,9 @@ function ReelVideo({ src, poster, active, near, muted, paused, backfillId, thumb
         onCanPlay={() => setWaiting(false)}
         onPlaying={() => { setWaiting(false); setFailed(false); }}
         onError={() => setFailed(true)}
-        onLoadedMetadata={(e) => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight) setPortrait(v.videoWidth / v.videoHeight < 0.8); }}
         onContextMenu={(e) => e.preventDefault()}
         poster={poster}
-        className={`absolute inset-0 h-full w-full bg-black ${portrait ? "object-cover" : "object-contain"}`}
+        className="absolute inset-0 h-full w-full bg-black object-contain"
       />
       {active && waiting && !failed && <div className="absolute inset-0 z-[5] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-white/70" /></div>}
       {failed && (
@@ -340,6 +337,7 @@ export default function HelpMePage() {
 
 function Card(p: {
   a: Appeal; cfg: HelpMeConfig | null; vCur: string; active: boolean; near: boolean; muted: boolean; paused: boolean;
+  poster?: string;
   onTap: () => void; onPray: () => void; onRepost: () => void; onShare: () => void; onComments: () => void; onHelp: () => void; onReport: () => void; onOwner: () => void;
 }) {
   const { a } = p;
@@ -347,7 +345,7 @@ function Card(p: {
   const raisedEq = convert(a.raised_local, a.currency, p.vCur, p.cfg);
   return (
     <>
-      {a.video_url ? <ReelVideo src={a.video_url} active={p.active} near={p.near} muted={p.muted} paused={p.paused} backfillId={a.is_owner || adminViewer ? a.id : undefined} thumbUrl={a.thumbnail_url} /> : <div className="absolute inset-0 bg-slate-900" />}
+      {a.video_url ? <ReelVideo src={a.video_url} poster={p.poster || a.thumbnail_url || undefined} active={p.active} near={p.near} muted={p.muted} paused={p.paused} backfillId={a.is_owner || adminViewer ? a.id : undefined} thumbUrl={a.thumbnail_url} /> : <div className="absolute inset-0 bg-slate-900" />}
       <div className="pointer-events-none absolute inset-0 z-[6] bg-gradient-to-b from-black/55 via-transparent to-black/90" />
       <button type="button" aria-label="Play or pause" onClick={p.onTap} className="absolute inset-0 z-10 h-full w-full" />
       {p.paused && p.active && <div className="pointer-events-none absolute inset-0 z-[12] flex items-center justify-center"><div className="rounded-full bg-black/50 p-5"><Pause className="h-9 w-9" /></div></div>}
@@ -357,7 +355,7 @@ function Card(p: {
         <span className="text-sm font-extrabold tracking-wide text-white/60 drop-shadow">Help Me!</span>
         {a.helped && (
           <span className="-rotate-6 self-start rounded-lg border-2 border-emerald-400 bg-black/40 px-3 py-1 text-center text-xs font-extrabold text-emerald-300 backdrop-blur-sm">
-            Helped ✅<br /><span className="text-[11px]">مدد ہو چکی</span>
+            Helped ✅
           </span>
         )}
       </div>
@@ -395,7 +393,7 @@ function Card(p: {
         <p className="line-clamp-3 text-[13px] leading-snug text-white/95 drop-shadow">{a.description}</p>
 
         {a.helped ? (
-          <div className="flex items-center justify-center gap-2 rounded-xl bg-green-600/90 py-3 text-sm font-extrabold"><CheckCircle2 className="h-4 w-4" /> Helped ✅ · مدد ہو چکی</div>
+          <div className="flex items-center justify-center gap-2 rounded-xl bg-green-600/90 py-3 text-sm font-extrabold"><CheckCircle2 className="h-4 w-4" /> Helped ✅</div>
         ) : a.is_owner ? (
           <div className="rounded-xl bg-white/10 py-3 text-center text-xs font-semibold text-gray-200">This is your appeal</div>
         ) : (

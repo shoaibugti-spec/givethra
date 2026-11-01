@@ -6,7 +6,9 @@ const BASE = typeof window !== "undefined" ? window.location.origin : "https://g
 const RETURN_PATH_KEY = "givethra_helpme_return_path";
 
 export function buildHelpMeShareUrl(appealId: string, origin = BASE): string {
-  return new URL(`/share/helpme/${encodeURIComponent(appealId)}`, origin).toString();
+  const url = new URL(`/share/helpme/${encodeURIComponent(appealId)}`, origin);
+  url.searchParams.set("preview", "2");
+  return url.toString();
 }
 
 function safeHelpMeReturnPath(value: string): string | null {
@@ -289,10 +291,23 @@ export function regionName(code: string): string {
 }
 
 export const PAY_METHODS: Record<string, string[]> = {
-  PK: ["Easypaisa", "JazzCash", "Bank transfer"],
-  IN: ["UPI", "Bank transfer"],
-  default: ["Bank transfer", "PayPal", "Wise", "Other"],
+  default: ["Account transfer", "Digital wallet", "Online transfer", "Other"],
 };
+
+/** Keep legacy payment labels understandable without exposing named providers or banks. */
+export function displayHelpMePaymentMethod(value: string | null | undefined): string {
+  const method = String(value || "").trim().toLowerCase();
+  if (!method) return "Account transfer";
+  if (/easypaisa|jazzcash|wallet|mobile/.test(method)) return "Digital wallet";
+  if (/paypal|wise|upi|online/.test(method)) return "Online transfer";
+  if (/bank|account|iban|transfer/.test(method)) return "Account transfer";
+  if (method === "other") return "Other";
+  return "Other";
+}
+
+export function isValidHelpMeAccountIdentifier(value: string): boolean {
+  return /^[A-Za-z0-9 @\-+_./]{5,40}$/.test(value.trim());
+}
 
 /** Picks the best recording format this browser supports (mp4 first: it plays on every phone). */
 export function pickRecorderMime(): string {

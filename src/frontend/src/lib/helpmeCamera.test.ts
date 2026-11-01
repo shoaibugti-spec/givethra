@@ -7,12 +7,13 @@ const recorderSource = readFileSync(new URL("../pages/HelpMeCreatePage.tsx", imp
 describe("Help Me camera framing", () => {
   it.each(["user", "environment"] as const)("requests portrait framing for the %s camera", (facing) => {
     const constraints = getHelpMeCameraConstraints(facing);
-    expect(constraints.audio).toBe(true);
+    expect(constraints.audio).toMatchObject({ echoCancellation: true, noiseSuppression: true });
     expect(constraints.video).toMatchObject({
       facingMode: { exact: facing },
       width: { ideal: 720 },
       height: { ideal: 1280 },
       aspectRatio: { ideal: 9 / 16 },
+      frameRate: { ideal: 30, max: 30 },
     });
   });
 
@@ -54,6 +55,9 @@ describe("Help Me camera framing", () => {
   it("uses the zoom-safe constraints and displays the full live camera frame", () => {
     expect(recorderSource).toContain("getHelpMeCameraConstraints(mode)");
     expect(recorderSource).toContain("resetHelpMeCameraZoom(track)");
+    expect(recorderSource).toContain("Math.min(canvas.width / recordVideo.videoWidth");
+    expect(recorderSource).not.toContain("Math.max(canvas.width / recordVideo.videoWidth");
     expect(recorderSource).toContain("object-contain");
+    expect(recorderSource).not.toContain("object-cover");
   });
 });

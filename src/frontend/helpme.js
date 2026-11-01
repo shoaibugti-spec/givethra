@@ -152,19 +152,22 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   }
 
   // Posters are private while staged and are only served after the matching video is published.
-  if (method === "GET" && sub === "thumbnail" && parts[3]) {
+  if ((method === "GET" || method === "HEAD") && sub === "thumbnail" && parts[3]) {
     const appealId = String(parts[3]);
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(appealId)) return json({ error: "Thumbnail not found" }, 404, origin);
     const appeal = await db.prepare("SELECT status, video_deleted_at, expires_at FROM helpme_appeals WHERE id = ? AND status IN ('published','helped')").bind(appealId).first();
     if (!appeal || appeal.video_deleted_at || (appeal.expires_at && new Date(appeal.expires_at).getTime() <= Date.now())) return json({ error: "Thumbnail not found" }, 404, origin);
-    const object = await env.HELPME_VIDEOS?.get(`thumbs/${appealId}.jpg`);
+    const object = method === "HEAD"
+      ? await env.HELPME_VIDEOS?.head(`thumbs/${appealId}.jpg`)
+      : await env.HELPME_VIDEOS?.get(`thumbs/${appealId}.jpg`);
     if (!object) return json({ error: "Thumbnail not found" }, 404, origin);
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set("Content-Type", "image/jpeg");
     headers.set("Cache-Control", "public, max-age=3600, s-maxage=3600");
     headers.set("X-Content-Type-Options", "nosniff");
-    return new Response(object.body, { headers });
+    headers.set("Content-Length", String(object.size));
+    return new Response(method === "HEAD" ? null : object.body, { headers });
   }
 
   if (method === "GET" && sub === "users" && parts[3]) {
@@ -353,7 +356,7 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     if (description.length < 10) return json({ error: "Please describe your need in 2-3 short lines (at least 10 characters).", code: "BAD_DESCRIPTION" }, 400, origin);
     if (hasPublicContact(description)) return json({ error: "Please remove phone numbers, e-mail and links from the description. Payment details go in the payment box.", code: "CONTACT_IN_DESCRIPTION" }, 400, origin);
     if (!/^[A-Z]{2}$/.test(country)) return json({ error: "Select the country of your payment account", code: "BAD_COUNTRY" }, 400, origin);
-    if (payMethod.length < 2 || title.length < 2 || !/^[A-Za-z0-9 \-+_./]{5,40}$/.test(number)) return json({ error: "Payment method, account title and a valid account number are required", code: "BAD_PAYMENT" }, 400, origin);
+    if (payMethod.length < 2 || title.length < 2 || !/^[A-Za-z0-9 @\-+_./]{5,40}$/.test(number)) return json({ error: "Payment method, account title and a valid account identifier are required", code: "BAD_PAYMENT" }, 400, origin);
     const upload = await db.prepare("SELECT id, video_key, content_type, size_bytes FROM helpme_uploads WHERE id = ? AND user_id = ? AND used_appeal_id IS NULL").bind(String(b.upload_id || ""), user.user_id).first();
     if (!upload) return json({ error: "Recording not found. Please record again.", code: "UPLOAD_MISSING" }, 400, origin);
     const accountNorm = norm(number);

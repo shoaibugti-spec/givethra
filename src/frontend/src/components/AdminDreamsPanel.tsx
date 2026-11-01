@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { adminDeleteDream, adminGetDreamParticipations, adminGetDreamPaymentAccounts, adminGetDreams, adminReviewDreamParticipation, adminSaveDream, adminSaveDreamPaymentAccount, adminSelectDreamWinner, uploadFileToStorage } from "@/lib/api";
+import { handleImageError } from "@/lib/media";
+import { resolveDreamProductImage } from "@/lib/dreamProductImage";
 
 const emptyForm = { name: "", category: "Car", description: "", image_url: "", actual_market_price: "", dream_price: "", contribution_amount: "", quantity: "1", participant_capacity: "100", internal_percentage_unit: "", credit_award: "0", announcement_at: "", status: "open", publication_status: "published" };
 const emptyAccount = { label: "", method: "Bank Transfer", account_title: "", account_number: "", instructions: "", is_active: true };
@@ -150,7 +152,7 @@ export default function AdminDreamsPanel({ onQueueChanged }: { onQueueChanged?: 
               Product image
               <input type="file" accept="image/*" onChange={e => void image(e.target.files?.[0] || null)} className="text-xs" />
             </label>
-            {form.image_url && <img src={form.image_url} alt="Product" className="h-24 w-full rounded-lg object-cover" />}
+            {form.image_url && <img src={resolveDreamProductImage(form.image_url)} alt="Product" onError={handleImageError} className="h-24 w-full rounded-lg object-cover" />}
             <Input placeholder="Market value — user ko dikhta hai (e.g. 5000)" inputMode="numeric" value={form.actual_market_price} onChange={e => set("actual_market_price", e.target.value)} />
             <Input placeholder="Funding goal — asli target (e.g. 7000)" inputMode="numeric" value={form.dream_price} onChange={e => set("dream_price", e.target.value)} required />
             <Input placeholder="Suggested contribution per participant" inputMode="numeric" value={form.contribution_amount} onChange={e => set("contribution_amount", e.target.value)} />
@@ -190,7 +192,7 @@ export default function AdminDreamsPanel({ onQueueChanged }: { onQueueChanged?: 
                 <div key={d.id} className="rounded-2xl border bg-card p-4">
                   <div className="flex gap-4">
                     {d.image_url
-                      ? <img src={d.image_url} alt={d.name} className="h-20 w-24 rounded-lg object-cover" />
+                      ? <img src={resolveDreamProductImage(d.image_url)} alt={d.name} onError={handleImageError} className="h-20 w-24 rounded-lg object-cover" />
                       : <div className="grid h-20 w-24 place-items-center rounded-lg bg-muted text-[10px] text-center">No image</div>}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap justify-between gap-2">

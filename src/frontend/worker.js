@@ -1752,7 +1752,7 @@ async function handleRequest(request, env, ctx) {
   }
 
   // Help Me video links need crawler-readable image/video metadata while humans use the existing reel route.
-  if (parts[0] === "share" && parts[1] === "helpme" && parts[2] && request.method === "GET") {
+  if (parts[0] === "share" && parts[1] === "helpme" && parts[2] && (request.method === "GET" || request.method === "HEAD")) {
     try {
       const preview = await helpMeShareDocument(request, env, url, parts);
       if (preview) return preview;
@@ -3205,7 +3205,7 @@ async function caseShareDocument(request, env, url, parts) {
 }
 
 async function helpMeShareDocument(request, env, url, parts) {
-  if (!env.ASSETS || request.method !== "GET" || parts[0] !== "share" || parts[1] !== "helpme" || !parts[2]) return null;
+  if (!env.ASSETS || (request.method !== "GET" && request.method !== "HEAD") || parts[0] !== "share" || parts[1] !== "helpme" || !parts[2]) return null;
   const appealId = decodeURIComponent(parts[2]);
   const appeal = await env.DB.prepare(
     `SELECT id, description, status, video_key, video_content_type, video_deleted_at, expires_at, currency, goal_local, raised_local
@@ -3216,10 +3216,11 @@ async function helpMeShareDocument(request, env, url, parts) {
   ).bind(appealId, new Date().toISOString()).first();
   if (!appeal) return new Response("This Help Me appeal is no longer available.", { status: 404, headers: { "content-type": "text/plain; charset=UTF-8", "cache-control": "no-store" } });
 
-  const pageUrl = new URL(`/share/helpme/${encodeURIComponent(appealId)}`, url.origin).toString();
+  const pageUrl = new URL(`/share/helpme/${encodeURIComponent(appealId)}`, url.origin);
+  pageUrl.searchParams.set("preview", "2");
   if (!isSocialCrawler(request)) return Response.redirect(new URL(`/helpme?v=${encodeURIComponent(appealId)}`, url.origin), 302);
 
-  const documentResponse = await env.ASSETS.fetch(new Request(new URL("/", url), request));
+  const documentResponse = await env.ASSETS.fetch(new Request(new URL("/", url), { headers: request.headers, method: "GET" }));
   let html = await documentResponse.text();
   const title = `Help Me · ${String(appeal.currency || "USD")} ${Number(appeal.goal_local || 0).toLocaleString()}`;
   const shortDescription = String(appeal.description || "A person is asking for direct support through Givethra.").replace(/\s+/g, " ").trim().slice(0, 220);
@@ -3239,7 +3240,7 @@ async function helpMeShareDocument(request, env, url, parts) {
     ["og:type", "video.other"], ["og:url", pageUrl], ["og:image", image], ["og:image:secure_url", image], ["og:image:type", imageType],
     ["og:image:alt", "Help Me video thumbnail"], ["og:image:width", hasPoster ? "600" : "512"], ["og:image:height", hasPoster ? "600" : "512"], ["og:video", video],
     ["og:video:url", video], ["og:video:secure_url", video], ["og:video:type", videoType],
-    ["twitter:card", "summary"], ["twitter:title", title],
+    ["twitter:card", "summary_large_image"], ["twitter:title", title],
     ["twitter:description", description], ["twitter:image", image],
   ];
   for (const [property, value] of replacements) {
@@ -3251,7 +3252,8 @@ async function helpMeShareDocument(request, env, url, parts) {
   const headers = new Headers(documentResponse.headers);
   headers.set("content-type", "text/html; charset=UTF-8");
   headers.set("cache-control", "public, max-age=60, s-maxage=300");
-  return new Response(html, { status: documentResponse.status, headers });
+  headers.set("content-length", String(new TextEncoder().encode(html).byteLength));
+  return new Response(request.method === "HEAD" ? null : html, { status: documentResponse.status, headers });
 }
 
 export default {

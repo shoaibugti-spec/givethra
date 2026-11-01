@@ -4,13 +4,15 @@ import path from "node:path";
 import { buildHelpMeShareUrl } from "./helpme";
 
 const root = process.cwd();
-const workerSource = fs.readFileSync(path.join(root, "worker.js"), "utf8");
+const workerFile = ["worker.js", "worker (5).js"].find((file) => fs.existsSync(path.join(root, file)));
+if (!workerFile) throw new Error("Could not locate the Help Me Worker source");
+const workerSource = fs.readFileSync(path.join(root, workerFile), "utf8");
 const helpMeSource = fs.readFileSync(path.join(root, "src/pages/HelpMePage.tsx"), "utf8");
 const uploadSource = fs.readFileSync(path.join(root, "helpme.js"), "utf8");
 
 describe("Help Me audio and social sharing", () => {
   it("creates the public crawler-preview URL for the appeal", () => {
-    expect(buildHelpMeShareUrl("appeal_123", "https://givethra.org")).toBe("https://givethra.org/share/helpme/appeal_123");
+    expect(buildHelpMeShareUrl("appeal_123", "https://givethra.org")).toBe("https://givethra.org/share/helpme/appeal_123?preview=2");
   });
 
   it("provides public-only thumbnail and video metadata for social crawlers", () => {
@@ -20,6 +22,10 @@ describe("Help Me audio and social sharing", () => {
     expect(workerSource).toContain('"og:video:secure_url"');
     expect(workerSource).toContain("isSocialCrawler(request)");
     expect(workerSource).toContain("/helpme?v=${encodeURIComponent(appealId)}");
+    expect(workerSource).toContain('pageUrl.searchParams.set("preview", "2")');
+    expect(workerSource).toContain('"summary_large_image"');
+    expect(workerSource).toContain('request.method === "HEAD"');
+    expect(uploadSource).toContain('method === "HEAD"');
     expect(uploadSource).toContain('status IN (\'published\',\'helped\')');
   });
 
