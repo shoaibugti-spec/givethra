@@ -1,5 +1,11 @@
-export type ThumbnailSize = { width: number; height: number };
+// src/frontend/src/lib/helpmeThumbnail.ts
+// Share-preview poster: a SQUARE 600x600 JPEG that shows the WHOLE vertical frame (no zoom/crop).
+// WhatsApp / Telegram / Facebook show square posters as a small card (like YouTube Shorts links),
+// so the full 9:16 frame sits in the middle on a soft colour-matched background.
+const SIZE = 600;
 
+// kept from the previous version in case other files import it
+export type ThumbnailSize = { width: number; height: number };
 export function getHelpMeThumbnailSize(width: number, height: number, maxEdge = 720): ThumbnailSize {
   if (![width, height, maxEdge].every(Number.isFinite) || width <= 0 || height <= 0 || maxEdge <= 0) {
     throw new Error("Video dimensions are unavailable");
@@ -8,72 +14,55 @@ export function getHelpMeThumbnailSize(width: number, height: number, maxEdge = 
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
-function waitForLoadedFrame(video: HTMLVideoElement): Promise<void> {
-  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) return Promise.resolve();
+function waitFor(video: HTMLVideoElement, ok: "loadeddata" | "seeked", ms: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => finish(new Error("Video frame is not ready")), 10000);
-    const loaded = () => finish();
-    const failed = () => finish(new Error("Video frame could not be decoded"));
-    const finish = (error?: Error) => {
-      window.clearTimeout(timeout);
-      video.removeEventListener("loadeddata", loaded);
-      video.removeEventListener("error", failed);
-      error ? reject(error) : resolve();
-    };
-    video.addEventListener("loadeddata", loaded, { once: true });
-    video.addEventListener("error", failed, { once: true });
+    const t = window.setTimeout(() => (ok === "seeked" ? resolve() : reject(new Error("Video poster timeout"))), ms);
+    video.addEventListener(ok, () => { window.clearTimeout(t); resolve(); }, { once: true });
+    video.addEventListener("error", () => { window.clearTimeout(t); reject(new Error("Video poster failed")); }, { once: true });
   });
 }
 
-async function seekToPosterFrame(video: HTMLVideoElement): Promise<void> {
-  const time = Math.min(0.5, Math.max(0, (Number.isFinite(video.duration) ? video.duration : 1) * 0.08));
-  if (!time) return;
-  await new Promise<void>((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeout);
-      video.removeEventListener("seeked", finish);
-      resolve();
-    };
-    const timeout = window.setTimeout(finish, 1500);
-    video.addEventListener("seeked", finish, { once: true });
-    try { video.currentTime = time; } catch { finish(); }
-  });
-}
-
-/** Capture a small local poster; callers may continue submitting the video if a device cannot decode it. */
-export async function captureHelpMeThumbnail(videoBlob: Blob): Promise<Blob> {
-  if (typeof document === "undefined" || typeof URL.createObjectURL !== "function") {
-    throw new Error("Video thumbnail capture is unavailable");
-  }
-  const objectUrl = URL.createObjectURL(videoBlob);
+export async function captureHelpMeThumbnail(blob: Blob): Promise<Blob> {
+  const url = URL.createObjectURL(blob);
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
   video.preload = "auto";
-  video.src = objectUrl;
+  video.src = url;
   try {
-    video.load();
-    await waitForLoadedFrame(video);
-    await seekToPosterFrame(video);
-    const { width, height } = getHelpMeThumbnailSize(video.videoWidth, video.videoHeight);
+    await waitFor(video, "loadeddata", 8000);
+    const target = Number.isFinite(video.duration) && video.duration > 0 ? Math.min(1, video.duration * 0.3) : 0.8;
+    const seeked = waitFor(video, "seeked", 3000);
+    try { video.currentTime = target; await seeked; } catch { /* use the first frame */ }
+
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) throw new Error("No video frame");
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Video thumbnail could not be created");
-    context.drawImage(video, 0, 0, width, height);
-    const poster = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Video thumbnail could not be encoded")), "image/jpeg", 0.82);
-    });
-    if (!poster.size) throw new Error("Video thumbnail is empty");
-    return poster;
+    canvas.width = SIZE; canvas.height = SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("No canvas");
+
+    // soft background: shrink the frame to 24px, stretch it back (works on every browser, no ctx.filter needed)
+    const tiny = document.createElement("canvas");
+    tiny.width = 24; tiny.height = 24;
+    tiny.getContext("2d")?.drawImage(video, 0, 0, 24, 24);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(tiny, 0, 0, SIZE, SIZE);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // the whole frame, never cropped
+    const scale = Math.min(SIZE / vw, SIZE / vh);
+    const w = vw * scale, h = vh * scale;
+    ctx.drawImage(video, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
+
+    const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    if (!out || out.size < 500) throw new Error("Poster could not be created");
+    return out;
   } finally {
-    video.pause();
     video.removeAttribute("src");
     video.load();
-    URL.revokeObjectURL(objectUrl);
+    URL.revokeObjectURL(url);
   }
 }
