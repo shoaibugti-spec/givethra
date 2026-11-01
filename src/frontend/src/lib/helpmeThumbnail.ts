@@ -35,34 +35,39 @@ export async function captureHelpMeThumbnail(blob: Blob): Promise<Blob> {
     const seeked = waitFor(video, "seeked", 3000);
     try { video.currentTime = target; await seeked; } catch { /* use the first frame */ }
 
-    const vw = video.videoWidth, vh = video.videoHeight;
-    if (!vw || !vh) throw new Error("No video frame");
-    const canvas = document.createElement("canvas");
-    canvas.width = SIZE; canvas.height = SIZE;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("No canvas");
-
-    // soft background: shrink the frame to 24px, stretch it back (works on every browser, no ctx.filter needed)
-    const tiny = document.createElement("canvas");
-    tiny.width = 24; tiny.height = 24;
-    tiny.getContext("2d")?.drawImage(video, 0, 0, 24, 24);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(tiny, 0, 0, SIZE, SIZE);
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fillRect(0, 0, SIZE, SIZE);
-
-    // the whole frame, never cropped
-    const scale = Math.min(SIZE / vw, SIZE / vh);
-    const w = vw * scale, h = vh * scale;
-    ctx.drawImage(video, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
-
-    const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-    if (!out || out.size < 500) throw new Error("Poster could not be created");
-    return out;
+    return await posterFromVideo(video);
   } finally {
     video.removeAttribute("src");
     video.load();
     URL.revokeObjectURL(url);
   }
+}
+
+/** Draws the current frame of any <video> as the square share poster (whole vertical frame, nothing cropped). */
+export async function posterFromVideo(video: HTMLVideoElement): Promise<Blob> {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh) throw new Error("No video frame");
+  const canvas = document.createElement("canvas");
+  canvas.width = SIZE; canvas.height = SIZE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("No canvas");
+
+  // soft background: shrink the frame to 24px, stretch it back (works on every browser, no ctx.filter needed)
+  const tiny = document.createElement("canvas");
+  tiny.width = 24; tiny.height = 24;
+  tiny.getContext("2d")?.drawImage(video, 0, 0, 24, 24);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(tiny, 0, 0, SIZE, SIZE);
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // the whole frame, never cropped
+  const scale = Math.min(SIZE / vw, SIZE / vh);
+  const w = vw * scale, h = vh * scale;
+  ctx.drawImage(video, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
+
+  const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+  if (!out || out.size < 500) throw new Error("Poster could not be created");
+  return out;
 }
