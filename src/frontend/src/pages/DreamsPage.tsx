@@ -8,8 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getDreams } from "@/lib/api";
-import { handleImageError } from "@/lib/media";
-import { resolveDreamProductImage } from "@/lib/dreamProductImage";
+import { handleImageError, resolveMediaUrl } from "@/lib/media";
 
 // ==================================================================
 // TYPES
@@ -68,12 +67,19 @@ const SORTS = [
 // SUB-COMPONENTS
 // ==================================================================
 function ProductImage({ dream, className = "" }: { dream: Dream; className?: string }) {
+  const imageUrl = resolveMediaUrl(dream.image_url);
+
   return (
     <div className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-teal-50 via-white to-amber-50 ${className}`}>
       <div className="absolute -right-8 -top-12 h-36 w-36 rounded-full bg-teal-200/30 blur-2xl" />
       <div className="absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-amber-200/35 blur-2xl" />
       {dream.image_url ? (
-        <img src={resolveDreamProductImage(dream.image_url)} alt={dream.name} onError={handleImageError} className="relative h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <img
+          src={imageUrl}
+          alt={dream.name}
+          onError={handleImageError}
+          className="relative h-full w-full object-cover transition duration-500 group-hover:scale-105"
+        />
       ) : (
         <div className="relative px-5 text-center text-sm font-semibold text-teal-700">Product image coming soon</div>
       )}
