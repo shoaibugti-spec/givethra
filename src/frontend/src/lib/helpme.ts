@@ -221,6 +221,12 @@ export const helpme = {
       headers: { "Content-Type": "image/jpeg" },
       body: blob,
     }),
+  backfillPoster: (appealId: string, blob: Blob) =>
+    call<{ ok: true }>(`poster-backfill/${encodeURIComponent(appealId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "image/jpeg" },
+      body: blob,
+    }),
   admin: {
     queue: () => call<any>("admin/queue"),
     counts: () => call<{ pending_videos: number; pending_payment_proofs: number; open_reports: number }>("admin/counts"),
