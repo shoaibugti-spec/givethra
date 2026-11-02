@@ -64,7 +64,8 @@ describe("Help Me camera framing", () => {
     expect(recorderSource).toContain("isHelpMePortraitRecording");
     expect(recorderSource).toContain("isHelpMePortraitViewport");
     expect(recorderSource).toContain("getHelpMeCameraFrameLayout");
-    expect(recorderSource).toContain("context.rotate(Math.PI / 2)");
+    expect(recorderSource).toContain("context.rotate(frame.rotationDegrees * Math.PI / 180)");
+    expect(recorderSource).toContain('const landscapeRotation = mode === "user" ? -90 : 90');
     expect(recorderSource).toContain('if (mode === "user")');
     expect(recorderSource).toContain("context.scale(-1, 1)");
     expect(recorderSource).not.toContain("-scale-x-100");
@@ -93,6 +94,9 @@ describe("Help Me camera framing", () => {
   it("rotates a landscape-reported camera frame to fill 9:16 on an upright phone", () => {
     expect(getHelpMeCameraFrameLayout(1920, 1080, 720, 1280, true)).toEqual({
       x: 0, y: 0, width: 720, height: 1280, rotationDegrees: 90,
+    });
+    expect(getHelpMeCameraFrameLayout(1920, 1080, 720, 1280, true, -90)).toEqual({
+      x: 0, y: 0, width: 720, height: 1280, rotationDegrees: -90,
     });
     expect(getHelpMeCameraFrameLayout(1280, 720, 720, 1280, false)).toBeNull();
   });

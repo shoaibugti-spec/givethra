@@ -22,14 +22,17 @@ export function getHelpMeContainedFrameRect(sourceWidth: number, sourceHeight: n
   return { x: (targetWidth - width) / 2, y: (targetHeight - height) / 2, width, height };
 }
 
-export function getHelpMeCameraFrameLayout(sourceWidth: number, sourceHeight: number, targetWidth = 720, targetHeight = 1280, rotateLandscapeToPortrait = false) {
+export function getHelpMeCameraFrameLayout(sourceWidth: number, sourceHeight: number, targetWidth = 720, targetHeight = 1280, rotateLandscapeToPortrait = false, landscapeRotationDegrees: -90 | 90 = 90) {
   if (![sourceWidth, sourceHeight, targetWidth, targetHeight].every(Number.isFinite) || sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) return null;
-  const rotationDegrees = sourceWidth > sourceHeight ? 90 : 0;
+  const rotationDegrees = sourceWidth > sourceHeight ? landscapeRotationDegrees : 0;
   if (rotationDegrees === 90 && !rotateLandscapeToPortrait) return null;
+  if (rotationDegrees === -90 && !rotateLandscapeToPortrait) return null;
   const frame = rotationDegrees === 90
     ? getHelpMeContainedFrameRect(sourceHeight, sourceWidth, targetWidth, targetHeight)
-    : getHelpMeContainedFrameRect(sourceWidth, sourceHeight, targetWidth, targetHeight);
-  return frame ? { ...frame, rotationDegrees: rotationDegrees as 0 | 90 } : null;
+    : rotationDegrees === -90
+      ? getHelpMeContainedFrameRect(sourceHeight, sourceWidth, targetWidth, targetHeight)
+      : getHelpMeContainedFrameRect(sourceWidth, sourceHeight, targetWidth, targetHeight);
+  return frame ? { ...frame, rotationDegrees } : null;
 }
 
 type ZoomRange = { min: number; max: number };
