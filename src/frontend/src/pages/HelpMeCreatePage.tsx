@@ -3,7 +3,7 @@
 // Android Chrome and desktop webcams. Steps: check -> record -> preview -> details -> done.
 import { useAuth } from "@/contexts/AuthContext";
 import { HelpMeError, isValidHelpMeAccountIdentifier, PAY_METHODS, formatMoney, helpme, niceGoal, pickRecorderMime, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
-import { getHelpMeCameraConstraints, getHelpMeContainedFrameRect, isHelpMePortraitCameraFrame, isHelpMePortraitRecording, resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
+import { getHelpMeCameraConstraints, getHelpMeCameraFrameLayout, isHelpMePortraitRecording, isHelpMePortraitViewport, resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
 import { captureHelpMeThumbnail } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RefreshCw, RotateCcw, ShieldAlert, Square, Video } from "lucide-react";
@@ -163,17 +163,38 @@ export default function HelpMeCreatePage() {
           context.fillStyle = "#000";
           context.fillRect(0, 0, canvas.width, canvas.height);
           if (v.videoWidth > 0 && v.videoHeight > 0) {
-            if (!isHelpMePortraitCameraFrame(v.videoWidth, v.videoHeight)) {
+            if (!isHelpMePortraitViewport(window.innerWidth, window.innerHeight, window.screen?.orientation?.type)) {
               invalidCameraFrameRef.current = true;
               if (recRef.current && recRef.current.state !== "inactive") recRef.current.stop();
               else {
                 stopStream();
-                setCamError("Your camera is sending a landscape frame. Hold your phone upright and try again.");
+                setCamError("Your phone is sideways. Hold it upright and tap Try again.");
               }
               return;
             }
-            const frame = getHelpMeContainedFrameRect(v.videoWidth, v.videoHeight, canvas.width, canvas.height);
-            if (frame) context.drawImage(v, frame.x, frame.y, frame.width, frame.height);
+            const frame = getHelpMeCameraFrameLayout(v.videoWidth, v.videoHeight, canvas.width, canvas.height, true);
+            if (!frame) {
+              invalidCameraFrameRef.current = true;
+              if (recRef.current && recRef.current.state !== "inactive") recRef.current.stop();
+              else {
+                stopStream();
+                setCamError("The camera frame could not be prepared. Tap Try again or switch cameras.");
+              }
+              return;
+            }
+            context.save();
+            if (mode === "user") {
+              context.translate(canvas.width, 0);
+              context.scale(-1, 1);
+            }
+            if (frame.rotationDegrees === 90) {
+              context.translate(canvas.width / 2, canvas.height / 2);
+              context.rotate(Math.PI / 2);
+              context.drawImage(v, -frame.height / 2, -frame.width / 2, frame.height, frame.width);
+            } else {
+              context.drawImage(v, frame.x, frame.y, frame.width, frame.height);
+            }
+            context.restore();
             if (!readySignaled) { readySignaled = true; setCameraReady(true); }
           }
           drawFrameRef.current = requestAnimationFrame(drawFrame);
@@ -232,7 +253,7 @@ export default function HelpMeCreatePage() {
       stopStream();
       if (invalidCameraFrameRef.current) {
         chunksRef.current = [];
-        setCamError("Recording stopped because the camera changed to landscape. Hold your phone upright and retake it.");
+        setCamError("Recording stopped because the phone was turned sideways. Hold it upright and retake the video.");
         setStep("record");
         return;
       }
@@ -395,7 +416,7 @@ export default function HelpMeCreatePage() {
               <>
                 <div className="relative mx-auto flex w-full shrink-0 flex-col overflow-hidden bg-black" style={{ aspectRatio: "9 / 16", maxHeight: "calc(100dvh - 64px)", maxWidth: "calc((100dvh - 64px) * 9 / 16)" }}>
                 <video ref={liveRef} playsInline muted autoPlay aria-hidden="true" className="absolute inset-0 h-full w-full opacity-0" />
-                <canvas ref={portraitCanvasRef} width={REEL_W} height={REEL_H} aria-label="Live vertical camera preview" className={`absolute inset-0 h-full w-full bg-black object-contain ${facing === "user" ? "-scale-x-100" : ""}`} />
+                <canvas ref={portraitCanvasRef} width={REEL_W} height={REEL_H} aria-label="Live vertical camera preview" className="absolute inset-0 h-full w-full bg-black object-contain" />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
                 <div className="relative z-10 mt-2 flex justify-center">
                   <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-extrabold tabular-nums">{recording && <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />}{seconds}s / {cfg?.max_seconds ?? 20}s</span>

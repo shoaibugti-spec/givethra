@@ -6,8 +6,12 @@ export function isHelpMePortraitRecording(width: number, height: number): boolea
   return Math.abs(width / height - 9 / 16) <= 0.01;
 }
 
-export function isHelpMePortraitCameraFrame(width: number, height: number): boolean {
-  return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > width;
+export function isHelpMePortraitViewport(width: number, height: number, orientationType?: string): boolean {
+  if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0 && width !== height) return height > width;
+  const orientation = orientationType?.toLowerCase();
+  if (orientation?.startsWith("portrait")) return true;
+  if (orientation?.startsWith("landscape")) return false;
+  return false;
 }
 
 export function getHelpMeContainedFrameRect(sourceWidth: number, sourceHeight: number, targetWidth = 720, targetHeight = 1280) {
@@ -16,6 +20,16 @@ export function getHelpMeContainedFrameRect(sourceWidth: number, sourceHeight: n
   const width = sourceWidth * scale;
   const height = sourceHeight * scale;
   return { x: (targetWidth - width) / 2, y: (targetHeight - height) / 2, width, height };
+}
+
+export function getHelpMeCameraFrameLayout(sourceWidth: number, sourceHeight: number, targetWidth = 720, targetHeight = 1280, rotateLandscapeToPortrait = false) {
+  if (![sourceWidth, sourceHeight, targetWidth, targetHeight].every(Number.isFinite) || sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) return null;
+  const rotationDegrees = sourceWidth > sourceHeight ? 90 : 0;
+  if (rotationDegrees === 90 && !rotateLandscapeToPortrait) return null;
+  const frame = rotationDegrees === 90
+    ? getHelpMeContainedFrameRect(sourceHeight, sourceWidth, targetWidth, targetHeight)
+    : getHelpMeContainedFrameRect(sourceWidth, sourceHeight, targetWidth, targetHeight);
+  return frame ? { ...frame, rotationDegrees: rotationDegrees as 0 | 90 } : null;
 }
 
 type ZoomRange = { min: number; max: number };

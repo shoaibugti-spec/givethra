@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { getHelpMeCameraConstraints, getHelpMeContainedFrameRect, isHelpMePortraitCameraFrame, isHelpMePortraitRecording, resetHelpMeCameraZoom } from "./helpmeCamera";
+import { getHelpMeCameraConstraints, getHelpMeCameraFrameLayout, getHelpMeContainedFrameRect, isHelpMePortraitRecording, isHelpMePortraitViewport, resetHelpMeCameraZoom } from "./helpmeCamera";
 
 const recorderSource = readFileSync(new URL("../pages/HelpMeCreatePage.tsx", import.meta.url), "utf8");
+const cameraHelperSource = readFileSync(new URL("./helpmeCamera.ts", import.meta.url), "utf8");
 
 describe("Help Me camera framing", () => {
   it.each(["user", "environment"] as const)("requests portrait framing for the %s camera", (facing) => {
@@ -55,13 +56,18 @@ describe("Help Me camera framing", () => {
   it("uses the zoom-safe constraints and displays the full live camera frame", () => {
     expect(recorderSource).toContain("getHelpMeCameraConstraints(mode)");
     expect(recorderSource).toContain("resetHelpMeCameraZoom(track)");
-    expect(recorderSource).toContain("getHelpMeContainedFrameRect");
+    expect(cameraHelperSource).toContain("getHelpMeContainedFrameRect");
     expect(recorderSource).toContain("object-contain");
     expect(recorderSource).not.toContain("object-cover");
     expect(recorderSource).toContain("canvas.captureStream(30)");
     expect(recorderSource).not.toContain("recordingStream = stream");
     expect(recorderSource).toContain("isHelpMePortraitRecording");
-    expect(recorderSource).toContain("isHelpMePortraitCameraFrame");
+    expect(recorderSource).toContain("isHelpMePortraitViewport");
+    expect(recorderSource).toContain("getHelpMeCameraFrameLayout");
+    expect(recorderSource).toContain("context.rotate(Math.PI / 2)");
+    expect(recorderSource).toContain('if (mode === "user")');
+    expect(recorderSource).toContain("context.scale(-1, 1)");
+    expect(recorderSource).not.toContain("-scale-x-100");
     expect(recorderSource).toContain("portraitCanvasRef");
     expect(recorderSource).toContain("cameraRequestIdRef");
     expect(recorderSource).toMatch(/try\s*\{\s*rec\.start\(1000\);\s*\}\s*catch/);
@@ -76,11 +82,29 @@ describe("Help Me camera framing", () => {
     expect(isHelpMePortraitRecording(0, 1280)).toBe(false);
   });
 
-  it("does not disguise landscape camera footage as a vertical canvas recording", () => {
-    expect(isHelpMePortraitCameraFrame(720, 1280)).toBe(true);
-    expect(isHelpMePortraitCameraFrame(720, 960)).toBe(true);
-    expect(isHelpMePortraitCameraFrame(1280, 720)).toBe(false);
-    expect(isHelpMePortraitCameraFrame(0, 1280)).toBe(false);
+  it("prefers the current viewport and falls back to screen orientation", () => {
+    expect(isHelpMePortraitViewport(400, 800, "landscape-primary")).toBe(true);
+    expect(isHelpMePortraitViewport(800, 400, "portrait-primary")).toBe(false);
+    expect(isHelpMePortraitViewport(400, 800)).toBe(true);
+    expect(isHelpMePortraitViewport(800, 400)).toBe(false);
+    expect(isHelpMePortraitViewport(0, 0, "portrait-primary")).toBe(true);
+  });
+
+  it("rotates a landscape-reported camera frame to fill 9:16 on an upright phone", () => {
+    expect(getHelpMeCameraFrameLayout(1920, 1080, 720, 1280, true)).toEqual({
+      x: 0, y: 0, width: 720, height: 1280, rotationDegrees: 90,
+    });
+    expect(getHelpMeCameraFrameLayout(1280, 720, 720, 1280, false)).toBeNull();
+  });
+
+  it("keeps portrait footage unrotated and fits non-9:16 frames without cropping", () => {
+    expect(getHelpMeCameraFrameLayout(720, 1280, 720, 1280, true)).toEqual({
+      x: 0, y: 0, width: 720, height: 1280, rotationDegrees: 0,
+    });
+    expect(getHelpMeCameraFrameLayout(640, 480, 720, 1280, true)).toEqual({
+      x: 0, y: 160, width: 720, height: 960, rotationDegrees: 90,
+    });
+    expect(getHelpMeCameraFrameLayout(0, 720, 720, 1280, true)).toBeNull();
   });
 
   it("fits the whole camera frame into 9:16 without cropping or zooming", () => {
