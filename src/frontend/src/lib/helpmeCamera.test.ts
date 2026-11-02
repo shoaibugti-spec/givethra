@@ -53,19 +53,14 @@ describe("Help Me camera framing", () => {
     await expect(resetHelpMeCameraZoom(track)).resolves.toBeUndefined();
   });
 
-  it("uses the zoom-safe constraints and displays the full live camera frame", () => {
+  it("records the upright camera picture into a 9:16 canvas, filling the frame", () => {
     expect(recorderSource).toContain("getHelpMeCameraConstraints(mode)");
     expect(recorderSource).toContain("resetHelpMeCameraZoom(track)");
-    expect(cameraHelperSource).toContain("getHelpMeContainedFrameRect");
-    expect(recorderSource).toContain("object-contain");
-    expect(recorderSource).not.toContain("object-cover");
     expect(recorderSource).toContain("canvas.captureStream(30)");
     expect(recorderSource).not.toContain("recordingStream = stream");
     expect(recorderSource).toContain("isHelpMePortraitRecording");
     expect(recorderSource).toContain("isHelpMePortraitViewport");
-    expect(recorderSource).toContain("getHelpMeCameraFrameLayout");
-    expect(recorderSource).toContain("context.rotate(frame.rotationDegrees * Math.PI / 180)");
-    expect(recorderSource).toContain('const landscapeRotation = mode === "user" ? -90 : 90');
+    expect(recorderSource).toContain("Math.max(canvas.width");
     expect(recorderSource).toContain('if (mode === "user")');
     expect(recorderSource).toContain("context.scale(-1, 1)");
     expect(recorderSource).not.toContain("-scale-x-100");
