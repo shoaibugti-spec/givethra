@@ -53,21 +53,13 @@ describe("Help Me camera framing", () => {
     await expect(resetHelpMeCameraZoom(track)).resolves.toBeUndefined();
   });
 
-  it("records the upright camera picture into a 9:16 canvas, filling the frame", () => {
-    expect(recorderSource).toContain("getHelpMeCameraConstraints(mode)");
-    expect(recorderSource).toContain("resetHelpMeCameraZoom(track)");
-    expect(recorderSource).toContain("canvas.captureStream(30)");
-    expect(recorderSource).not.toContain("recordingStream = stream");
-    expect(recorderSource).toContain("isHelpMePortraitRecording");
-    expect(recorderSource).toContain("isHelpMePortraitViewport");
-    expect(recorderSource).toContain("Math.max(canvas.width");
-    expect(recorderSource).toContain('if (mode === "user")');
-    expect(recorderSource).toContain("context.scale(-1, 1)");
-    expect(recorderSource).not.toContain("-scale-x-100");
-    expect(recorderSource).toContain("portraitCanvasRef");
-    expect(recorderSource).toContain("cameraRequestIdRef");
-    expect(recorderSource).toMatch(/try\s*\{\s*rec\.start\(1000\);\s*\}\s*catch/);
-    expect(recorderSource).not.toContain("getUserMedia({ video: true, audio: true })");
+  it("uses the phone's own camera app for the appeal video", () => {
+    expect(recorderSource).toContain('type="file"');
+    expect(recorderSource).toContain('accept="video/*"');
+    expect(recorderSource).toContain('capture="user"');
+    expect(recorderSource).toContain("onVideoPicked");
+    expect(recorderSource).toContain("meta.h > meta.w");
+    expect(recorderSource).not.toContain("getUserMedia");
   });
 
   it("accepts only vertical 9:16 recording metadata", () => {
