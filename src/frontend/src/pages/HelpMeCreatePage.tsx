@@ -1,19 +1,15 @@
 // src/frontend/src/pages/HelpMeCreatePage.tsx
-// Create a video appeal: LIVE CAMERA ONLY (no file picker, no gallery). Works on iPhone Safari,
-// Android Chrome and desktop webcams. Steps: check -> record -> preview -> details -> done.
+// Create a video appeal: opens the PHONE'S OWN camera app (exactly like the normal camera: vertical, no zoom,
+// good sound). Steps: check -> intro -> preview -> details -> done.
 import { useAuth } from "@/contexts/AuthContext";
-import { HelpMeError, isValidHelpMeAccountIdentifier, PAY_METHODS, formatMoney, helpme, niceGoal, pickRecorderMime, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
-import { getHelpMeCameraConstraints, isHelpMePortraitRecording, isHelpMePortraitViewport, resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
+import { HelpMeError, isValidHelpMeAccountIdentifier, PAY_METHODS, formatMoney, helpme, niceGoal, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
 import { captureHelpMeThumbnail } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RefreshCw, RotateCcw, ShieldAlert, Square, Video } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, Camera, CheckCircle2, Loader2, RotateCcw, ShieldAlert, Video } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 
-type Step = "check" | "blocked" | "intro" | "record" | "preview" | "details" | "done";
-// Reel size: always vertical 9:16.
-const REEL_W = 720;
-const REEL_H = 1280;
+type Step = "check" | "blocked" | "intro" | "preview" | "details" | "done";
 const CONTACT_RE = /@|https?:\/\/|www\.|\d{7,}|whats?app|telegram|signal|wechat|\bimo\b|e-?mail/i;
 
 function useCountdown(iso?: string) {
@@ -37,14 +33,8 @@ export default function HelpMeCreatePage() {
   const [elig, setElig] = useState<Eligibility | null>(null);
   const [cfg, setCfg] = useState<HelpMeConfig | null>(null);
   const [camError, setCamError] = useState("");
-  const [cameraReady, setCameraReady] = useState(false);
-  const [facing, setFacing] = useState<"user" | "environment">("user");
-  const [recording, setRecording] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const [elapsed, setElapsed] = useState(0); // recorded milliseconds only (paused time excluded)
   const [blob, setBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
-  const [portraitValid, setPortraitValid] = useState<boolean | null>(null);
   const [uploadId, setUploadId] = useState("");
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -55,41 +45,13 @@ export default function HelpMeCreatePage() {
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
 
-  const liveRef = useRef<HTMLVideoElement>(null);
-  const portraitCanvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const cameraRequestIdRef = useRef(0);
-  const invalidCameraFrameRef = useRef(false);
-  const recRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<number | null>(null);
-  const elapsedRef = useRef(0);
-  const lastTickRef = useRef(0);
+  const fileRef = useRef<HTMLInputElement>(null);
   const durationRef = useRef(0);
-  const drawFrameRef = useRef<number | null>(null);
-  const canvasStreamRef = useRef<MediaStream | null>(null);
 
-  const maxMs = (cfg?.max_seconds ?? 20) * 1000;
-  const minStopMs = (cfg?.min_stop_seconds ?? 12) * 1000;
+  const maxSec = cfg?.max_seconds ?? 20;
+  const minSec = cfg?.min_stop_seconds ?? 12;
   const countdown = useCountdown(elig?.next_allowed_at);
 
-  const stopStream = useCallback(() => {
-    cameraRequestIdRef.current += 1;
-    if (drawFrameRef.current !== null) cancelAnimationFrame(drawFrameRef.current);
-    drawFrameRef.current = null;
-    canvasStreamRef.current?.getTracks().forEach((t) => t.stop());
-    canvasStreamRef.current = null;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    if (liveRef.current) liveRef.current.srcObject = null;
-  }, []);
-
-  const clearTimer = useCallback(() => {
-    if (timerRef.current) window.clearInterval(timerRef.current);
-    timerRef.current = null;
-  }, []);
-
-  useEffect(() => () => { clearTimer(); stopStream(); }, [clearTimer, stopStream]);
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
   // eligibility + config
@@ -113,188 +75,43 @@ export default function HelpMeCreatePage() {
     return () => { live = false; };
   }, [isAuthenticated, isInitializing, navigate]);
 
-  async function openCamera(mode: "user" | "environment" = facing) {
+  function openCamera() {
     setCamError("");
-    setCameraReady(false);
-    stopStream();
-    const requestId = ++cameraRequestIdRef.current;
-    invalidCameraFrameRef.current = false;
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setCamError("This browser cannot record video. Please update your browser (Chrome, Safari 14.5+, Edge or Firefox) and try again.");
-      setStep("record");
-      return;
-    }
-    try {
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(getHelpMeCameraConstraints(mode));
-      } catch (e) {
-        if (requestId !== cameraRequestIdRef.current) return;
-        if ((e as DOMException)?.name === "OverconstrainedError" || (e as DOMException)?.name === "NotFoundError") {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: REEL_W }, height: { ideal: REEL_H }, aspectRatio: { ideal: 9 / 16 }, frameRate: { ideal: 30, max: 30 } },
-            audio: { echoCancellation: true, noiseSuppression: true },
-          });
-        } else throw e;
-      }
-      if (requestId !== cameraRequestIdRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
-      await Promise.all(stream.getVideoTracks().map((track) => resetHelpMeCameraZoom(track)));
-      if (requestId !== cameraRequestIdRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
-      streamRef.current = stream;
-      setFacing(mode);
-      setStep("record");
-      const attachAndDraw = () => {
-        if (streamRef.current !== stream || requestId !== cameraRequestIdRef.current) return;
-        const v = liveRef.current;
-        const canvas = portraitCanvasRef.current;
-        if (!v || !canvas) { requestAnimationFrame(attachAndDraw); return; }
-        v.srcObject = stream;
-        v.muted = true;
-        void v.play().catch(() => {
-          if (requestId !== cameraRequestIdRef.current) return;
-          stopStream();
-          setCamError("The camera preview could not start. Check camera permission and try again.");
-        });
-        const context = canvas.getContext("2d");
-        if (!context) { stopStream(); setCamError("The portrait camera preview could not be started. Please try again."); return; }
-        let readySignaled = false;
-        const drawFrame = () => {
-          if (streamRef.current !== stream || requestId !== cameraRequestIdRef.current) return;
-          context.fillStyle = "#000";
-          context.fillRect(0, 0, canvas.width, canvas.height);
-          if (v.videoWidth > 0 && v.videoHeight > 0) {
-            if (!isHelpMePortraitViewport(window.innerWidth, window.innerHeight, window.screen?.orientation?.type)) {
-              invalidCameraFrameRef.current = true;
-              if (recRef.current && recRef.current.state !== "inactive") recRef.current.stop();
-              else {
-                stopStream();
-                setCamError("Your phone is sideways. Hold it upright and tap Try again.");
-              }
-              return;
-            }
-            // Draw the camera picture exactly as the phone shows it (upright), filling the whole 9:16 frame.
-            const vw = v.videoWidth, vh = v.videoHeight;
-            const k = Math.max(canvas.width / vw, canvas.height / vh);
-            context.save();
-            if (mode === "user") {
-              context.translate(canvas.width, 0);
-              context.scale(-1, 1);
-            }
-            context.drawImage(v, (canvas.width - vw * k) / 2, (canvas.height - vh * k) / 2, vw * k, vh * k);
-            context.restore();
-            if (!readySignaled) { readySignaled = true; setCameraReady(true); }
-          }
-          drawFrameRef.current = requestAnimationFrame(drawFrame);
-        };
-        drawFrame();
-      };
-      requestAnimationFrame(attachAndDraw);
-    } catch (e) {
-      if (requestId !== cameraRequestIdRef.current) return;
-      const name = (e as DOMException)?.name;
-      setStep("record");
-      if (name === "NotAllowedError" || name === "SecurityError") setCamError("Camera or microphone permission was denied. Tap the lock icon in your browser's address bar, allow Camera and Microphone, then try again.");
-      else if (name === "NotFoundError") setCamError("No camera or microphone was found on this device.");
-      else if (name === "NotReadableError") setCamError("Your camera is being used by another app. Close it and try again.");
-      else setCamError("The camera could not be started. Please try again.");
-    }
+    fileRef.current?.click();
   }
 
-  async function startRecording() {
-    const stream = streamRef.current;
-    const canvas = portraitCanvasRef.current;
-    if (!stream || !canvas || !cameraReady) return;
-    let recordingStream: MediaStream;
-    let portraitStream: MediaStream | null = null;
+  async function onVideoPicked(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setCamError("");
+    if (!file.type.startsWith("video/")) { setCamError("Please record a video with the camera."); return; }
+    const maxBytes = cfg?.max_bytes ?? 40 * 1024 * 1024;
+    if (file.size > maxBytes) { setCamError(`This video is too large (${Math.round(file.size / 1048576)} MB, limit ${Math.round(maxBytes / 1048576)} MB). Set your camera to HD (720p) and record again.`); return; }
+    const probeUrl = URL.createObjectURL(file);
     try {
-      if (canvas.width !== REEL_W || canvas.height !== REEL_H || typeof canvas.captureStream !== "function") throw new Error("Portrait recording is unavailable");
-      const outputStream = canvas.captureStream(30);
-      portraitStream = outputStream;
-      stream.getAudioTracks().forEach((track) => outputStream.addTrack(track));
-      canvasStreamRef.current = outputStream;
-      recordingStream = outputStream;
-    } catch {
-      portraitStream?.getTracks().forEach((track) => track.stop());
-      canvasStreamRef.current = null;
-      setCamError("Vertical 9:16 recording could not start in this browser. Please update your browser and try again.");
-      return;
-    }
-    const mime = pickRecorderMime();
-    let rec: MediaRecorder;
-    try {
-      rec = new MediaRecorder(recordingStream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 800000, audioBitsPerSecond: 64000 });
-    } catch {
-      try { rec = new MediaRecorder(recordingStream); } catch {
-        canvasStreamRef.current?.getTracks().forEach((track) => track.stop());
-        canvasStreamRef.current = null;
-        setCamError("Recording is not supported on this browser.");
-        return;
-      }
-    }
-    chunksRef.current = [];
-    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
-    rec.onstop = () => {
-      clearTimer();
-      setRecording(false);
-      setPaused(false);
-      stopStream();
-      if (invalidCameraFrameRef.current) {
-        chunksRef.current = [];
-        setCamError("Recording stopped because the phone was turned sideways. Hold it upright and retake the video.");
-        setStep("record");
-        return;
-      }
-      const type = (rec.mimeType || mime || "video/mp4").split(";")[0];
-      const out = new Blob(chunksRef.current, { type: type.startsWith("video/webm") ? "video/webm" : "video/mp4" });
-      durationRef.current = elapsedRef.current;
-      if (out.size < 2000) { setCamError("Nothing was recorded. Please try again."); setStep("record"); return; }
-      setBlob(out);
-      setPortraitValid(null);
-      setPreviewUrl(URL.createObjectURL(out));
+      const meta = await new Promise<{ d: number; w: number; h: number }>((resolve, reject) => {
+        const v = document.createElement("video");
+        const timer = window.setTimeout(() => reject(new Error("timeout")), 10000);
+        v.preload = "metadata"; v.muted = true;
+        v.onloadedmetadata = () => { window.clearTimeout(timer); resolve({ d: v.duration, w: v.videoWidth, h: v.videoHeight }); };
+        v.onerror = () => { window.clearTimeout(timer); reject(new Error("unreadable")); };
+        v.src = probeUrl;
+      });
+      if (Number.isFinite(meta.d) && meta.d > maxSec + 0.5) { setCamError(`Video is ${Math.round(meta.d)}s. Please record at most ${maxSec} seconds.`); return; }
+      if (Number.isFinite(meta.d) && meta.d < minSec - 0.5) { setCamError(`Video is only ${Math.round(meta.d)}s. Please record ${minSec} to ${maxSec} seconds.`); return; }
+      if (!(meta.h > meta.w)) { setCamError("Please hold your phone upright (vertical) and record again."); return; }
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      durationRef.current = Number.isFinite(meta.d) ? Math.round(meta.d * 1000) : minSec * 1000;
+      setBlob(file);
+      setUploadId("");
+      setPreviewUrl(URL.createObjectURL(file));
       setStep("preview");
-    };
-    recRef.current = rec;
-    elapsedRef.current = 0;
-    setElapsed(0);
-    lastTickRef.current = performance.now();
-    try {
-      rec.start(1000);
     } catch {
-      if (rec.state !== "inactive") {
-        try { rec.stop(); return; } catch { /* fall through to full stream cleanup */ }
-      }
-      clearTimer();
-      recRef.current = null;
-      chunksRef.current = [];
-      stopStream();
-      setRecording(false);
-      setPaused(false);
-      setCamError("The browser could not start recording. Tap Try again to reopen the camera.");
-      return;
+      setCamError("This video could not be read. Please record it again.");
+    } finally {
+      URL.revokeObjectURL(probeUrl);
     }
-    setRecording(true);
-    setPaused(false);
-    clearTimer();
-    timerRef.current = window.setInterval(() => {
-      const now = performance.now();
-      if (recRef.current?.state === "recording") elapsedRef.current += now - lastTickRef.current;
-      lastTickRef.current = now;
-      setElapsed(elapsedRef.current);
-      if (elapsedRef.current >= maxMs) stopRecording(true);
-    }, 100);
-  }
-
-  function stopRecording(force = false) {
-    if (!force && elapsedRef.current < minStopMs) return;
-    const rec = recRef.current;
-    if (rec && rec.state !== "inactive") rec.stop();
-  }
-
-  function togglePause() {
-    const rec = recRef.current;
-    if (!rec) return;
-    if (rec.state === "recording") { rec.pause(); setPaused(true); }
-    else if (rec.state === "paused") { lastTickRef.current = performance.now(); rec.resume(); setPaused(false); }
   }
 
   function retake() {
@@ -302,8 +119,7 @@ export default function HelpMeCreatePage() {
     setPreviewUrl("");
     setBlob(null);
     setUploadId("");
-    setElapsed(0);
-    void openCamera();
+    openCamera();
   }
 
   const methods = PAY_METHODS[country] || PAY_METHODS.default;
@@ -351,10 +167,7 @@ export default function HelpMeCreatePage() {
     }
   }
 
-  const leave = () => { clearTimer(); stopStream(); navigate({ to: "/helpme" }); };
-  const seconds = Math.floor(elapsed / 1000);
-  const ring = Math.min(1, elapsed / maxMs);
-  const canStop = elapsed >= minStopMs;
+  const leave = () => navigate({ to: "/helpme" });
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-black text-white" style={{ height: "100dvh" }}>
@@ -383,66 +196,25 @@ export default function HelpMeCreatePage() {
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 ring-2 ring-emerald-400/50"><Camera className="h-9 w-9 text-emerald-300" /></div>
             <h2 className="text-xl font-extrabold">Record your appeal</h2>
             <ul className="max-w-[300px] space-y-1.5 text-left text-sm text-gray-200">
-              <li>• Record live, up to {cfg?.max_seconds ?? 20} seconds (stop is possible after {cfg?.min_stop_seconds ?? 12}s).</li>
+              <li>• Record {minSec} to {maxSec} seconds, with your phone upright.</li>
               <li>• Speak clearly: who you are and what you need.</li>
-              <li>• When your browser asks, tap <b>Allow</b> for camera and microphone.</li>
+              <li>• Your normal phone camera will open. Record, then tap the tick to use the video.</li>
             </ul>
-            <button type="button" onClick={() => void openCamera()} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 px-7 py-3.5 text-sm font-extrabold shadow-lg active:scale-95"><Video className="h-4 w-4" /> Open camera</button>
-          </div>
-        )}
-
-        {step === "record" && (
-          <div className="relative flex flex-1 flex-col items-center justify-center">
-            {camError ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-                <ShieldAlert className="h-10 w-10 text-amber-400" />
-                <p className="text-sm text-gray-200">{camError}</p>
-                <button type="button" onClick={() => void openCamera()} className="rounded-xl bg-emerald-500 px-6 py-3 text-sm font-extrabold">Try again</button>
-              </div>
-            ) : (
-              <>
-                <div className="relative mx-auto flex w-full shrink-0 flex-col overflow-hidden bg-black" style={{ aspectRatio: "9 / 16", maxHeight: "calc(100dvh - 64px)", maxWidth: "calc((100dvh - 64px) * 9 / 16)" }}>
-                <video ref={liveRef} playsInline muted autoPlay aria-hidden="true" className="absolute inset-0 h-full w-full opacity-0" />
-                <canvas ref={portraitCanvasRef} width={REEL_W} height={REEL_H} aria-label="Live vertical camera preview" className="absolute inset-0 h-full w-full bg-black object-contain" />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
-                <div className="relative z-10 mt-2 flex justify-center">
-                  <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-extrabold tabular-nums">{recording && <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />}{seconds}s / {cfg?.max_seconds ?? 20}s</span>
-                </div>
-                <div className="relative z-10 mt-auto flex items-center justify-center gap-6 pb-8">
-                  {!recording ? (
-                    <>
-                      <button type="button" onClick={() => void openCamera(facing === "user" ? "environment" : "user")} aria-label="Flip camera" className="flex h-12 w-12 items-center justify-center rounded-full bg-black/55 active:scale-95"><RefreshCw className="h-5 w-5" /></button>
-                      <button type="button" disabled={!cameraReady} onClick={() => void startRecording()} aria-label="Start recording" className="flex h-[74px] w-[74px] items-center justify-center rounded-full border-4 border-white active:scale-95 disabled:opacity-50"><span className="h-14 w-14 rounded-full bg-red-500" /></button>
-                      <div className="w-12" />
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" onClick={togglePause} aria-label={paused ? "Resume" : "Pause"} className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 active:scale-95">{paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}</button>
-                      <div className="relative flex h-[84px] w-[84px] items-center justify-center">
-                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 84 84"><circle cx="42" cy="42" r="38" fill="none" stroke="rgba(255,255,255,.25)" strokeWidth="5" /><circle cx="42" cy="42" r="38" fill="none" stroke="#22c55e" strokeWidth="5" strokeLinecap="round" strokeDasharray={2 * Math.PI * 38} strokeDashoffset={2 * Math.PI * 38 * (1 - ring)} /></svg>
-                        <button type="button" disabled={!canStop} onClick={() => stopRecording()} aria-label="Stop recording" className={`flex h-14 w-14 items-center justify-center rounded-full ${canStop ? "bg-red-500 active:scale-95" : "bg-red-500/40"}`}><Square className="h-5 w-5 fill-white" /></button>
-                      </div>
-                      <div className="w-12 text-center text-[10px] leading-tight text-white/80">{canStop ? "Tap ■ to finish" : `Stop in ${Math.max(0, Math.ceil((minStopMs - elapsed) / 1000))}s`}</div>
-                    </>
-                  )}
-                </div>
-                </div>
-              </>
-            )}
+            {camError && <p className="max-w-[300px] text-sm text-amber-300">{camError}</p>}
+            <button type="button" onClick={openCamera} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 px-7 py-3.5 text-sm font-extrabold shadow-lg active:scale-95"><Video className="h-4 w-4" /> Open camera</button>
+            <input ref={fileRef} type="file" accept="video/*" capture="user" onChange={onVideoPicked} className="hidden" />
           </div>
         )}
 
         {step === "preview" && (
           <div className="flex flex-1 flex-col px-4 pb-6">
             <div className="mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-2xl bg-black">
-              <video src={previewUrl} controls playsInline onLoadedMetadata={(event) => setPortraitValid(isHelpMePortraitRecording(event.currentTarget.videoWidth, event.currentTarget.videoHeight))} className="h-full w-full object-contain" />
+              <video src={previewUrl} controls playsInline className="h-full w-full object-contain" />
             </div>
-            {portraitValid === null && <p className="mt-3 text-center text-xs text-gray-300">Checking vertical video format…</p>}
-            {portraitValid === false && <p className="mt-3 text-center text-sm text-amber-300">This video is not vertical 9:16, so it cannot be submitted. Retake it with your phone upright.</p>}
             <p className="mt-3 text-center text-xs text-gray-300">Watch and listen to your recording. Is it clear?</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button type="button" onClick={retake} className="flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 py-3 text-sm font-bold active:scale-95"><RotateCcw className="h-4 w-4" /> Retake</button>
-              <button type="button" disabled={portraitValid !== true} onClick={() => setStep("details")} className="rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 py-3 text-sm font-extrabold active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">Use this video</button>
+              <button type="button" onClick={() => setStep("details")} className="rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 py-3 text-sm font-extrabold active:scale-95">Use this video</button>
             </div>
           </div>
         )}
