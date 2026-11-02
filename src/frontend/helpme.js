@@ -13,7 +13,7 @@ const DEFAULTS = {
 };
 const MAX_SECONDS = 20;
 const MIN_STOP_SECONDS = 12;
-const MAX_VIDEO_BYTES = 6 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
 const MAX_THUMBNAIL_BYTES = 1024 * 1024;
 const VIDEO_TYPES = { "video/webm": "webm", "video/mp4": "mp4" };
 const DAY = 86400000;
