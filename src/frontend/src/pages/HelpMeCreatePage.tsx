@@ -3,7 +3,7 @@
 // Android Chrome and desktop webcams. Steps: check -> record -> preview -> details -> done.
 import { useAuth } from "@/contexts/AuthContext";
 import { HelpMeError, isValidHelpMeAccountIdentifier, PAY_METHODS, formatMoney, helpme, niceGoal, pickRecorderMime, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
-import { getHelpMeCameraConstraints, getHelpMeCameraFrameLayout, isHelpMePortraitRecording, isHelpMePortraitViewport, resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
+import { getHelpMeCameraConstraints, isHelpMePortraitRecording, isHelpMePortraitViewport, resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
 import { captureHelpMeThumbnail } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RefreshCw, RotateCcw, ShieldAlert, Square, Video } from "lucide-react";
@@ -172,29 +172,15 @@ export default function HelpMeCreatePage() {
               }
               return;
             }
-            const landscapeRotation = mode === "user" ? -90 : 90;
-            const frame = getHelpMeCameraFrameLayout(v.videoWidth, v.videoHeight, canvas.width, canvas.height, true, landscapeRotation);
-            if (!frame) {
-              invalidCameraFrameRef.current = true;
-              if (recRef.current && recRef.current.state !== "inactive") recRef.current.stop();
-              else {
-                stopStream();
-                setCamError("The camera frame could not be prepared. Tap Try again or switch cameras.");
-              }
-              return;
-            }
+            // Draw the camera picture exactly as the phone shows it (upright), filling the whole 9:16 frame.
+            const vw = v.videoWidth, vh = v.videoHeight;
+            const k = Math.max(canvas.width / vw, canvas.height / vh);
             context.save();
             if (mode === "user") {
               context.translate(canvas.width, 0);
               context.scale(-1, 1);
             }
-            if (frame.rotationDegrees !== 0) {
-              context.translate(canvas.width / 2, canvas.height / 2);
-              context.rotate(frame.rotationDegrees * Math.PI / 180);
-              context.drawImage(v, -frame.height / 2, -frame.width / 2, frame.height, frame.width);
-            } else {
-              context.drawImage(v, frame.x, frame.y, frame.width, frame.height);
-            }
+            context.drawImage(v, (canvas.width - vw * k) / 2, (canvas.height - vh * k) / 2, vw * k, vh * k);
             context.restore();
             if (!readySignaled) { readySignaled = true; setCameraReady(true); }
           }
