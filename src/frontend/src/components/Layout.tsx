@@ -42,7 +42,6 @@ import {
 } from "@/lib/api";
 import RoleSwitcher from "@/components/RoleSwitcher";
 import SocialLinks from "@/components/SocialLinks";
-import { SiWhatsapp } from "react-icons/si";
 import { loadHelpImpact, formatAmount, type HelpImpact } from "@/lib/helpStats";
 import { rememberHelpMeReturnPath } from "@/lib/helpme";
 
@@ -464,9 +463,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       >
         <div className="max-w-7xl mx-auto px-4 md:px-4 h-16 flex items-center gap-2 md:gap-4">
           
-          {/* 🔥 Left Side: Just the Text (No sandwich, no heart) 🔥 */}
+          {/* Left Side: Just the Text (No sandwich, no heart) */}
           <div className="flex items-center shrink-0">
-            {/* Mobile: Click text to open menu */}
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
@@ -478,7 +476,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <ChevronDown className="h-4 w-4 text-teal-700 font-bold" strokeWidth={3} />
             </button>
 
-            {/* Desktop: Normal Link */}
             <Link
               to={isAuthenticated ? "/home" : "/"}
               onClick={() => {
@@ -866,19 +863,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-
-      {/* Floating WhatsApp Button */}
-      <a
-        href={WHATSAPP_SUPPORT_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="24/7 WhatsApp Support"
-        className="fixed bottom-24 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] px-4 py-3 text-sm font-bold text-white shadow-[0_10px_30px_rgba(37,211,102,0.45)] ring-4 ring-white/80 transition-all hover:scale-105 md:bottom-6 md:right-6"
-      >
-        <SiWhatsapp className="h-5 w-5 drop-shadow" />
-        <span className="hidden sm:inline">24/7 WhatsApp Support</span>
-        <span className="sm:hidden">Support</span>
-      </a>
+      
+      {/* ✅ REMOVED the extra WhatsApp button from here. 
+          Now only the nice circular "24/7" button from HomePage will show up! */}
     </div>
   );
 }
