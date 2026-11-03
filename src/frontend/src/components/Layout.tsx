@@ -8,7 +8,6 @@ import {
   Bell,
   WalletCards,
   Heart,
-  Menu,
   Moon,
   Shield,
   Sun,
@@ -29,6 +28,7 @@ import {
   HelpCircle,
   LogOut,
   ChevronRight,
+  ChevronDown,
   FileText,
   Users,
   MapPin,
@@ -70,7 +70,7 @@ function NavLink({
       onClick={onClick}
       className={cn(
         "flex w-full touch-manipulation select-none items-center gap-2.5 rounded-lg px-2 py-2.5 text-sm font-medium transition-colors hover:bg-muted hover:text-primary md:inline-flex md:w-auto md:gap-0 md:rounded-none md:px-0 md:py-0 md:hover:bg-transparent",
-        isActive ? "text-primary font-bold" : "text-muted-foreground"
+        isActive ? "text-teal-700 font-bold dark:text-teal-400" : "text-slate-500"
       )}
     >
       {children}
@@ -83,7 +83,7 @@ type DrawerIcon = React.ComponentType<{ className?: string }>;
 
 function DrawerSectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-3 pb-1.5 pt-6 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+    <p className="px-3 pb-1.5 pt-6 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
       {children}
     </p>
   );
@@ -110,7 +110,7 @@ function DrawerRow({
 }) {
   const className = cn(
     "flex min-h-[52px] touch-manipulation select-none items-center gap-3 rounded-xl px-2.5 py-2 text-[15px] font-semibold transition-colors active:bg-muted",
-    active ? "bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400" : "text-foreground hover:bg-slate-50 dark:hover:bg-slate-900"
+    active ? "bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400" : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
   );
   const content = (
     <>
@@ -127,7 +127,7 @@ function DrawerRow({
       <span className="min-w-0 flex-1">
         <span className="block truncate leading-tight">{label}</span>
         {hint ? (
-          <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
+          <span className="mt-0.5 block truncate text-xs font-normal text-slate-400">
             {hint}
           </span>
         ) : null}
@@ -137,7 +137,7 @@ function DrawerRow({
           {badge}
         </span>
       ) : null}
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
     </>
   );
   if (external) {
@@ -197,7 +197,7 @@ function DrawerTile({
       >
         <Icon className="h-[18px] w-[18px]" />
       </span>
-      <span className="text-sm font-bold text-foreground">{label}</span>
+      <span className="text-sm font-bold text-slate-900 dark:text-white">{label}</span>
       {badge ? (
         <span className="absolute right-3 top-3 min-w-5 rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white shadow-sm">
           {badge}
@@ -306,7 +306,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [notifCount, setNotifCount] = useState(0);
   const [supportPostCount, setSupportPostCount] = useState(0);
 
-  // 🔥 Smart Scroll State for Top Header
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
@@ -320,15 +319,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const impactLoadedAt = useRef(0);
   const userId = user?.id;
 
-  // 🔥 Smart Scroll Logic (Hide on scroll down, show on scroll up)
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      // Agar user neeche scroll kar raha hai aur 80px se zyada door hai, toh header chupao
       if (currentScrollY > lastScrollY && currentScrollY > 80) {
         setIsVisible(false);
       } else {
-        // Agar upar scroll kar raha hai, toh wapas dikhao
         setIsVisible(true);
       }
       setLastScrollY(currentScrollY);
@@ -466,38 +462,45 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           isVisible ? "translate-y-0" : "-translate-y-full"
         )}
       >
-        <div className="max-w-7xl mx-auto px-3 md:px-4 h-16 flex items-center gap-2 md:gap-4">
-          <button
-            type="button"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Toggle menu"
-            className="md:hidden h-11 w-11 shrink-0 touch-manipulation flex items-center justify-center rounded-full text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+        <div className="max-w-7xl mx-auto px-4 md:px-4 h-16 flex items-center gap-2 md:gap-4">
           
-          <Link
-            to={isAuthenticated ? "/home" : "/"}
-            onClick={() => {
-              if (!isAuthenticated) return;
-              try { window.localStorage.setItem("givethra_home_mode", "support"); } catch {}
-              window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" }));
-            }}
-            aria-label="Givethra home"
-            className="flex items-center gap-2 shrink-0 group"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-md group-hover:scale-105 transition-transform">
-              <Heart className="h-5 w-5 text-white" fill="currentColor" />
-            </div>
-            <span className="font-display font-black text-xl tracking-tight bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent">
-              Givethra
-            </span>
-          </Link>
+          {/* 🔥 Left Side: Just the Text (No sandwich, no heart) 🔥 */}
+          <div className="flex items-center shrink-0">
+            {/* Mobile: Click text to open menu */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="md:hidden flex items-center gap-1 active:opacity-70 transition-opacity"
+            >
+              <span className="font-display font-black text-2xl tracking-tight bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent">
+                Givethra
+              </span>
+              <ChevronDown className="h-4 w-4 text-teal-700 font-bold" strokeWidth={3} />
+            </button>
 
+            {/* Desktop: Normal Link */}
+            <Link
+              to={isAuthenticated ? "/home" : "/"}
+              onClick={() => {
+                if (!isAuthenticated) return;
+                try { window.localStorage.setItem("givethra_home_mode", "support"); } catch {}
+                window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" }));
+              }}
+              aria-label="Givethra home"
+              className="hidden md:flex items-center shrink-0 group"
+            >
+              <span className="font-display font-black text-2xl tracking-tight bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent group-hover:opacity-80 transition-opacity">
+                Givethra
+              </span>
+            </Link>
+          </div>
+
+          {/* Center: Role Switcher */}
           <div className="min-w-0 flex-1 flex items-center justify-center overflow-visible">
             {isAuthenticated && <RoleSwitcher supportPostCount={supportPostCount} />}
           </div>
 
+          {/* Right: Icons & Profile */}
           <div className="flex items-center gap-1.5 shrink-0">
             {isAuthenticated && (
               <>
@@ -622,10 +625,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 aria-label="Givethra home"
                 className="flex items-center gap-2"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
-                  <Heart className="h-[18px] w-[18px]" fill="currentColor" />
-                </span>
-                <span className="font-display text-xl font-black tracking-tight">
+                <span className="font-display text-2xl font-black tracking-tight">
                   Givethra
                 </span>
               </Link>
@@ -818,7 +818,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </aside>
       </div>
 
-      {/* 🔥 MAIN CONTENT: Padding added to prevent content from hiding under Fixed Header */}
       <main className="flex-1 has-bottom-nav pt-16 md:pt-[108px]">
         {children}
       </main>
@@ -828,10 +827,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-sm">
-                  <Heart className="h-4 w-4 text-white" fill="currentColor" />
-                </div>
-                <span className="font-display font-black text-lg text-slate-900 dark:text-white">
+                <span className="font-display font-black text-xl text-slate-900 dark:text-white">
                   Givethra
                 </span>
               </div>
