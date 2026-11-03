@@ -1,5 +1,5 @@
 // src/frontend/src/pages/HomePage.tsx
-// Givethra - Premium redesigned HomePage (all logic preserved, UI upgraded)
+// Givethra - Premium redesigned HomePage (Logic preserved, footer gap fixed for logged-in users)
 
 import InstallButton from "@/components/InstallButton";
 import CompletionCooldownBanner from "@/components/CompletionCooldownBanner";
@@ -1085,32 +1085,35 @@ export default function HomePage() {
             </div>
           </section>
 
-          <section className="border-t border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-8">
-            <div className="mx-auto max-w-2xl space-y-5 text-center">
-              <div className="space-y-1">
-                <h2 className="font-display text-lg font-black tracking-tight text-slate-900">Connect with Givethra</h2>
-                <p className="text-sm text-slate-500">Follow us and reach out — we're here to help.</p>
-              </div>
-              <SocialLinks className="justify-center" />
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-green-600 hover:underline">
-                <MessageCircle className="h-4 w-4" /> Follow our WhatsApp Channel
-              </a>
-              <div>
-                <a href={`mailto:${CONTACT_EMAIL}`} className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:underline">
-                  <Mail className="h-4 w-4" /> {CONTACT_EMAIL}
+          {/* Footer: HIDDEN for logged-in users to remove the gap, shown only to visitors */}
+          {!isAuthenticated && (
+            <section className="border-t border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-8">
+              <div className="mx-auto max-w-2xl space-y-5 text-center">
+                <div className="space-y-1">
+                  <h2 className="font-display text-lg font-black tracking-tight text-slate-900">Connect with Givethra</h2>
+                  <p className="text-sm text-slate-500">Follow us and reach out — we're here to help.</p>
+                </div>
+                <SocialLinks className="justify-center" />
+                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-green-600 hover:underline">
+                  <MessageCircle className="h-4 w-4" /> Follow our WhatsApp Channel
                 </a>
+                <div>
+                  <a href={`mailto:${CONTACT_EMAIL}`} className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:underline">
+                    <Mail className="h-4 w-4" /> {CONTACT_EMAIL}
+                  </a>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-slate-200 pt-5 text-sm text-slate-500">
+                  <Link to="/about" className="transition-colors hover:text-blue-600">About</Link>
+                  <Link to="/faq" className="transition-colors hover:text-blue-600">FAQ</Link>
+                  <Link to="/privacy-policy" className="transition-colors hover:text-blue-600">Privacy Policy</Link>
+                  <Link to="/terms" className="transition-colors hover:text-blue-600">Terms</Link>
+                  <Link to="/community-guidelines" className="transition-colors hover:text-blue-600">Community Guidelines</Link>
+                  <Link to="/contact" className="transition-colors hover:text-blue-600">Contact Us</Link>
+                </div>
+                <p className="pt-1 text-xs text-slate-400">© {new Date().getFullYear()} Givethra. All rights reserved.</p>
               </div>
-              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-slate-200 pt-5 text-sm text-slate-500">
-                <Link to="/about" className="transition-colors hover:text-blue-600">About</Link>
-                <Link to="/faq" className="transition-colors hover:text-blue-600">FAQ</Link>
-                <Link to="/privacy-policy" className="transition-colors hover:text-blue-600">Privacy Policy</Link>
-                <Link to="/terms" className="transition-colors hover:text-blue-600">Terms</Link>
-                <Link to="/community-guidelines" className="transition-colors hover:text-blue-600">Community Guidelines</Link>
-                <Link to="/contact" className="transition-colors hover:text-blue-600">Contact Us</Link>
-              </div>
-              <p className="pt-1 text-xs text-slate-400">© {new Date().getFullYear()} Givethra. All rights reserved.</p>
-            </div>
-          </section>
+            </section>
+          )}
         </>}
 
         {isAuthenticated && <HomeSocialDashboard notificationCount={notifCount} />}
