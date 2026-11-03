@@ -70,7 +70,7 @@ function NavLink({
       onClick={onClick}
       className={cn(
         "flex w-full touch-manipulation select-none items-center gap-2.5 rounded-lg px-2 py-2.5 text-sm font-medium transition-colors hover:bg-muted hover:text-primary md:inline-flex md:w-auto md:gap-0 md:rounded-none md:px-0 md:py-0 md:hover:bg-transparent",
-        isActive ? "text-primary" : "text-muted-foreground"
+        isActive ? "text-primary font-bold" : "text-muted-foreground"
       )}
     >
       {children}
@@ -110,7 +110,7 @@ function DrawerRow({
 }) {
   const className = cn(
     "flex min-h-[52px] touch-manipulation select-none items-center gap-3 rounded-xl px-2.5 py-2 text-[15px] font-semibold transition-colors active:bg-muted",
-    active ? "bg-primary/10 text-primary" : "text-foreground"
+    active ? "bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400" : "text-foreground hover:bg-slate-50 dark:hover:bg-slate-900"
   );
   const content = (
     <>
@@ -118,8 +118,8 @@ function DrawerRow({
         className={cn(
           "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
           active
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted text-muted-foreground"
+            ? "bg-teal-600 text-white shadow-md"
+            : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
         )}
       >
         <Icon className="h-[18px] w-[18px]" />
@@ -133,7 +133,7 @@ function DrawerRow({
         ) : null}
       </span>
       {badge ? (
-        <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+        <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm">
           {badge}
         </span>
       ) : null}
@@ -183,23 +183,23 @@ function DrawerTile({
       className={cn(
         "relative flex min-h-[88px] touch-manipulation select-none flex-col justify-between rounded-2xl border p-3.5 transition active:scale-[.98]",
         active
-          ? "border-primary/40 bg-primary/10"
-          : "border-border bg-background"
+          ? "border-teal-500/40 bg-teal-50 dark:bg-teal-900/20"
+          : "border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900"
       )}
     >
       <span
         className={cn(
           "flex h-9 w-9 items-center justify-center rounded-xl",
           active
-            ? "bg-primary text-primary-foreground"
-            : "bg-primary/10 text-primary"
+            ? "bg-teal-600 text-white shadow-md"
+            : "bg-teal-50 text-teal-600 dark:bg-teal-900/40 dark:text-teal-400"
         )}
       >
         <Icon className="h-[18px] w-[18px]" />
       </span>
       <span className="text-sm font-bold text-foreground">{label}</span>
       {badge ? (
-        <span className="absolute right-3 top-3 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white">
+        <span className="absolute right-3 top-3 min-w-5 rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white shadow-sm">
           {badge}
         </span>
       ) : null}
@@ -233,14 +233,14 @@ function ImpactCard({ state, impact }: { state: ImpactState; impact: HelpImpact 
   return (
     <section
       aria-label="Your impact"
-      className="relative mt-4 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-3.5 shadow-sm"
+      className="relative mt-4 overflow-hidden rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-white p-3.5 shadow-sm dark:border-teal-900/30 dark:from-teal-950/20 dark:via-slate-900 dark:to-slate-900"
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted-foreground">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-teal-700 dark:text-teal-500">
           Your impact
         </p>
         {impact ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+          <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-bold text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
             <MapPin className="h-3 w-3" />
             {impact.country ? `${impact.country} \u00b7 ` : ""}
             {impact.currency}
@@ -250,42 +250,36 @@ function ImpactCard({ state, impact }: { state: ImpactState; impact: HelpImpact 
 
       <div className="mt-3 grid grid-cols-2 gap-2.5">
         {columns.map(({ key, label, icon: Icon, side, caption }) => (
-          <div key={key} className="min-w-0 rounded-xl bg-background/80 p-3 ring-1 ring-border">
+          <div key={key} className="min-w-0 rounded-xl bg-white p-3 ring-1 ring-slate-100 dark:bg-slate-950 dark:ring-slate-800">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400">
                 <Icon className="h-4 w-4" />
               </span>
-              <span className="truncate text-xs font-semibold text-muted-foreground">{label}</span>
+              <span className="truncate text-xs font-semibold text-slate-600 dark:text-slate-400">{label}</span>
             </div>
             <div className="mt-2.5">
               {loading ? (
-                <span className="block h-6 w-24 animate-pulse rounded bg-muted" />
+                <span className="block h-6 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
               ) : side ? (
                 <p className="flex items-baseline gap-1 truncate" title={side.approx ? "Approximate value in your local currency" : undefined}>
-                  <span className="text-[11px] font-bold text-muted-foreground">
+                  <span className="text-[11px] font-bold text-slate-500">
                     {side.approx ? "\u2248 " : ""}
                     {side.currency}
                   </span>
-                  <span className="text-xl font-extrabold tabular-nums text-foreground">
+                  <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">
                     {formatAmount(side.amount)}
                   </span>
                 </p>
               ) : (
-                <p className="text-xl font-extrabold text-muted-foreground">{"\u2014"}</p>
+                <p className="text-xl font-extrabold text-slate-400">{"\u2014"}</p>
               )}
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="mt-1 text-[11px] text-slate-500">
                 {loading ? "\u00a0" : side ? caption(side.cases) : "Unavailable right now"}
               </p>
             </div>
           </div>
         ))}
       </div>
-
-      {anyApprox ? (
-        <p className="mt-2.5 text-[10px] leading-snug text-muted-foreground">
-          Amounts in other currencies are converted to your local currency at today's approximate rate.
-        </p>
-      ) : null}
     </section>
   );
 }
@@ -312,17 +306,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [notifCount, setNotifCount] = useState(0);
   const [supportPostCount, setSupportPostCount] = useState(0);
 
+  // 🔥 Smart Scroll State for Top Header
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
   const isAdmin = user?.email === ADMIN_EMAIL;
   const displayName = user?.fullName ?? "";
   const roleLabel =
     role === "hero" ? "Hero" : role === "requester" ? "Requester" : null;
 
-  // "Your impact": loaded the first time the menu opens (and refreshed if the
-  // numbers are more than a minute old) so normal pages make no extra requests.
   const [impact, setImpact] = useState<HelpImpact | null>(null);
   const [impactState, setImpactState] = useState<ImpactState>("idle");
   const impactLoadedAt = useRef(0);
   const userId = user?.id;
+
+  // 🔥 Smart Scroll Logic (Hide on scroll down, show on scroll up)
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      // Agar user neeche scroll kar raha hai aur 80px se zyada door hai, toh header chupao
+      if (currentScrollY > lastScrollY && currentScrollY > 80) {
+        setIsVisible(false);
+      } else {
+        // Agar upar scroll kar raha hai, toh wapas dikhao
+        setIsVisible(true);
+      }
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
 
   useEffect(() => {
     setImpact(null);
@@ -350,13 +364,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
   }, [menuOpen, isAuthenticated, userId]);
 
-  // Close the mobile menu after any navigation.
   useEffect(() => {
     setMenuOpen(false);
   }, [router.location.pathname]);
 
-  // While the menu is open: lock page scroll, close on Escape, and close if
-  // the screen grows to desktop width (so scroll is never left locked).
   useEffect(() => {
     if (!menuOpen) return;
     const previousOverflow = document.body.style.overflow;
@@ -390,10 +401,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     window.addEventListener("notification-updated", handleNotificationUpdate);
     return () => {
       clearInterval(interval);
-      window.removeEventListener(
-        "notification-updated",
-        handleNotificationUpdate
-      );
+      window.removeEventListener("notification-updated", handleNotificationUpdate);
     };
   }, [isAuthenticated, user]);
 
@@ -418,9 +426,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       const newest = Number((event as CustomEvent<{ newest?: number }>).detail?.newest || Date.now());
       try {
         window.localStorage.setItem("givethra_my_help_posts_seen_at", String(newest));
-      } catch {
-        // Restricted browsers may block storage; the badge can still reset in memory.
-      }
+      } catch {}
       setSupportPostCount(0);
     };
     window.addEventListener("givethra-support-posts-seen", handleSupportPostsSeen);
@@ -444,45 +450,46 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const iconLinkClass = (to: string) =>
     cn(
-      "relative h-10 w-10 flex items-center justify-center rounded-full transition-colors duration-200",
+      "relative h-10 w-10 flex items-center justify-center rounded-full transition-all duration-200",
       isRouteActive(to)
-        ? "bg-primary text-primary-foreground shadow-sm"
-        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        ? "bg-teal-50 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400"
+        : "text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800"
     );
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* ===== HEADER ===== */}
-      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
+      
+      {/* ===== 🔥 SMART GLASS HEADER 🔥 ===== */}
+      <header
+        className={cn(
+          "fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out bg-white/85 backdrop-blur-xl border-b border-slate-200/60 dark:bg-slate-950/85 dark:border-slate-800 shadow-sm",
+          isVisible ? "translate-y-0" : "-translate-y-full"
+        )}
+      >
         <div className="max-w-7xl mx-auto px-3 md:px-4 h-16 flex items-center gap-2 md:gap-4">
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
-            aria-expanded={menuOpen}
-            aria-controls="mobile-menu"
-            className="md:hidden h-11 w-11 shrink-0 touch-manipulation flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
+            className="md:hidden h-11 w-11 shrink-0 touch-manipulation flex items-center justify-center rounded-full text-slate-700 hover:bg-slate-100 transition-colors"
           >
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
+          
           <Link
             to={isAuthenticated ? "/home" : "/"}
             onClick={() => {
               if (!isAuthenticated) return;
-              try {
-                window.localStorage.setItem("givethra_home_mode", "support");
-              } catch {
-                // Restricted browsers should still be able to navigate home.
-              }
+              try { window.localStorage.setItem("givethra_home_mode", "support"); } catch {}
               window.dispatchEvent(new CustomEvent("givethra-home-panel-tab", { detail: "support" }));
             }}
             aria-label="Givethra home"
-            className="flex items-center gap-1.5 shrink-0"
+            className="flex items-center gap-2 shrink-0 group"
           >
-            <div className="hidden md:flex h-8 w-8 rounded-lg bg-primary items-center justify-center">
-              <Heart className="h-4 w-4 text-primary-foreground" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-md group-hover:scale-105 transition-transform">
+              <Heart className="h-5 w-5 text-white" fill="currentColor" />
             </div>
-            <span className="font-display font-bold text-lg text-primary">
+            <span className="font-display font-black text-xl tracking-tight bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent">
               Givethra
             </span>
           </Link>
@@ -491,22 +498,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {isAuthenticated && <RoleSwitcher supportPostCount={supportPostCount} />}
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            {/* LanguageSwitcher (Urdu button) removed completely */}
-
+          <div className="flex items-center gap-1.5 shrink-0">
             {isAuthenticated && (
               <>
                 <Link
                   to="/notifications"
                   aria-label="Notifications"
-                  aria-current={
-                    isRouteActive("/notifications") ? "page" : undefined
-                  }
                   className={iconLinkClass("/notifications")}
                 >
                   <Bell className="h-5 w-5" />
                   {notifCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex items-center justify-center ring-2 ring-card">
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex items-center justify-center ring-2 ring-white">
                       {notifCount > 99 ? "99+" : notifCount}
                     </span>
                   )}
@@ -514,7 +516,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link
                   to="/donation"
                   aria-label="Community contribution"
-                  aria-current={isRouteActive("/donation") ? "page" : undefined}
                   className={iconLinkClass("/donation")}
                 >
                   <WalletCards className="h-5 w-5" />
@@ -523,46 +524,41 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={toggleTheme}
                   aria-label="Toggle theme"
-                  className="hidden md:flex h-10 w-10 rounded-full items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  className="hidden md:flex h-10 w-10 rounded-full items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                 >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4" />
-                  ) : (
-                    <Moon className="h-4 w-4" />
-                  )}
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>
                 <Link
                   to="/profile/$id"
                   params={{ id: "me" }}
                   aria-label="Profile"
-                  aria-current={isRouteActive("/profile") ? "page" : undefined}
-                  className="hidden md:flex h-10 items-center gap-2 px-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors overflow-hidden"
+                  className="hidden md:flex h-10 items-center gap-2 px-2 pr-4 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors overflow-hidden ml-1"
                 >
-                  <User className="h-5 w-5" />
-                  <span className="text-sm font-medium max-w-[120px] truncate">
-                    {displayName || "My Profile"}
+                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white font-bold text-xs">
+                    {getInitials(displayName)}
+                  </div>
+                  <span className="text-sm font-bold text-slate-700 max-w-[100px] truncate">
+                    {displayName.split(' ')[0] || "Profile"}
                   </span>
                 </Link>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={handleLogout}
-                  className="hidden md:flex ml-1"
+                  className="hidden md:flex ml-1 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold"
                 >
                   Logout
                 </Button>
               </>
             )}
             {!isAuthenticated && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 <Link to="/sign-in">
-                  <Button variant="ghost" size="sm">
-                    Sign in
-                  </Button>
+                  <Button variant="ghost" size="sm" className="font-bold">Sign in</Button>
                 </Link>
                 <Link to="/sign-up">
-                  <Button size="sm" className="font-semibold">
-                    Get Started
+                  <Button size="sm" className="font-bold bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 shadow-md hover:from-yellow-500 hover:to-amber-600">
+                    Join Free
                   </Button>
                 </Link>
               </div>
@@ -571,30 +567,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Desktop Navigation Links */}
-        <div className="hidden md:block border-t border-border/50">
-          <div className="max-w-7xl mx-auto px-4 h-10 flex items-center gap-6">
+        <div className="hidden md:block border-t border-slate-100 dark:border-slate-800">
+          <div className="max-w-7xl mx-auto px-4 h-11 flex items-center gap-7 text-sm font-semibold">
             <NavLink to="/cases">Browse Cases</NavLink>
             <NavLink to="/dreams">Dreams</NavLink>
             <NavLink to="/helpme" onClick={() => rememberHelpMeReturnPath(`${window.location.pathname}${window.location.search}${window.location.hash}`)}>Help Me</NavLink>
             <NavLink to="/donation">Contribute</NavLink>
             {isAuthenticated && <NavLink to="/my-help">My Help</NavLink>}
             {isAuthenticated && <NavLink to="/my-cases">My Cases</NavLink>}
-            {isAuthenticated && (
-              <NavLink to="/support">Help & Support</NavLink>
-            )}
+            {isAuthenticated && <NavLink to="/support">Help & Support</NavLink>}
             {isAdmin && <NavLink to="/admin">Admin</NavLink>}
             <NavLink to="/about">About</NavLink>
             <NavLink to="/faq">FAQ</NavLink>
           </div>
         </div>
-
       </header>
 
-      {/* ===== MOBILE MENU (full-height drawer) =====
-          Rendered outside <header> on purpose: the header is a sticky z-50
-          stacking context, so a menu inside it would sit under the bottom nav
-          and could never scroll. This drawer is fixed, scrollable and always
-          shows the logout / sign-in buttons at the bottom. */}
+      {/* ===== MOBILE MENU (full-height drawer) ===== */}
       <div
         className={cn(
           "fixed inset-0 z-[100] md:hidden transition-[visibility] duration-300",
@@ -605,7 +594,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div
           onClick={closeMenu}
           className={cn(
-            "absolute inset-0 bg-slate-950/60 transition-opacity duration-300",
+            "absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-300",
             menuOpen ? "opacity-100" : "opacity-0"
           )}
         />
@@ -615,13 +604,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           aria-modal="true"
           aria-label="Main menu"
           className={cn(
-            "absolute inset-y-0 left-0 flex w-[88%] max-w-[380px] flex-col bg-card shadow-2xl transition-transform duration-300 ease-out",
+            "absolute inset-y-0 left-0 flex w-[88%] max-w-[380px] flex-col bg-slate-50 shadow-2xl transition-transform duration-300 ease-out",
             menuOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
           {/* Header / identity */}
           <div
-            className="relative shrink-0 overflow-hidden bg-gradient-to-br from-primary via-primary to-teal-700 px-5 pb-5 text-primary-foreground"
+            className="relative shrink-0 overflow-hidden bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-800 px-5 pb-5 text-white"
             style={{ paddingTop: "max(1.25rem, env(safe-area-inset-top))" }}
           >
             <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10" />
@@ -636,7 +625,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
                   <Heart className="h-[18px] w-[18px]" fill="currentColor" />
                 </span>
-                <span className="font-display text-xl font-bold tracking-tight">
+                <span className="font-display text-xl font-black tracking-tight">
                   Givethra
                 </span>
               </Link>
@@ -664,9 +653,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       src={user.photo}
                       alt=""
                       referrerPolicy="no-referrer"
-                      onError={(event) => {
-                        event.currentTarget.style.display = "none";
-                      }}
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
                       className="absolute inset-0 h-full w-full object-cover"
                     />
                   ) : null}
@@ -702,19 +689,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             {isAuthenticated && <ImpactCard state={impactState} impact={impact} />}
 
-            {/* Donation / community contribution */}
             <Link
               to="/donation"
               onClick={closeMenu}
-              className="relative mt-4 block touch-manipulation select-none overflow-hidden rounded-2xl bg-gradient-to-br from-amber-300 via-amber-200 to-amber-100 p-4 text-amber-950 shadow-md ring-1 ring-amber-400/50 transition active:scale-[.99]"
+              className="relative mt-4 block touch-manipulation select-none overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-500 p-4 text-amber-950 shadow-md ring-1 ring-amber-300 transition active:scale-[.99]"
             >
-              <WalletCards className="pointer-events-none absolute -bottom-4 -right-3 h-28 w-28 text-amber-500/25" />
+              <WalletCards className="pointer-events-none absolute -bottom-4 -right-3 h-28 w-28 text-amber-900/20" />
               <span className="relative flex items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-950 text-amber-200">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-950 text-amber-300 shadow-inner">
                   <Heart className="h-5 w-5" fill="currentColor" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[10px] font-extrabold uppercase tracking-[0.16em] text-amber-900/70">
+                  <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-amber-900/70">
                     Community contribution
                   </span>
                   <span className="block font-display text-base font-bold leading-tight">
@@ -726,13 +712,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span className="text-xs font-medium text-amber-900/80">
                   Give once or monthly
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-950 px-3.5 py-1.5 text-xs font-bold text-amber-100">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-950 px-3.5 py-1.5 text-xs font-bold text-amber-100 shadow-sm">
                   Contribute <ChevronRight className="h-3.5 w-3.5" />
                 </span>
               </span>
             </Link>
 
-            {/* Quick access */}
             {isAuthenticated && (
               <div className="mt-4 grid grid-cols-2 gap-2.5">
                 <DrawerTile to="/my-help" icon={HeartHandshake} label="My Help" active={isRouteActive("/my-help")} onNavigate={closeMenu} />
@@ -775,17 +760,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Footer: always visible */}
           <div
-            className="shrink-0 border-t border-border bg-card px-4 pt-3"
+            className="shrink-0 border-t border-slate-200 bg-white px-4 pt-3"
             style={{ paddingBottom: "max(0.875rem, env(safe-area-inset-bottom))" }}
           >
-            <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1" role="group" aria-label="Theme">
+            <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" role="group" aria-label="Theme">
               <button
                 type="button"
                 onClick={() => setTheme("light")}
                 aria-pressed={theme !== "dark"}
                 className={cn(
                   "flex min-h-10 touch-manipulation items-center justify-center gap-2 rounded-lg text-sm font-semibold transition",
-                  theme !== "dark" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"
+                  theme !== "dark" ? "bg-white text-teal-700 shadow-sm" : "text-slate-500"
                 )}
               >
                 <Sun className="h-4 w-4" /> Light
@@ -796,7 +781,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 aria-pressed={theme === "dark"}
                 className={cn(
                   "flex min-h-10 touch-manipulation items-center justify-center gap-2 rounded-lg text-sm font-semibold transition",
-                  theme === "dark" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"
+                  theme === "dark" ? "bg-slate-800 text-teal-400 shadow-sm" : "text-slate-500"
                 )}
               >
                 <Moon className="h-4 w-4" /> Dark
@@ -807,7 +792,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 text-sm font-bold text-red-700 transition active:bg-red-100 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+                className="flex min-h-12 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-red-50 text-sm font-bold text-red-600 transition active:bg-red-100"
               >
                 <LogOut className="h-4 w-4" /> Log out
               </button>
@@ -816,14 +801,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link
                   to="/sign-in"
                   onClick={closeMenu}
-                  className="flex min-h-12 items-center justify-center rounded-xl border border-border text-sm font-bold text-foreground transition active:bg-muted"
+                  className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 transition active:bg-slate-50"
                 >
                   Sign in
                 </Link>
                 <Link
                   to="/sign-up"
                   onClick={closeMenu}
-                  className="flex min-h-12 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-sm transition active:opacity-90"
+                  className="flex min-h-12 items-center justify-center rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 text-sm font-bold text-white shadow-md transition active:opacity-90"
                 >
                   Get Started
                 </Link>
@@ -833,21 +818,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </aside>
       </div>
 
-      <main className="flex-1 has-bottom-nav">{children}</main>
+      {/* 🔥 MAIN CONTENT: Padding added to prevent content from hiding under Fixed Header */}
+      <main className="flex-1 has-bottom-nav pt-16 md:pt-[108px]">
+        {children}
+      </main>
 
-      <footer className="bg-card border-t border-border">
+      <footer className="bg-white border-t border-slate-200 dark:bg-slate-950 dark:border-slate-800 mt-auto">
         <div className="max-w-7xl mx-auto px-4 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
-                  <Heart className="h-3.5 w-3.5 text-primary-foreground" />
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-sm">
+                  <Heart className="h-4 w-4 text-white" fill="currentColor" />
                 </div>
-                <span className="font-display font-bold text-foreground">
+                <span className="font-display font-black text-lg text-slate-900 dark:text-white">
                   Givethra
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground max-w-xs">
+              <p className="text-sm font-medium text-slate-500 max-w-xs">
                 Verified Help. Real Impact.
               </p>
               <SocialLinks className="pt-1" />
@@ -864,14 +852,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={to}
                   to={to}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm font-semibold text-slate-500 hover:text-teal-600 transition-colors"
                 >
                   {label}
                 </Link>
               ))}
             </nav>
           </div>
-          <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-1">
+          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center text-xs font-medium text-slate-400 space-y-1">
             <p>
               &copy; {new Date().getFullYear()} Givethra. All rights reserved.
             </p>
@@ -882,14 +870,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Button */}
       <a
         href={WHATSAPP_SUPPORT_URL}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="24/7 WhatsApp Support"
-        className="fixed bottom-5 right-4 z-50 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-lg ring-4 ring-[#25D366]/20 transition hover:bg-[#1EBE5A] hover:shadow-xl md:bottom-6 md:right-6"
+        className="fixed bottom-24 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] px-4 py-3 text-sm font-bold text-white shadow-[0_10px_30px_rgba(37,211,102,0.45)] ring-4 ring-white/80 transition-all hover:scale-105 md:bottom-6 md:right-6"
       >
-        <SiWhatsapp className="h-5 w-5" />
+        <SiWhatsapp className="h-5 w-5 drop-shadow" />
         <span className="hidden sm:inline">24/7 WhatsApp Support</span>
         <span className="sm:hidden">Support</span>
       </a>
