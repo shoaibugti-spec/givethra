@@ -2,7 +2,7 @@
 // Full-screen vertical reel of short video appeals. Immersive: no app header, no bottom navigation.
 import { useAuth } from "@/contexts/AuthContext";
 import { CommentsSheet, HelpSheet, ReportSheet } from "@/components/HelpMeSheets";
-import { buildHelpMeShareUrl, compact, consumeHelpMeReturnPath, convert, formatMoney, helpme, viewerCurrency, type Appeal, type HelpMeConfig } from "@/lib/helpme";
+import { buildHelpMeShareUrl, compact, consumeHelpMeReturnPath, convert, formatMoney, helpme, type Appeal, type HelpMeConfig } from "@/lib/helpme";
 import { posterFromVideo } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, BadgeCheck, CheckCircle2, Flag, HandHeart, Loader2, MessageCircle, Pause, Plus, Repeat2, Share2, Volume2, VolumeX } from "lucide-react";
@@ -14,11 +14,12 @@ let configCache: HelpMeConfig | null = null;
 const posterChecked = new Set<string>(); // one backfill attempt per appeal per page load
 let adminViewer = false; // set when the signed-in user can open the admin API (may add missing posters to any appeal)
 
-function ReelVideo({ src, poster, active, near, muted, paused, backfillId, thumbUrl }: { src: string; poster?: string; active: boolean; near: boolean; muted: boolean; paused: boolean; backfillId?: string; thumbUrl?: string | null }) {
+function ReelVideo({ src, active, near, preload, muted, paused, backfillId, thumbUrl, onMuteForced }: { src: string; active: boolean; near: boolean; preload: "auto" | "metadata"; muted: boolean; paused: boolean; backfillId?: string; thumbUrl?: string | null; onMuteForced: () => void }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [waiting, setWaiting] = useState(true);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [portrait, setPortrait] = useState(true); // vertical videos fill the whole screen; wide ones are shown whole
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
@@ -30,7 +31,10 @@ function ReelVideo({ src, poster, active, near, muted, paused, backfillId, thumb
     if (!v) return;
     if (active && !paused) {
       const p = v.play();
-      if (p && typeof p.catch === "function") p.catch(() => undefined);
+      if (p && typeof p.catch === "function") {
+        // Some phones refuse to start a video with sound before a tap: start it silent instead of staying stuck.
+        p.catch(() => { v.muted = true; onMuteForced(); const q = v.play(); if (q && typeof q.catch === "function") q.catch(() => undefined); });
+      }
     } else {
       v.pause();
       if (!active) {
@@ -65,14 +69,14 @@ function ReelVideo({ src, poster, active, near, muted, paused, backfillId, thumb
         loop
         playsInline
         muted={muted}
-        preload={active ? "auto" : "metadata"}
+        preload={active ? "auto" : preload}
+        onLoadedMetadata={(e) => { const el = e.currentTarget; if (el.videoWidth && el.videoHeight) setPortrait(el.videoWidth / el.videoHeight < 0.8); }}
         onWaiting={() => setWaiting(true)}
         onCanPlay={() => setWaiting(false)}
         onPlaying={() => { setWaiting(false); setFailed(false); }}
         onError={() => setFailed(true)}
         onContextMenu={(e) => e.preventDefault()}
-        poster={poster}
-        className="absolute inset-0 h-full w-full bg-black object-contain"
+        className={`absolute inset-0 h-full w-full bg-black ${portrait ? "object-cover" : "object-contain"}`}
       />
       {active && waiting && !failed && <div className="absolute inset-0 z-[5] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-white/70" /></div>}
       {failed && (
@@ -273,8 +277,6 @@ export default function HelpMePage() {
     if (root) root.scrollTo({ top: (active + 1) * root.clientHeight, behavior: "smooth" });
   }
 
-  const vCur = viewerCurrency(cfg);
-
   return (
     <div className="fixed inset-0 z-[60] bg-black text-white" style={{ height: "100dvh" }}>
       <div className="relative mx-auto h-full w-full max-w-[480px] overflow-hidden bg-black">
@@ -312,8 +314,9 @@ export default function HelpMePage() {
                 <IntroCard signedIn={isAuthenticated} onCreate={startCreate} />
               ) : (
                 <Card
-                  a={e.a} cfg={cfg} vCur={vCur}
-                  poster={e.a.thumbnail_url || undefined} active={i === active && visible} near={i === active || i === active + 1}
+                  a={e.a} cfg={cfg}
+                  active={i === active && visible} near={i >= active - 1 && i <= active + 2} preload={i === active + 1 ? "auto" : "metadata"}
+                  onMuteForced={() => setMuted(true)}
                   muted={muted} paused={paused}
                   onTap={() => setPaused((p) => !p)}
                   onPray={() => togglePray(e.a)} onRepost={() => toggleRepost(e.a)} onShare={() => share(e.a)}
@@ -336,16 +339,16 @@ export default function HelpMePage() {
 }
 
 function Card(p: {
-  a: Appeal; cfg: HelpMeConfig | null; vCur: string; active: boolean; near: boolean; muted: boolean; paused: boolean;
-  poster?: string;
+  a: Appeal; cfg: HelpMeConfig | null; active: boolean; near: boolean; muted: boolean; paused: boolean;
+  preload: "auto" | "metadata"; onMuteForced: () => void;
   onTap: () => void; onPray: () => void; onRepost: () => void; onShare: () => void; onComments: () => void; onHelp: () => void; onReport: () => void; onOwner: () => void;
 }) {
   const { a } = p;
-  const goalEq = convert(a.goal_local, a.currency, p.vCur, p.cfg);
-  const raisedEq = convert(a.raised_local, a.currency, p.vCur, p.cfg);
+  const goalEq = convert(a.goal_local, a.currency, "USD", p.cfg);
+  const raisedEq = convert(a.raised_local, a.currency, "USD", p.cfg);
   return (
     <>
-      {a.video_url ? <ReelVideo src={a.video_url} poster={p.poster || a.thumbnail_url || undefined} active={p.active} near={p.near} muted={p.muted} paused={p.paused} backfillId={a.is_owner || adminViewer ? a.id : undefined} thumbUrl={a.thumbnail_url} /> : <div className="absolute inset-0 bg-slate-900" />}
+      {a.video_url ? <ReelVideo src={a.video_url} active={p.active} near={p.near} preload={p.preload} onMuteForced={p.onMuteForced} muted={p.muted} paused={p.paused} backfillId={a.is_owner || adminViewer ? a.id : undefined} thumbUrl={a.thumbnail_url} /> : <div className="absolute inset-0 bg-slate-900" />}
       <div className="pointer-events-none absolute inset-0 z-[6] bg-gradient-to-b from-black/55 via-transparent to-black/90" />
       <button type="button" aria-label="Play or pause" onClick={p.onTap} className="absolute inset-0 z-10 h-full w-full" />
       {p.paused && p.active && <div className="pointer-events-none absolute inset-0 z-[12] flex items-center justify-center"><div className="rounded-full bg-black/50 p-5"><Pause className="h-9 w-9" /></div></div>}
@@ -375,8 +378,8 @@ function Card(p: {
       <div className="absolute inset-x-0 bottom-0 z-20 space-y-2.5 px-4 pr-[72px]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
         <div className="rounded-xl border border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur-sm">
           <div className="mb-1 flex items-center justify-between text-[10px] font-semibold">
-            <span className="text-emerald-400">Raised: <b>{formatMoney(a.raised_local, a.currency)}</b>{raisedEq !== null && a.raised_local > 0 && <span className="text-gray-400"> ≈ {formatMoney(Math.round(raisedEq * 100) / 100, p.vCur)}</span>}</span>
-            <span className="text-gray-300">Goal: <b>{formatMoney(a.goal_local, a.currency)}</b>{goalEq !== null && <span className="text-gray-400"> ≈ {formatMoney(Math.round(goalEq * 100) / 100, p.vCur)}</span>}</span>
+            <span className="text-emerald-400">Raised: <b>{formatMoney(a.raised_local, a.currency)}</b>{raisedEq !== null && a.raised_local > 0 && <span className="text-gray-400"> ≈ {formatMoney(Math.round(raisedEq * 100) / 100, "USD")}</span>}</span>
+            <span className="text-gray-300">Goal: <b>{formatMoney(a.goal_local, a.currency)}</b>{goalEq !== null && <span className="text-gray-400"> ≈ {formatMoney(Math.round(goalEq * 100) / 100, "USD")}</span>}</span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-800">
             <div className={`h-full rounded-full transition-all duration-700 ${a.helped ? "bg-green-500" : "bg-gradient-to-r from-emerald-500 to-green-400"}`} style={{ width: `${a.helped ? 100 : a.percent}%` }} />
