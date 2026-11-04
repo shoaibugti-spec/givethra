@@ -13,7 +13,10 @@ const DEFAULTS = {
 };
 const MAX_SECONDS = 20;
 const MIN_STOP_SECONDS = 12;
-const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
+// Mobile browsers can ignore MediaRecorder's bitrate hint and emit a larger
+// 720p file. Keep a bounded ceiling that accepts those valid 20-second
+// recordings without allowing unrestricted uploads.
+const MAX_VIDEO_BYTES = 16 * 1024 * 1024;
 const MAX_THUMBNAIL_BYTES = 1024 * 1024;
 const VIDEO_TYPES = { "video/webm": "webm", "video/mp4": "mp4" };
 const DAY = 86400000;
@@ -27,12 +30,6 @@ function pendingPosterKey(videoKey) {
 }
 
 // Account country -> currency. Unknown countries fall back to USD.
-// Country of the visitor as seen by Cloudflare (empty when unknown or not a supported country).
-function detectedCountry(request) {
-  const c = String(request?.cf?.country || request?.headers?.get?.("CF-IPCountry") || "").toUpperCase();
-  return /^[A-Z]{2}$/.test(c) && COUNTRY_CURRENCY[c] ? c : "";
-}
-
 const COUNTRY_CURRENCY = {
   PK: "PKR", IN: "INR", BD: "BDT", LK: "LKR", NP: "NPR", AE: "AED", SA: "SAR", QA: "QAR", KW: "KWD",
   TR: "TRY", EG: "EGP", NG: "NGN", KE: "KES", GH: "GHS", ZA: "ZAR", ID: "IDR", MY: "MYR", PH: "PHP",
@@ -125,9 +122,9 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     const res = json({
       goal_usd_cents: S.goal_usd_cents, max_seconds: MAX_SECONDS, min_stop_seconds: MIN_STOP_SECONDS,
       max_bytes: MAX_VIDEO_BYTES, retention_days: S.retention_days, video_base: videoBase,
-      country_code: detectedCountry(request), country_currency: COUNTRY_CURRENCY, rates: rates.results || [],
+      country_currency: COUNTRY_CURRENCY, rates: rates.results || [],
     }, 200, origin);
-    res.headers.set("Cache-Control", "private, max-age=300");
+    res.headers.set("Cache-Control", "public, max-age=300");
     return res;
   }
 
@@ -158,22 +155,19 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   }
 
   // Posters are private while staged and are only served after the matching video is published.
-  if ((method === "GET" || method === "HEAD") && sub === "thumbnail" && parts[3]) {
+  if (method === "GET" && sub === "thumbnail" && parts[3]) {
     const appealId = String(parts[3]);
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(appealId)) return json({ error: "Thumbnail not found" }, 404, origin);
     const appeal = await db.prepare("SELECT status, video_deleted_at, expires_at FROM helpme_appeals WHERE id = ? AND status IN ('published','helped')").bind(appealId).first();
     if (!appeal || appeal.video_deleted_at || (appeal.expires_at && new Date(appeal.expires_at).getTime() <= Date.now())) return json({ error: "Thumbnail not found" }, 404, origin);
-    const object = method === "HEAD"
-      ? await env.HELPME_VIDEOS?.head(`thumbs/${appealId}.jpg`)
-      : await env.HELPME_VIDEOS?.get(`thumbs/${appealId}.jpg`);
+    const object = await env.HELPME_VIDEOS?.get(`thumbs/${appealId}.jpg`);
     if (!object) return json({ error: "Thumbnail not found" }, 404, origin);
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set("Content-Type", "image/jpeg");
     headers.set("Cache-Control", "public, max-age=3600, s-maxage=3600");
     headers.set("X-Content-Type-Options", "nosniff");
-    headers.set("Content-Length", String(object.size));
-    return new Response(method === "HEAD" ? null : object.body, { headers });
+    return new Response(object.body, { headers });
   }
 
   if (method === "GET" && sub === "users" && parts[3]) {
@@ -353,17 +347,18 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     const el = await eligibility();
     if (!el.can_post) return json({ error: el.reason, code: el.code, next_allowed_at: el.next_allowed_at }, el.code === "ACCOUNT_SUSPENDED" ? 403 : 409, origin);
     const b = (await readJson(request)) || {};
-    const description = clean(b.description, 300);
-    // The country (and so the currency) comes from the person's real network location; the app's value is only a fallback.
-    const country = detectedCountry(request) || clean(b.account_country, 2).toUpperCase();
+    const description = clean(b.description, 800);
+    const country = clean(b.account_country, 2).toUpperCase();
     const payMethod = clean(b.pay_method, 60);
     const bank = clean(b.pay_bank_name, 60);
     const title = clean(b.pay_account_title, 80);
     const number = clean(b.pay_account_number, 40);
+    const descriptionWords = description ? description.split(/\s+/).filter(Boolean) : [];
     if (description.length < 10) return json({ error: "Please describe your need in 2-3 short lines (at least 10 characters).", code: "BAD_DESCRIPTION" }, 400, origin);
+    if (descriptionWords.length > 80) return json({ error: "Please keep your description within 80 words.", code: "DESCRIPTION_TOO_LONG" }, 400, origin);
     if (hasPublicContact(description)) return json({ error: "Please remove phone numbers, e-mail and links from the description. Payment details go in the payment box.", code: "CONTACT_IN_DESCRIPTION" }, 400, origin);
     if (!/^[A-Z]{2}$/.test(country)) return json({ error: "Select the country of your payment account", code: "BAD_COUNTRY" }, 400, origin);
-    if (payMethod.length < 2 || title.length < 2 || !/^[A-Za-z0-9 @\-+_./]{5,40}$/.test(number)) return json({ error: "Payment method, account title and a valid account identifier are required", code: "BAD_PAYMENT" }, 400, origin);
+    if (payMethod.length < 2 || bank.length < 2 || title.length < 2 || !/^[A-Za-z0-9 \-+_./]{5,40}$/.test(number)) return json({ error: "Payment method, bank name, account title and a valid account number are required", code: "BAD_PAYMENT" }, 400, origin);
     const upload = await db.prepare("SELECT id, video_key, content_type, size_bytes FROM helpme_uploads WHERE id = ? AND user_id = ? AND used_appeal_id IS NULL").bind(String(b.upload_id || ""), user.user_id).first();
     if (!upload) return json({ error: "Recording not found. Please record again.", code: "UPLOAD_MISSING" }, 400, origin);
     const accountNorm = norm(number);
