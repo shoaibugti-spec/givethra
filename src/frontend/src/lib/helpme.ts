@@ -90,6 +90,9 @@ async function call<T = any>(path: string, init: RequestInit & { json?: unknown 
   return payload as T;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  TYPES
+// ─────────────────────────────────────────────────────────────────────────────
 export interface HelpMeConfig {
   goal_usd_cents: number;
   max_seconds: number;
@@ -97,8 +100,11 @@ export interface HelpMeConfig {
   max_bytes: number;
   retention_days: number;
   country_code?: string | null;
+  viewer_currency?: string;
   country_currency: Record<string, string>;
-  rates: { currency: string; per_usd: number }[];
+  rates: { currency: string; per_usd: number; updated_at?: string }[];
+  /** Fallback table so display works even before the daily FX job has run. */
+  fallback_rates?: Record<string, number>;
 }
 
 export interface Appeal {
@@ -108,15 +114,21 @@ export interface Appeal {
   description: string;
   video_url: string | null;
   thumbnail_url: string | null;
+  /** Owner's native currency — the currency the money is actually sent in. */
   currency: string;
   goal_local: number;
   raised_local: number;
-  remaining_local: number;
+  /** Viewer-converted display values (server-computed, in the viewer's currency). */
+  viewer_currency: string;
+  viewer_goal: number;
+  viewer_raised: number;
+  viewer_remaining: number;
   percent: number;
   counts: { prays: number; comments: number; reposts: number; shares: number; views: number };
   owner: { id: string; name: string; username: string | null; avatar_url: string | null; verified: boolean };
   published_at: string | null;
   helped_at: string | null;
+  expires_at?: string | null;
   is_owner: boolean;
   prayed: boolean;
   reposted: boolean;
@@ -132,7 +144,9 @@ export interface Eligibility {
 
 export interface PaymentInfo {
   appeal_id: string;
+  /** Owner's currency — this is the currency you must actually send. */
   currency: string;
+  account_country: string;
   pay_method: string;
   bank_name: string | null;
   account_title: string;
@@ -140,6 +154,18 @@ export interface PaymentInfo {
   goal_local: number;
   raised_local: number;
   remaining_local: number;
+  /** Viewer-converted equivalents (display only). */
+  viewer_currency: string;
+  viewer_remaining: number | null;
+}
+
+/** Feed response now includes the local-first phase and the viewer's currency. */
+export interface FeedResponse {
+  items: Appeal[];
+  next_cursor: string | null;
+  phase: "local" | "global";
+  viewer_currency: string;
+  viewer_country: string | null;
 }
 
 /** Keep legacy/admin payment labels readable while preserving the submitted value. */
@@ -157,13 +183,16 @@ export interface HelpComment {
   mine: boolean;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  API CLIENT
+// ─────────────────────────────────────────────────────────────────────────────
 export const helpme = {
   config: () => call<HelpMeConfig>("config"),
   feed: (tab: "need" | "helped", cursor?: string | null) =>
-    call<{ items: Appeal[]; next_cursor: string | null }>(`feed?tab=${tab}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
+    call<FeedResponse>(`feed?tab=${tab}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
   appeal: (id: string) => call<Appeal>(`appeals/${encodeURIComponent(id)}`),
   user: (id: string) =>
-    call<{ user: Appeal["owner"]; appeals: Appeal[]; reposts: Appeal[] }>(`users/${encodeURIComponent(id)}`),
+    call<{ user: Appeal["owner"]; appeals: Appeal[]; reposts: Appeal[]; viewer_currency?: string }>(`users/${encodeURIComponent(id)}`),
   comments: (id: string) => call<HelpComment[]>(`appeals/${encodeURIComponent(id)}/comments`),
   addComment: (id: string, body: string) => call(`appeals/${encodeURIComponent(id)}/comments`, { method: "POST", json: { body } }),
   deleteComment: (id: string) => call(`comments/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -246,8 +275,15 @@ export const helpme = {
   },
 };
 
-// ---------- money helpers ----------
-const SYMBOL: Record<string, string> = { PKR: "Rs", INR: "₹", USD: "$", GBP: "£", EUR: "€", AED: "AED", SAR: "SAR" };
+// ─────────────────────────────────────────────────────────────────────────────
+//  MONEY HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+const SYMBOL: Record<string, string> = {
+  PKR: "Rs", INR: "₹", USD: "$", GBP: "£", EUR: "€", AED: "AED", SAR: "SAR",
+  BDT: "৳", LKR: "Rs", NPR: "Rs", QAR: "QAR", KWD: "KWD", TRY: "₺", EGP: "E£",
+  NGN: "₦", KES: "KSh", GHS: "₵", ZAR: "R", IDR: "Rp", MYR: "RM", PHP: "₱",
+  CAD: "C$", AUD: "A$",
+};
 
 export function formatMoney(amount: number, currency: string): string {
   const n = Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
@@ -256,23 +292,129 @@ export function formatMoney(amount: number, currency: string): string {
   return sym.length > 1 && /^[A-Z]+$/.test(sym) ? `${sym} ${n}` : `${sym}${n}`;
 }
 
-/** Viewer currency from Cloudflare's request country, then browser locale, then USD. */
+// ─────────────────────────────────────────────────────────────────────────────
+//  COUNTRY / CURRENCY DETECTION (viewer side)
+//
+//  Priority chain (most accurate first):
+//   1. Cloudflare's CF-IPCountry, forwarded by /api/helpme/config as `country_code`
+//   2. Browser time zone (works even when the language is en-US)
+//   3. Browser language region (last-resort)
+//   4. "USD" fallback
+// ─────────────────────────────────────────────────────────────────────────────
+const TZ_TO_COUNTRY: Record<string, string> = {
+  "Asia/Karachi": "PK",
+  "Asia/Kolkata": "IN", "Asia/Calcutta": "IN",
+  "Asia/Dhaka": "BD",
+  "Asia/Colombo": "LK",
+  "Asia/Kathmandu": "NP",
+  "Asia/Kabul": "AF",
+  "Asia/Tehran": "IR",
+  "Asia/Dubai": "AE",
+  "Asia/Riyadh": "SA",
+  "Asia/Qatar": "QA",
+  "Asia/Kuwait": "KW",
+  "Asia/Bahrain": "BH",
+  "Asia/Muscat": "OM",
+  "Asia/Amman": "JO",
+  "Asia/Beirut": "LB",
+  "Asia/Jerusalem": "IL",
+  "Europe/Istanbul": "TR", "Asia/Istanbul": "TR",
+  "Africa/Cairo": "EG",
+  "Africa/Lagos": "NG",
+  "Africa/Nairobi": "KE",
+  "Africa/Accra": "GH",
+  "Africa/Johannesburg": "ZA",
+  "Africa/Casablanca": "MA",
+  "Asia/Jakarta": "ID",
+  "Asia/Kuala_Lumpur": "MY",
+  "Asia/Manila": "PH",
+  "Asia/Singapore": "SG",
+  "Asia/Bangkok": "TH",
+  "Asia/Ho_Chi_Minh": "VN",
+  "Asia/Shanghai": "CN",
+  "Asia/Hong_Kong": "HK",
+  "Asia/Taipei": "TW",
+  "Asia/Seoul": "KR",
+  "Asia/Tokyo": "JP",
+  "Europe/London": "GB",
+  "Europe/Dublin": "IE",
+  "Europe/Paris": "FR",
+  "Europe/Berlin": "DE",
+  "Europe/Madrid": "ES",
+  "Europe/Rome": "IT",
+  "Europe/Amsterdam": "NL",
+  "Europe/Brussels": "BE",
+  "Europe/Lisbon": "PT",
+  "Europe/Vienna": "AT",
+  "Europe/Zurich": "CH",
+  "Europe/Stockholm": "SE",
+  "Europe/Oslo": "NO",
+  "Europe/Copenhagen": "DK",
+  "Europe/Helsinki": "FI",
+  "Europe/Warsaw": "PL",
+  "Europe/Prague": "CZ",
+  "Europe/Athens": "GR",
+  "Europe/Moscow": "RU",
+  "America/New_York": "US",
+  "America/Chicago": "US",
+  "America/Denver": "US",
+  "America/Los_Angeles": "US",
+  "America/Phoenix": "US",
+  "America/Anchorage": "US",
+  "Pacific/Honolulu": "US",
+  "America/Toronto": "CA",
+  "America/Vancouver": "CA",
+  "America/Montreal": "CA",
+  "America/Mexico_City": "MX",
+  "America/Sao_Paulo": "BR",
+  "America/Argentina/Buenos_Aires": "AR",
+  "America/Buenos_Aires": "AR",
+  "America/Santiago": "CL",
+  "America/Bogota": "CO",
+  "America/Lima": "PE",
+  "Australia/Sydney": "AU",
+  "Australia/Melbourne": "AU",
+  "Australia/Brisbane": "AU",
+  "Australia/Perth": "AU",
+  "Pacific/Auckland": "NZ",
+};
+
+/** The currency the viewer is likely to be showing. Server-detected country wins. */
 export function viewerCurrency(cfg: HelpMeConfig | null): string {
+  // 1. Cloudflare-detected country (forwarded by the backend as cfg.country_code).
+  const cfgCC = String(cfg?.country_code || "").toUpperCase();
+  if (cfgCC && cfg?.country_currency[cfgCC]) return cfg.country_currency[cfgCC];
+  // 2. Browser time zone — works even when the browser language is "en-US".
   try {
-    const detectedCountry = String(cfg?.country_code || "").toUpperCase();
-    if (cfg && detectedCountry && cfg.country_currency[detectedCountry]) return cfg.country_currency[detectedCountry];
-    const lang = typeof navigator !== "undefined" ? navigator.language || "" : "";
-    const region = (lang.split("-")[1] || "").toUpperCase();
-    return (cfg && cfg.country_currency[region]) || "USD";
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const cc = TZ_TO_COUNTRY[tz];
+    if (cc && cfg?.country_currency[cc]) return cfg.country_currency[cc];
   } catch {
-    return "USD";
+    /* ignore */
   }
+  // 3. Language region.
+  try {
+    const parts = String(navigator.language || "").split("-");
+    const cc = (parts[1] || "").toUpperCase();
+    if (cc && cfg?.country_currency[cc]) return cfg.country_currency[cc];
+  } catch {
+    /* ignore */
+  }
+  return "USD";
 }
 
 export function convert(amount: number, from: string, to: string, cfg: HelpMeConfig | null): number | null {
   if (!cfg || from === to) return null;
-  const a = cfg.rates.find((r) => r.currency === from)?.per_usd;
-  const b = to === "USD" ? 1 : cfg.rates.find((r) => r.currency === to)?.per_usd;
+  const rateFor = (cur: string): number | null => {
+    if (cur === "USD") return 1;
+    const fromApi = cfg.rates.find((r) => r.currency === cur)?.per_usd;
+    if (fromApi && fromApi > 0) return fromApi;
+    const fromFallback = cfg.fallback_rates?.[cur];
+    if (fromFallback && fromFallback > 0) return fromFallback;
+    return null;
+  };
+  const a = rateFor(from);
+  const b = rateFor(to);
   if (!a || !b) return null;
   return (amount / a) * b;
 }
@@ -282,6 +424,17 @@ export function niceGoal(usdCents: number, perUsd: number): number {
   const raw = (usdCents / 100) * perUsd;
   const step = perUsd >= 1000 ? 100 : perUsd >= 100 ? 10 : perUsd >= 10 ? 1 : perUsd >= 2 ? 0.5 : 0.1;
   return Math.round(Math.max(step, Math.round(raw / step) * step) * 100) / 100;
+}
+
+/** What the viewer should SEE on a card (already converted by the server). */
+export function displayGoal(appeal: Appeal): { amount: number; currency: string } {
+  return { amount: appeal.viewer_goal, currency: appeal.viewer_currency };
+}
+export function displayRaised(appeal: Appeal): { amount: number; currency: string } {
+  return { amount: appeal.viewer_raised, currency: appeal.viewer_currency };
+}
+export function displayRemaining(appeal: Appeal): { amount: number; currency: string } {
+  return { amount: appeal.viewer_remaining, currency: appeal.viewer_currency };
 }
 
 export function compact(n: number): string {
@@ -329,5 +482,75 @@ export async function compressImage(file: File): Promise<File> {
     return new File([blob], "proof.jpg", { type: "image/jpeg" });
   } finally {
     URL.revokeObjectURL(bitmapUrl);
+  }
+}
+
+export type HelpMeCameraFacing = "user" | "environment";
+
+/** Accept only a true vertical 9:16 recording; display CSS must not disguise landscape uploads. */
+export function isHelpMePortraitRecording(width: number, height: number): boolean {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || height <= width) return false;
+  return Math.abs(width / height - 9 / 16) <= 0.01;
+}
+
+export function isHelpMePortraitViewport(width: number, height: number, orientationType?: string): boolean {
+  if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0 && width !== height) return height > width;
+  const orientation = orientationType?.toLowerCase();
+  if (orientation?.startsWith("portrait")) return true;
+  if (orientation?.startsWith("landscape")) return false;
+  return false;
+}
+
+export function getHelpMeContainedFrameRect(sourceWidth: number, sourceHeight: number, targetWidth = 720, targetHeight = 1280) {
+  if (![sourceWidth, sourceHeight, targetWidth, targetHeight].every(Number.isFinite) || sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) return null;
+  const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
+  const width = sourceWidth * scale;
+  const height = sourceHeight * scale;
+  return { x: (targetWidth - width) / 2, y: (targetHeight - height) / 2, width, height };
+}
+
+export function getHelpMeCameraFrameLayout(sourceWidth: number, sourceHeight: number, targetWidth = 720, targetHeight = 1280, rotateLandscapeToPortrait = false, landscapeRotationDegrees: -90 | 90 = 90) {
+  if (![sourceWidth, sourceHeight, targetWidth, targetHeight].every(Number.isFinite) || sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) return null;
+  const rotationDegrees = sourceWidth > sourceHeight ? landscapeRotationDegrees : 0;
+  if (rotationDegrees === 90 && !rotateLandscapeToPortrait) return null;
+  if (rotationDegrees === -90 && !rotateLandscapeToPortrait) return null;
+  const frame = rotationDegrees === 90
+    ? getHelpMeContainedFrameRect(sourceHeight, sourceWidth, targetWidth, targetHeight)
+    : rotationDegrees === -90
+      ? getHelpMeContainedFrameRect(sourceHeight, sourceWidth, targetWidth, targetHeight)
+      : getHelpMeContainedFrameRect(sourceWidth, sourceHeight, targetWidth, targetHeight);
+  return frame ? { ...frame, rotationDegrees } : null;
+}
+
+type ZoomRange = { min: number; max: number };
+type CameraCapabilitiesWithZoom = MediaTrackCapabilities & { zoom?: ZoomRange };
+type CameraConstraintWithZoom = MediaTrackConstraintSet & { zoom?: number };
+
+/** Ask for a portrait camera stream, preferring a normal, un-cropped sensor view. */
+export function getHelpMeCameraConstraints(facing: HelpMeCameraFacing): MediaStreamConstraints {
+  return {
+    video: {
+      facingMode: { exact: facing },
+      width: { ideal: 720 },
+      height: { ideal: 1280 },
+      aspectRatio: { ideal: 9 / 16 },
+      frameRate: { ideal: 30, max: 30 },
+    },
+    audio: { echoCancellation: true, noiseSuppression: true },
+  };
+}
+
+/** Reset optical/digital zoom when the browser exposes camera zoom controls. */
+export async function resetHelpMeCameraZoom(track: MediaStreamTrack): Promise<void> {
+  try {
+    if (typeof track.getCapabilities !== "function" || typeof track.applyConstraints !== "function") return;
+    const zoom = (track.getCapabilities() as CameraCapabilitiesWithZoom).zoom;
+    if (!zoom || !Number.isFinite(zoom.min) || !Number.isFinite(zoom.max)) return;
+
+    // 1x is the natural, unzoomed view. Some devices have a minimum above 1x.
+    const naturalZoom = Math.max(zoom.min, Math.min(1, zoom.max));
+    await track.applyConstraints({ advanced: [{ zoom: naturalZoom } as CameraConstraintWithZoom] });
+  } catch {
+    // Zoom constraints are optional and must never prevent camera preview/recording.
   }
 }
