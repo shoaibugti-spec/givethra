@@ -2,7 +2,7 @@
 // Givethra - Complete Cloudflare Worker with all APIs including Onboarding Status
 // FIXED: Correctly identifies direct/contribution, updates case status, and sums amounts.
 
-import { handleHelpMe, helpmeDailyCleanup, helpmeLeaderboardRows, helpmeWallRows } from "./helpme.js";
+import { handleHelpMe, helpmeDailyCleanup, helpmeLeaderboardRows, helpmeWallRows, helpmeRefreshFxRates } from "./helpme.js";
 
 const PUBLIC_ORIGIN = "https://givethra.org";
 const PUBLIC_ORIGINS = new Set([PUBLIC_ORIGIN, "https://www.givethra.org"]);
@@ -891,7 +891,7 @@ async function expireDueCases(env) {
     if (item.user_id) affectedUsers.add(String(item.user_id));
     if (item.user_id) {
       try {
-        await sendNotification(env, item.user_id, "case_expired", "Your case has expired", `Your case “${item.title || "Help request"}” reached its expiry date and has been moved to My Cases → Expired. You can submit a new request.`, "/my-cases");
+        await sendNotification(env, item.user_id, "case_expired", "Your case has expired", `Your case "${item.title || "Help request"}" reached its expiry date and has been moved to My Cases → Expired. You can submit a new request.`, "/my-cases");
       } catch (error) {
         console.error("Case expired; requester notification failed", item.id, error);
       }
@@ -1690,10 +1690,10 @@ async function synchronizeCompletedCase(env, resolutionId) {
   if (nextStatus === "completed") {
     const title = resolution.case_title || "your case";
     if (resolution.hero_id) {
-      await sendNotification(env, resolution.hero_id, "help_completed", "Your help was verified ✅", `Your help for “${title}” was verified and completed.`, `/cases/${resolution.case_id}`);
+      await sendNotification(env, resolution.hero_id, "help_completed", "Your help was verified ✅", `Your help for "${title}" was verified and completed.`, `/cases/${resolution.case_id}`);
     }
     if (totals.user_id && totals.user_id !== resolution.hero_id) {
-      await sendNotification(env, totals.user_id, "help_completed", "Your case is complete ✅", `Your case “${title}” has received verified help and is now complete.`, `/cases/${resolution.case_id}`);
+      await sendNotification(env, totals.user_id, "help_completed", "Your case is complete ✅", `Your case "${title}" has received verified help and is now complete.`, `/cases/${resolution.case_id}`);
     }
   }
   return { case_id: resolution.case_id, amount_collected: verifiedTotal, status: nextStatus || "open" };
@@ -1802,7 +1802,7 @@ async function handleRequest(request, env, ctx) {
       });
       if (url.searchParams.get("download") === "1") {
         const fileName = decodeURIComponent(key.split("/").pop() || "download")
-          .replace(/[\\r\\n\\\"]+/g, "_")
+          .replace(/[\\r\\n\\"]+/g, "_")
           .slice(0, 180) || "download";
         headers.set("Content-Disposition", `attachment; filename="${fileName}"`);
       }
@@ -3289,6 +3289,10 @@ export default {
     ctx.waitUntil(helpmeDailyCleanup(env).catch((err) => {
       console.error("Scheduled Help Me cleanup failed", err);
     }));
+    // ⬇️ NEW: Refresh live FX rates once per day (uses exchangerate.host, falls back to er-api.com).
+    ctx.waitUntil(helpmeRefreshFxRates(env).catch((err) => {
+      console.error("Scheduled HelpMe FX refresh failed", err);
+    }));
   },
 };
 
@@ -3430,8 +3434,8 @@ async function handleDreams(request, env, user, url, parts, origin) {
         if (Number(results?.[0]?.meta?.changes || 0) !== 1) return json({ error: approved ? "This Dream was just reviewed or participant capacity has been reached. Refresh the queue." : "This Dream payment was already reviewed. Refresh the queue." }, 409, origin);
         let notificationSent = true;
         try {
-          if (approved) await sendNotification(env, participation.user_id, "dream_approved", "Dream Participation Approved", `Your participation in “${participation.dream_name}” is approved. Registration number: ${registration}. Your Givethra Credit has been credited.`, `/dreams/${participation.dream_id}`);
-          else await sendNotification(env, participation.user_id, "dream_rejected", "Dream Participation Rejected", `Your participation in “${participation.dream_name}” was rejected. Reason: ${reason}`, `/dreams/${participation.dream_id}`);
+          if (approved) await sendNotification(env, participation.user_id, "dream_approved", "Dream Participation Approved", `Your participation in "${participation.dream_name}" is approved. Registration number: ${registration}. Your Givethra Credit has been credited.`, `/dreams/${participation.dream_id}`);
+          else await sendNotification(env, participation.user_id, "dream_rejected", "Dream Participation Rejected", `Your participation in "${participation.dream_name}" was rejected. Reason: ${reason}`, `/dreams/${participation.dream_id}`);
         } catch (error) { notificationSent = false; console.error("Dream review notification failed after saved decision", error); }
         return json({ ...(await env.DB.prepare("SELECT * FROM dream_participations WHERE id=?").bind(parts[3]).first()), notification_sent: notificationSent }, 200, origin);
       } else {
@@ -3470,6 +3474,6 @@ async function handleDreams(request, env, user, url, parts, origin) {
   const timestamp = now(); const participationId = id();
   await env.DB.prepare(`INSERT INTO dream_participations (id,dream_id,user_id,full_name,father_husband_name,cnic_number,mobile_number,payment_method,contribution_amount,transaction_id,proof_url,note,province,city,address,postal_code,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending_approval',?,?)`).bind(participationId,dreamId,user.user_id,body?.full_name || user.full_name || null,body?.father_husband_name || null,body?.cnic_number || null,body?.mobile_number || null,body?.payment_method || null,amount,transactionId,body?.proof_url || null,body?.note || null,body?.province || null,body?.city || null,body?.address || null,body?.postal_code || null,timestamp,timestamp).run();
   await env.DB.prepare("INSERT INTO dream_participation_history (id,participation_id,dream_id,user_id,from_status,to_status,note,registration_number,changed_by,changed_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id(),participationId,dreamId,user.user_id,null,"pending_approval","Payment submission received and is awaiting admin verification.",null,user.user_id,timestamp).run();
-  await sendNotification(env,user.user_id,"dream_submitted","Dream Participation Submitted",`Your participation in “${dream.name}” was submitted and is awaiting verification.`, `/dreams/${dreamId}`);
+  await sendNotification(env,user.user_id,"dream_submitted","Dream Participation Submitted",`Your participation in "${dream.name}" was submitted and is awaiting verification.`, `/dreams/${dreamId}`);
   return json({ id: participationId,dream_id:dreamId,status:"pending_approval",message:"Dream submission received for admin verification" },201,origin);
 }
