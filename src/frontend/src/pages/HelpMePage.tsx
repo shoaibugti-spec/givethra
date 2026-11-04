@@ -5,7 +5,7 @@ import { CommentsSheet, HelpSheet, ReportSheet } from "@/components/HelpMeSheets
 import { buildHelpMeShareUrl, compact, consumeHelpMeReturnPath, convert, formatMoney, helpme, type Appeal, type HelpMeConfig } from "@/lib/helpme";
 import { posterFromVideo } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, BadgeCheck, CheckCircle2, Flag, HandHeart, Loader2, MessageCircle, Pause, Plus, Repeat2, Share2, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, BadgeCheck, CheckCircle2, Flag, HandHeart, Loader2, MessageCircle, Pause, Plus, Repeat2, Share2, Volume2, VolumeX, History, X, AlertTriangle, CheckCircle, Clock, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -107,10 +107,158 @@ function IntroCard({ signedIn, onCreate }: { signedIn: boolean; onCreate: () => 
   );
 }
 
+// ------------------- History Sheet Component -------------------
+function HistorySheet({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"appeals" | "helps">("appeals");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoading(true);
+    helpme.my()
+      .then((res) => setData(res))
+      .catch((err) => toast.error(err.message || "Could not load history"))
+      .finally(() => setLoading(false));
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 sm:items-center">
+      <div className="flex h-[85vh] w-full flex-col rounded-t-3xl bg-slate-900 text-white sm:h-[80vh] sm:max-w-md sm:rounded-3xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/10 p-4">
+          <h2 className="text-lg font-extrabold">My History</h2>
+          <button onClick={onClose} className="rounded-full bg-white/10 p-2 active:scale-95">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-white/10">
+          <button
+            onClick={() => setActiveTab("appeals")}
+            className={`flex-1 py-3 text-sm font-bold ${activeTab === "appeals" ? "border-b-2 border-emerald-500 text-emerald-400" : "text-gray-400"}`}
+          >
+            My Appeals (Requests)
+          </button>
+          <button
+            onClick={() => setActiveTab("helps")}
+            className={`flex-1 py-3 text-sm font-bold ${activeTab === "helps" ? "border-b-2 border-emerald-500 text-emerald-400" : "text-gray-400"}`}
+          >
+            My Contributions (Help)
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading ? (
+            <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+          ) : !data ? (
+            <p className="text-center text-gray-400">No data found.</p>
+          ) : activeTab === "appeals" ? (
+            <div className="space-y-4">
+              {data.appeals?.length === 0 && <p className="text-center text-sm text-gray-400">You haven't posted any appeals yet.</p>}
+              {data.appeals?.map((appeal: any) => (
+                <div key={appeal.id} className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide
+                        ${appeal.status === 'published' ? 'bg-emerald-500/20 text-emerald-400' :
+                          appeal.status === 'pending_review' ? 'bg-amber-500/20 text-amber-400' :
+                          appeal.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                          'bg-gray-500/20 text-gray-400'}`}>
+                        {appeal.status === 'published' ? <CheckCircle className="h-3 w-3" /> : 
+                         appeal.status === 'pending_review' ? <Clock className="h-3 w-3" /> : 
+                         <XCircle className="h-3 w-3" />}
+                        {appeal.status.replace('_', ' ')}
+                      </span>
+                      <p className="mt-2 line-clamp-2 text-sm">{appeal.description}</p>
+                    </div>
+                  </div>
+                  
+                  {appeal.status === "rejected" && appeal.rejection_reason && (
+                    <div className="mt-2 rounded-lg bg-red-500/10 p-2 text-xs text-red-300">
+                      <b>Reason:</b> {appeal.rejection_reason}
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-xs">
+                    <div>
+                      <span className="text-gray-400">Goal:</span> <span className="font-bold">{formatMoney(appeal.goal_local, appeal.currency)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Raised:</span> <span className="font-bold text-emerald-400">{formatMoney(appeal.raised_local, appeal.currency)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Helps Given (As a Hero) */}
+              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-500">Help I Provided (Given)</h3>
+              {data.helps_given?.length === 0 && <p className="text-xs text-gray-400">You haven't helped anyone yet.</p>}
+              {data.helps_given?.map((help: any) => (
+                <div key={help.id} className="rounded-xl border border-white/10 bg-black/40 p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold">{formatMoney(help.amount_approved || help.amount_claimed, help.currency)}</span>
+                    <span className={`text-xs font-bold ${help.status === 'approved' ? 'text-emerald-400' : help.status === 'rejected' ? 'text-red-400' : 'text-amber-400'}`}>
+                      {help.status.toUpperCase()}
+                    </span>
+                  </div>
+                  {help.rejection_reason && <p className="mt-1 text-xs text-red-300">Reason: {help.rejection_reason}</p>}
+                </div>
+              ))}
+
+              {/* Helps Received (As a Requester) */}
+              <h3 className="mt-6 text-xs font-bold uppercase tracking-wider text-emerald-500">Help I Received (Received)</h3>
+              {data.helps_received?.length === 0 && <p className="text-xs text-gray-400">You haven't received any help yet.</p>}
+              {data.helps_received?.map((rec: any) => (
+                <div key={rec.id} className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-emerald-400">{formatMoney(rec.amount_approved, rec.currency)}</span>
+                    <span className="text-xs text-gray-400">From: {rec.hero_name}</span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-gray-500">Approved on: {new Date(rec.reviewed_at).toLocaleDateString()}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+// -------------------------------------------------------------
+
 export default function HelpMePage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [, setAdminTick] = useState(0);
+
+  // --- Rejection Notice & History State ---
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [recentRejection, setRecentRejection] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    helpme.my().then((res) => {
+      const rejected = res.appeals?.find((a: any) => a.status === "rejected" && a.rejection_reason);
+      const dismissed = rejected ? localStorage.getItem(`dismissed_rejection_${rejected.id}`) : null;
+      if (rejected && !dismissed) setRecentRejection(rejected);
+    }).catch(() => { /* ignore if fails */ });
+  }, [isAuthenticated]);
+
+  const dismissRejection = () => {
+    if (recentRejection) {
+      localStorage.setItem(`dismissed_rejection_${recentRejection.id}`, "1");
+      setRecentRejection(null);
+    }
+  };
+  // ------------------------------------------
+
   useEffect(() => {
     if (!isAuthenticated || adminViewer) return;
     helpme.admin.counts().then(() => { adminViewer = true; setAdminTick((n) => n + 1); }).catch(() => undefined);
@@ -232,6 +380,7 @@ export default function HelpMePage() {
 
   function startCreate() {
     if (!isAuthenticated) return needSignIn();
+    dismissRejection(); // اگر دوبارہ ریکارڈ کرنے جا رہے ہیں تو نوٹس ہٹا دیں
     navigate({ to: "/helpme/new" });
   }
 
@@ -280,6 +429,27 @@ export default function HelpMePage() {
   return (
     <div className="fixed inset-0 z-[60] bg-black text-white" style={{ height: "100dvh" }}>
       <div className="relative mx-auto h-full w-full max-w-[480px] overflow-hidden bg-black">
+        
+        {/* ⚠️ ریجیکشن نوٹس (Notice) */}
+        {recentRejection && (
+          <div className="absolute left-4 right-4 top-16 z-50 flex items-start gap-3 rounded-2xl border border-red-500/50 bg-red-500/90 p-4 text-white shadow-lg backdrop-blur-md">
+            <AlertTriangle className="h-6 w-6 shrink-0" />
+            <div className="flex-1">
+              <h3 className="font-bold">Appeal Rejected</h3>
+              <p className="mt-1 text-xs opacity-90">{recentRejection.rejection_reason}</p>
+              <button 
+                onClick={startCreate}
+                className="mt-2 rounded-lg bg-white/20 px-3 py-1 text-xs font-bold active:scale-95"
+              >
+                Record Again
+              </button>
+            </div>
+            <button onClick={dismissRejection} className="p-1 active:scale-90">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
         {/* Top bar */}
         <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-3 pb-2" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
           <button type="button" onClick={goBack} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/55 backdrop-blur-md active:scale-95"><ArrowLeft className="h-4 w-4" /></button>
@@ -322,6 +492,7 @@ export default function HelpMePage() {
                   onPray={() => togglePray(e.a)} onRepost={() => toggleRepost(e.a)} onShare={() => share(e.a)}
                   onComments={() => setCommentsFor(e.a)} onHelp={() => openHelp(e.a)} onReport={() => (isAuthenticated ? setReportFor(e.a) : needSignIn())}
                   onOwner={() => navigate({ to: "/helpme/u/$userId", params: { userId: e.a.owner.id } })}
+                  onOpenHistory={() => setHistoryOpen(true)}
                 />
               )}
             </section>
@@ -334,6 +505,9 @@ export default function HelpMePage() {
       <CommentsSheet appeal={commentsFor} signedIn={isAuthenticated} onClose={() => setCommentsFor(null)} onNeedSignIn={needSignIn}
         onCountChange={(id, d) => patch(id, (x) => ({ ...x, counts: { ...x.counts, comments: Math.max(0, x.counts.comments + d) } }))} />
       <ReportSheet appeal={reportFor} onClose={() => setReportFor(null)} />
+      
+      {/* History Popup */}
+      <HistorySheet isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   );
 }
@@ -342,6 +516,7 @@ function Card(p: {
   a: Appeal; cfg: HelpMeConfig | null; active: boolean; near: boolean; muted: boolean; paused: boolean;
   preload: "auto" | "metadata"; onMuteForced: () => void;
   onTap: () => void; onPray: () => void; onRepost: () => void; onShare: () => void; onComments: () => void; onHelp: () => void; onReport: () => void; onOwner: () => void;
+  onOpenHistory: () => void; // <-- نیا پروپ شامل کیا گیا
 }) {
   const { a } = p;
   const goalEq = convert(a.goal_local, a.currency, "USD", p.cfg);
@@ -400,9 +575,20 @@ function Card(p: {
         ) : a.is_owner ? (
           <div className="rounded-xl bg-white/10 py-3 text-center text-xs font-semibold text-gray-200">This is your appeal</div>
         ) : (
-          <button type="button" onClick={p.onHelp} className="flex w-full animate-pulse items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-600 py-3.5 text-sm font-extrabold uppercase tracking-wide shadow-lg active:scale-[0.99]">
-            <HandHeart className="h-5 w-5" /> Help Me
-          </button>
+          /* HELP ME Button + HISTORY Button side-by-side */
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={p.onHelp} className="flex flex-1 animate-pulse items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-600 py-3.5 text-sm font-extrabold uppercase tracking-wide shadow-lg active:scale-[0.99]">
+              <HandHeart className="h-5 w-5" /> Help Me
+            </button>
+            <button 
+              type="button" 
+              onClick={p.onOpenHistory}
+              className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-xl bg-white/10 border border-white/20 active:scale-95"
+              aria-label="View History"
+            >
+              <History className="h-6 w-6 text-white" />
+            </button>
+          </div>
         )}
       </div>
     </>
