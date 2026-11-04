@@ -19,12 +19,37 @@ const HELP_ME_DESCRIPTION_WORDS = 80;
 const CONTACT_RE = /@|https?:\/\/|www\.|\d{7,}|whats?app|telegram|signal|wechat|\bimo\b|e-?mail/i;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Word-limit helper that DOES NOT break typing.
+// The previous version was:
+//   value.trim().split(/\s+/).filter(Boolean).slice(0, max).join(" ")
+// which trimmed the trailing space on every keystroke, so the user could not
+// insert a space before the next word. We now:
+//   1. Count words in the FULL value (trailing space still counts as a break)
+//   2. If word count > max, keep only the first `max` words plus any trailing
+//      whitespace that came after the last kept word, so the caret stays put.
+//   3. Otherwise return the value untouched, preserving internal spaces.
+// ─────────────────────────────────────────────────────────────────────────────
+function limitHelpMeWords(value: string, max: number): string {
+  // Split, but keep track of whether the original string ended in whitespace.
+  const tokens = value.split(/\s+/);
+  const endedWithSpace = /\s$/.test(value);
+  const words = tokens.filter(Boolean);
+
+  if (words.length <= max) {
+    // Under the limit — return the user's text exactly as typed.
+    return value;
+  }
+
+  // Over the limit — keep only the first `max` words.
+  const kept = words.slice(0, max).join(" ");
+  return endedWithSpace ? kept + " " : kept;
+}
+
 // Country detection chain:
 //   1. Cloudflare's request country (if the backend ever forwards it as cfg.country_code)
 //   2. Browser time zone (most reliable — "Asia/Karachi" → PK even when language is en-US)
 //   3. Browser language region (last resort)
 //   4. "US" as a safe default
-// ─────────────────────────────────────────────────────────────────────────────
 const TZ_TO_COUNTRY: Record<string, string> = {
   "Asia/Karachi": "PK",
   "Asia/Kolkata": "IN", "Asia/Calcutta": "IN",
@@ -102,9 +127,6 @@ const TZ_TO_COUNTRY: Record<string, string> = {
   "Pacific/Auckland": "NZ",
 };
 
-// Approximate rates for DISPLAY ONLY. If the backend `helpme_fx` table has a
-// real rate for a currency, that value is used and this fallback is ignored.
-// Admin should still add PKR to `helpme_fx` so submissions are accepted.
 const FALLBACK_RATES: Record<string, number> = {
   PKR: 278, INR: 83, BDT: 120, LKR: 300, NPR: 160,
   AED: 3.67, SAR: 3.75, QAR: 3.64, KWD: 0.31, TRY: 33,
@@ -130,10 +152,6 @@ function detectCountry(cfg: HelpMeConfig | null): string {
     if (fromLang && cfg?.country_currency[fromLang]) return fromLang;
   } catch { /* ignore */ }
   return "US";
-}
-
-function limitHelpMeWords(value: string, max: number): string {
-  return value.trim().split(/\s+/).filter(Boolean).slice(0, max).join(" ");
 }
 
 function useCountdown(iso?: string) {
@@ -404,12 +422,15 @@ export default function HelpMeCreatePage() {
     return rate ? niceGoal(cfg.goal_usd_cents, rate) : null;
   }, [cfg, currency]);
 
+  // Live word count that does NOT strip spaces while the user is typing.
+  const descWords = useMemo(() => desc.trim().split(/\s+/).filter(Boolean).length, [desc]);
+
   async function submit() {
     setFormError("");
     if (!blob) return;
     if (durationRef.current < minSec * 1000 || durationRef.current > maxSec * 1000) return setFormError(`Record a video between ${minSec} and ${maxSec} seconds.`);
     if (desc.trim().length < 10) return setFormError("Please describe your need in 2-3 short lines (at least 10 characters).");
-    if (desc.trim().split(/\s+/).filter(Boolean).length > HELP_ME_DESCRIPTION_WORDS) return setFormError(`Please keep your description within ${HELP_ME_DESCRIPTION_WORDS} words.`);
+    if (descWords > HELP_ME_DESCRIPTION_WORDS) return setFormError(`Please keep your description within ${HELP_ME_DESCRIPTION_WORDS} words.`);
     if (CONTACT_RE.test(desc)) return setFormError("Please remove phone numbers, e-mail and links from the description. Payment details go in the boxes below.");
     if (bankName.trim().length < 2) return setFormError("Enter the bank name.");
     if (title.trim().length < 2 || !isValidHelpMeAccountIdentifier(number)) return setFormError("Enter the account title and a valid account number.");
@@ -536,8 +557,14 @@ export default function HelpMeCreatePage() {
 
         {step === "details" && (
           <div className="flex-1 space-y-3 px-5 pb-8">
-            <Field label="Your need (up to 80 words)" hint={`${desc.trim() ? desc.trim().split(/\s+/).filter(Boolean).length : 0}/${HELP_ME_DESCRIPTION_WORDS} words · no phone numbers, e-mail or links`}>
-              <textarea value={desc} onChange={(e) => setDesc(limitHelpMeWords(e.target.value, HELP_ME_DESCRIPTION_WORDS))} rows={3} className="w-full resize-none rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" placeholder="Example: I need help to pay my child's school fee this month." />
+            <Field label="Your need (up to 80 words)" hint={`${descWords}/${HELP_ME_DESCRIPTION_WORDS} words · no phone numbers, e-mail or links`}>
+              <textarea
+                value={desc}
+                onChange={(e) => setDesc(limitHelpMeWords(e.target.value, HELP_ME_DESCRIPTION_WORDS))}
+                rows={3}
+                className="w-full resize-none rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400"
+                placeholder="Example: I need help to pay my child's school fee this month."
+              />
             </Field>
             <Field label="Your country (detected automatically)">
               <div className="rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm font-semibold">{regionName(country)} · {currency}</div>
