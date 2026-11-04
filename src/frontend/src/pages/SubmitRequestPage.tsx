@@ -58,6 +58,7 @@ const CATEGORIES = ["Electricity Bill", "Gas Bill", "Water Bill", "House Rent", 
 const STEPS = ["Basic Info", "Category Details", "Verification", "Review"];
 const CASE_CURRENCIES = CURRENCY_CODES;
 const SS_KEY = "givethra_submit_draft_v4";
+
 const MAX_REJECTIONS_BEFORE_SUSPENSION = 5;
 const UNLOCK_CREDITS_REQUIRED = 5;
 const MAX_FREE_CASES = 2;
