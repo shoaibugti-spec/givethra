@@ -142,6 +142,11 @@ export interface PaymentInfo {
   remaining_local: number;
 }
 
+/** Keep legacy/admin payment labels readable while preserving the submitted value. */
+export function displayHelpMePaymentMethod(value: string | null | undefined): string {
+  return value?.trim() || "Payment account";
+}
+
 export interface HelpComment {
   id: string;
   user_id: string;

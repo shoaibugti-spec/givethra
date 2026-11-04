@@ -53,9 +53,9 @@ describe("Help Me camera framing", () => {
     await expect(resetHelpMeCameraZoom(track)).resolves.toBeUndefined();
   });
 
-  it("records with Givethra's own live camera into a vertical 9:16 canvas", () => {
+  it("records with Givethra's own live camera without a canvas capture wrapper", () => {
     expect(recorderSource).toContain("navigator.mediaDevices.getUserMedia");
-    expect(recorderSource).toContain("captureStream(30)");
+    expect(recorderSource).toContain("const source = stream");
     expect(recorderSource).toContain("Math.max(c.width / v.videoWidth");
     expect(recorderSource).toContain("resetHelpMeCameraZoom(track)");
     expect(recorderSource).toContain("const REEL_W = 720");

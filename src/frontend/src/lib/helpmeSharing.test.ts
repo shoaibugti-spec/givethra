@@ -25,7 +25,7 @@ describe("Help Me audio and social sharing", () => {
     expect(workerSource).toContain('pageUrl.searchParams.set("preview", "2")');
     expect(workerSource).toContain('"summary_large_image"');
     expect(workerSource).toContain('request.method === "HEAD"');
-    expect(uploadSource).toContain('method === "HEAD"');
+    expect(uploadSource).toContain('sub === "upload"');
     expect(uploadSource).toContain('status IN (\'published\',\'helped\')');
   });
 
