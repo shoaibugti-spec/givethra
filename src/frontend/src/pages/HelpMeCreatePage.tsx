@@ -13,7 +13,14 @@ import { toast } from "sonner";
 type Step = "check" | "blocked" | "intro" | "record" | "preview" | "details" | "done";
 const REEL_W = 720; // always recorded as a vertical 9:16 reel
 const REEL_H = 1280;
+const HELP_ME_MAX_SECONDS = 20;
+const HELP_ME_MIN_STOP_SECONDS = 12;
+const HELP_ME_DESCRIPTION_WORDS = 80;
 const CONTACT_RE = /@|https?:\/\/|www\.|\d{7,}|whats?app|telegram|signal|wechat|\bimo\b|e-?mail/i;
+
+function limitHelpMeWords(value: string, max: number): string {
+  return value.trim().split(/\s+/).filter(Boolean).slice(0, max).join(" ");
+}
 
 function useCountdown(iso?: string) {
   const [left, setLeft] = useState(0);
@@ -66,8 +73,8 @@ export default function HelpMeCreatePage() {
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const durationRef = useRef(0);
 
-  const maxSec = cfg?.max_seconds ?? 20;
-  const minSec = cfg?.min_stop_seconds ?? 12;
+  const maxSec = HELP_ME_MAX_SECONDS;
+  const minSec = HELP_ME_MIN_STOP_SECONDS;
   const maxMs = maxSec * 1000;
   const minStopMs = minSec * 1000;
   const countdown = useCountdown(elig?.next_allowed_at);
@@ -202,17 +209,11 @@ export default function HelpMeCreatePage() {
 
   function startRecording() {
     const stream = streamRef.current;
-    const canvas = canvasRef.current;
     if (!stream) return;
-    // Record the vertical canvas (with the microphone). If this browser cannot, record the camera directly.
-    let source: MediaStream = stream;
-    try {
-      if (canvas && typeof canvas.captureStream === "function") {
-        const cs = canvas.captureStream(30);
-        stream.getAudioTracks().forEach((t) => cs.addTrack(t));
-        if (cs.getVideoTracks().length) source = cs;
-      }
-    } catch { source = stream; }
+    // Record the native camera stream. Canvas captureStream can stop early on
+    // some Android browsers; the canvas remains preview-only and cannot crop
+    // or zoom the source that is uploaded.
+    const source = stream;
     const mime = pickRecorderMime();
     let rec: MediaRecorder;
     try {
@@ -297,6 +298,7 @@ export default function HelpMeCreatePage() {
     if (!blob) return;
     if (durationRef.current < minSec * 1000 || durationRef.current > maxSec * 1000) return setFormError(`Record a video between ${minSec} and ${maxSec} seconds.`);
     if (desc.trim().length < 10) return setFormError("Please describe your need in 2-3 short lines (at least 10 characters).");
+    if (desc.trim().split(/\s+/).filter(Boolean).length > HELP_ME_DESCRIPTION_WORDS) return setFormError(`Please keep your description within ${HELP_ME_DESCRIPTION_WORDS} words.`);
     if (CONTACT_RE.test(desc)) return setFormError("Please remove phone numbers, e-mail and links from the description. Payment details go in the boxes below.");
     if (bankName.trim().length < 2) return setFormError("Enter the bank name.");
     if (title.trim().length < 2 || !isValidHelpMeAccountIdentifier(number)) return setFormError("Enter the account title and a valid account number.");
@@ -423,13 +425,13 @@ export default function HelpMeCreatePage() {
 
         {step === "details" && (
           <div className="flex-1 space-y-3 px-5 pb-8">
-            <Field label="Your need (2–3 short lines)" hint={`${desc.length}/300 · no phone numbers, e-mail or links`}>
-              <textarea value={desc} onChange={(e) => setDesc(e.target.value.slice(0, 300))} rows={3} className="w-full resize-none rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" placeholder="Example: I need help to pay my child's school fee this month." />
+            <Field label="Your need (up to 80 words)" hint={`${desc.trim() ? desc.trim().split(/\s+/).filter(Boolean).length : 0}/${HELP_ME_DESCRIPTION_WORDS} words · no phone numbers, e-mail or links`}>
+              <textarea value={desc} onChange={(e) => setDesc(limitHelpMeWords(e.target.value, HELP_ME_DESCRIPTION_WORDS))} rows={3} className="w-full resize-none rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" placeholder="Example: I need help to pay my child's school fee this month." />
             </Field>
             <Field label="Your country (detected automatically)">
               <div className="rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm font-semibold">{regionName(country)} · {currency}</div>
             </Field>
-            <Field label="Bank name"><input value={bankName} onChange={(e) => setBankName(e.target.value.slice(0, 60))} maxLength={60} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" placeholder="Write your bank name" /></Field>
+            <Field label="Bank name *"><input value={bankName} onChange={(e) => setBankName(e.target.value.slice(0, 60))} maxLength={60} required className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" placeholder="Write your bank name" /></Field>
             <Field label="Account title (name on the account)"><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" /></Field>
             <Field label="Account number"><input value={number} onChange={(e) => setNumber(e.target.value)} maxLength={40} inputMode="text" className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 font-mono text-sm outline-none focus:border-emerald-400" /></Field>
             {goal !== null && cfg && (
