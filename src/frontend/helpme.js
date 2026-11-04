@@ -375,7 +375,7 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     if (!rate) return json({ error: "This currency is not available yet", code: "NO_RATE" }, 400, origin);
     const goalLocal = niceGoal(S.goal_usd_cents, rate);
     const appealId = id(); const ts = now();
-    const duration = Math.min(Math.max(Math.round(Number(b.duration_ms) || 0), 0), (MAX_SECONDS + 1) * 1000);
+    const duration = Math.min(Math.max(Math.round(Number(b.duration_ms) || 0), 0), MAX_SECONDS * 1000);
     try {
       await db.batch([
         db.prepare(`INSERT INTO helpme_appeals (id,user_id,status,description,video_key,video_content_type,video_size,duration_ms,account_country,currency,fx_per_usd,goal_usd_cents,goal_local,pay_method,pay_bank_name,pay_account_title,pay_account_number,pay_account_norm,created_at)
