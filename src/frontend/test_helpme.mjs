@@ -35,13 +35,15 @@ const h = {
   publicDisplayName: (v, f) => (v && !String(v).includes("@") ? v : f),
   getActiveSuspension: async () => suspended, suspendedActionResponse: (o) => h.json({ code: "ACCOUNT_SUSPENDED" }, 403),
 };
-const call = async (user, method, path, body, raw) => {
+const call = async (user, method, path, body, raw, cf) => {
   const url = new URL("https://givethra.org" + path);
   const init = { method, headers: {} };
   if (raw) { init.body = raw.body; init.headers["Content-Type"] = raw.type; init.headers["Content-Length"] = String(raw.body.length); }
   else if (body) { init.body = JSON.stringify(body); init.headers["Content-Type"] = "application/json"; }
-  const res = await handleHelpMe(new Request(url, init), env, {}, user, url, url.pathname.split("/").filter(Boolean), "https://givethra.org", h);
-  return { status: res.status, body: await res.json().catch(() => null) };
+  const request = new Request(url, init);
+  if (cf) Object.defineProperty(request, "cf", { value: cf });
+  const res = await handleHelpMe(request, env, {}, user, url, url.pathname.split("/").filter(Boolean), "https://givethra.org", h);
+  return { status: res.status, body: await res.json().catch(() => null), headers: res.headers };
 };
 for (const [i, n] of [["u1", "Ali"], ["u2", "Sara"], ["u3", "Omar"], ["u4", "Zed"]]) {
   sql.prepare("INSERT INTO users VALUES (?,?,?,?,?)").run(i, i + "@x", n, null, i === "u4" ? "none" : "approved");
@@ -51,18 +53,23 @@ const ali = { user_id: "u1", email: "u1@x", kyc_status: "approved" }, sara = { u
 const video = Buffer.alloc(2_000_000, 1);
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x01]);
 
-let r = await call(null, "GET", "/api/helpme/config"); assert.equal(r.status, 200); assert.equal(r.body.goal_usd_cents, 210);
+let r = await call(null, "GET", "/api/helpme/config"); assert.equal(r.status, 200); assert.equal(r.body.goal_usd_cents, 210); assert.equal(r.body.country_code, null);
+r = await call(null, "GET", "/api/helpme/config", null, null, { country: "US" }); assert.equal(r.body.country_code, "US"); assert.equal(r.headers.get("Cache-Control"), "private, max-age=300");
 r = await call(zed, "GET", "/api/helpme/eligibility"); assert.equal(r.body.code, "KYC_REQUIRED");
 r = await call(ali, "POST", "/api/helpme/upload", null, { body: Buffer.alloc(10), type: "image/png" }); assert.equal(r.status, 415);
-r = await call(ali, "POST", "/api/helpme/upload", null, { body: Buffer.alloc(7_000_000), type: "video/webm" }); assert.equal(r.status, 413);
+r = await call(ali, "POST", "/api/helpme/upload", null, { body: Buffer.alloc(41 * 1024 * 1024), type: "video/webm" }); assert.equal(r.status, 413);
 r = await call(ali, "POST", "/api/helpme/upload", null, { body: video, type: "video/webm;codecs=vp8" }); assert.equal(r.status, 201);
 const uploadId = r.body.upload_id;
 r = await call(sara, "POST", `/api/helpme/upload-thumbnail/${uploadId}`, null, { body: jpeg, type: "image/jpeg" }); assert.equal(r.status, 404);
 r = await call(ali, "POST", `/api/helpme/upload-thumbnail/${uploadId}`, null, { body: jpeg, type: "image/jpeg" }); assert.equal(r.status, 201);
-const pay = { account_country: "PK", pay_method: "Easypaisa", pay_account_title: "Ali Khan", pay_account_number: "03001234567" };
+const pay = { account_country: "PK", pay_method: "Easypaisa", pay_bank_name: "Example Bank", pay_account_title: "Ali Khan", pay_account_number: "03001234567", duration_ms: 20000 };
 r = await call(ali, "POST", "/api/helpme/appeals", { upload_id: uploadId, description: "Call me on 03001234567", ...pay }); assert.equal(r.body.code, "CONTACT_IN_DESCRIPTION");
+r = await call(ali, "POST", "/api/helpme/appeals", { upload_id: uploadId, description: "I need help with school fees for my kids", ...pay, duration_ms: 2000 }); assert.equal(r.body.code, "BAD_DURATION");
+r = await call(ali, "POST", "/api/helpme/appeals", { upload_id: uploadId, description: "I need help with school fees for my kids", ...pay, duration_ms: 21000 }); assert.equal(r.body.code, "BAD_DURATION");
+r = await call(ali, "POST", "/api/helpme/appeals", { upload_id: uploadId, description: "I need help with school fees for my kids", account_country: pay.account_country, pay_method: pay.pay_method, pay_account_title: pay.pay_account_title, pay_account_number: pay.pay_account_number, duration_ms: pay.duration_ms }); assert.equal(r.body.code, "BAD_PAYMENT");
 r = await call(ali, "POST", "/api/helpme/appeals", { upload_id: uploadId, description: "I need help with school fees for my kids", ...pay }); assert.equal(r.status, 201); assert.equal(r.body.goal_local, 580); assert.equal(r.body.currency, "PKR");
 const appealId = r.body.id;
+assert.equal(sql.prepare("SELECT duration_ms FROM helpme_appeals WHERE id = ?").get(appealId)?.duration_ms, 20000);
 r = await call(null, "GET", `/api/helpme/thumbnail/${appealId}`); assert.equal(r.status, 404);
 r = await call(ali, "GET", "/api/helpme/eligibility"); assert.equal(r.body.code, "ACTIVE_APPEAL");
 r = await call(ali, "POST", "/api/helpme/upload", null, { body: video, type: "video/webm" }); assert.equal(r.status, 409);
@@ -90,7 +97,7 @@ assert.ok(it.video_url.startsWith("/api/helpme/media/v/")); assert.equal(it.thum
 { const u = new URL("https://givethra.org/api/helpme/media/pending/x.mp4"); const res = await handleHelpMe(new Request(u), env, {}, null, u, u.pathname.split("/").filter(Boolean), "https://givethra.org", h); assert.equal(res.status, 404); }
 r = await call(null, "GET", `/api/helpme/appeals/${appealId}/payment`); assert.equal(r.status, 401);
 r = await call(ali, "GET", `/api/helpme/appeals/${appealId}/payment`); assert.equal(r.status, 400);
-r = await call(omar, "GET", `/api/helpme/appeals/${appealId}/payment`); assert.equal(r.status, 200); assert.equal(r.body.account_number, "03001234567"); assert.equal(r.body.remaining_local, 580);
+r = await call(omar, "GET", `/api/helpme/appeals/${appealId}/payment`); assert.equal(r.status, 200); assert.equal(r.body.bank_name, "Example Bank"); assert.equal(r.body.account_number, "03001234567"); assert.equal(r.body.goal_local, 580); assert.equal(r.body.remaining_local, 580);
 // reactions
 r = await call(omar, "POST", `/api/helpme/appeals/${appealId}/pray`); assert.equal(r.body.active, true);
 r = await call(omar, "POST", `/api/helpme/appeals/${appealId}/pray`); assert.equal(r.body.active, false);

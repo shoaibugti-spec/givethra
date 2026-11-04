@@ -156,8 +156,10 @@ export function HelpSheet({ appeal, onClose, onDone }: { appeal: Appeal | null; 
           </p>
           <div className="space-y-2">
             <CopyRow label="Transfer type" value={displayHelpMePaymentMethod(info.pay_method)} />
+            <CopyRow label="Bank name" value={info.bank_name || "Not provided"} />
             <CopyRow label="Account title" value={info.account_title} />
             <CopyRow label="Account number" value={info.account_number} />
+            <CopyRow label="Total goal" value={formatMoney(info.goal_local, info.currency)} />
           </div>
           <div className="flex items-center justify-between rounded-xl bg-lime-500 px-3 py-2 text-xs font-extrabold text-black">
             <span>Still needed</span>

@@ -96,6 +96,7 @@ export interface HelpMeConfig {
   min_stop_seconds: number;
   max_bytes: number;
   retention_days: number;
+  country_code?: string | null;
   country_currency: Record<string, string>;
   rates: { currency: string; per_usd: number }[];
 }
@@ -250,10 +251,12 @@ export function formatMoney(amount: number, currency: string): string {
   return sym.length > 1 && /^[A-Z]+$/.test(sym) ? `${sym} ${n}` : `${sym}${n}`;
 }
 
-/** Viewer currency from the browser language (ur-PK -> PKR). Falls back to USD. */
+/** Viewer currency from Cloudflare's request country, then browser locale, then USD. */
 export function viewerCurrency(cfg: HelpMeConfig | null): string {
   try {
-    const lang = navigator.language || "";
+    const detectedCountry = String(cfg?.country_code || "").toUpperCase();
+    if (cfg && detectedCountry && cfg.country_currency[detectedCountry]) return cfg.country_currency[detectedCountry];
+    const lang = typeof navigator !== "undefined" ? navigator.language || "" : "";
     const region = (lang.split("-")[1] || "").toUpperCase();
     return (cfg && cfg.country_currency[region]) || "USD";
   } catch {

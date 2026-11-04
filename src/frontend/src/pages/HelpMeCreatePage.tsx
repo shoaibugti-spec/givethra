@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { HelpMeError, isValidHelpMeAccountIdentifier, PAY_METHODS, formatMoney, helpme, niceGoal, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
 import { captureHelpMeThumbnail } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Camera, CheckCircle2, Loader2, RotateCcw, ShieldAlert, Video } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RotateCcw, ShieldAlert, Video } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -42,10 +42,13 @@ export default function HelpMeCreatePage() {
   const [desc, setDesc] = useState("");
   const [country, setCountry] = useState("PK");
   const [method, setMethod] = useState("");
+  const [bankName, setBankName] = useState("");
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
+  const [previewPlaying, setPreviewPlaying] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
   const durationRef = useRef(0);
 
   const maxSec = cfg?.max_seconds ?? 20;
@@ -67,7 +70,9 @@ export default function HelpMeCreatePage() {
         if (!live) return;
         setElig(e);
         setCfg(c);
-        const cc = (navigator.language.split("-")[1] || "").toUpperCase();
+        const detectedCountry = (c.country_code || "").toUpperCase();
+        const localeCountry = (navigator.language.split("-")[1] || "").toUpperCase();
+        const cc = c.country_currency[detectedCountry] ? detectedCountry : localeCountry;
         if (c.country_currency[cc]) setCountry(cc);
         setStep(e.can_post ? "intro" : "blocked");
       })
@@ -98,13 +103,15 @@ export default function HelpMeCreatePage() {
         v.onerror = () => { window.clearTimeout(timer); reject(new Error("unreadable")); };
         v.src = probeUrl;
       });
-      if (Number.isFinite(meta.d) && meta.d > maxSec + 0.5) { setCamError(`Video is ${Math.round(meta.d)}s. Please record at most ${maxSec} seconds.`); return; }
-      if (Number.isFinite(meta.d) && meta.d < minSec - 0.5) { setCamError(`Video is only ${Math.round(meta.d)}s. Please record ${minSec} to ${maxSec} seconds.`); return; }
+      if (!Number.isFinite(meta.d) || meta.d <= 0) { setCamError("Could not read the video length. Please record again."); return; }
+      if (meta.d > maxSec) { setCamError(`Video is ${Math.round(meta.d)}s. Please record at most ${maxSec} seconds.`); return; }
+      if (meta.d < minSec) { setCamError(`Video is only ${Math.round(meta.d)}s. Please record ${minSec} to ${maxSec} seconds.`); return; }
       if (!(meta.h > meta.w)) { setCamError("Please hold your phone upright (vertical) and record again."); return; }
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      durationRef.current = Number.isFinite(meta.d) ? Math.round(meta.d * 1000) : minSec * 1000;
+      durationRef.current = Math.round(meta.d * 1000);
       setBlob(file);
       setUploadId("");
+      setPreviewPlaying(false);
       setPreviewUrl(URL.createObjectURL(file));
       setStep("preview");
     } catch {
@@ -114,11 +121,21 @@ export default function HelpMeCreatePage() {
     }
   }
 
+  async function togglePreviewPlayback() {
+    const video = previewVideoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      try { await video.play(); }
+      catch { toast.error("This browser could not play the recording inline. Please try again."); }
+    } else video.pause();
+  }
+
   function retake() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl("");
     setBlob(null);
     setUploadId("");
+    setPreviewPlaying(false);
     openCamera();
   }
 
@@ -134,8 +151,10 @@ export default function HelpMeCreatePage() {
   async function submit() {
     setFormError("");
     if (!blob) return;
+    if (durationRef.current < minSec * 1000 || durationRef.current > maxSec * 1000) return setFormError(`Record a video between ${minSec} and ${maxSec} seconds.`);
     if (desc.trim().length < 10) return setFormError("Please describe your need in 2-3 short lines (at least 10 characters).");
     if (CONTACT_RE.test(desc)) return setFormError("Please remove phone numbers, e-mail and links from the description. Payment details go in the boxes below.");
+    if (bankName.trim().length < 2) return setFormError("Enter the bank name.");
     if (title.trim().length < 2 || !isValidHelpMeAccountIdentifier(number)) return setFormError("Enter the account title and a valid account, IBAN or wallet identifier.");
     setBusy(true);
     try {
@@ -153,7 +172,7 @@ export default function HelpMeCreatePage() {
       }
       await helpme.createAppeal({
         upload_id: uid, description: desc.trim(), account_country: country, pay_method: method,
-        pay_bank_name: "", pay_account_title: title.trim(), pay_account_number: number.trim(), duration_ms: Math.round(durationRef.current),
+        pay_bank_name: bankName.trim(), pay_account_title: title.trim(), pay_account_number: number.trim(), duration_ms: Math.round(durationRef.current),
       });
       setStep("done");
       toast.success("Sent for review");
@@ -208,13 +227,16 @@ export default function HelpMeCreatePage() {
 
         {step === "preview" && (
           <div className="flex flex-1 flex-col px-4 pb-6">
-            <div className="mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-2xl bg-black">
-              <video src={previewUrl} controls playsInline className="h-full w-full object-contain" />
+            <div className="relative mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-2xl bg-black">
+              <video ref={previewVideoRef} src={previewUrl} playsInline preload="metadata" controls={false} disablePictureInPicture disableRemotePlayback onClick={() => void togglePreviewPlayback()} onPlay={() => setPreviewPlaying(true)} onPause={() => setPreviewPlaying(false)} onEnded={() => setPreviewPlaying(false)} onContextMenu={(event) => event.preventDefault()} className="h-full w-full object-contain" />
+              <button type="button" onClick={() => void togglePreviewPlayback()} aria-label={previewPlaying ? "Pause recording" : "Play recording"} className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/75 px-4 py-2 text-sm font-bold text-white active:scale-95">
+                {previewPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}{previewPlaying ? "Pause" : "Play recording"}
+              </button>
             </div>
-            <p className="mt-3 text-center text-xs text-gray-300">Watch and listen to your recording. Is it clear?</p>
+              <p className="mt-3 text-center text-xs text-gray-300">Watch and listen to your recording. Is it clear?</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button type="button" onClick={retake} className="flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 py-3 text-sm font-bold active:scale-95"><RotateCcw className="h-4 w-4" /> Retake</button>
-              <button type="button" onClick={() => setStep("details")} className="rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 py-3 text-sm font-extrabold active:scale-95">Use this video</button>
+              <button type="button" onClick={() => { previewVideoRef.current?.pause(); setStep("details"); }} className="rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 py-3 text-sm font-extrabold active:scale-95">Use this video</button>
             </div>
           </div>
         )}
@@ -234,6 +256,7 @@ export default function HelpMeCreatePage() {
                 {methods.map((m) => <button key={m} type="button" onClick={() => setMethod(m)} className={`rounded-full border px-3.5 py-1.5 text-xs font-bold ${method === m ? "border-emerald-400 bg-emerald-500 text-white" : "border-white/20 bg-white/5 text-gray-200"}`}>{m}</button>)}
               </div>
             </Field>
+            <Field label="Bank name"><input value={bankName} onChange={(e) => setBankName(e.target.value.slice(0, 60))} maxLength={60} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" placeholder="Enter the bank name" /></Field>
             <Field label="Account title"><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" /></Field>
             <Field label="Account number, IBAN or wallet ID"><input value={number} onChange={(e) => setNumber(e.target.value)} maxLength={40} inputMode="text" className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 font-mono text-sm outline-none focus:border-emerald-400" /></Field>
             {goal !== null && cfg && (

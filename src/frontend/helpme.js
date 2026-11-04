@@ -119,9 +119,10 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     const res = json({
       goal_usd_cents: S.goal_usd_cents, max_seconds: MAX_SECONDS, min_stop_seconds: MIN_STOP_SECONDS,
       max_bytes: MAX_VIDEO_BYTES, retention_days: S.retention_days, video_base: videoBase,
+      country_code: typeof request.cf?.country === "string" ? request.cf.country.toUpperCase() : null,
       country_currency: COUNTRY_CURRENCY, rates: rates.results || [],
     }, 200, origin);
-    res.headers.set("Cache-Control", "public, max-age=300");
+    res.headers.set("Cache-Control", "private, max-age=300");
     return res;
   }
 
@@ -353,10 +354,12 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     const bank = clean(b.pay_bank_name, 60);
     const title = clean(b.pay_account_title, 80);
     const number = clean(b.pay_account_number, 40);
+    const requestedDuration = Number(b.duration_ms);
     if (description.length < 10) return json({ error: "Please describe your need in 2-3 short lines (at least 10 characters).", code: "BAD_DESCRIPTION" }, 400, origin);
     if (hasPublicContact(description)) return json({ error: "Please remove phone numbers, e-mail and links from the description. Payment details go in the payment box.", code: "CONTACT_IN_DESCRIPTION" }, 400, origin);
     if (!/^[A-Z]{2}$/.test(country)) return json({ error: "Select the country of your payment account", code: "BAD_COUNTRY" }, 400, origin);
-    if (payMethod.length < 2 || title.length < 2 || !/^[A-Za-z0-9 @\-+_./]{5,40}$/.test(number)) return json({ error: "Payment method, account title and a valid account identifier are required", code: "BAD_PAYMENT" }, 400, origin);
+    if (bank.length < 2 || payMethod.length < 2 || title.length < 2 || !/^[A-Za-z0-9 @\-+_./]{5,40}$/.test(number)) return json({ error: "Bank name, payment method, account title and a valid account identifier are required", code: "BAD_PAYMENT" }, 400, origin);
+    if (!Number.isFinite(requestedDuration) || requestedDuration < MIN_STOP_SECONDS * 1000 || requestedDuration > MAX_SECONDS * 1000) return json({ error: `Record a video between ${MIN_STOP_SECONDS} and ${MAX_SECONDS} seconds.`, code: "BAD_DURATION" }, 400, origin);
     const upload = await db.prepare("SELECT id, video_key, content_type, size_bytes FROM helpme_uploads WHERE id = ? AND user_id = ? AND used_appeal_id IS NULL").bind(String(b.upload_id || ""), user.user_id).first();
     if (!upload) return json({ error: "Recording not found. Please record again.", code: "UPLOAD_MISSING" }, 400, origin);
     const accountNorm = norm(number);
@@ -368,7 +371,7 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     if (!rate) return json({ error: "This currency is not available yet", code: "NO_RATE" }, 400, origin);
     const goalLocal = niceGoal(S.goal_usd_cents, rate);
     const appealId = id(); const ts = now();
-    const duration = Math.min(Math.max(Math.round(Number(b.duration_ms) || 0), 0), (MAX_SECONDS + 1) * 1000);
+    const duration = Math.round(requestedDuration);
     try {
       await db.batch([
         db.prepare(`INSERT INTO helpme_appeals (id,user_id,status,description,video_key,video_content_type,video_size,duration_ms,account_country,currency,fx_per_usd,goal_usd_cents,goal_local,pay_method,pay_bank_name,pay_account_title,pay_account_number,pay_account_norm,created_at)
