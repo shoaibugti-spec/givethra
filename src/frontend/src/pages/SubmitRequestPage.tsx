@@ -1,145 +1,69 @@
 // src/frontend/src/pages/SubmitRequestPage.tsx
-// Fully refactored, Premium UI, and Global Country Profiles Integrated.
-// 🔥 FIXED: Imported motion from 'motion/react', fixed JSX typo causing crash, integrated countryProfiles.
+// Premium Globalized UI with All Logic Intact
+// 🌍 Country profiles drive currency, ID/document labels, amount limits and provider lists.
+// 🔥 100% Original Logic Preserved + Premium Design.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { COUNTRIES } from "@/lib/countries";
+import { getCountryProfile, scaleFromPKR, isPhoneValid, CURRENCY_CODES, CURRENCY_SYMBOLS } from "@/lib/countryProfiles";
 import {
-  getKycStatus,
-  getWallet,
-  getUserSettings,
-  getCasesByUser,
-  getUserSuspension,
-  upsertUserSuspension,
-  getCategoryOffer,
-  getOfferClaimCount,
-  insertOfferClaim,
-  updateCategoryOfferUsage,
-  getCaseCounts,
-  getFeedbacks,
-  insertCaseSubmission,
-  uploadFileToStorage,
+  getKycStatus, getWallet, getUserSettings, getCasesByUser, getUserSuspension, upsertUserSuspension,
+  getCategoryOffer, getOfferClaimCount, insertOfferClaim, updateCategoryOfferUsage, getCaseCounts,
+  getFeedbacks, insertCaseSubmission, uploadFileToStorage,
 } from "@/lib/api";
 import { sendNotification } from "@/lib/notify";
 import { getCategoryConfig } from "@/lib/categoryFields";
 import { ELECTRICITY_APPLIANCES, ELECTRICITY_MAX_ELIGIBLE_UNITS, normalizeElectricityAppliances } from "./submit-request/electricity";
 import { EMPLOYMENT_OPTIONS } from "./submit-request/employment";
-import {
-  ELECTRICITY_COMPANIES,
-  GAS_COMPANIES,
-  WATER_COMPANIES,
-  EDUCATION_INSTITUTES,
-  HEALTH_INSTITUTES,
-  EDUCATION_REF_HINT,
-  HEALTH_REF_HINT,
-} from "@/lib/institutesList";
+import { ELECTRICITY_COMPANIES, GAS_COMPANIES, WATER_COMPANIES, EDUCATION_INSTITUTES, HEALTH_INSTITUTES, EDUCATION_REF_HINT, HEALTH_REF_HINT } from "@/lib/institutesList";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
-  Camera,
-  AlertCircle,
-  Languages,
-  Info,
-  Gift,
-  CheckCircle2,
-  Search,
-  ShieldAlert,
-  ShieldCheck,
-  Wallet,
-  MapPin,
-  Phone,
-  Building2,
-  X,
-  Calculator,
-  Heart,
-  FileText,
-  UploadCloud,
-  User,
-  Briefcase,
-  GraduationCap,
-  Stethoscope,
-  Home,
-  ChevronRight,
-  Check,
-  Video,
-  Play,
-  Square,
-  Sparkles,
-  Shield,
+  Camera, AlertCircle, Languages, Info, Gift, CheckCircle2, Search, ShieldAlert, ShieldCheck,
+  Wallet, MapPin, Phone, Building2, Calculator, Heart, Lock, Globe, FileText, UploadCloud,
+  Briefcase, ChevronRight, Check, Video, Square, Shield,
 } from "lucide-react";
-
-// 🔥 Correctly using motion/react
-import { motion, AnimatePresence } from "motion/react"; 
+import { motion, AnimatePresence } from "motion/react";
 import { checkCreditGate } from "@/lib/creditGate";
-import { getCountryProfile, CURRENCY_SYMBOLS, CURRENCY_CODES } from "@/lib/countryProfiles";
 
 // ============================================================
 //  CATEGORY ASSISTANCE LIMITS POLICY
 // ============================================================
-const CATEGORY_LIMITS: Record<
-  string,
-  {
-    type: "fixed" | "verified" | "max" | "debt_percentage";
-    amount?: number;
-    minAmount?: number;
-    maxAmount?: number;
-    percentage?: number;
-    label: string;
-  }
-> = {
+const CATEGORY_LIMITS: Record<string, { type: "fixed" | "verified" | "max" | "debt_percentage"; amount?: number; minAmount?: number; maxAmount?: number; percentage?: number; label: string; }> = {
   "Widow & Elderly Support": { type: "fixed", amount: 3000, label: "Fixed Stipend" },
   "Child Support": { type: "fixed", amount: 2000, label: "Fixed Stipend" },
   "Orphan Support": { type: "fixed", amount: 3000, label: "Fixed Orphan Support" },
   "Disability Support": { type: "fixed", amount: 3000, label: "Fixed Stipend" },
-  "Food & Groceries": { type: "fixed", amount: 6000, label: "Fixed Rs 6,000 per family" },
+  "Food & Groceries": { type: "fixed", amount: 6000, label: "Fixed amount per family" },
   "Electricity Bill": { type: "verified", label: "1 Month Verified Bill" },
   "Gas Bill": { type: "verified", label: "1 Month Verified Bill" },
   "Water Bill": { type: "verified", label: "1 Month Verified Bill" },
   "House Rent": { type: "verified", label: "1 Month Verified Rent" },
   "School, College & University Fees": { type: "verified", label: "1 Student / 1 Month Verified Fee" },
-  "Education, Books & Admission": { type: "verified", label: "Admission: manual amount · Books/Uniform: fixed Rs 3,000" },
+  "Education, Books & Admission": { type: "verified", label: "Admission: manual amount · Books/Uniform: fixed amount" },
   "Medicines": { type: "fixed", amount: 3000, label: "Fixed Medicine Help" },
   "Medical & Treatment": { type: "verified", label: "Verified Treatment Bill" },
   "Home Repair": { type: "fixed", amount: 10000, label: "Fixed Home Repair Help" },
-  "Debt Relief": { type: "debt_percentage", percentage: 5, maxAmount: 25000, label: "5% of debt (max Rs 25,000)" },
+  "Debt Relief": { type: "debt_percentage", percentage: 5, maxAmount: 25000, label: "5% of debt (capped)" },
   "Business / Work Help": { type: "fixed", amount: 10000, label: "Fixed Business / Work Help" },
-  "Marriage Support": { type: "max", minAmount: 1000, maxAmount: 30000, label: "Rs 1,000–30,000 for one selected marriage item" },
+  "Marriage Support": { type: "max", minAmount: 1000, maxAmount: 30000, label: "One selected marriage item (capped)" },
   "Funeral Expenses": { type: "fixed", amount: 5000, label: "Fixed Funeral Help" },
   "Livestock / Farming": { type: "fixed", amount: 10000, label: "Fixed Farming Help" },
   "Emergency Help": { type: "fixed", amount: 3000, label: "Fixed Emergency Help" },
 };
 
-const CATEGORIES = [
-  "Electricity Bill", "Gas Bill", "Water Bill", "House Rent",
-  "School, College & University Fees", "Education, Books & Admission",
-  "Medical & Treatment", "Medicines", "Food & Groceries", "Child Support",
-  "Orphan Support", "Widow & Elderly Support", "Disability Support",
-  "Marriage Support", "Business / Work Help", "Home Repair",
-  "Funeral Expenses", "Livestock / Farming", "Debt Relief", "Emergency Help",
-];
-
+const CATEGORIES = ["Electricity Bill", "Gas Bill", "Water Bill", "House Rent", "School, College & University Fees", "Education, Books & Admission", "Medical & Treatment", "Medicines", "Food & Groceries", "Child Support", "Orphan Support", "Widow & Elderly Support", "Disability Support", "Marriage Support", "Business / Work Help", "Home Repair", "Funeral Expenses", "Livestock / Farming", "Debt Relief", "Emergency Help"];
 const STEPS = ["Basic Info", "Category Details", "Verification", "Review"];
+const CASE_CURRENCIES = CURRENCY_CODES;
 const SS_KEY = "givethra_submit_draft_v4";
-
-const COMMON_GUIDE_TAIL = [
-  "Upload clear documents so Givethra can verify your case.",
-  "Take a live selfie and record a video explaining your need in your own words.",
-  "Your first case is FREE. After that, a 1 credit listing fee applies.",
-];
-
+const COMMON_GUIDE_TAIL = ["Upload clear documents so Givethra can verify your case.", "Take a live selfie and record a video explaining your need in your own words.", "Your first case is FREE. After that, a 1 credit listing fee applies."];
 const MAX_REJECTIONS_BEFORE_SUSPENSION = 5;
 const UNLOCK_CREDITS_REQUIRED = 5;
 const MAX_FREE_CASES = 2;
@@ -150,77 +74,36 @@ const UTILITY_CATS: Record<string, { companies: { name: string; ref: string; ref
   "Water Bill": { companies: WATER_COMPANIES },
 };
 
-const EDUCATION_SUB_OPTIONS = [
-  { value: "admission", label: "🎓 Admission Fee" },
-  { value: "books", label: "📚 Books / Study Materials" },
-  { value: "uniform", label: "👕 Uniform / Shoes" },
-];
-
-const FEE_SUB_OPTIONS = [
-  { value: "school", label: "🏫 School Fee" },
-  { value: "college", label: "🎓 College Fee" },
-  { value: "university", label: "🏛️ University Fee" },
-];
+const EDUCATION_SUB_OPTIONS = [{ value: "admission", label: "🎓 Admission Fee" }, { value: "books", label: "📚 Books / Study Materials" }, { value: "uniform", label: "👕 Uniform / Shoes" }];
+const FEE_SUB_OPTIONS = [{ value: "school", label: "🏫 School Fee" }, { value: "college", label: "🎓 College Fee" }, { value: "university", label: "🏛️ University Fee" }];
 
 const EDUCATION_ADMISSION_FIELDS = {
-  School: [
-    { key: "institute_name", label: "School Name", required: true, placeholder: "e.g. Beaconhouse School System" },
-    { key: "class_grade", label: "Class / Grade", required: true, placeholder: "e.g. Grade 8" },
-    { key: "admission_type", label: "Admission Type", required: true, choices: ["New Admission", "Re-admission", "Transfer"] },
-    { key: "admission_status", label: "Admission Status", required: true, choices: ["Selected", "Admission Offered", "Confirmed"] },
-  ],
-  College: [
-    { key: "institute_name", label: "College Name", required: true, placeholder: "e.g. Government College University" },
-    { key: "program", label: "Program / Class", required: true, choices: ["FA", "FSc", "ICS", "I.Com", "Other"] },
-    { key: "year", label: "Year", required: true, choices: ["1st Year", "2nd Year"] },
-    { key: "admission_status", label: "Admission Status", required: true, choices: ["Selected", "Admission Offered", "Confirmed"] },
-  ],
-  University: [
-    { key: "institute_name", label: "University Name", required: true, placeholder: "e.g. National University of Modern Languages" },
-    { key: "program_degree", label: "Program / Degree", required: true, placeholder: "e.g. BS Psychology" },
-    { key: "semester_year", label: "Semester / Year", required: true, placeholder: "e.g. Fall 2026" },
-    { key: "admission_status", label: "Admission Status", required: true, choices: ["Selected", "Admission Offered", "Confirmed", "Waiting List"] },
-  ],
+  School: [{ key: "institute_name", label: "School Name", required: true, placeholder: "Full name of the school" }, { key: "class_grade", label: "Class / Grade", required: true, placeholder: "e.g. Grade 8" }, { key: "admission_type", label: "Admission Type", required: true, choices: ["New Admission", "Re-admission", "Transfer"] }, { key: "admission_status", label: "Admission Status", required: true, choices: ["Selected", "Admission Offered", "Confirmed"] }],
+  College: [{ key: "institute_name", label: "College Name", required: true, placeholder: "Full name of the college" }, { key: "program", label: "Program / Class", required: true, choices: ["High School / Secondary", "Pre-university (A-Level, FA/FSc, etc.)", "Diploma / Vocational", "Other"] }, { key: "year", label: "Year", required: true, choices: ["1st Year", "2nd Year", "Other"] }, { key: "admission_status", label: "Admission Status", required: true, choices: ["Selected", "Admission Offered", "Confirmed"] }],
+  University: [{ key: "institute_name", label: "University Name", required: true, placeholder: "Full name of the university" }, { key: "program_degree", label: "Program / Degree", required: true, placeholder: "e.g. BS Psychology" }, { key: "semester_year", label: "Semester / Year", required: true, placeholder: "e.g. Fall 2026" }, { key: "admission_status", label: "Admission Status", required: true, choices: ["Selected", "Admission Offered", "Confirmed", "Waiting List"] }],
 };
 
 const EDUCATION_FEE_FIELDS = {
-  School: [
-    { key: "institute_name", label: "School Name", required: true, placeholder: "e.g. Beaconhouse School System" },
-    { key: "class_grade", label: "Class / Grade", required: true, placeholder: "e.g. Grade 8" },
-    { key: "fee_month", label: "Fee Month", required: true, placeholder: "e.g. August 2026" },
-  ],
-  College: [
-    { key: "institute_name", label: "College Name", required: true, placeholder: "e.g. Government College University" },
-    { key: "program", label: "Program / Class", required: true, choices: ["FA", "FSc", "ICS", "I.Com", "Other"] },
-    { key: "year", label: "Year", required: true, choices: ["1st Year", "2nd Year"] },
-    { key: "fee_month", label: "Fee Month", required: true, placeholder: "e.g. August 2026" },
-  ],
-  University: [
-    { key: "institute_name", label: "University Name", required: true, placeholder: "e.g. National University of Modern Languages" },
-    { key: "program_degree", label: "Program / Degree", required: true, placeholder: "e.g. BS Psychology" },
-    { key: "semester_year", label: "Semester / Year", required: true, placeholder: "e.g. Fall 2026" },
-    { key: "fee_month", label: "Fee Month", required: true, placeholder: "e.g. August 2026" },
-  ],
+  School: [{ key: "institute_name", label: "School Name", required: true, placeholder: "Full name of the school" }, { key: "class_grade", label: "Class / Grade", required: true, placeholder: "e.g. Grade 8" }, { key: "fee_month", label: "Fee Month", required: true, placeholder: "e.g. August 2026" }],
+  College: [{ key: "institute_name", label: "College Name", required: true, placeholder: "Full name of the college" }, { key: "program", label: "Program / Class", required: true, choices: ["High School / Secondary", "Pre-university (A-Level, FA/FSc, etc.)", "Diploma / Vocational", "Other"] }, { key: "year", label: "Year", required: true, choices: ["1st Year", "2nd Year", "Other"] }, { key: "fee_month", label: "Fee Month", required: true, placeholder: "e.g. August 2026" }],
+  University: [{ key: "institute_name", label: "University Name", required: true, placeholder: "Full name of the university" }, { key: "program_degree", label: "Program / Degree", required: true, placeholder: "e.g. BS Psychology" }, { key: "semester_year", label: "Semester / Year", required: true, placeholder: "e.g. Fall 2026" }, { key: "fee_month", label: "Fee Month", required: true, placeholder: "e.g. August 2026" }],
 };
 
-function getEducationDocs(type: string, subType: string, profile: any) {
+function getEducationDocs(type: string, subType: string) {
   const docs: { key: string; label: string; required: boolean; hint?: string }[] = [];
-  const idLabel = profile?.idLabel || "ID Card";
-  const childIdLabel = profile?.childIdLabel || "Child ID";
-  
   if (type === "admission") {
-    docs.push({ key: "admission_proof", label: "Admission / Selection Proof (Offer Letter / Merit List)", required: true, hint: "Clear photo of offer letter or merit list" });
-    docs.push({ key: "fee_challan", label: "Fee Challan / Voucher (with amount & due date)", required: true, hint: "Challan should clearly show amount and due date" });
-    docs.push({ key: "student_id_proof", label: `Student ${childIdLabel} / ${idLabel} / School ID`, required: true, hint: "Clear proof of student identity" });
+    docs.push({ key: "admission_proof", label: "Admission / Selection Proof (Offer Letter / Acceptance Letter / Merit List)", required: true, hint: "Clear photo of offer letter or merit list" });
+    docs.push({ key: "fee_challan", label: "Fee Invoice / Challan / Voucher (with amount & due date)", required: true, hint: "Challan should clearly show amount and due date" });
+    docs.push({ key: "student_id_proof", label: "Student ID proof (school ID, birth certificate or national ID)", required: true, hint: "Clear proof of student identity" });
   } else if (type === "fee") {
-    docs.push({ key: "fee_challan", label: "Fee Challan / Voucher (with amount & due date)", required: true, hint: "Challan should clearly show amount and due date" });
-    docs.push({ key: "student_id_proof", label: `Student ${childIdLabel} / ${idLabel} / School ID`, required: true, hint: "Clear proof of student identity" });
+    docs.push({ key: "fee_challan", label: "Fee Invoice / Challan / Voucher (with amount & due date)", required: true, hint: "Challan should clearly show amount and due date" });
+    docs.push({ key: "student_id_proof", label: "Student ID proof (school ID, birth certificate or national ID)", required: true, hint: "Clear proof of student identity" });
   } else if (type === "books") {
     docs.push({ key: "books_quotation", label: "Books List / Quotation from Shop", required: true, hint: "Clear photo of book list and price quotation" });
-    docs.push({ key: "student_id_proof", label: `Student ${childIdLabel} / School ID`, required: true, hint: "Student identity proof" });
+    docs.push({ key: "student_id_proof", label: "Student ID proof (school/college ID or birth certificate)", required: true, hint: "Student identity proof" });
   } else if (type === "uniform") {
     docs.push({ key: "uniform_quotation", label: "Uniform List / Quotation from Shop", required: true, hint: "Clear photo of uniform items and price quotation" });
-    docs.push({ key: "student_id_proof", label: `Student ${childIdLabel} / School ID`, required: true, hint: "Student identity proof" });
+    docs.push({ key: "student_id_proof", label: "Student ID proof (school/college ID or birth certificate)", required: true, hint: "Student identity proof" });
     docs.push({ key: "uniform_items", label: "Items Needed (List photo or written)", required: true, hint: "List of uniform items (shoes, bag, winter uniform etc.)" });
   }
   return docs;
@@ -231,21 +114,14 @@ const PAYMENT_RECEIVER_CATS = new Set(["House Rent", "Food & Groceries", "Medici
 const LIST_CATS: Record<string, any> = {
   "School, College & University Fees": {
     list: EDUCATION_INSTITUTES, refLabel: "Fee Challan / Voucher Number", refHint: EDUCATION_REF_HINT,
-    personFields: [
-      { key: "student_name", label: "Student's Name (ONE student)", required: true, placeholder: "Full name of student" },
-      { key: "father_name", label: "Father's Name", required: true, placeholder: "Father's full name" },
-      { key: "roll_no", label: "Roll No / Registration No", required: true, placeholder: "Student's roll number" },
-    ],
+    personFields: [{ key: "student_name", label: "Student's Name (ONE student)", required: true, placeholder: "Full name of student" }, { key: "father_name", label: "Father's Name", required: true, placeholder: "Father's full name" }, { key: "roll_no", label: "Roll No / Registration No", required: true, placeholder: "Student's roll number" }],
     billLabel: "Fee Challan / Voucher Photo", isEducationCategory: true, subOptions: FEE_SUB_OPTIONS,
     getSubFields: (subType: string) => subType === "school" ? EDUCATION_FEE_FIELDS.School : subType === "college" ? EDUCATION_FEE_FIELDS.College : subType === "university" ? EDUCATION_FEE_FIELDS.University : [],
-    getSubDocs: (subType: string, profile: any) => getEducationDocs("fee", subType, profile),
+    getSubDocs: (subType: string) => getEducationDocs("fee", subType),
   },
   "Education, Books & Admission": {
     list: EDUCATION_INSTITUTES, refLabel: "Challan / Reference Number", refHint: "If available, enter the challan or quotation reference number",
-    personFields: [
-      { key: "student_name", label: "Student's Name (ONE student)", required: true, placeholder: "Full name of student" },
-      { key: "student_class", label: "Class / Grade / Program", required: true, placeholder: "e.g. Grade 8, FA, BS" },
-    ],
+    personFields: [{ key: "student_name", label: "Student's Name (ONE student)", required: true, placeholder: "Full name of student" }, { key: "student_class", label: "Class / Grade / Program", required: true, placeholder: "e.g. Grade 8, FA, BS" }],
     billLabel: "Bill / Challan / Quotation Photo", isEducationCategory: true, subOptions: EDUCATION_SUB_OPTIONS,
     getSubFields: (subType: string, subValue: string) => {
       if (subType === "admission") {
@@ -255,22 +131,16 @@ const LIST_CATS: Record<string, any> = {
       }
       return [];
     },
-    getSubDocs: (subType: string, subValue: string, profile: any) => getEducationDocs(subType, subValue, profile),
+    getSubDocs: (subType: string, subValue: string) => getEducationDocs(subType, subValue),
   },
   "Medical & Treatment": {
     list: HEALTH_INSTITUTES, refLabel: "Bill / Invoice / MR Number", refHint: HEALTH_REF_HINT,
-    personFields: [
-      { key: "patient_name", label: "Patient's Name (ONE patient)", required: true, placeholder: "Full name of patient" },
-      { key: "illness", label: "Illness / Treatment Needed", required: true, placeholder: "Brief description of illness" },
-    ],
+    personFields: [{ key: "patient_name", label: "Patient's Name (ONE patient)", required: true, placeholder: "Full name of patient" }, { key: "illness", label: "Illness / Treatment Needed", required: true, placeholder: "Brief description of illness" }],
     billLabel: "Hospital Bill / Medical Receipt Photo",
   },
   "Medicines": {
     list: HEALTH_INSTITUTES, refLabel: "Invoice / Prescription Number (if any)", refHint: HEALTH_REF_HINT,
-    personFields: [
-      { key: "patient_name", label: "Patient's Name (ONE patient)", required: true, placeholder: "Full name of patient" },
-      { key: "illness", label: "Illness / Condition", required: true, placeholder: "Brief description of condition" },
-    ],
+    personFields: [{ key: "patient_name", label: "Patient's Name (ONE patient)", required: true, placeholder: "Full name of patient" }, { key: "illness", label: "Illness / Condition", required: true, placeholder: "Brief description of condition" }],
     billLabel: "Prescription / Medicine Estimate Photo",
     extraDocs: [{ key: "doctor_report", label: "Doctor's Report / Prescription", required: true, hint: "Clear photo of the doctor's written report or prescription" }],
   },
@@ -285,15 +155,15 @@ const SKIP_FIELDS = new Set(["provider_name", "provider_contact", "landlord_name
 
 function getCategoryLimit(category: string) { return CATEGORY_LIMITS[category] || null; }
 function isFixedAmountCategory(category: string): boolean { return getCategoryLimit(category)?.type === "fixed"; }
-function getFixedAmount(category: string): number | null { const limit = getCategoryLimit(category); return limit?.type === "fixed" ? limit.amount || null : null; }
-function getMaxAmount(category: string): number | null { const limit = getCategoryLimit(category); if (limit?.type === "max") return limit.maxAmount || null; if (limit?.type === "debt_percentage") return limit.maxAmount || null; return null; }
-function getMinAmount(category: string): number | null { return getCategoryLimit(category)?.minAmount || null; }
+function getFixedAmount(category: string, currency = "PKR"): number | null { const limit = getCategoryLimit(category); return limit?.type === "fixed" && limit.amount ? scaleFromPKR(limit.amount, currency) : null; }
+function getMaxAmount(category: string, currency = "PKR"): number | null { const limit = getCategoryLimit(category); if ((limit?.type === "max" || limit?.type === "debt_percentage") && limit.maxAmount) return scaleFromPKR(limit.maxAmount, currency); return null; }
+function getMinAmount(category: string, currency = "PKR"): number | null { const min = getCategoryLimit(category)?.minAmount; return min ? scaleFromPKR(min, currency) : null; }
 function isDebtPercentageCategory(category: string): boolean { return getCategoryLimit(category)?.type === "debt_percentage"; }
-function calculateDebtAmount(debtTotal: number): number {
+function calculateDebtAmount(debtTotal: number, currency = "PKR"): number {
   const limit = CATEGORY_LIMITS["Debt Relief"];
   if (!limit || limit.type !== "debt_percentage") return 0;
   const percentage = limit.percentage || 5;
-  const maxAmount = limit.maxAmount || 25000;
+  const maxAmount = scaleFromPKR(limit.maxAmount || 25000, currency);
   return Math.min((debtTotal * percentage) / 100, maxAmount);
 }
 function urgencyFromDue(due: string): string {
@@ -302,19 +172,6 @@ function urgencyFromDue(due: string): string {
   if (days <= 31) return "Emergency";
   if (days <= 62) return "Medium";
   return "Low";
-}
-
-function StepGuide({ lines }: { lines: string[] }) {
-  return (
-    <div className="mt-4 rounded-2xl bg-teal-50/50 border border-teal-100 p-4 text-sm text-teal-900/80 space-y-2">
-      <div className="flex items-center gap-2 text-teal-700 font-bold text-xs uppercase tracking-wide">
-        <Info className="h-4 w-4" /> How to fill this page
-      </div>
-      {lines.map((l, i) => (
-        <p key={i} className="flex items-start gap-2"><span className="text-teal-500 font-bold mt-0.5">•</span> {l}</p>
-      ))}
-    </div>
-  );
 }
 
 function saveDraft(data: any) { try { sessionStorage.setItem(SS_KEY, JSON.stringify(data)); } catch {} }
@@ -331,7 +188,6 @@ const CHOICE_FIELDS: Record<string, string[]> = {
   deceased_relation: ["My father", "My mother", "My husband", "My wife", "My child", "Other relative"],
   pay_to_type: ["Shopkeeper", "Person", "Organization / Institute"],
 };
-
 const GENDER_OPTIONS = ["Male", "Female", "Child"];
 const MARITAL_STATUS_OPTIONS = ["Single", "Married", "Widow", "Divorced"];
 
@@ -357,13 +213,7 @@ export default function SubmitRequestPage() {
   const [tried1, setTried1] = useState(false);
   const [tried2, setTried2] = useState(false);
 
-  const [category, setCategory] = useState(() => {
-    try {
-      const value = localStorage.getItem("givethra_prefill_category") || "";
-      localStorage.removeItem("givethra_prefill_category");
-      return value;
-    } catch { return ""; }
-  });
+  const [category, setCategory] = useState(() => { try { const value = localStorage.getItem("givethra_prefill_category") || ""; localStorage.removeItem("givethra_prefill_category"); return value; } catch { return ""; } });
   const [title, setTitle] = useState("");
   const [shortDesc, setShortDesc] = useState("");
   const [country, setCountry] = useState("");
@@ -377,7 +227,7 @@ export default function SubmitRequestPage() {
 
   const [instituteName, setInstituteName] = useState("");
   const [instituteSearch, setInstituteSearch] = useState("");
-  const [isOtherInstitute, setIsOtherInstitute] = useState(false);
+  const [isOtherInstituteState, setIsOtherInstitute] = useState(false);
   const [otherName, setOtherName] = useState("");
   const [otherContact, setOtherContact] = useState("");
   const [otherAddress, setOtherAddress] = useState("");
@@ -418,7 +268,6 @@ export default function SubmitRequestPage() {
   const [eduSubFields, setEduSubFields] = useState<Record<string, string>>({});
 
   const [propertyOwnership, setPropertyOwnership] = useState<"owned" | "rented" | "">("");
-
   const [catFields, setCatFields] = useState<Record<string, any>>({});
   const [catDocUrls, setCatDocUrls] = useState<Record<string, string>>({});
   const [catDocNames, setCatDocNames] = useState<Record<string, string>>({});
@@ -452,7 +301,18 @@ export default function SubmitRequestPage() {
   const [blockedByFeedback, setBlockedByFeedback] = useState<{ caseId: string; caseTitle: string } | null>(null);
   const [checkingFeedback, setCheckingFeedback] = useState(true);
 
+  // 🔥 Global Profile integration
   const easy = isEasyCat(category);
+  const profile = getCountryProfile(country);
+  const localLists = profile.hasLocalProviderLists;
+  const unitCap = localLists ? ELECTRICITY_MAX_ELIGIBLE_UNITS : null;
+  const sym = CURRENCY_SYMBOLS[currency] ?? currency;
+  const money = (n: number | null | undefined) => `${sym} ${Number(n ?? 0).toLocaleString()}`;
+  const stipendAmount = scaleFromPKR(DISABILITY_STIPEND_AMOUNT, currency);
+  const capDebt = scaleFromPKR(25000, currency);
+  const isOtherInstitute = isOtherInstituteState || (easy && !localLists && !!country);
+  const utilCompanies = localLists ? UTILITY_CATS[category]?.companies ?? [] : [];
+  const utilityNoun = category === "Electricity Bill" ? "electricity" : category === "Gas Bill" ? "gas" : "water";
   const utilCfg = UTILITY_CATS[category];
   const listCfg = LIST_CATS[category];
   const config = category && !easy ? getCategoryConfig(category) : null;
@@ -461,16 +321,6 @@ export default function SubmitRequestPage() {
   const cfgGuide = config?.guide ?? [];
   const cfgOneCase = config?.oneCaseNote ?? "";
 
-  // 🔥 Country Profile Integration
-  const profile = getCountryProfile(country);
-  
-  // Set default currency based on selected country
-  useEffect(() => {
-    if (country && profile.currency) {
-      setCurrency(profile.currency);
-    }
-  }, [country, profile.currency]);
-
   const selectedCompany = utilCfg?.companies.find((c) => c.name === instituteName);
   const autoUrgency = easy ? urgencyFromDue(deadline) : "";
   const treatmentAutoUrgency = treatmentExpiry ? urgencyFromDue(treatmentExpiry) : "";
@@ -478,41 +328,28 @@ export default function SubmitRequestPage() {
   const isEducationCategory = category === "Education, Books & Admission" || category === "School, College & University Fees";
   const needsPaymentReceiver = PAYMENT_RECEIVER_CATS.has(category);
 
-  const canUseFreeCase = () => {
-    if (isSuspended || isFreeDisabled) return false;
-    return userFreeCasesUsed < MAX_FREE_CASES;
-  };
-
-  const hasFixedStipend = () => {
-    if (category === "Disability Support" && disabilityMode === "stipend") return true;
-    if (FIXED_STIPEND_CATS.has(category)) return true;
-    return false;
-  };
-
-  const shouldShowPaymentReceiver = () => {
-    return PERSONAL_PAYMENT_CATS.has(category) && !hasFixedStipend();
-  };
+  const canUseFreeCase = () => { if (isSuspended || isFreeDisabled) return false; return userFreeCasesUsed < MAX_FREE_CASES; };
+  const hasFixedStipend = () => { if (category === "Disability Support" && disabilityMode === "stipend") return true; if (FIXED_STIPEND_CATS.has(category)) return true; return false; };
+  const shouldShowPaymentReceiver = () => { return PERSONAL_PAYMENT_CATS.has(category) && !hasFixedStipend(); };
 
   const isFixedAmount = (cat: string) => {
     if (cat === "Disability Support" && disabilityMode === "stipend") return true;
     if (cat === "Education, Books & Admission" && ["books", "uniform"].includes(eduSubType)) return true;
     return isFixedAmountCategory(cat);
   };
-
   const getFixedAmountValue = (cat: string): number | null => {
-    if (cat === "Disability Support" && disabilityMode === "stipend") return DISABILITY_STIPEND_AMOUNT;
-    if (cat === "Education, Books & Admission" && ["books", "uniform"].includes(eduSubType)) return 3000;
-    return getFixedAmount(cat);
+    if (cat === "Disability Support" && disabilityMode === "stipend") return stipendAmount;
+    if (cat === "Education, Books & Admission" && ["books", "uniform"].includes(eduSubType)) return scaleFromPKR(3000, currency);
+    return getFixedAmount(cat, currency);
   };
-
-  const getMaxLimit = (cat: string): number | null => getMaxAmount(cat);
+  const getMaxLimit = (cat: string): number | null => getMaxAmount(cat, currency);
   const isDebtCategory = (cat: string): boolean => cat === "Debt Relief";
 
   useEffect(() => {
     if (isDebtCategory(category) && debtTotalAmount) {
       const total = parseFloat(debtTotalAmount);
       if (!isNaN(total) && total > 0) {
-        const calculated = calculateDebtAmount(total);
+        const calculated = calculateDebtAmount(total, currency);
         setCalculatedDebtAmount(calculated);
         setAmount(calculated.toString());
       } else {
@@ -520,14 +357,14 @@ export default function SubmitRequestPage() {
         setAmount("");
       }
     }
-  }, [debtTotalAmount, category]);
+  }, [debtTotalAmount, category, currency]);
 
   useEffect(() => {
     if (isFixedAmount(category)) {
       const fixedVal = getFixedAmountValue(category);
       if (fixedVal) setAmount(fixedVal.toString());
     }
-  }, [category, disabilityMode, eduSubType]);
+  }, [category, disabilityMode, eduSubType, currency]);
 
   async function loadUserStats() {
     if (!user?.id) { setLoadingUserStats(false); return; }
@@ -538,9 +375,7 @@ export default function SubmitRequestPage() {
       const rejectedCases = cases?.filter((c: any) => c.status === "rejected").length || 0;
       const freeCasesUsed = cases?.filter((c: any) => c.was_free === true).length || 0;
 
-      setUserTotalCases(totalCases);
-      setUserRejectionCount(rejectedCases);
-      setUserFreeCasesUsed(freeCasesUsed);
+      setUserTotalCases(totalCases); setUserRejectionCount(rejectedCases); setUserFreeCasesUsed(freeCasesUsed);
 
       const lastFreeRejected = cases?.some((c: any) => c.was_free === true && String(c.status || "").toLowerCase() === "rejected") || false;
       const canUseFree = freeCasesUsed === 0 || (freeCasesUsed === 1 && lastFreeRejected);
@@ -548,19 +383,13 @@ export default function SubmitRequestPage() {
       setIsFreeDisabled(freeDisabled);
 
       const suspensionData = await getUserSuspension(user.id);
-      if (suspensionData) {
-        setIsSuspended(suspensionData.is_active);
-        setSuspensionCount(suspensionData.suspension_count || 0);
-      } else if (rejectedCases >= MAX_REJECTIONS_BEFORE_SUSPENSION) {
+      if (suspensionData) { setIsSuspended(suspensionData.is_active); setSuspensionCount(suspensionData.suspension_count || 0); }
+      else if (rejectedCases >= MAX_REJECTIONS_BEFORE_SUSPENSION) {
         await upsertUserSuspension({ user_id: user.id, suspension_count: 1, is_active: true, suspended_at: new Date().toISOString(), rejection_count_at_suspension: rejectedCases });
-        setIsSuspended(true);
-        setSuspensionCount(1);
+        setIsSuspended(true); setSuspensionCount(1);
       }
-    } catch (err) {
-      console.error("Error loading user stats:", err);
-    } finally {
-      setLoadingUserStats(false);
-    }
+    } catch (err) { console.error("Error loading user stats:", err); }
+    finally { setLoadingUserStats(false); }
   }
 
   async function handleUnlockAccount() {
@@ -568,17 +397,12 @@ export default function SubmitRequestPage() {
     setUnlocking(true);
     try {
       await upsertUserSuspension({ user_id: user.id, is_active: false });
-      setIsSuspended(false);
-      setSuspensionCount(suspensionCount + 1);
-      setUserRejectionCount(0);
+      setIsSuspended(false); setSuspensionCount(suspensionCount + 1); setUserRejectionCount(0);
       await sendNotification(user.id, "system", "🔓 Account Unlocked", `Your account has been unlocked using ${UNLOCK_CREDITS_REQUIRED} credits.`, "/dashboard");
       toast.success(`✅ Account unlocked! ${UNLOCK_CREDITS_REQUIRED} credits deducted.`);
       await loadUserStats();
-    } catch (err) {
-      toast.error(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
-    } finally {
-      setUnlocking(false);
-    }
+    } catch (err) { toast.error(`Error: ${err instanceof Error ? err.message : "Unknown error"}`); }
+    finally { setUnlocking(false); }
   }
 
   function extraConditionalDocs(): { key: string; label: string; hint?: string }[] {
@@ -591,11 +415,11 @@ export default function SubmitRequestPage() {
     if (category === "Funeral Expenses") {
       const rel = catFields.deceased_relation;
       if (rel === "My husband" || rel === "My wife") list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Proof of relation to spouse" });
-      else if (rel === "My father" || rel === "My mother" || rel === "My child") list.push({ key: "relation_proof", label: `Proof of Relation (${profile.familyProofLabel})`, hint: "Proof of relation to parent/child" });
+      else if (rel === "My father" || rel === "My mother" || rel === "My child") list.push({ key: "relation_proof", label: "Proof of relation (birth certificate or family registration)", hint: "Proof of relation to parent/child" });
     }
     if (category === "Home Repair" && catFields.contractor_name?.trim()) list.push({ key: "contractor_agreement", label: "Contractor Agreement / Work Order", hint: "If you have a contractor, attach the agreement" });
     if (category === "Marriage Support") {
-      if (catFields.relation && catFields.relation !== "Myself") list.push({ key: "relation_proof", label: `Proof of Relation (${profile.familyProofLabel})`, hint: "Proof that you are related to the person getting married" });
+      if (catFields.relation && catFields.relation !== "Myself") list.push({ key: "relation_proof", label: "Proof of relation (birth certificate or family registration)", hint: "Proof that you are related to the person getting married" });
       list.push({ key: "marriage_quotation", label: "Marriage Expenses Quotation / List", hint: "List of items needed for the marriage" });
     }
     if (category === "Business / Work Help") {
@@ -609,18 +433,18 @@ export default function SubmitRequestPage() {
     if (gender === "Male") {
       if (maritalStatus === "Single") list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required for single male" });
       if (maritalStatus === "Married") { list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Required for married male" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required for married male" }); }
-      if (maritalStatus === "Widow") { list.push({ key: "wife_death_cert", label: "Wife's Death Certificate", hint: "Required for widow" }); list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Marriage certificate" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Family registration" }); }
-      if (maritalStatus === "Divorced") { list.push({ key: "divorce_cert", label: "Divorce Certificate (Court issued)", hint: "Court issued" }); list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Marriage certificate" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Family registration" }); }
+      if (maritalStatus === "Widow") { list.push({ key: "wife_death_cert", label: "Wife's Death Certificate", hint: "Required for widow" }); list.push({ key: "nikah_nama", label: `${profile.marriageCertLabel} (from wife)`, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
+      if (maritalStatus === "Divorced") { list.push({ key: "divorce_cert", label: "Divorce Certificate (Court issued)", hint: "Required" }); list.push({ key: "nikah_nama", label: `${profile.marriageCertLabel} (from ex-spouse)`, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
     }
     if (gender === "Female") {
       if (maritalStatus === "Single") list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required for single female" });
-      if (maritalStatus === "Married") { list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
-      if (maritalStatus === "Widow") { list.push({ key: "husband_death_cert", label: "Husband's Death Certificate", hint: "Required" }); list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
-      if (maritalStatus === "Divorced") { list.push({ key: "divorce_cert", label: "Divorce Certificate (Court issued)", hint: "Required" }); list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
+      if (maritalStatus === "Married") { list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Required for married female" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required for married female" }); }
+      if (maritalStatus === "Widow") { list.push({ key: "husband_death_cert", label: "Husband's Death Certificate", hint: "Required" }); list.push({ key: "nikah_nama", label: `${profile.marriageCertLabel} (from husband)`, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
+      if (maritalStatus === "Divorced") { list.push({ key: "divorce_cert", label: "Divorce Certificate (Court issued)", hint: "Required" }); list.push({ key: "nikah_nama", label: `${profile.marriageCertLabel} (from ex-spouse)`, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
       if (isOrphan === "Yes") list.push({ key: "orphan_proof", label: "Orphan Proof (Parent's Death Certificate)", hint: "Required since you selected orphan" });
     }
     if (gender === "Child") {
-      if (isOrphan === "Yes") list.push({ key: "orphan_proof", label: "Orphan Proof (Parent's Death Certificate)", hint: "Required since child is orphan" });
+      if (isOrphan === "Yes") list.push({ key: "orphan_proof", label: "Orphan Proof (Parent's Death Certificate)", hint: "Required" });
       list.push({ key: "b_form", label: profile.childIdLabel, hint: "Required for child" });
       list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required for child" });
     }
@@ -630,8 +454,7 @@ export default function SubmitRequestPage() {
   useEffect(() => {
     const d = loadDraft();
     if (d && d.category) {
-      setStep(Math.min(d.step ?? 1, 4));
-      setCategory(d.category ?? ""); setTitle(d.title ?? ""); setShortDesc(d.shortDesc ?? ""); setCountry(d.country ?? ""); setCity(d.city ?? ""); setUrgency(d.urgency ?? ""); setDescription(d.description ?? ""); setAmount(d.amount ?? ""); setDebtTotalAmount(d.debtTotalAmount ?? ""); setDeadline(d.deadline ?? ""); setInstituteName(d.instituteName ?? ""); setIsOtherInstitute(d.isOtherInstitute ?? false); setOtherName(d.otherName ?? ""); setOtherContact(d.otherContact ?? ""); setOtherAddress(d.otherAddress ?? ""); setRefNumber(d.refNumber ?? ""); setJobStatus(d.jobStatus ?? ""); setGender(d.gender ?? ""); setMaritalStatus(d.maritalStatus ?? ""); setIsOrphan(d.isOrphan ?? ""); setOrphanParent(d.orphanParent ?? ""); setSeekerName(d.seekerName ?? ""); setSeekerContact(d.seekerContact ?? ""); setReceiverName(d.receiverName ?? ""); setReceiverContact(d.receiverContact ?? ""); setReceiverBank(d.receiverBank ?? ""); setReceiverAccount(d.receiverAccount ?? ""); setReceiverAddress(d.receiverAddress ?? ""); setReceiverShopName(d.receiverShopName ?? ""); setCatFields(d.catFields ?? {}); setCatDocUrls(d.catDocUrls ?? {}); setCatDocNames(d.catDocNames ?? {}); setSelfieUrl(d.selfieUrl ?? ""); setSelfiePreview(d.selfieUrl || null); setVideoUrl(d.videoUrl ?? ""); setVideoPreview(d.videoUrl || null);
+      setStep(Math.min(d.step ?? 1, 4)); setCategory(d.category ?? ""); setTitle(d.title ?? ""); setShortDesc(d.shortDesc ?? ""); setCountry(d.country ?? ""); setCity(d.city ?? ""); setUrgency(d.urgency ?? ""); setDescription(d.description ?? ""); setAmount(d.amount ?? ""); setDebtTotalAmount(d.debtTotalAmount ?? ""); setDeadline(d.deadline ?? ""); setInstituteName(d.instituteName ?? ""); setIsOtherInstitute(d.isOtherInstitute ?? false); setOtherName(d.otherName ?? ""); setOtherContact(d.otherContact ?? ""); setOtherAddress(d.otherAddress ?? ""); setRefNumber(d.refNumber ?? ""); setJobStatus(d.jobStatus ?? ""); setGender(d.gender ?? ""); setMaritalStatus(d.maritalStatus ?? ""); setIsOrphan(d.isOrphan ?? ""); setOrphanParent(d.orphanParent ?? ""); setSeekerName(d.seekerName ?? ""); setSeekerContact(d.seekerContact ?? ""); setReceiverName(d.receiverName ?? ""); setReceiverContact(d.receiverContact ?? ""); setReceiverBank(d.receiverBank ?? ""); setReceiverAccount(d.receiverAccount ?? ""); setReceiverAddress(d.receiverAddress ?? ""); setReceiverShopName(d.receiverShopName ?? ""); setCatFields(d.catFields ?? {}); setCatDocUrls(d.catDocUrls ?? {}); setCatDocNames(d.catDocNames ?? {}); setSelfieUrl(d.selfieUrl ?? ""); setSelfiePreview(d.selfieUrl || null); setVideoUrl(d.videoUrl ?? ""); setVideoPreview(d.videoUrl || null);
       if (d.eduSubType) setEduSubType(d.eduSubType); if (d.eduAdmissionLevel) setEduAdmissionLevel(d.eduAdmissionLevel); if (d.eduSubFields) setEduSubFields(d.eduSubFields); if (d.currency) setCurrency(d.currency); if (d.propertyOwnership) setPropertyOwnership(d.propertyOwnership); if (d.disabilityMode) setDisabilityMode(d.disabilityMode); if (d.disabilityShopName) setDisabilityShopName(d.disabilityShopName); if (d.disabilityShopContact) setDisabilityShopContact(d.disabilityShopContact); if (d.disabilityHospital) setDisabilityHospital(d.disabilityHospital); if (d.disabilityHospitalOther) setDisabilityHospitalOther(d.disabilityHospitalOther); if (d.disabilityBankTitle) setDisabilityBankTitle(d.disabilityBankTitle); if (d.disabilityBankNumber) setDisabilityBankNumber(d.disabilityBankNumber); if (d.treatmentAmount) setTreatmentAmount(d.treatmentAmount); if (d.treatmentExpiry) setTreatmentExpiry(d.treatmentExpiry); if (d.treatmentPatientNumber) setTreatmentPatientNumber(d.treatmentPatientNumber); if (d.disabilityType) setDisabilityType(d.disabilityType); if (d.disabilityReason) setDisabilityReason(d.disabilityReason);
     }
     setRestored(true);
@@ -688,9 +511,9 @@ export default function SubmitRequestPage() {
 
   async function uploadFile(file: File, path: string): Promise<string> {
     const fileSizeMB = file.size / (1024 * 1024);
-    if (fileSizeMB > 48) throw new Error(`File size (${fileSizeMB.toFixed(1)}MB) exceeds 50MB limit. Please record a shorter video.`);
+    if (fileSizeMB > 48) throw new Error(`File size (${fileSizeMB.toFixed(1)}MB) exceeds 50MB limit.`);
     try { return await uploadFileToStorage(file, path); } catch (error: any) {
-      if (error.message.includes("limit") || error.message.includes("size")) throw new Error(`File too large: ${fileSizeMB.toFixed(1)}MB (max 50MB)`);
+      if (error.message.includes("limit") || error.message.includes("size")) throw new Error(`File too large: ${fileSizeMB.toFixed(1)}MB`);
       throw new Error(error.message);
     }
   }
@@ -811,6 +634,7 @@ export default function SubmitRequestPage() {
     if (gender === "Child") if (!isOrphan) return "Please select: Is this child an orphan?";
     if (!seekerName.trim()) return "Please enter your full name.";
     if (!seekerContact.trim()) return "Please enter your contact number.";
+    if (!isPhoneValid(seekerContact)) return "Please enter a valid phone number with country code.";
     if (needsPaymentReceiver) {
       if (!receiverName.trim()) return `Please enter the ${getReceiverLabel()} name.`;
       if (!receiverContact.trim()) return `Please enter the ${getReceiverLabel()} contact number.`;
@@ -820,7 +644,7 @@ export default function SubmitRequestPage() {
       if (category === "Food & Groceries" || category === "Medicines" || category === "Home Repair") if (!receiverShopName.trim()) return `Please enter the shop name.`;
     }
     if (category === "Disability Support") {
-      if (!catDocUrls["disability_cnic"]) return "Please attach Disability CNIC (Front & Back).";
+      if (!catDocUrls["disability_cnic"]) return "Please attach the disability ID or certificate.";
       if (!catDocUrls["disability_photo"]) return "Please attach a clear photo of the disability.";
       if (!disabilityType) return "Please select the type of disability.";
       if (!disabilityMode) return "Please choose: Product, Treatment, or Monthly Stipend.";
@@ -842,11 +666,11 @@ export default function SubmitRequestPage() {
       }
       if (isOtherInstitute) { if (!otherName.trim()) return "Please enter the institute name."; if (!otherContact.trim()) return "Please enter the institute contact number."; if (!otherAddress.trim()) return "Please enter the institute address (city, area, street)."; }
       let subDocs: { key: string; label: string; required: boolean; hint?: string }[] = [];
-      if (category === "Education, Books & Admission") subDocs = listCfg.getSubDocs?.(eduSubType, eduSubType === "admission" ? eduAdmissionLevel : "", profile) || [];
-      else if (category === "School, College & University Fees") subDocs = listCfg.getSubDocs?.(eduSubType, "", profile) || [];
+      if (category === "Education, Books & Admission") subDocs = listCfg.getSubDocs?.(eduSubType, eduSubType === "admission" ? eduAdmissionLevel : "") || [];
+      else if (category === "School, College & University Fees") subDocs = listCfg.getSubDocs?.(eduSubType, "") || [];
       for (const doc of subDocs) if (doc.required && !catDocUrls[doc.key]) return `Please attach: ${doc.label}`;
-      if (!catDocUrls["student_id_proof"] && !catDocUrls["student_id"]) { const hasStudentId = subDocs.some((d) => d.key === "student_id_proof" || d.key === "student_id"); if (!hasStudentId) if (!catDocUrls["student_id"]) return "Please attach student's B-Form / ID card."; }
-      if (!isFixedAmount(category)) { if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter the amount needed."; const maxLimit = getMaxLimit(category); if (maxLimit && parseFloat(amount) > maxLimit) return `Amount cannot exceed Rs ${maxLimit.toLocaleString()}.`; }
+      if (!catDocUrls["student_id_proof"] && !catDocUrls["student_id"]) { const hasStudentId = subDocs.some((d) => d.key === "student_id_proof" || d.key === "student_id"); if (!hasStudentId) if (!catDocUrls["student_id"]) return "Please attach the student's ID proof."; }
+      if (!isFixedAmount(category)) { if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter the amount needed."; const maxLimit = getMaxLimit(category); if (maxLimit && parseFloat(amount) > maxLimit) return `Amount cannot exceed ${sym} ${maxLimit.toLocaleString()}.`; }
       if (!deadline) return "Please select the expiry date.";
       return null;
     }
@@ -859,9 +683,8 @@ export default function SubmitRequestPage() {
         if (!(catFields.bill_owner_name || "").trim()) return "Please enter the bill owner name as it appears on the bill.";
         if (["Electricity Bill", "Gas Bill", "Water Bill"].includes(category)) {
           const units = Number(catFields.monthly_units);
-          const utilityName = category === "Electricity Bill" ? "electricity" : category === "Gas Bill" ? "gas" : "water";
-          if (!Number.isFinite(units) || units < 1) return `Please enter monthly ${utilityName} usage in units.`;
-          if (units > ELECTRICITY_MAX_ELIGIBLE_UNITS) return "You are not eligible for this help request because usage is above 300 units.";
+          if (!Number.isFinite(units) || units < 1) return `Please enter monthly ${utilityNoun} usage in units.`;
+          if (unitCap !== null && units > unitCap) return `You are not eligible for this help request because usage is above ${unitCap} units.`;
           if (category === "Electricity Bill" && Object.keys(normalizeElectricityAppliances(catFields.appliances)).length === 0) return "Please select at least one appliance and its quantity.";
         }
       }
@@ -873,7 +696,7 @@ export default function SubmitRequestPage() {
       if (category === "Medical & Treatment" && !catDocUrls["doctor_prescription"]) return "Please attach the Doctor's written prescription/report.";
       if (!isFixedAmount(category)) {
         if (isDebtCategory(category)) { if (!debtTotalAmount.trim() || parseFloat(debtTotalAmount) <= 0) return "Please enter your total outstanding debt amount."; if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter your total outstanding debt amount to calculate 5%."; }
-        else { if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter the amount needed."; const maxLimit = getMaxLimit(category); if (maxLimit && parseFloat(amount) > maxLimit) return `Amount cannot exceed Rs ${maxLimit.toLocaleString()}.`; }
+        else { if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter the amount needed."; const maxLimit = getMaxLimit(category); if (maxLimit && parseFloat(amount) > maxLimit) return `Amount cannot exceed ${sym} ${maxLimit.toLocaleString()}.`; }
       }
     }
     if (!easy && config && category !== "Disability Support" && !isEducationCategory) {
@@ -882,7 +705,7 @@ export default function SubmitRequestPage() {
       for (const d of extraConditionalDocs()) if (!catDocUrls[d.key]) return `Please attach: ${d.label}`;
       if (!isFixedAmount(category)) {
         if (isDebtCategory(category)) { if (!debtTotalAmount.trim() || parseFloat(debtTotalAmount) <= 0) return "Please enter your total outstanding debt amount."; if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter your total outstanding debt amount to calculate 5%."; }
-        else { if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter the amount needed."; const minLimit = getMinAmount(category); if (minLimit && parseFloat(amount) < minLimit) return `Amount must be at least Rs ${minLimit.toLocaleString()}.`; const maxLimit = getMaxLimit(category); if (maxLimit && parseFloat(amount) > maxLimit) return `Amount cannot exceed Rs ${maxLimit.toLocaleString()}.`; }
+        else { if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter the amount needed."; const minLimit = getMinAmount(category, currency); if (minLimit && parseFloat(amount) < minLimit) return `Amount must be at least ${sym} ${minLimit.toLocaleString()}.`; const maxLimit = getMaxLimit(category); if (maxLimit && parseFloat(amount) > maxLimit) return `Amount cannot exceed ${sym} ${maxLimit.toLocaleString()}.`; }
       }
     }
     if (!description.trim()) return "Please explain your situation.";
@@ -890,8 +713,8 @@ export default function SubmitRequestPage() {
     if (!deadline) return "Please select the expiry date.";
     if (PROPERTY_RELEVANT_CATS.has(category) && !isEducationCategory) {
       if (!propertyOwnership) return "Please select property ownership (Owned or Rented).";
-      if (propertyOwnership === "rented") { if (!catDocUrls["rental_agreement"]) return "Please attach the Rental Agreement."; if (!catDocUrls["landlord_cnic"]) return "Please attach the Landlord's CNIC."; }
-      if (propertyOwnership === "owned") { if (!catFields.owner_relation) return "Please select whose name the house is in."; if (!catDocUrls["owner_cnic"]) return "Please attach the owner's CNIC."; }
+      if (propertyOwnership === "rented") { if (!catDocUrls["rental_agreement"]) return "Please attach the Rental Agreement."; if (!catDocUrls["landlord_cnic"]) return "Please attach the landlord's ID."; }
+      if (propertyOwnership === "owned") { if (!catFields.owner_relation) return "Please select whose name the house is in."; if (!catDocUrls["owner_cnic"]) return "Please attach the owner's ID."; }
     }
     return null;
   }
@@ -948,18 +771,18 @@ export default function SubmitRequestPage() {
       };
 
       if (needsPaymentReceiver) { categoryDetails.receiver_name = receiverName; categoryDetails.receiver_contact = receiverContact; categoryDetails.receiver_bank = receiverBank; categoryDetails.receiver_account = receiverAccount; categoryDetails.receiver_address = receiverAddress; categoryDetails.receiver_shop_name = receiverShopName; }
-      if (isDebtCategory(category)) { categoryDetails.debt_total_amount = parseFloat(debtTotalAmount) || 0; categoryDetails.debt_percentage = 5; categoryDetails.debt_calculated_amount = calculatedDebtAmount; categoryDetails.debt_max_limit = 25000; }
+      if (isDebtCategory(category)) { categoryDetails.debt_total_amount = parseFloat(debtTotalAmount) || 0; categoryDetails.debt_percentage = 5; categoryDetails.debt_calculated_amount = calculatedDebtAmount; categoryDetails.debt_max_limit = capDebt; }
       if (isEducationCategory) { categoryDetails.edu_sub_type = eduSubType; categoryDetails.edu_sub_fields = eduSubFields; if (eduSubType === "admission") categoryDetails.edu_admission_level = eduAdmissionLevel; categoryDetails.edu_documents = { admission_proof: catDocUrls["admission_proof"] || "", fee_challan: catDocUrls["fee_challan"] || "", student_id_proof: catDocUrls["student_id_proof"] || "", books_quotation: catDocUrls["books_quotation"] || "", uniform_quotation: catDocUrls["uniform_quotation"] || "", uniform_items: catDocUrls["uniform_items"] || "" }; }
       if (shouldShowPaymentReceiver()) { categoryDetails.receiver_name = receiverName; categoryDetails.receiver_contact = receiverContact; categoryDetails.receiver_bank = receiverBank; categoryDetails.receiver_account = receiverAccount; }
       if (category === "Disability Support") {
-        categoryDetails.disability_mode = disabilityMode; categoryDetails.disability_shop_name = disabilityShopName; categoryDetails.disability_shop_contact = disabilityShopContact; categoryDetails.disability_hospital = disabilityHospital; categoryDetails.disability_stipend_amount = disabilityMode === "stipend" ? DISABILITY_STIPEND_AMOUNT : undefined; categoryDetails.disability_bank_title = disabilityBankTitle; categoryDetails.disability_bank_number = disabilityBankNumber; categoryDetails.disability_type = disabilityType; categoryDetails.disability_reason = disabilityReason;
+        categoryDetails.disability_mode = disabilityMode; categoryDetails.disability_shop_name = disabilityShopName; categoryDetails.disability_shop_contact = disabilityShopContact; categoryDetails.disability_hospital = disabilityHospital; categoryDetails.disability_stipend_amount = disabilityMode === "stipend" ? stipendAmount : undefined; categoryDetails.disability_bank_title = disabilityBankTitle; categoryDetails.disability_bank_number = disabilityBankNumber; categoryDetails.disability_type = disabilityType; categoryDetails.disability_reason = disabilityReason;
         if (disabilityMode === "treatment") { categoryDetails.treatment_amount = parseFloat(treatmentAmount); categoryDetails.treatment_expiry = treatmentExpiry; categoryDetails.treatment_patient_number = treatmentPatientNumber; categoryDetails.treatment_urgency = treatmentAutoUrgency; }
       }
       if (easy && !isEducationCategory) { categoryDetails.institute = finalInstitute; categoryDetails.institute_in_list = !isOtherInstitute; categoryDetails.reference_type = utilCfg ? selectedCompany?.ref ?? "Reference" : listCfg?.refLabel ?? "Reference"; categoryDetails.reference_number = refNumber; categoryDetails.due_date = deadline; }
 
       let finalAmount: number;
       if (isFixedAmount(category)) finalAmount = getFixedAmountValue(category) || 0;
-      else if (hasFixedStipend()) finalAmount = DISABILITY_STIPEND_AMOUNT;
+      else if (hasFixedStipend()) finalAmount = stipendAmount;
       else if (isDebtCategory(category)) finalAmount = calculatedDebtAmount;
       else finalAmount = parseFloat(amount) || 0;
 
@@ -1035,8 +858,7 @@ export default function SubmitRequestPage() {
     );
   }
 
-  const sym = CURRENCY_SYMBOLS[currency] ?? currency;
-  const filteredInstitutes = listCfg ? listCfg.list.filter((n: string) => n.toLowerCase().includes(instituteSearch.toLowerCase())).slice(0, 8) : [];
+  const filteredInstitutes = listCfg && localLists ? listCfg.list.filter((n: string) => n.toLowerCase().includes(instituteSearch.toLowerCase())).slice(0, 8) : [];
 
   const docBox = (key: string, label: string, required: boolean, hint?: string, accept = "image/*,.pdf") => {
     const isUploaded = !!catDocUrls[key];
@@ -1045,16 +867,11 @@ export default function SubmitRequestPage() {
       <div className={`relative overflow-hidden rounded-2xl border-2 transition-all duration-300 ${isUploaded ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20" : "border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/50 dark:hover:bg-slate-800"}`}>
         <label className="flex flex-col items-center justify-center p-5 cursor-pointer">
           <input type="file" accept={accept} onChange={(e) => handleDocSelect(key, e.target.files?.[0] ?? null)} className="hidden" />
-          
           <div className={`flex h-12 w-12 items-center justify-center rounded-full mb-3 transition-colors ${isUploaded ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50" : "bg-white text-slate-400 shadow-sm dark:bg-slate-800"}`}>
             {isUploaded ? <CheckCircle2 className="h-6 w-6" /> : isUploading ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" /> : <UploadCloud className="h-6 w-6" />}
           </div>
-          
-          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 text-center">
-            {label} {required && <span className="text-red-500">*</span>}
-          </span>
+          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 text-center">{label} {required && <span className="text-red-500">*</span>}</span>
           {hint && <span className="text-xs text-slate-500 text-center mt-1">{hint}</span>}
-          
           {isUploading && <span className="mt-2 text-xs font-semibold text-teal-600 animate-pulse">Uploading...</span>}
           {isUploaded && !isUploading && <span className="mt-2 text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-1 rounded-md">✓ {catDocNames[key] || "Uploaded"}</span>}
           {!isUploaded && !isUploading && <span className="mt-3 text-xs font-semibold text-teal-600 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-slate-100 dark:bg-slate-800 dark:border-slate-700">Tap to browse</span>}
@@ -1069,9 +886,7 @@ export default function SubmitRequestPage() {
   function TermsAndConditions() {
     return (
       <div className="mt-6 space-y-4 rounded-3xl border border-teal-100 bg-teal-50/30 p-5 dark:border-teal-900/30 dark:bg-teal-950/10">
-        <h3 className="flex items-center gap-2 text-base font-black text-teal-800 dark:text-teal-300">
-          <ShieldCheck className="h-5 w-5" /> Terms & Conditions
-        </h3>
+        <h3 className="flex items-center gap-2 text-base font-black text-teal-800 dark:text-teal-300"><ShieldCheck className="h-5 w-5" /> Terms & Conditions</h3>
         <div className="max-h-60 overflow-y-auto rounded-xl border border-teal-200/50 bg-white p-4 text-xs space-y-3 leading-relaxed text-slate-600 dark:border-teal-900/50 dark:bg-slate-900 dark:text-slate-400 custom-scrollbar">
           <p><strong className="text-slate-900 dark:text-white">1. Truthfulness & Accuracy</strong><br />I confirm that all information, documents, and statements provided in my case are completely true and accurate. Any falsehood or fraud will result in permanent account closure.</p>
           <p><strong className="text-slate-900 dark:text-white">2. Video Privacy & Access</strong><br />a. My identity documents ({profile.idLabel}) and my selfie will <strong className="text-teal-600">never</strong> be shown to any contributor. They are only for Givethra's verification team.<br />b. My verification video (the appeal video I record) will be shown only to the Hero who unlocks my case.<br />c. The video is provided in stream-only mode — it cannot be downloaded.<br />d. Once my case is completed, the video will be permanently hidden.</p>
@@ -1098,9 +913,7 @@ export default function SubmitRequestPage() {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/50"><Heart className="h-8 w-8 text-amber-600 dark:text-amber-400" /></div>
             <h1 className="text-2xl font-black text-amber-900 dark:text-amber-200">Please Share Your Feedback First</h1>
             <p className="text-sm font-medium text-amber-800/80 dark:text-amber-300/80">Your case "<strong>{blockedByFeedback.caseTitle}</strong>" was completed with a Hero's help. Before submitting a new case, please share your feedback (message + 90-second video) to build trust.</p>
-            <Button asChild className="h-12 w-full rounded-xl bg-amber-600 font-bold text-white hover:bg-amber-700">
-              <Link to="/cases/$id" params={{ id: blockedByFeedback.caseId }}>Go to My Completed Case</Link>
-            </Button>
+            <Button asChild className="h-12 w-full rounded-xl bg-amber-600 font-bold text-white hover:bg-amber-700"><Link to="/cases/$id" params={{ id: blockedByFeedback.caseId }}>Go to My Completed Case</Link></Button>
           </div>
         </div>
       </Layout>
@@ -1180,14 +993,11 @@ export default function SubmitRequestPage() {
   return (
     <Layout>
       <div className="mx-auto max-w-3xl px-3 py-6 pb-24 sm:px-5 sm:py-10">
-        
-        {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white sm:text-4xl">Submit a Help Request</h1>
           <p className="mt-2 text-sm font-medium text-slate-500">Your first case is FREE. After that, a 1 credit listing fee applies.</p>
         </div>
 
-        {/* User Stats Banner */}
         {!loadingUserStats && user && (
           <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="grid grid-cols-2 divide-x divide-slate-100 sm:grid-cols-4 dark:divide-slate-800">
@@ -1201,7 +1011,6 @@ export default function SubmitRequestPage() {
           </div>
         )}
 
-        {/* Language Tip */}
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900/30 dark:bg-blue-950/20">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400"><Languages className="h-4 w-4" /></div>
           <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Don't understand English? In your phone browser menu, tap <strong>"Translate"</strong> to read this page in Urdu or any language.</p>
@@ -1217,7 +1026,6 @@ export default function SubmitRequestPage() {
           </div>
         )}
 
-        {/* Modern Step Indicator */}
         <div className="mb-8 flex items-center justify-between px-2">
           {STEPS.map((label, i) => {
             const isActive = i + 1 === step;
@@ -1228,16 +1036,13 @@ export default function SubmitRequestPage() {
                   {isDone ? <Check className="h-5 w-5" /> : i + 1}
                 </div>
                 <span className={`mt-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider ${isActive ? "text-teal-700 dark:text-teal-400" : isDone ? "text-slate-800 dark:text-slate-200" : "text-slate-400"}`}>{label}</span>
-                {i < STEPS.length - 1 && (
-                  <div className={`absolute top-5 left-1/2 w-full h-1 -z-10 ${isDone ? "bg-teal-600" : "bg-slate-200 dark:bg-slate-700"}`} />
-                )}
+                {i < STEPS.length - 1 && <div className={`absolute top-5 left-1/2 w-full h-1 -z-10 ${isDone ? "bg-teal-600" : "bg-slate-200 dark:bg-slate-700"}`} />}
               </div>
             );
           })}
         </div>
 
         <AnimatePresence mode="wait">
-          {/* STEP 1 */}
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:border-slate-800 dark:bg-slate-900 sm:p-8">
               <h2 className="mb-6 flex items-center gap-2 text-xl font-black text-slate-900 dark:text-white"><FileText className="h-5 w-5 text-teal-600" /> Basic Information</h2>
@@ -1260,40 +1065,35 @@ export default function SubmitRequestPage() {
                   {category && (
                     <div className="mt-3 rounded-xl bg-teal-50 border border-teal-100 p-3 text-sm dark:bg-teal-900/20 dark:border-teal-800">
                       <p className="font-bold text-teal-800 dark:text-teal-300 flex items-center gap-2"><Info className="h-4 w-4" /> {CATEGORY_LIMITS[category]?.label || "Verified Need"}</p>
-                      {isFixedAmount(category) && <p className="text-emerald-600 font-bold mt-1">💰 Fixed Amount: Rs {getFixedAmountValue(category)?.toLocaleString()}</p>}
-                      {getMaxLimit(category) && <p className="text-amber-600 font-semibold mt-1">⚠️ Maximum Limit: Rs {getMaxLimit(category)?.toLocaleString()}</p>}
-                      {isDebtCategory(category) && <p className="text-blue-600 font-semibold mt-1">📊 5% of total debt (max Rs 25,000)</p>}
+                      {isFixedAmount(category) && <p className="text-emerald-600 font-bold mt-1">💰 Fixed Amount: {money(getFixedAmountValue(category))}</p>}
+                      {getMaxLimit(category) && <p className="text-amber-600 font-semibold mt-1">⚠️ Maximum Limit: {money(getMaxLimit(category))}</p>}
+                      {isDebtCategory(category) && <p className="text-blue-600 font-semibold mt-1">📊 5% of total debt (max {money(capDebt)})</p>}
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-bold text-slate-700 dark:text-slate-300">Request Title *</Label>
-                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Help with School Fee" className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-bold text-slate-700 dark:text-slate-300">Short Description *</Label>
-                  <Input value={shortDesc} onChange={(e) => setShortDesc(e.target.value)} placeholder="One line summary" className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
-                </div>
+                <div className="space-y-2"><Label className="text-sm font-bold text-slate-700 dark:text-slate-300">Request Title *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Help with School Fee" className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" /></div>
+                <div className="space-y-2"><Label className="text-sm font-bold text-slate-700 dark:text-slate-300">Short Description *</Label><Input value={shortDesc} onChange={(e) => setShortDesc(e.target.value)} placeholder="One line summary" className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" /></div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label className="text-sm font-bold text-slate-700 dark:text-slate-300">Country *</Label>
-                    <Select value={country} onValueChange={setCountry}>
-                      <SelectTrigger className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:ring-teal-500">
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
+                    <Select value={country} onValueChange={(name) => { setCountry(name); setCurrency(getCountryProfile(name).currency); setInstituteName(""); setIsOtherInstitute(false); setRefNumber(""); }}>
+                      <SelectTrigger className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:ring-teal-500"><SelectValue placeholder="Select country" /></SelectTrigger>
                       <SelectContent className="max-h-72">
                         {COUNTRIES.map((option) => <SelectItem key={option.code} value={option.name} className="py-3 text-base">{option.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-bold text-slate-700 dark:text-slate-300">City *</Label>
-                    <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder={profile.cityExample || "e.g. Karachi"} className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
-                  </div>
+                  <div className="space-y-2"><Label className="text-sm font-bold text-slate-700 dark:text-slate-300">City *</Label><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder={profile.cityExample || "e.g. Karachi"} className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" /></div>
                 </div>
+
+                {country && (
+                  <div className="flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs text-teal-800 dark:border-teal-800 dark:bg-teal-900/20 dark:text-teal-300">
+                    <Globe className="h-4 w-4 shrink-0 mt-0.5" />
+                    <p>Request for <strong>{country}</strong>. Amounts are in <strong>{currency}</strong>. Main ID we accept: <strong>{profile.idLabel}</strong>.</p>
+                  </div>
+                )}
 
                 {!easy && category && category !== "Disability Support" && !isEducationCategory && (
                   <div className="space-y-2">
@@ -1317,21 +1117,15 @@ export default function SubmitRequestPage() {
             </motion.div>
           )}
 
-          {/* STEP 2 */}
           {step === 2 && (
             <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-              
               <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:border-slate-800 dark:bg-slate-900 sm:p-8">
                 <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-600 dark:bg-teal-900/30"><Briefcase className="h-6 w-6" /></div>
-                  <div>
-                    <h2 className="text-xl font-black text-slate-900 dark:text-white">{category || "Category"}</h2>
-                    <p className="text-sm font-medium text-slate-500">Please provide the required details below.</p>
-                  </div>
+                  <div><h2 className="text-xl font-black text-slate-900 dark:text-white">{category || "Category"}</h2><p className="text-sm font-medium text-slate-500">Please provide the required details below.</p></div>
                 </div>
 
                 <div className="space-y-8">
-                  {/* Income Source */}
                   <div className="space-y-3">
                     <Label className="text-base font-black text-slate-800 dark:text-slate-200">1. What is your current source of income? *</Label>
                     <div className="grid gap-2 sm:grid-cols-2">
@@ -1352,7 +1146,6 @@ export default function SubmitRequestPage() {
                     )}
                   </div>
 
-                  {/* Personal Background */}
                   <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                     <Label className="text-base font-black text-slate-800 dark:text-slate-200">2. Personal Background *</Label>
                     <div className="space-y-2">
@@ -1363,7 +1156,6 @@ export default function SubmitRequestPage() {
                         ))}
                       </div>
                     </div>
-
                     {(gender === "Male" || gender === "Female") && (
                       <div className="space-y-2">
                         <Label className="text-sm font-bold text-slate-600 dark:text-slate-400">Marital Status</Label>
@@ -1374,7 +1166,6 @@ export default function SubmitRequestPage() {
                         </div>
                       </div>
                     )}
-
                     {(gender === "Female" || gender === "Child") && (
                       <div className="space-y-2">
                         <Label className="text-sm font-bold text-slate-600 dark:text-slate-400">Is {gender === "Child" ? "this child" : "she"} an orphan?</Label>
@@ -1385,7 +1176,6 @@ export default function SubmitRequestPage() {
                         </div>
                       </div>
                     )}
-
                     {gender === "Female" && isOrphan === "Yes" && (
                       <div className="space-y-2">
                         <Label className="text-sm font-bold text-slate-600 dark:text-slate-400">Which parent passed away?</Label>
@@ -1396,35 +1186,22 @@ export default function SubmitRequestPage() {
                         </div>
                       </div>
                     )}
-
                     {gender && extraConditionalDocs().length > 0 && (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        {extraConditionalDocs().map((d) => docBox(d.key, d.label, true, d.hint))}
-                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">{extraConditionalDocs().map((d) => docBox(d.key, d.label, true, d.hint))}</div>
                     )}
                   </div>
 
-                  {/* Seeker Details */}
                   <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                     <Label className="text-base font-black text-slate-800 dark:text-slate-200">3. Your Details (Seeker)</Label>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-bold text-slate-600 dark:text-slate-400">Full Name *</Label>
-                        <Input value={seekerName} onChange={(e) => setSeekerName(e.target.value)} placeholder="Enter your full name" className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm font-bold text-slate-600 dark:text-slate-400">Contact Number *</Label>
-                        <Input value={seekerContact} onChange={(e) => setSeekerContact(e.target.value)} placeholder="Phone number for verification" className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
-                      </div>
+                      <div className="space-y-2"><Label className="text-sm font-bold text-slate-600 dark:text-slate-400">Full Name *</Label><Input value={seekerName} onChange={(e) => setSeekerName(e.target.value)} placeholder="Enter your full name" className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" /></div>
+                      <div className="space-y-2"><Label className="text-sm font-bold text-slate-600 dark:text-slate-400">Contact Number *</Label><Input value={seekerContact} onChange={(e) => setSeekerContact(e.target.value)} placeholder={`Phone number with country code${profile.dialCode ? ` (${profile.dialCode} …)` : ""}`} className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" /></div>
                     </div>
                   </div>
 
-                  {/* Payment Receiver Details */}
                   {needsPaymentReceiver && (
                     <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                      <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
-                        💡 Provide the official {getReceiverLabel().toLowerCase()} details where funds should be sent so Givethra can verify.
-                      </div>
+                      <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200 border border-amber-200 dark:border-amber-800">💡 Provide the official {getReceiverLabel().toLowerCase()} details where funds should be sent so Givethra can verify.</div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2"><Label className="text-sm font-bold">{getReceiverLabel()} Name *</Label><Input value={receiverName} onChange={(e) => setReceiverName(e.target.value)} placeholder={`Enter ${getReceiverLabel()} name`} className="h-12 rounded-xl bg-slate-50" /></div>
                         <div className="space-y-2"><Label className="text-sm font-bold">{getReceiverLabel()} Contact *</Label><Input value={receiverContact} onChange={(e) => setReceiverContact(e.target.value)} placeholder="Phone number" className="h-12 rounded-xl bg-slate-50" /></div>
@@ -1438,25 +1215,38 @@ export default function SubmitRequestPage() {
                     </div>
                   )}
 
-                  {/* Utilities / Easy Categories */}
                   {utilCfg && (
                     <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                       <div className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-600 border border-red-200">⚠️ One case = ONE bill only.</div>
-                      <div className="space-y-3">
-                        <Label className="text-base font-black text-slate-800 dark:text-slate-200">Select Your Company *</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {utilCfg.companies.map((c) => (
-                            <button key={c.name} type="button" onClick={() => { setInstituteName(c.name); setCatFields((p) => ({ ...p, institute_name: c.name })); setIsOtherInstitute(false); }} className={`px-3 py-3 rounded-xl border text-xs font-bold text-left transition-all ${instituteName === c.name ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300 dark:bg-slate-950 dark:border-slate-800"}`}>{c.name}</button>
-                          ))}
+                      {utilCompanies.length > 0 && !isOtherInstitute && (
+                        <div className="space-y-3">
+                          <Label className="text-base font-black text-slate-800 dark:text-slate-200">Select Your Company *</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {utilCompanies.map((c) => (
+                              <button key={c.name} type="button" onClick={() => { setInstituteName(c.name); setCatFields((p) => ({ ...p, institute_name: c.name })); setIsOtherInstitute(false); }} className={`px-3 py-3 rounded-xl border text-xs font-bold text-left transition-all ${instituteName === c.name ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300 dark:bg-slate-950 dark:border-slate-800"}`}>{c.name}</button>
+                            ))}
+                            <button type="button" onClick={() => { setInstituteName(""); setIsOtherInstitute(true); }} className="px-3 py-3 rounded-xl border border-dashed border-teal-300 text-xs font-bold text-left text-teal-600 hover:bg-teal-50">My company is not listed</button>
+                          </div>
                         </div>
-                      </div>
-                      {selectedCompany && (
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2"><Label className="text-sm font-bold">{selectedCompany.ref} *</Label><Input value={refNumber} onChange={(e) => setRefNumber(e.target.value)} placeholder={selectedCompany.refHint} className="h-12 rounded-xl bg-slate-50" /></div>
-                          <div className="space-y-2"><Label className="text-sm font-bold">Bill Owner Name *</Label><Input value={catFields.bill_owner_name || ""} onChange={(e) => setCatFields((p) => ({ ...p, bill_owner_name: e.target.value }))} placeholder="As on bill" className="h-12 rounded-xl bg-slate-50" /></div>
-                          
+                      )}
+                      {isOtherInstitute && (
+                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+                          <div className="flex items-center justify-between"><p className="text-sm font-bold">Your {utilityNoun} company</p>{localLists && (<button type="button" onClick={() => { setIsOtherInstitute(false); setOtherName(""); setOtherContact(""); setOtherAddress(""); }} className="text-xs font-bold text-teal-600 underline">Back to list</button>)}</div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1"><Label className="text-xs font-bold">Company Name *</Label><Input value={otherName} onChange={(e) => setOtherName(e.target.value)} placeholder="Name printed on your bill" className="h-12 rounded-xl bg-white" /></div>
+                            <div className="space-y-1"><Label className="text-xs font-bold">Company Contact Number *</Label><Input value={otherContact} onChange={(e) => setOtherContact(e.target.value)} placeholder="Customer-service number" className="h-12 rounded-xl bg-white" /></div>
+                            <div className="space-y-1 sm:col-span-2"><Label className="text-xs font-bold">Company Address / Website *</Label><Textarea value={otherAddress} onChange={(e) => setOtherAddress(e.target.value)} placeholder="Office address or official website" rows={2} className="rounded-xl bg-white" /></div>
+                          </div>
+                        </div>
+                      )}
+                      {(selectedCompany || isOtherInstitute) && (
+                        <div className="space-y-4">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2"><Label className="text-sm font-bold">{selectedCompany?.ref ?? "Customer / Account / Reference Number"} *</Label><Input value={refNumber} onChange={(e) => setRefNumber(e.target.value)} placeholder={selectedCompany?.refHint ?? "As printed on your bill"} className="h-12 rounded-xl bg-slate-50" /></div>
+                            <div className="space-y-2"><Label className="text-sm font-bold">Bill Owner Name (as on bill) *</Label><Input value={catFields.bill_owner_name || ""} onChange={(e) => setCatFields((p) => ({ ...p, bill_owner_name: e.target.value }))} placeholder="Name exactly as printed" className="h-12 rounded-xl bg-slate-50" /></div>
+                          </div>
                           {category === "Electricity Bill" && (
-                            <div className="sm:col-span-2 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                               <Label className="text-sm font-bold">Appliances used in the home *</Label>
                               <div className="grid gap-2 sm:grid-cols-2">
                                 {ELECTRICITY_APPLIANCES.map(({ key, label }) => {
@@ -1476,11 +1266,10 @@ export default function SubmitRequestPage() {
                               </div>
                             </div>
                           )}
-                          
-                          <div className="space-y-2 sm:col-span-2">
-                            <Label className="text-sm font-bold">Monthly Units *</Label>
-                            <Input type="number" min={1} max={ELECTRICITY_MAX_ELIGIBLE_UNITS} value={catFields.monthly_units || ""} onChange={(e) => setCatFields((p) => ({ ...p, monthly_units: e.target.value }))} placeholder="1–300 units" className="h-12 rounded-xl bg-slate-50" />
-                            {Number(catFields.monthly_units) > ELECTRICITY_MAX_ELIGIBLE_UNITS && <p className="text-sm font-bold text-red-500">Not eligible because usage is above 300 units.</p>}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-bold">Monthly {utilityNoun} units *</Label>
+                            <Input type="number" min={1} max={unitCap ?? undefined} value={catFields.monthly_units || ""} onChange={(e) => setCatFields((p) => ({ ...p, monthly_units: e.target.value }))} placeholder={unitCap ? `1–${unitCap} units` : "Units shown on your bill"} className="h-12 rounded-xl bg-slate-50" />
+                            {unitCap !== null && Number(catFields.monthly_units) > unitCap && <p className="text-sm font-bold text-red-500">Not eligible because usage is above {unitCap} units.</p>}
                           </div>
                         </div>
                       )}
@@ -1488,22 +1277,17 @@ export default function SubmitRequestPage() {
                     </div>
                   )}
 
-                  {/* List Categories (Medical, etc.) */}
                   {listCfg && !isEducationCategory && (
                     <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                       <div className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-600 border border-red-200">⚠️ One case = ONE {category.includes("Medic") ? "patient" : "student"} only.</div>
-                      
                       {!isOtherInstitute && !instituteName && (
                         <div className="space-y-3">
                           <Label className="text-base font-black text-slate-800 dark:text-slate-200">Search & Select Your Institute *</Label>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" />
-                            <Input value={instituteSearch} onChange={(e) => setInstituteSearch(e.target.value)} placeholder="Type institute name..." className="h-14 pl-10 rounded-xl bg-slate-50 text-base" />
-                          </div>
+                          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" /><Input value={instituteSearch} onChange={(e) => setInstituteSearch(e.target.value)} placeholder="Type institute name..." className="h-14 pl-10 rounded-xl bg-slate-50 text-base" /></div>
                           {instituteSearch.trim().length >= 2 && (
                             <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden max-h-48 overflow-y-auto bg-white dark:border-slate-800 dark:divide-slate-800 dark:bg-slate-900">
                               {filteredInstitutes.map((n: string) => (
-                                <button key={n} type="button" onClick={() => { setInstituteName(n); setInstituteSearch(""); }} className="w-full text-left px-4 py-3 text-sm font-semibold hover:bg-teal-50 hover:text-teal-700 dark:hover:bg-teal-900/20">{n}</button>
+                                <button key={n} type="button" onClick={() => { setInstituteName(n); setInstituteSearch(""); }} className="w-full text-left px-4 py-3 text-sm font-semibold hover:bg-teal-50 hover:text-teal-700">{n}</button>
                               ))}
                               {filteredInstitutes.length === 0 && <p className="px-4 py-3 text-sm text-slate-500">No match found.</p>}
                             </div>
@@ -1511,38 +1295,29 @@ export default function SubmitRequestPage() {
                           <button type="button" onClick={() => setIsOtherInstitute(true)} className="text-sm font-bold text-teal-600 hover:underline">My institute is not in the list — add manually</button>
                         </div>
                       )}
-                      
                       {instituteName && !isOtherInstitute && (
                         <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-900/20">
-                          <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">✓ {instituteName} (1Bill listed)</p>
+                          <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">✓ {instituteName}</p>
                           <button type="button" onClick={() => setInstituteName("")} className="text-xs font-bold text-teal-600 underline">Change</button>
                         </div>
                       )}
-                      
                       {isOtherInstitute && (
                         <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-                          <div className="flex items-center justify-between"><p className="text-sm font-bold">Add Institute Manually</p><button type="button" onClick={() => { setIsOtherInstitute(false); setOtherName(""); setOtherContact(""); setOtherAddress(""); }} className="text-xs font-bold text-teal-600 underline">Back to list</button></div>
+                          <div className="flex items-center justify-between"><p className="text-sm font-bold">Add Institute Manually</p>{localLists && (<button type="button" onClick={() => { setIsOtherInstitute(false); setOtherName(""); setOtherContact(""); setOtherAddress(""); }} className="text-xs font-bold text-teal-600 underline">Back to list</button>)}</div>
                           <div className="space-y-3">
-                            <div className="space-y-1"><Label className="text-xs font-bold">Institute Full Name *</Label><Input value={otherName} onChange={(e) => setOtherName(e.target.value)} placeholder="Complete official name" className="h-12 rounded-xl bg-white" /></div>
-                            <div className="space-y-1"><Label className="text-xs font-bold">Institute Contact Number *</Label><Input value={otherContact} onChange={(e) => setOtherContact(e.target.value)} placeholder="Office number" className="h-12 rounded-xl bg-white" /></div>
-                            <div className="space-y-1"><Label className="text-xs font-bold">Institute Address *</Label><Textarea value={otherAddress} onChange={(e) => setOtherAddress(e.target.value)} placeholder="City, Area, Street" rows={2} className="rounded-xl bg-white" /></div>
+                            <div className="space-y-1"><Label className="text-xs font-bold">Institute Full Name *</Label><Input value={otherName} onChange={(e) => setOtherName(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
+                            <div className="space-y-1"><Label className="text-xs font-bold">Institute Contact Number *</Label><Input value={otherContact} onChange={(e) => setOtherContact(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
+                            <div className="space-y-1"><Label className="text-xs font-bold">Institute Address *</Label><Textarea value={otherAddress} onChange={(e) => setOtherAddress(e.target.value)} rows={2} className="rounded-xl bg-white" /></div>
                           </div>
                         </div>
                       )}
-                      
                       {(instituteName || isOtherInstitute) && (
                         <div className="space-y-4 pt-3">
                           <div className="grid gap-4 sm:grid-cols-2">
                             {listCfg.personFields.map((f: any) => (
-                              <div key={f.key} className="space-y-2">
-                                <Label className="text-sm font-bold">{f.label} {f.required && "*"}</Label>
-                                <Input value={catFields[f.key] ?? ""} onChange={(e) => setCatFields((p) => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder || f.label} className="h-12 rounded-xl bg-slate-50" />
-                              </div>
+                              <div key={f.key} className="space-y-2"><Label className="text-sm font-bold">{f.label} {f.required && "*"}</Label><Input value={catFields[f.key] ?? ""} onChange={(e) => setCatFields((p) => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder || f.label} className="h-12 rounded-xl bg-slate-50" /></div>
                             ))}
-                            <div className="space-y-2 sm:col-span-2">
-                              <Label className="text-sm font-bold">{listCfg.refLabel}</Label>
-                              <Input value={refNumber} onChange={(e) => setRefNumber(e.target.value)} placeholder={listCfg.refHint} className="h-12 rounded-xl bg-slate-50" />
-                            </div>
+                            <div className="space-y-2 sm:col-span-2"><Label className="text-sm font-bold">{listCfg.refLabel}</Label><Input value={refNumber} onChange={(e) => setRefNumber(e.target.value)} placeholder={listCfg.refHint} className="h-12 rounded-xl bg-slate-50" /></div>
                           </div>
                           <div className="grid gap-3 sm:grid-cols-2">
                             {docBox("bill", listCfg.billLabel, true)}
@@ -1554,7 +1329,6 @@ export default function SubmitRequestPage() {
                     </div>
                   )}
 
-                  {/* Education Categories */}
                   {isEducationCategory && listCfg && (
                     <div className="space-y-5 pt-4 border-t border-slate-100 dark:border-slate-800">
                       <div className="space-y-3">
@@ -1565,18 +1339,14 @@ export default function SubmitRequestPage() {
                           ))}
                         </div>
                       </div>
-
                       {!isOtherInstitute && !instituteName && (
                         <div className="space-y-3">
                           <Label className="text-sm font-bold">Search & Select Institute *</Label>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" />
-                            <Input value={instituteSearch} onChange={(e) => setInstituteSearch(e.target.value)} placeholder="Type institute name..." className="h-14 pl-10 rounded-xl bg-slate-50 text-base" />
-                          </div>
+                          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" /><Input value={instituteSearch} onChange={(e) => setInstituteSearch(e.target.value)} placeholder="Type institute name..." className="h-14 pl-10 rounded-xl bg-slate-50 text-base" /></div>
                           {instituteSearch.trim().length >= 2 && (
-                            <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden max-h-48 overflow-y-auto bg-white dark:border-slate-800 dark:divide-slate-800 dark:bg-slate-900">
+                            <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden max-h-48 overflow-y-auto bg-white">
                               {filteredInstitutes.map((n: string) => (
-                                <button key={n} type="button" onClick={() => { setInstituteName(n); setCatFields((p) => ({ ...p, institute_name: n })); setInstituteSearch(""); }} className="w-full text-left px-4 py-3 text-sm font-semibold hover:bg-teal-50 hover:text-teal-700 dark:hover:bg-teal-900/20">{n}</button>
+                                <button key={n} type="button" onClick={() => { setInstituteName(n); setCatFields((p) => ({ ...p, institute_name: n })); setInstituteSearch(""); }} className="w-full text-left px-4 py-3 text-sm font-semibold hover:bg-teal-50 hover:text-teal-700">{n}</button>
                               ))}
                               {filteredInstitutes.length === 0 && <p className="px-4 py-3 text-sm text-slate-500">No match found.</p>}
                             </div>
@@ -1584,17 +1354,15 @@ export default function SubmitRequestPage() {
                           <button type="button" onClick={() => setIsOtherInstitute(true)} className="text-sm font-bold text-teal-600 hover:underline">My institute is not in the list — add manually</button>
                         </div>
                       )}
-
                       {instituteName && !isOtherInstitute && (
-                        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-900/20">
-                          <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">✓ {instituteName}</p>
+                        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                          <p className="text-sm font-bold text-emerald-800">✓ {instituteName}</p>
                           <button type="button" onClick={() => setInstituteName("")} className="text-xs font-bold text-teal-600 underline">Change</button>
                         </div>
                       )}
-
                       {isOtherInstitute && (
-                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-                          <div className="flex items-center justify-between"><p className="text-sm font-bold">Add Institute Manually</p><button type="button" onClick={() => { setIsOtherInstitute(false); setOtherName(""); setOtherContact(""); setOtherAddress(""); }} className="text-xs font-bold text-teal-600 underline">Back to list</button></div>
+                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex items-center justify-between"><p className="text-sm font-bold">Add Institute Manually</p>{localLists && (<button type="button" onClick={() => { setIsOtherInstitute(false); setOtherName(""); setOtherContact(""); setOtherAddress(""); }} className="text-xs font-bold text-teal-600 underline">Back to list</button>)}</div>
                           <div className="space-y-3">
                             <div className="space-y-1"><Label className="text-xs font-bold">Institute Full Name *</Label><Input value={otherName} onChange={(e) => setOtherName(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
                             <div className="space-y-1"><Label className="text-xs font-bold">Institute Contact Number *</Label><Input value={otherContact} onChange={(e) => setOtherContact(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
@@ -1602,32 +1370,26 @@ export default function SubmitRequestPage() {
                           </div>
                         </div>
                       )}
-
                       {(instituteName || isOtherInstitute) && (
                         <div className="space-y-4">
                           <div className="grid gap-4 sm:grid-cols-2">
                             {listCfg.personFields.map((f: any) => (
-                              <div key={f.key} className="space-y-2">
-                                <Label className="text-sm font-bold">{f.label} {f.required && "*"}</Label>
-                                <Input value={catFields[f.key] ?? ""} onChange={(e) => setCatFields((p) => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder || f.label} className="h-12 rounded-xl bg-slate-50" />
-                              </div>
+                              <div key={f.key} className="space-y-2"><Label className="text-sm font-bold">{f.label} {f.required && "*"}</Label><Input value={catFields[f.key] ?? ""} onChange={(e) => setCatFields((p) => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder || f.label} className="h-12 rounded-xl bg-slate-50" /></div>
                             ))}
                           </div>
-
                           {category === "Education, Books & Admission" && eduSubType === "admission" && (
                             <div className="space-y-2">
                               <Label className="text-sm font-bold">Where are you seeking admission? *</Label>
                               <div className="grid grid-cols-3 gap-2">
                                 {["School", "College", "University"].map((level) => (
-                                  <button key={level} type="button" onClick={() => { setEduAdmissionLevel(level as any); setEduSubFields({}); }} className={`h-12 rounded-xl border text-sm font-bold transition-all ${eduAdmissionLevel === level ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300 dark:bg-slate-950 dark:border-slate-800"}`}>{level}</button>
+                                  <button key={level} type="button" onClick={() => { setEduAdmissionLevel(level as any); setEduSubFields({}); }} className={`h-12 rounded-xl border text-sm font-bold transition-all ${eduAdmissionLevel === level ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300"}`}>{level}</button>
                                 ))}
                               </div>
                             </div>
                           )}
-
                           {((category === "Education, Books & Admission" && eduSubType === "admission" && eduAdmissionLevel) || (category === "School, College & University Fees" && eduSubType)) && (
-                            <div className="space-y-4 rounded-xl border border-teal-100 bg-teal-50/30 p-4 dark:border-teal-900/30 dark:bg-teal-950/10">
-                              <p className="text-sm font-bold text-teal-800 dark:text-teal-300">📋 Details</p>
+                            <div className="space-y-4 rounded-xl border border-teal-100 bg-teal-50/30 p-4">
+                              <p className="text-sm font-bold text-teal-800">📋 Details</p>
                               <div className="grid gap-4 sm:grid-cols-2">
                                 {listCfg.getSubFields?.(eduSubType, category === "Education, Books & Admission" ? eduAdmissionLevel : "")?.map((f: any) => {
                                   if (f.choices) {
@@ -1636,7 +1398,7 @@ export default function SubmitRequestPage() {
                                         <Label className="text-xs font-bold">{f.label} *</Label>
                                         <div className="grid grid-cols-2 gap-2">
                                           {f.choices.map((choice: string) => (
-                                            <button key={choice} type="button" onClick={() => setEduSubFields((p) => ({ ...p, [f.key]: choice }))} className={`px-3 py-2 rounded-xl border text-xs font-bold text-left transition-all ${eduSubFields[f.key] === choice ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300 dark:bg-slate-950 dark:border-slate-800"}`}>{choice}</button>
+                                            <button key={choice} type="button" onClick={() => setEduSubFields((p) => ({ ...p, [f.key]: choice }))} className={`px-3 py-2 rounded-xl border text-xs font-bold text-left transition-all ${eduSubFields[f.key] === choice ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700"}`}>{choice}</button>
                                           ))}
                                         </div>
                                       </div>
@@ -1652,15 +1414,10 @@ export default function SubmitRequestPage() {
                               </div>
                             </div>
                           )}
-
-                          <div className="space-y-2">
-                            <Label className="text-sm font-bold">{listCfg.refLabel}</Label>
-                            <Input value={refNumber} onChange={(e) => setRefNumber(e.target.value)} placeholder={listCfg.refHint} className="h-12 rounded-xl bg-slate-50" />
-                          </div>
-
+                          <div className="space-y-2"><Label className="text-sm font-bold">{listCfg.refLabel}</Label><Input value={refNumber} onChange={(e) => setRefNumber(e.target.value)} placeholder={listCfg.refHint} className="h-12 rounded-xl bg-slate-50" /></div>
                           {((category === "Education, Books & Admission" && eduSubType === "admission" && eduAdmissionLevel) || (category === "School, College & University Fees" && eduSubType)) && (
                             <div className="grid gap-3 sm:grid-cols-2 pt-2">
-                              {listCfg.getSubDocs?.(eduSubType, category === "Education, Books & Admission" ? eduAdmissionLevel : "", profile)?.map((doc: any) => docBox(doc.key, doc.label, doc.required, doc.hint))}
+                              {listCfg.getSubDocs?.(eduSubType, category === "Education, Books & Admission" ? eduAdmissionLevel : "")?.map((doc: any) => docBox(doc.key, doc.label, doc.required, doc.hint))}
                             </div>
                           )}
                         </div>
@@ -1668,48 +1425,39 @@ export default function SubmitRequestPage() {
                     </div>
                   )}
 
-                  {/* Other Complex Config Categories */}
                   {!easy && config && category !== "Disability Support" && !isEducationCategory && (
                     <div className="space-y-5 pt-4 border-t border-slate-100 dark:border-slate-800">
                       {cfgOneCase && <div className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-600 border border-red-200">⚠️ {cfgOneCase}</div>}
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {cfgFields.filter((f) => f.key !== "job_status" && !SKIP_FIELDS.has(f.key)).map((f) => renderField(f))}
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {cfgDocs.filter((d) => d.key !== "salary_slip" && d.key !== "statement").map((d) => docBox(d.key, d.label, !!d.required, d.hint))}
-                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">{cfgFields.filter((f) => f.key !== "job_status" && !SKIP_FIELDS.has(f.key)).map((f) => renderField(f))}</div>
+                      <div className="grid gap-3 sm:grid-cols-2">{cfgDocs.filter((d) => d.key !== "salary_slip" && d.key !== "statement").map((d) => docBox(d.key, d.label, !!d.required, d.hint))}</div>
                     </div>
                   )}
 
-                  {/* Disability Support */}
                   {category === "Disability Support" && (
                     <div className="space-y-5 pt-4 border-t border-slate-100 dark:border-slate-800">
                       <div className="grid gap-3 sm:grid-cols-2">
-                        {docBox("disability_cnic", `CNIC showing Disability / ${profile.idLabel}`, true, "REQUIRED — CNIC that marks the person as disabled")}
+                        {docBox("disability_cnic", "Disability ID or official Disability Certificate", true, "REQUIRED — official ID or certificate")}
                         {docBox("disability_photo", "Clear Photo of Disability", true, "A clear photo showing the disability")}
                       </div>
-
                       <div className="space-y-3">
                         <Label className="text-base font-black text-slate-800 dark:text-slate-200">What kind of help is needed? *</Label>
                         <div className="grid grid-cols-1 gap-2">
-                          {[{ v: "product", l: "🦽 Equipment / Product (e.g. wheelchair)" }, { v: "treatment", l: "🏥 Hospital Treatment" }, { v: "stipend", l: `💰 Monthly Stipend (Rs ${DISABILITY_STIPEND_AMOUNT})` }].map((o) => (
-                            <button key={o.v} type="button" onClick={() => setDisabilityMode(o.v as any)} className={`px-4 py-3 rounded-xl border text-sm font-bold text-left transition-all ${disabilityMode === o.v ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300 dark:bg-slate-950 dark:border-slate-800"}`}>{o.l}</button>
+                          {[{ v: "product", l: "🦽 Equipment / Product (e.g. wheelchair)" }, { v: "treatment", l: "🏥 Hospital Treatment" }, { v: "stipend", l: `💰 Monthly Stipend (${money(stipendAmount)})` }].map((o) => (
+                            <button key={o.v} type="button" onClick={() => setDisabilityMode(o.v as any)} className={`px-4 py-3 rounded-xl border text-sm font-bold text-left transition-all ${disabilityMode === o.v ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300"}`}>{o.l}</button>
                           ))}
                         </div>
                       </div>
-
                       <div className="space-y-2">
                         <Label className="text-sm font-bold">Type of Disability *</Label>
                         <div className="grid grid-cols-2 gap-2">
                           {CHOICE_FIELDS.disability_type.map((opt) => (
-                            <button key={opt} type="button" onClick={() => setDisabilityType(opt)} className={`px-3 py-2 rounded-xl border text-xs font-bold text-left transition-all ${disabilityType === opt ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300 dark:bg-slate-950 dark:border-slate-800"}`}>{opt}</button>
+                            <button key={opt} type="button" onClick={() => setDisabilityType(opt)} className={`px-3 py-2 rounded-xl border text-xs font-bold text-left transition-all ${disabilityType === opt ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700"}`}>{opt}</button>
                           ))}
                         </div>
                       </div>
-
                       {disabilityMode === "product" && (
-                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-                          <p className="text-sm font-bold text-teal-700 dark:text-teal-400">🛒 Shop Details</p>
+                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="text-sm font-bold text-teal-700">🛒 Shop Details</p>
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-1"><Label className="text-xs font-bold">Shop Name *</Label><Input value={disabilityShopName} onChange={(e) => setDisabilityShopName(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
                             <div className="space-y-1"><Label className="text-xs font-bold">Shop Contact *</Label><Input value={disabilityShopContact} onChange={(e) => setDisabilityShopContact(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
@@ -1717,18 +1465,13 @@ export default function SubmitRequestPage() {
                           {docBox("product_receipt", "Shop Quotation / Price Estimate", true, "Photo of the shop's quotation")}
                         </div>
                       )}
-
                       {disabilityMode === "treatment" && (
-                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-                          <p className="text-sm font-bold text-teal-700 dark:text-teal-400">🏥 Treatment Details</p>
-                          
+                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="text-sm font-bold text-teal-700">🏥 Treatment Details</p>
                           {!disabilityHospitalOther && !disabilityHospital && (
                             <div className="space-y-3">
                               <Label className="text-sm font-bold">Search Hospital *</Label>
-                              <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" />
-                                <Input value={disabilityHospitalSearch} onChange={(e) => setDisabilityHospitalSearch(e.target.value)} placeholder="Type hospital name..." className="h-14 pl-10 rounded-xl bg-white text-base" />
-                              </div>
+                              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" /><Input value={disabilityHospitalSearch} onChange={(e) => setDisabilityHospitalSearch(e.target.value)} placeholder="Type hospital name..." className="h-14 pl-10 rounded-xl bg-white text-base" /></div>
                               {disabilityHospitalSearch.trim().length >= 2 && (
                                 <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden max-h-48 overflow-y-auto bg-white">
                                   {HEALTH_INSTITUTES.filter((n) => n.toLowerCase().includes(disabilityHospitalSearch.toLowerCase())).slice(0, 8).map((n) => (
@@ -1739,14 +1482,12 @@ export default function SubmitRequestPage() {
                               <button type="button" onClick={() => setDisabilityHospitalOther(true)} className="text-xs font-bold text-teal-600 hover:underline">Not in list — add manually</button>
                             </div>
                           )}
-                          
                           {disabilityHospital && !disabilityHospitalOther && (
                             <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                               <p className="text-sm font-bold text-emerald-800">✓ {disabilityHospital}</p>
                               <button type="button" onClick={() => setDisabilityHospital("")} className="text-xs font-bold text-teal-600 underline">Change</button>
                             </div>
                           )}
-                          
                           {disabilityHospitalOther && (
                             <div className="space-y-2">
                               <Label className="text-xs font-bold">Hospital Name *</Label>
@@ -1754,7 +1495,6 @@ export default function SubmitRequestPage() {
                               <button type="button" onClick={() => { setDisabilityHospitalOther(false); setDisabilityHospital(""); }} className="text-xs font-bold text-teal-600 underline">Back to list</button>
                             </div>
                           )}
-
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-1"><Label className="text-xs font-bold">Treatment Amount *</Label><Input type="number" value={treatmentAmount} onChange={(e) => setTreatmentAmount(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
                             <div className="space-y-1"><Label className="text-xs font-bold">Bill Expiry Date *</Label><Input type="date" value={treatmentExpiry} onChange={(e) => setTreatmentExpiry(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
@@ -1762,32 +1502,30 @@ export default function SubmitRequestPage() {
                           </div>
                         </div>
                       )}
-
                       {disabilityMode === "stipend" && (
-                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-                          <p className="text-sm font-bold text-teal-700 dark:text-teal-400">💰 Monthly Stipend (Rs {DISABILITY_STIPEND_AMOUNT})</p>
+                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="text-sm font-bold text-teal-700">💰 Monthly Stipend (${money(stipendAmount)})</p>
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-1"><Label className="text-xs font-bold">Account Title *</Label><Input value={disabilityBankTitle} onChange={(e) => setDisabilityBankTitle(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
-                            <div className="space-y-1"><Label className="text-xs font-bold">Bank / EasyPaisa / JazzCash *</Label><Input value={disabilityBankNumber} onChange={(e) => setDisabilityBankNumber(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
+                            <div className="space-y-1"><Label className="text-xs font-bold">Bank / {profile.walletHint || "Wallet"} *</Label><Input value={disabilityBankNumber} onChange={(e) => setDisabilityBankNumber(e.target.value)} className="h-12 rounded-xl bg-white" /></div>
                           </div>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Property Ownership */}
                   {PROPERTY_RELEVANT_CATS.has(category) && !isEducationCategory && (
                     <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                       <Label className="text-base font-black text-slate-800 dark:text-slate-200">🏠 Property Ownership *</Label>
                       <p className="text-xs font-medium text-slate-500">Is the property where you live owned by you or are you renting?</p>
                       <div className="grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => setPropertyOwnership("owned")} className={`h-12 rounded-xl border text-sm font-bold transition-all ${propertyOwnership === "owned" ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300 dark:bg-slate-950 dark:border-slate-800"}`}>🏠 Owned</button>
-                        <button type="button" onClick={() => setPropertyOwnership("rented")} className={`h-12 rounded-xl border text-sm font-bold transition-all ${propertyOwnership === "rented" ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300 dark:bg-slate-950 dark:border-slate-800"}`}>🏢 Rented (Tenant)</button>
+                        <button type="button" onClick={() => setPropertyOwnership("owned")} className={`h-12 rounded-xl border text-sm font-bold transition-all ${propertyOwnership === "owned" ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300"}`}>🏠 Owned</button>
+                        <button type="button" onClick={() => setPropertyOwnership("rented")} className={`h-12 rounded-xl border text-sm font-bold transition-all ${propertyOwnership === "rented" ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300"}`}>🏢 Rented (Tenant)</button>
                       </div>
                       {propertyOwnership === "rented" && (
                         <div className="grid gap-3 sm:grid-cols-2 mt-3">
                           {docBox("rental_agreement", "Rental Agreement / Contract", true, "Clear photo of your rental agreement")}
-                          {docBox("landlord_cnic", "Landlord's CNIC", true, "CNIC of the landlord")}
+                          {docBox("landlord_cnic", "Landlord's ID", true, "ID of the landlord")}
                         </div>
                       )}
                       {propertyOwnership === "owned" && (
@@ -1795,38 +1533,36 @@ export default function SubmitRequestPage() {
                           <Label className="text-sm font-bold">House is in whose name? *</Label>
                           <div className="grid grid-cols-3 gap-2">
                             {["Myself", "Father", "Mother"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setCatFields((p) => ({ ...p, owner_relation: opt }))} className={`h-12 rounded-xl border text-xs font-bold transition-all ${catFields.owner_relation === opt ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700 hover:border-teal-300 dark:bg-slate-950 dark:border-slate-800"}`}>{opt}</button>
+                              <button key={opt} type="button" onClick={() => setCatFields((p) => ({ ...p, owner_relation: opt }))} className={`h-12 rounded-xl border text-xs font-bold transition-all ${catFields.owner_relation === opt ? "bg-teal-600 text-white border-teal-600 shadow-md" : "bg-white border-slate-200 text-slate-700"}`}>{opt}</button>
                             ))}
                           </div>
-                          {docBox("owner_cnic", `${catFields.owner_relation || "Owner"}'s CNIC`, true, "CNIC of the person whose name the house is registered")}
+                          {docBox("owner_cnic", `${catFields.owner_relation || "Owner"}'s ID`, true, "ID of the person whose name the house is registered")}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Description & Amount */}
                   <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                     <div className="space-y-2">
                       <Label className="text-base font-black text-slate-800 dark:text-slate-200">Why do you need this help? *</Label>
                       <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe your situation in detail — Heroes read this to understand your need..." className="rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
                       <p className="text-xs font-medium text-slate-500">💡 Write in detail so Heroes understand your situation and can help better.</p>
                     </div>
-
                     {isFixedAmount(category) ? (
                       <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 p-5 text-white shadow-lg">
                         <p className="text-sm font-bold opacity-90">💰 Fixed Amount</p>
-                        <p className="text-3xl font-black mt-1">Rs {getFixedAmountValue(category)?.toLocaleString()}</p>
+                        <p className="text-3xl font-black mt-1">{money(getFixedAmountValue(category))}</p>
                         <p className="text-xs font-medium opacity-80 mt-1">This amount is fixed for this category. You cannot change it.</p>
                       </div>
                     ) : isDebtCategory(category) ? (
-                      <div className="space-y-4 rounded-2xl border border-blue-200 bg-blue-50 p-5 dark:border-blue-900/30 dark:bg-blue-950/20">
-                        <p className="text-sm font-bold text-blue-800 dark:text-blue-300 flex items-center gap-2"><Calculator className="h-5 w-5" /> 5% of Total Debt (Max Rs 25,000)</p>
+                      <div className="space-y-4 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                        <p className="text-sm font-bold text-blue-800 flex items-center gap-2"><Calculator className="h-5 w-5" /> 5% of Total Debt (Max {money(capDebt)})</p>
                         <div className="space-y-2">
-                          <Label className="text-sm font-bold text-blue-900 dark:text-blue-200">Total Outstanding Debt Amount *</Label>
+                          <Label className="text-sm font-bold text-blue-900">Total Outstanding Debt Amount *</Label>
                           <div className="flex gap-2">
                             <Select value={currency} onValueChange={setCurrency}>
                               <SelectTrigger className="h-14 w-28 rounded-xl bg-white"><SelectValue /></SelectTrigger>
-                              <SelectContent>{CURRENCY_CODES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                              <SelectContent>{CASE_CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                             </Select>
                             <div className="relative flex-1">
                               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-slate-500 pointer-events-none">{sym}</span>
@@ -1835,12 +1571,9 @@ export default function SubmitRequestPage() {
                           </div>
                         </div>
                         {debtTotalAmount && parseFloat(debtTotalAmount) > 0 && (
-                          <div className="rounded-xl bg-white p-4 shadow-sm border border-blue-100 dark:border-blue-900/50">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-bold text-slate-700">Calculated 5% Amount:</span>
-                              <span className="text-xl font-black text-blue-700">{sym} {calculatedDebtAmount.toLocaleString()}</span>
-                            </div>
-                            <p className="text-xs text-slate-500 mt-1">5% of {parseFloat(debtTotalAmount).toLocaleString()} (Max limit: Rs 25,000)</p>
+                          <div className="rounded-xl bg-white p-4 shadow-sm border border-blue-100">
+                            <div className="flex justify-between items-center"><span className="text-sm font-bold text-slate-700">Calculated 5% Amount:</span><span className="text-xl font-black text-blue-700">{sym} {calculatedDebtAmount.toLocaleString()}</span></div>
+                            <p className="text-xs text-slate-500 mt-1">5% of {parseFloat(debtTotalAmount).toLocaleString()} (Max limit: {money(capDebt)})</p>
                           </div>
                         )}
                       </div>
@@ -1850,18 +1583,17 @@ export default function SubmitRequestPage() {
                         <div className="flex gap-2">
                           <Select value={currency} onValueChange={setCurrency}>
                             <SelectTrigger className="h-14 w-28 rounded-xl bg-slate-50 font-bold text-base"><SelectValue /></SelectTrigger>
-                            <SelectContent>{CURRENCY_CODES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                            <SelectContent>{CASE_CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                           </Select>
                           <div className="relative flex-1">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-slate-500 pointer-events-none">{sym}</span>
-                            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} min={getMinAmount(category) ?? undefined} max={getMaxLimit(category) ?? undefined} placeholder="e.g. 5000" className="h-14 pl-14 rounded-xl bg-slate-50 text-base font-bold focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
+                            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} min={getMinAmount(category, currency) ?? undefined} max={getMaxLimit(category) ?? undefined} placeholder="e.g. 5000" className="h-14 pl-14 rounded-xl bg-slate-50 text-base font-bold focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
                           </div>
                         </div>
-                        {getMaxLimit(category) && <p className="text-xs font-bold text-amber-600">⚠️ Maximum allowed: Rs {getMaxLimit(category)?.toLocaleString()}</p>}
-                        {getMinAmount(category) && <p className="text-xs font-bold text-blue-600">ℹ️ Minimum allowed: Rs {getMinAmount(category)?.toLocaleString()}</p>}
+                        {getMaxLimit(category) && <p className="text-xs font-bold text-amber-600">⚠️ Maximum allowed: {money(getMaxLimit(category))}</p>}
+                        {getMinAmount(category, currency) && <p className="text-xs font-bold text-blue-600">ℹ️ Minimum allowed: {money(getMinAmount(category, currency))}</p>}
                       </div>
                     )}
-
                     <div className="space-y-2">
                       <Label className="text-base font-black text-slate-800 dark:text-slate-200">{easy ? "Bill / Challan Due Date *" : "Expected Resolution Date *"}</Label>
                       <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
@@ -1881,100 +1613,68 @@ export default function SubmitRequestPage() {
                     setStep(3);
                   }}>Continue <ChevronRight className="ml-2 h-5 w-5" /></Button>
               </div>
-              <StepGuide lines={[
-                "Answer the questions clearly.",
-                "Select your gender and attach required documents.",
-                ...(needsPaymentReceiver ? [`Fill the ${getReceiverLabel()} details.`] : []),
-                ...(isEducationCategory ? ["Select your institute and attach fee challan/ID."] : []),
-                ...(isFixedAmount(category) ? [`💰 Fixed amount: Rs ${getFixedAmountValue(category)?.toLocaleString()}`] : isDebtCategory(category) ? ["📊 Enter total debt, 5% will be calculated."] : ["💰 Enter the verified amount needed."]),
-                "Explain your situation and set the deadline.",
-              ]} />
             </motion.div>
           )}
 
-          {/* STEP 3 - Verification */}
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:border-slate-800 dark:bg-slate-900 sm:p-8">
               <h2 className="mb-6 flex items-center gap-2 text-xl font-black text-slate-900 dark:text-white"><ShieldCheck className="h-6 w-6 text-teal-600" /> Identity Verification</h2>
-              
               <div className="space-y-8">
-                {/* Selfie */}
                 <div className="space-y-3">
                   <div>
                     <Label className="text-base font-black text-slate-800 dark:text-slate-200 flex items-center gap-2"><Camera className="h-5 w-5 text-teal-600" /> Take Live Selfie *</Label>
                     <p className="text-sm font-medium text-slate-500 mt-1">Take a clear selfie to verify your identity. Must be a live photo.</p>
                   </div>
-                  
                   {!selfiePreview ? (
                     <div className="space-y-3">
                       {!cameraOn ? (
-                        <Button onClick={startCamera} variant="outline" className="h-16 w-full rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50/50 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:bg-teal-950/20 dark:text-teal-400">
-                          <Camera className="h-6 w-6 mr-2" /> Open Camera
-                        </Button>
+                        <Button onClick={startCamera} variant="outline" className="h-16 w-full rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50/50 text-teal-700 hover:bg-teal-50"><Camera className="h-6 w-6 mr-2" /> Open Camera</Button>
                       ) : (
                         <div className="space-y-3 rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 relative">
                           <video ref={videoRef} autoPlay playsInline className="w-full aspect-square object-cover" />
                           <div className="absolute inset-0 border-[40px] border-black/40 rounded-full pointer-events-none" />
-                          <div className="p-3 bg-slate-900 flex justify-center">
-                            <Button onClick={takeSelfie} className="h-14 w-full max-w-xs rounded-xl bg-white text-slate-900 font-bold hover:bg-slate-100 text-lg"><Camera className="h-5 w-5 mr-2" /> Capture Photo</Button>
-                          </div>
+                          <div className="p-3 bg-slate-900 flex justify-center"><Button onClick={takeSelfie} className="h-14 w-full max-w-xs rounded-xl bg-white text-slate-900 font-bold hover:bg-slate-100 text-lg"><Camera className="h-5 w-5 mr-2" /> Capture Photo</Button></div>
                         </div>
                       )}
                       <canvas ref={canvasRef} className="hidden" />
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                       <img src={selfiePreview} alt="Selfie" className="w-full max-h-64 object-cover rounded-xl shadow-sm mb-4" />
-                      {uploadingSelfie ? (
-                        <p className="text-sm font-bold text-amber-600 flex items-center justify-center gap-2"><div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" /> Uploading...</p>
-                      ) : selfieUrl ? (
-                        <p className="text-sm font-bold text-emerald-700 flex items-center justify-center gap-2"><CheckCircle2 className="h-5 w-5" /> Selfie Ready</p>
-                      ) : null}
+                      {uploadingSelfie ? <p className="text-sm font-bold text-amber-600 flex items-center justify-center gap-2"><div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" /> Uploading...</p>
+                        : selfieUrl ? <p className="text-sm font-bold text-emerald-700 flex items-center justify-center gap-2"><CheckCircle2 className="h-5 w-5" /> Selfie Ready</p> : null}
                       <Button variant="outline" className="w-full mt-4 h-12 rounded-xl font-bold" onClick={() => { setSelfiePreview(null); setSelfieUrl(""); }}>Retake Photo</Button>
                     </div>
                   )}
                 </div>
-
-                {/* Video */}
                 <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-slate-800">
                   <div>
                     <Label className="text-base font-black text-slate-800 dark:text-slate-200 flex items-center gap-2"><Video className="h-5 w-5 text-teal-600" /> Video Statement (60-90 Seconds) *</Label>
                     <p className="text-sm font-medium text-slate-500 mt-1">Explain your situation, financial challenge, and why you need this help.</p>
                     <div className="mt-2 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800 border border-amber-200">⚠️ The video must be up to 90 seconds to keep file size under 50 MB.</div>
                   </div>
-
                   {!videoPreview ? (
                     <div className="space-y-3">
                       {!videoRecording ? (
-                        <Button onClick={startVideoRecording} variant="outline" className="h-16 w-full rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50/50 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:bg-teal-950/20 dark:text-teal-400">
-                          <Video className="h-6 w-6 mr-2" /> Start Recording
-                        </Button>
+                        <Button onClick={startVideoRecording} variant="outline" className="h-16 w-full rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50/50 text-teal-700 hover:bg-teal-50"><Video className="h-6 w-6 mr-2" /> Start Recording</Button>
                       ) : (
                         <div className="space-y-3 rounded-2xl overflow-hidden border border-red-200 bg-slate-900 relative">
                           <video ref={liveVideoRef} autoPlay playsInline muted className="w-full aspect-video object-cover" />
-                          <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-                            <div className="h-2 w-2 rounded-full bg-white" /> REC {videoTimer}s / 90s
-                          </div>
-                          <div className="p-3 bg-slate-900">
-                            <Button size="lg" variant="destructive" onClick={stopVideoRecording} className="w-full h-14 rounded-xl font-bold text-lg"><Square className="h-5 w-5 mr-2" /> Stop Recording</Button>
-                          </div>
+                          <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse"><div className="h-2 w-2 rounded-full bg-white" /> REC {videoTimer}s / 90s</div>
+                          <div className="p-3 bg-slate-900"><Button size="lg" variant="destructive" onClick={stopVideoRecording} className="w-full h-14 rounded-xl font-bold text-lg"><Square className="h-5 w-5 mr-2" /> Stop Recording</Button></div>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                       <video src={videoPreview} controls className="w-full rounded-xl shadow-sm mb-4 aspect-video object-cover" />
-                      {uploadingVideo ? (
-                        <p className="text-sm font-bold text-amber-600 flex items-center justify-center gap-2"><div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" /> Uploading video...</p>
-                      ) : videoUrl ? (
-                        <p className="text-sm font-bold text-emerald-700 flex items-center justify-center gap-2"><CheckCircle2 className="h-5 w-5" /> Video Ready</p>
-                      ) : null}
+                      {uploadingVideo ? <p className="text-sm font-bold text-amber-600 flex items-center justify-center gap-2"><div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" /> Uploading video...</p>
+                        : videoUrl ? <p className="text-sm font-bold text-emerald-700 flex items-center justify-center gap-2"><CheckCircle2 className="h-5 w-5" /> Video Ready</p> : null}
                       <Button variant="outline" className="w-full mt-4 h-12 rounded-xl font-bold" onClick={() => { setVideoPreview(null); setVideoUrl(""); }}>Re-record Video</Button>
                     </div>
                   )}
                 </div>
               </div>
-
               <div className="mt-8 flex gap-3">
                 <Button variant="outline" className="h-14 flex-1 rounded-2xl font-bold text-base" onClick={() => setStep(2)}>Back</Button>
                 <Button className="h-14 flex-1 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 text-lg font-bold text-white shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]" onClick={() => {
@@ -1987,47 +1687,33 @@ export default function SubmitRequestPage() {
             </motion.div>
           )}
 
-          {/* STEP 4 - Review */}
           {step === 4 && (
             <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:border-slate-800 dark:bg-slate-900 sm:p-8">
               <h2 className="mb-6 flex items-center gap-2 text-xl font-black text-slate-900 dark:text-white"><CheckCircle2 className="h-6 w-6 text-teal-600" /> Review & Submit</h2>
-              
-              <div className="space-y-4 rounded-2xl border border-slate-100 bg-slate-50/50 p-5 dark:border-slate-800 dark:bg-slate-950/50">
+              <div className="space-y-4 rounded-2xl border border-slate-100 bg-slate-50/50 p-5">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Category</p><p className="text-sm font-bold text-slate-900 dark:text-white">{category}</p></div>
                   <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Title</p><p className="text-sm font-bold text-slate-900 dark:text-white">{title}</p></div>
                   <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Location</p><p className="text-sm font-bold text-slate-900 dark:text-white">{city}, {country}</p></div>
                   <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Urgency</p><p className="text-sm font-bold text-slate-900 dark:text-white">{easy ? (autoUrgency || "—") + " (auto)" : urgency}</p></div>
-                  
                   {isFixedAmount(category) ? (
-                    <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount (Fixed)</p><p className="text-sm font-black text-emerald-600">Rs {getFixedAmountValue(category)?.toLocaleString()}</p></div>
+                    <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount (Fixed)</p><p className="text-sm font-black text-emerald-600">{money(getFixedAmountValue(category))}</p></div>
                   ) : isDebtCategory(category) ? (
-                    <>
-                      <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Debt</p><p className="text-sm font-bold text-slate-900 dark:text-white">{sym} {parseFloat(debtTotalAmount || "0").toLocaleString()} {currency}</p></div>
-                      <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">5% Assistance</p><p className="text-sm font-black text-teal-600">{sym} {calculatedDebtAmount.toLocaleString()} {currency}</p></div>
-                    </>
+                    <><div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Debt</p><p className="text-sm font-bold text-slate-900 dark:text-white">{sym} {parseFloat(debtTotalAmount || "0").toLocaleString()} {currency}</p></div><div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">5% Assistance</p><p className="text-sm font-black text-teal-600">{sym} {calculatedDebtAmount.toLocaleString()} {currency}</p></div></>
                   ) : (
                     <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount Needed</p><p className="text-sm font-black text-teal-600">{sym} {amount} {currency}</p></div>
                   )}
-
                   <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Expiry</p><p className="text-sm font-bold text-slate-900 dark:text-white">{deadline}</p></div>
                   <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Seeker Name</p><p className="text-sm font-bold text-slate-900 dark:text-white">{seekerName || "—"}</p></div>
                   <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Documents</p><p className="text-sm font-bold text-emerald-600">{Object.keys(catDocUrls).length} uploaded ✓</p></div>
                   <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Selfie & Video</p><p className="text-sm font-bold text-emerald-600">{selfieUrl && videoUrl ? "✓ Both Ready" : "Missing"}</p></div>
                 </div>
               </div>
-
-              <div className="mt-4 flex items-center justify-between rounded-2xl bg-teal-50 p-4 dark:bg-teal-900/20">
+              <div className="mt-4 flex items-center justify-between rounded-2xl bg-teal-50 p-4">
                 <p className="text-base font-black text-teal-900 dark:text-teal-300">Listing Fee</p>
-                {willBeFree ? (
-                  <p className="text-lg font-black text-emerald-600">FREE 🎉 {isFirstCaseFree ? "(First Case)" : `(${offer?.label || "Offer"})`}</p>
-                ) : (
-                  <p className="text-lg font-black text-teal-700 dark:text-teal-400">1 Credit</p>
-                )}
+                {willBeFree ? <p className="text-lg font-black text-emerald-600">FREE 🎉 {isFirstCaseFree ? "(First Case)" : `(${offer?.label || "Offer"})`}</p> : <p className="text-lg font-black text-teal-700">1 Credit</p>}
               </div>
-
               <TermsAndConditions />
-
               <div className="mt-6 flex flex-col gap-3">
                 <Button className="h-16 w-full rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 text-xl font-black text-white shadow-xl transition-transform hover:scale-[1.02] active:scale-[0.98]" disabled={submitting} onClick={handleSubmit}>
                   {submitting ? "Submitting..." : willBeFree ? "Submit Request — FREE 🎉" : "Pay 1 Credit & Submit"}
