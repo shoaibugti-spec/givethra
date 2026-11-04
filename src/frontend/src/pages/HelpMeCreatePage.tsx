@@ -18,6 +18,120 @@ const HELP_ME_MIN_STOP_SECONDS = 12;
 const HELP_ME_DESCRIPTION_WORDS = 80;
 const CONTACT_RE = /@|https?:\/\/|www\.|\d{7,}|whats?app|telegram|signal|wechat|\bimo\b|e-?mail/i;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Country detection chain:
+//   1. Cloudflare's request country (if the backend ever forwards it as cfg.country_code)
+//   2. Browser time zone (most reliable — "Asia/Karachi" → PK even when language is en-US)
+//   3. Browser language region (last resort)
+//   4. "US" as a safe default
+// ─────────────────────────────────────────────────────────────────────────────
+const TZ_TO_COUNTRY: Record<string, string> = {
+  "Asia/Karachi": "PK",
+  "Asia/Kolkata": "IN", "Asia/Calcutta": "IN",
+  "Asia/Dhaka": "BD",
+  "Asia/Colombo": "LK",
+  "Asia/Kathmandu": "NP",
+  "Asia/Kabul": "AF",
+  "Asia/Tehran": "IR",
+  "Asia/Dubai": "AE",
+  "Asia/Riyadh": "SA",
+  "Asia/Qatar": "QA",
+  "Asia/Kuwait": "KW",
+  "Asia/Bahrain": "BH",
+  "Asia/Muscat": "OM",
+  "Asia/Amman": "JO",
+  "Asia/Beirut": "LB",
+  "Asia/Jerusalem": "IL",
+  "Europe/Istanbul": "TR", "Asia/Istanbul": "TR",
+  "Africa/Cairo": "EG",
+  "Africa/Lagos": "NG",
+  "Africa/Nairobi": "KE",
+  "Africa/Accra": "GH",
+  "Africa/Johannesburg": "ZA",
+  "Africa/Casablanca": "MA",
+  "Asia/Jakarta": "ID",
+  "Asia/Kuala_Lumpur": "MY",
+  "Asia/Manila": "PH",
+  "Asia/Singapore": "SG",
+  "Asia/Bangkok": "TH",
+  "Asia/Ho_Chi_Minh": "VN",
+  "Asia/Shanghai": "CN",
+  "Asia/Hong_Kong": "HK",
+  "Asia/Taipei": "TW",
+  "Asia/Seoul": "KR",
+  "Asia/Tokyo": "JP",
+  "Europe/London": "GB",
+  "Europe/Dublin": "IE",
+  "Europe/Paris": "FR",
+  "Europe/Berlin": "DE",
+  "Europe/Madrid": "ES",
+  "Europe/Rome": "IT",
+  "Europe/Amsterdam": "NL",
+  "Europe/Brussels": "BE",
+  "Europe/Lisbon": "PT",
+  "Europe/Vienna": "AT",
+  "Europe/Zurich": "CH",
+  "Europe/Stockholm": "SE",
+  "Europe/Oslo": "NO",
+  "Europe/Copenhagen": "DK",
+  "Europe/Helsinki": "FI",
+  "Europe/Warsaw": "PL",
+  "Europe/Prague": "CZ",
+  "Europe/Athens": "GR",
+  "Europe/Moscow": "RU",
+  "America/New_York": "US",
+  "America/Chicago": "US",
+  "America/Denver": "US",
+  "America/Los_Angeles": "US",
+  "America/Phoenix": "US",
+  "America/Anchorage": "US",
+  "Pacific/Honolulu": "US",
+  "America/Toronto": "CA",
+  "America/Vancouver": "CA",
+  "America/Montreal": "CA",
+  "America/Mexico_City": "MX",
+  "America/Sao_Paulo": "BR",
+  "America/Argentina/Buenos_Aires": "AR",
+  "America/Santiago": "CL",
+  "America/Bogota": "CO",
+  "America/Lima": "PE",
+  "Australia/Sydney": "AU",
+  "Australia/Melbourne": "AU",
+  "Australia/Brisbane": "AU",
+  "Australia/Perth": "AU",
+  "Pacific/Auckland": "NZ",
+};
+
+// Approximate rates for DISPLAY ONLY. If the backend `helpme_fx` table has a
+// real rate for a currency, that value is used and this fallback is ignored.
+// Admin should still add PKR to `helpme_fx` so submissions are accepted.
+const FALLBACK_RATES: Record<string, number> = {
+  PKR: 278, INR: 83, BDT: 120, LKR: 300, NPR: 160,
+  AED: 3.67, SAR: 3.75, QAR: 3.64, KWD: 0.31, TRY: 33,
+  EGP: 48, NGN: 1600, KES: 130, GHS: 15, ZAR: 18,
+  IDR: 16000, MYR: 4.7, PHP: 58,
+  GBP: 0.79, CAD: 1.36, AUD: 1.52, EUR: 0.92, USD: 1,
+};
+
+function detectCountry(cfg: HelpMeConfig | null): string {
+  // 1. Backend-provided country (Cloudflare CF-IPCountry) — most accurate if present.
+  const cfgCC = String(cfg?.country_code || "").toUpperCase();
+  if (cfgCC && cfg?.country_currency[cfgCC]) return cfgCC;
+  // 2. Browser time zone — reliable even when the browser language is "en-US".
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const fromTz = TZ_TO_COUNTRY[tz];
+    if (fromTz && cfg?.country_currency[fromTz]) return fromTz;
+  } catch { /* ignore */ }
+  // 3. Browser language region — last-resort fallback.
+  try {
+    const parts = String(navigator.language || "").split("-");
+    const fromLang = (parts[1] || "").toUpperCase();
+    if (fromLang && cfg?.country_currency[fromLang]) return fromLang;
+  } catch { /* ignore */ }
+  return "US";
+}
+
 function limitHelpMeWords(value: string, max: number): string {
   return value.trim().split(/\s+/).filter(Boolean).slice(0, max).join(" ");
 }
@@ -50,7 +164,15 @@ export default function HelpMeCreatePage() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [desc, setDesc] = useState("");
-  const [country, setCountry] = useState("US");
+  // Initial country guess from time zone so the screen shows PKR briefly before config loads.
+  const [country, setCountry] = useState<string>(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      return TZ_TO_COUNTRY[tz] || "US";
+    } catch {
+      return "US";
+    }
+  });
   const [bankName, setBankName] = useState("");
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
@@ -108,48 +230,30 @@ export default function HelpMeCreatePage() {
         if (!live) return;
         setElig(e);
         setCfg(c);
-        // Country (and so currency) is detected automatically: the network location first, then the phone language.
-        const detectedCountry = (c.country_code || "").toUpperCase();
-        const localeCountry = (navigator.language.split("-")[1] || "").toUpperCase();
-        const cc = c.country_currency[detectedCountry] ? detectedCountry : c.country_currency[localeCountry] ? localeCountry : "US";
-        setCountry(cc);
+        // Country (and so currency) is detected automatically: time zone first
+        // (Pakistan → PK even with an "en-US" browser), then language region.
+        setCountry(detectCountry(c));
         setStep(e.can_post ? "intro" : "blocked");
       })
       .catch((e) => { if (live) { setElig({ can_post: false, reason: e.message || "Could not check your account. Please try again." }); setStep("blocked"); } });
     return () => { live = false; };
   }, [isAuthenticated, isInitializing, navigate]);
 
-  // Draw the camera picture upright into a vertical 9:16 canvas, filling the whole frame (never rotated).
+  // Draw the camera picture into a vertical 9:16 canvas WITHOUT cropping or
+  // zooming — the whole sensor view is shown (letterboxed if the source aspect
+  // is wider than 9:16). Math.min = "contain"; Math.max would crop = zoom.
   const drawFrame = useCallback(() => {
     const v = liveRef.current, c = canvasRef.current;
     if (v && c && v.videoWidth > 0 && v.videoHeight > 0) {
       const ctx = c.getContext("2d");
       if (ctx) {
-        const k = Math.max(c.width / v.videoWidth, c.height / v.videoHeight);
+        const k = Math.min(c.width / v.videoWidth, c.height / v.videoHeight);
         const w = v.videoWidth * k, h = v.videoHeight * k;
         ctx.drawImage(v, (c.width - w) / 2, (c.height - h) / 2, w, h);
       }
     }
     rafRef.current = requestAnimationFrame(drawFrame);
   }, []);
-
-  // Some phones send a wide picture even when a vertical one is requested; ask the camera to crop it vertical itself.
-  async function coaxPortrait(track: MediaStreamTrack) {
-    const v = liveRef.current;
-    if (!v) return;
-    await new Promise((r) => window.setTimeout(r, 300));
-    if (v.videoHeight > v.videoWidth) return;
-    const tries: MediaTrackConstraints[] = [
-      { width: { ideal: REEL_W }, height: { ideal: REEL_H }, aspectRatio: { ideal: 9 / 16 }, resizeMode: "crop-and-scale" } as MediaTrackConstraints,
-      { aspectRatio: { exact: 9 / 16 } },
-      { width: { exact: 480 }, height: { exact: 640 } },
-    ];
-    for (const c of tries) {
-      try { await track.applyConstraints(c); } catch { continue; }
-      await new Promise((r) => window.setTimeout(r, 350));
-      if (v.videoHeight > v.videoWidth) return;
-    }
-  }
 
   async function openCamera(mode: "user" | "environment" = facing) {
     setCamError("");
@@ -161,9 +265,11 @@ export default function HelpMeCreatePage() {
     stopStream();
     const myRequest = ++requestRef.current;
     const audio: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true };
+    // Deliberately no width/height/aspectRatio: forcing a resolution or aspect
+    // ratio makes many phones crop (i.e. zoom) the sensor. The natural view is
+    // what the user wants — no crop.
     const attempts: MediaStreamConstraints[] = [
-      { video: { facingMode: { ideal: mode }, width: { ideal: REEL_W }, height: { ideal: REEL_H }, aspectRatio: { ideal: 9 / 16 }, frameRate: { ideal: 30, max: 30 } }, audio },
-      { video: { facingMode: { ideal: mode }, width: { ideal: 480 }, height: { ideal: 640 } }, audio },
+      { video: { facingMode: { ideal: mode }, frameRate: { ideal: 30, max: 30 } }, audio },
       { video: { facingMode: { ideal: mode } }, audio },
       { video: true, audio: true },
     ];
@@ -184,6 +290,7 @@ export default function HelpMeCreatePage() {
       setFacing(mode);
       setStep("record");
       const track = stream.getVideoTracks()[0];
+      // Try to reset hardware zoom back to 1x (fires and forgets; no-op where unsupported).
       if (track) void resetHelpMeCameraZoom(track);
       const attach = (tries = 0) => {
         const v = liveRef.current;
@@ -194,7 +301,8 @@ export default function HelpMeCreatePage() {
         void v.play().catch(() => undefined);
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         rafRef.current = requestAnimationFrame(drawFrame);
-        if (track) void coaxPortrait(track);
+        // NOTE: no coaxPortrait / resizeMode:"crop-and-scale" call here —
+        // those forced the camera to crop (zoom) which the user did not want.
       };
       requestAnimationFrame(() => attach());
     } catch (e) {
@@ -210,9 +318,7 @@ export default function HelpMeCreatePage() {
   function startRecording() {
     const stream = streamRef.current;
     if (!stream) return;
-    // Record the native camera stream. Canvas captureStream can stop early on
-    // some Android browsers; the canvas remains preview-only and cannot crop
-    // or zoom the source that is uploaded.
+    // Record the native camera stream (natural view, no crop, no zoom).
     const source = stream;
     const mime = pickRecorderMime();
     let rec: MediaRecorder;
@@ -289,8 +395,13 @@ export default function HelpMeCreatePage() {
 
   const currency = cfg?.country_currency[country] || "USD";
   const goal = useMemo(() => {
-    const rate = currency === "USD" ? 1 : cfg?.rates.find((r) => r.currency === currency)?.per_usd;
-    return cfg && rate ? niceGoal(cfg.goal_usd_cents, rate) : null;
+    if (!cfg) return null;
+    // Real DB rate first, then a display-only fallback so a Pakistan user
+    // still sees an approximate PKR amount instead of blank.
+    const rate = currency === "USD"
+      ? 1
+      : (cfg.rates.find((r) => r.currency === currency)?.per_usd || FALLBACK_RATES[currency]);
+    return rate ? niceGoal(cfg.goal_usd_cents, rate) : null;
   }, [cfg, currency]);
 
   async function submit() {
@@ -437,7 +548,7 @@ export default function HelpMeCreatePage() {
             {goal !== null && cfg && (
               <div className="rounded-xl bg-lime-500 px-3 py-2 text-center text-xs font-extrabold text-black">Goal: {formatMoney(goal, currency)}{currency !== "USD" && ` (≈ $${(cfg.goal_usd_cents / 100).toFixed(2)})`}</div>
             )}
-            <p className="text-[11px] text-gray-400">Your account details are shown only to signed-in heroes who tap “Help Me”, and disappear when your appeal is fully helped. Heroes send money directly to you; Givethra never holds it.</p>
+            <p className="text-[11px] text-gray-400">Your account details are shown only to signed-in heroes who tap "Help Me", and disappear when your appeal is fully helped. Heroes send money directly to you; Givethra never holds it.</p>
             {formError && <p className="rounded-xl bg-red-500/15 p-3 text-sm text-red-200">{formError}</p>}
             {busy && progress > 0 && progress < 100 && <div className="h-2 w-full overflow-hidden rounded-full bg-white/10"><div className="h-full bg-emerald-400 transition-all" style={{ width: `${progress}%` }} /></div>}
             <button type="button" disabled={busy} onClick={submit} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 py-3.5 text-sm font-extrabold shadow-lg active:scale-[0.99] disabled:opacity-60">
