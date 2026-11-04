@@ -53,13 +53,16 @@ describe("Help Me camera framing", () => {
     await expect(resetHelpMeCameraZoom(track)).resolves.toBeUndefined();
   });
 
-  it("uses the phone's own camera app for the appeal video", () => {
-    expect(recorderSource).toContain('type="file"');
-    expect(recorderSource).toContain('accept="video/*"');
-    expect(recorderSource).toContain('capture="user"');
-    expect(recorderSource).toContain("onVideoPicked");
-    expect(recorderSource).toContain("meta.h > meta.w");
-    expect(recorderSource).not.toContain("getUserMedia");
+  it("records with Givethra's own live camera into a vertical 9:16 canvas", () => {
+    expect(recorderSource).toContain("navigator.mediaDevices.getUserMedia");
+    expect(recorderSource).toContain("captureStream(30)");
+    expect(recorderSource).toContain("Math.max(c.width / v.videoWidth");
+    expect(recorderSource).toContain("resetHelpMeCameraZoom(track)");
+    expect(recorderSource).toContain("const REEL_W = 720");
+    expect(recorderSource).toContain("const REEL_H = 1280");
+    expect(recorderSource).not.toContain('type="file"');
+    expect(recorderSource).not.toContain("capture=");
+    expect(recorderSource).not.toContain("context.rotate");
   });
 
   it("accepts only vertical 9:16 recording metadata", () => {
