@@ -1,7 +1,5 @@
 // src/frontend/src/pages/SubmitRequestPage.tsx
-// Premium Globalized UI with All Logic Intact
-// 🌍 Country profiles drive currency, ID/document labels, amount limits and provider lists.
-// 🔥 100% Original Logic Preserved + Premium Design.
+// Premium UI + Fully Global + 60s Video Lock + 100% No Pakistan-specific labels.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -33,9 +31,6 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { checkCreditGate } from "@/lib/creditGate";
 
-// ============================================================
-//  CATEGORY ASSISTANCE LIMITS POLICY
-// ============================================================
 const CATEGORY_LIMITS: Record<string, { type: "fixed" | "verified" | "max" | "debt_percentage"; amount?: number; minAmount?: number; maxAmount?: number; percentage?: number; label: string; }> = {
   "Widow & Elderly Support": { type: "fixed", amount: 3000, label: "Fixed Stipend" },
   "Child Support": { type: "fixed", amount: 2000, label: "Fixed Stipend" },
@@ -63,7 +58,6 @@ const CATEGORIES = ["Electricity Bill", "Gas Bill", "Water Bill", "House Rent", 
 const STEPS = ["Basic Info", "Category Details", "Verification", "Review"];
 const CASE_CURRENCIES = CURRENCY_CODES;
 const SS_KEY = "givethra_submit_draft_v4";
-const COMMON_GUIDE_TAIL = ["Upload clear documents so Givethra can verify your case.", "Take a live selfie and record a video explaining your need in your own words.", "Your first case is FREE. After that, a 1 credit listing fee applies."];
 const MAX_REJECTIONS_BEFORE_SUSPENSION = 5;
 const UNLOCK_CREDITS_REQUIRED = 5;
 const MAX_FREE_CASES = 2;
@@ -301,7 +295,6 @@ export default function SubmitRequestPage() {
   const [blockedByFeedback, setBlockedByFeedback] = useState<{ caseId: string; caseTitle: string } | null>(null);
   const [checkingFeedback, setCheckingFeedback] = useState(true);
 
-  // 🔥 Global Profile integration
   const easy = isEasyCat(category);
   const profile = getCountryProfile(country);
   const localLists = profile.hasLocalProviderLists;
@@ -605,13 +598,17 @@ export default function SubmitRequestPage() {
       let sec = 0;
       const interval = setInterval(() => {
         sec++; setVideoTimer(sec); videoTimerRef.current = sec;
-        if (sec >= 90) { clearInterval(interval); if (recorder.state === "recording") recorder.stop(); toast.info("Recording stopped at 90 seconds. Your video must be at least 60 seconds."); }
+        if (sec >= 90) { clearInterval(interval); if (recorder.state === "recording") recorder.stop(); toast.info("Recording stopped at 90 seconds."); }
       }, 1000);
       (window as any)._videoInterval = interval;
     } catch (err) { toast.error("Camera/microphone access denied. Please allow permissions and try again."); }
   }
 
   function stopVideoRecording() {
+    if (videoTimerRef.current < 60) {
+      toast.error("You must record for at least 60 seconds before stopping.");
+      return;
+    }
     if (videoStartTimeRef.current) { const wallClockSeconds = Math.floor((Date.now() - videoStartTimeRef.current) / 1000); videoTimerRef.current = Math.max(videoTimerRef.current, wallClockSeconds); }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") mediaRecorderRef.current.stop();
     if ((window as any)._videoInterval) clearInterval((window as any)._videoInterval);
@@ -1046,7 +1043,6 @@ export default function SubmitRequestPage() {
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:border-slate-800 dark:bg-slate-900 sm:p-8">
               <h2 className="mb-6 flex items-center gap-2 text-xl font-black text-slate-900 dark:text-white"><FileText className="h-5 w-5 text-teal-600" /> Basic Information</h2>
-              
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label className="text-sm font-bold text-slate-700 dark:text-slate-300">Help Category *</Label>
@@ -1085,7 +1081,7 @@ export default function SubmitRequestPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2"><Label className="text-sm font-bold text-slate-700 dark:text-slate-300">City *</Label><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder={profile.cityExample || "e.g. Karachi"} className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" /></div>
+                  <div className="space-y-2"><Label className="text-sm font-bold text-slate-700 dark:text-slate-300">City *</Label><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder={profile.cityExample || "e.g. Your City"} className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" /></div>
                 </div>
 
                 {country && (
@@ -1661,7 +1657,15 @@ export default function SubmitRequestPage() {
                         <div className="space-y-3 rounded-2xl overflow-hidden border border-red-200 bg-slate-900 relative">
                           <video ref={liveVideoRef} autoPlay playsInline muted className="w-full aspect-video object-cover" />
                           <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse"><div className="h-2 w-2 rounded-full bg-white" /> REC {videoTimer}s / 90s</div>
-                          <div className="p-3 bg-slate-900"><Button size="lg" variant="destructive" onClick={stopVideoRecording} className="w-full h-14 rounded-xl font-bold text-lg"><Square className="h-5 w-5 mr-2" /> Stop Recording</Button></div>
+                          <div className="p-3 bg-slate-900">
+                            {videoTimer < 60 ? (
+                              <p className="text-center text-sm font-bold text-amber-400 py-4">
+                                Recording... Please wait {60 - videoTimer} more seconds before you can stop.
+                              </p>
+                            ) : (
+                              <Button size="lg" variant="destructive" onClick={stopVideoRecording} className="w-full h-14 rounded-xl font-bold text-lg"><Square className="h-5 w-5 mr-2" /> Stop Recording</Button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
