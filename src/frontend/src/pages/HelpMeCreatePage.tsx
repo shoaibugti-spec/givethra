@@ -1,15 +1,18 @@
 // src/frontend/src/pages/HelpMeCreatePage.tsx
-// Create a video appeal: opens the PHONE'S OWN camera app (exactly like the normal camera: vertical, no zoom,
-// good sound). Steps: check -> intro -> preview -> details -> done.
+// Create a video appeal with Givethra's OWN camera (live only: nothing is saved on the phone, no gallery).
+// The picture is always recorded as a vertical 9:16 video. Steps: check -> intro -> record -> preview -> details -> done.
 import { useAuth } from "@/contexts/AuthContext";
-import { HelpMeError, isValidHelpMeAccountIdentifier, PAY_METHODS, formatMoney, helpme, niceGoal, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
+import { HelpMeError, isValidHelpMeAccountIdentifier, formatMoney, helpme, niceGoal, pickRecorderMime, regionName, type Eligibility, type HelpMeConfig } from "@/lib/helpme";
+import { resetHelpMeCameraZoom } from "@/lib/helpmeCamera";
 import { captureHelpMeThumbnail } from "@/lib/helpmeThumbnail";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RotateCcw, ShieldAlert, Video } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { ArrowLeft, Camera, CheckCircle2, Loader2, Pause, Play, RefreshCw, RotateCcw, ShieldAlert, Square, Video } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
-type Step = "check" | "blocked" | "intro" | "preview" | "details" | "done";
+type Step = "check" | "blocked" | "intro" | "record" | "preview" | "details" | "done";
+const REEL_W = 720; // always recorded as a vertical 9:16 reel
+const REEL_H = 1280;
 const CONTACT_RE = /@|https?:\/\/|www\.|\d{7,}|whats?app|telegram|signal|wechat|\bimo\b|e-?mail/i;
 
 function useCountdown(iso?: string) {
@@ -40,21 +43,49 @@ export default function HelpMeCreatePage() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [desc, setDesc] = useState("");
-  const [country, setCountry] = useState("PK");
-  const [method, setMethod] = useState("");
+  const [country, setCountry] = useState("US");
   const [bankName, setBankName] = useState("");
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
   const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [facing, setFacing] = useState<"user" | "environment">("user");
+  const [recording, setRecording] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [elapsed, setElapsed] = useState(0); // recorded milliseconds only (paused time excluded)
 
-  const fileRef = useRef<HTMLInputElement>(null);
+  const liveRef = useRef<HTMLVideoElement>(null); // camera source (not shown)
+  const canvasRef = useRef<HTMLCanvasElement>(null); // what you see = what is recorded
+  const streamRef = useRef<MediaStream | null>(null);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const elapsedRef = useRef(0);
+  const lastTickRef = useRef(0);
+  const requestRef = useRef(0);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const durationRef = useRef(0);
 
   const maxSec = cfg?.max_seconds ?? 20;
   const minSec = cfg?.min_stop_seconds ?? 12;
+  const maxMs = maxSec * 1000;
+  const minStopMs = minSec * 1000;
   const countdown = useCountdown(elig?.next_allowed_at);
 
+  const stopStream = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (liveRef.current) liveRef.current.srcObject = null;
+  }, []);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    timerRef.current = null;
+  }, []);
+
+  useEffect(() => () => { clearTimer(); stopStream(); }, [clearTimer, stopStream]);
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
   // eligibility + config
@@ -70,55 +101,170 @@ export default function HelpMeCreatePage() {
         if (!live) return;
         setElig(e);
         setCfg(c);
+        // Country (and so currency) is detected automatically: the network location first, then the phone language.
         const detectedCountry = (c.country_code || "").toUpperCase();
         const localeCountry = (navigator.language.split("-")[1] || "").toUpperCase();
-        const cc = c.country_currency[detectedCountry] ? detectedCountry : localeCountry;
-        if (c.country_currency[cc]) setCountry(cc);
+        const cc = c.country_currency[detectedCountry] ? detectedCountry : c.country_currency[localeCountry] ? localeCountry : "US";
+        setCountry(cc);
         setStep(e.can_post ? "intro" : "blocked");
       })
       .catch((e) => { if (live) { setElig({ can_post: false, reason: e.message || "Could not check your account. Please try again." }); setStep("blocked"); } });
     return () => { live = false; };
   }, [isAuthenticated, isInitializing, navigate]);
 
-  function openCamera() {
-    setCamError("");
-    fileRef.current?.click();
+  // Draw the camera picture upright into a vertical 9:16 canvas, filling the whole frame (never rotated).
+  const drawFrame = useCallback(() => {
+    const v = liveRef.current, c = canvasRef.current;
+    if (v && c && v.videoWidth > 0 && v.videoHeight > 0) {
+      const ctx = c.getContext("2d");
+      if (ctx) {
+        const k = Math.max(c.width / v.videoWidth, c.height / v.videoHeight);
+        const w = v.videoWidth * k, h = v.videoHeight * k;
+        ctx.drawImage(v, (c.width - w) / 2, (c.height - h) / 2, w, h);
+      }
+    }
+    rafRef.current = requestAnimationFrame(drawFrame);
+  }, []);
+
+  // Some phones send a wide picture even when a vertical one is requested; ask the camera to crop it vertical itself.
+  async function coaxPortrait(track: MediaStreamTrack) {
+    const v = liveRef.current;
+    if (!v) return;
+    await new Promise((r) => window.setTimeout(r, 300));
+    if (v.videoHeight > v.videoWidth) return;
+    const tries: MediaTrackConstraints[] = [
+      { width: { ideal: REEL_W }, height: { ideal: REEL_H }, aspectRatio: { ideal: 9 / 16 }, resizeMode: "crop-and-scale" } as MediaTrackConstraints,
+      { aspectRatio: { exact: 9 / 16 } },
+      { width: { exact: 480 }, height: { exact: 640 } },
+    ];
+    for (const c of tries) {
+      try { await track.applyConstraints(c); } catch { continue; }
+      await new Promise((r) => window.setTimeout(r, 350));
+      if (v.videoHeight > v.videoWidth) return;
+    }
   }
 
-  async function onVideoPicked(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  async function openCamera(mode: "user" | "environment" = facing) {
     setCamError("");
-    if (!file.type.startsWith("video/")) { setCamError("Please record a video with the camera."); return; }
-    const maxBytes = cfg?.max_bytes ?? 40 * 1024 * 1024;
-    if (file.size > maxBytes) { setCamError(`This video is too large (${Math.round(file.size / 1048576)} MB, limit ${Math.round(maxBytes / 1048576)} MB). Set your camera to HD (720p) and record again.`); return; }
-    const probeUrl = URL.createObjectURL(file);
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setCamError("This browser cannot record video. Please update your browser (Chrome, Safari 14.5+, Edge or Firefox) and try again.");
+      setStep("record");
+      return;
+    }
+    stopStream();
+    const myRequest = ++requestRef.current;
+    const audio: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true };
+    const attempts: MediaStreamConstraints[] = [
+      { video: { facingMode: { ideal: mode }, width: { ideal: REEL_W }, height: { ideal: REEL_H }, aspectRatio: { ideal: 9 / 16 }, frameRate: { ideal: 30, max: 30 } }, audio },
+      { video: { facingMode: { ideal: mode }, width: { ideal: 480 }, height: { ideal: 640 } }, audio },
+      { video: { facingMode: { ideal: mode } }, audio },
+      { video: true, audio: true },
+    ];
     try {
-      const meta = await new Promise<{ d: number; w: number; h: number }>((resolve, reject) => {
-        const v = document.createElement("video");
-        const timer = window.setTimeout(() => reject(new Error("timeout")), 10000);
-        v.preload = "metadata"; v.muted = true;
-        v.onloadedmetadata = () => { window.clearTimeout(timer); resolve({ d: v.duration, w: v.videoWidth, h: v.videoHeight }); };
-        v.onerror = () => { window.clearTimeout(timer); reject(new Error("unreadable")); };
-        v.src = probeUrl;
-      });
-      if (!Number.isFinite(meta.d) || meta.d <= 0) { setCamError("Could not read the video length. Please record again."); return; }
-      if (meta.d > maxSec) { setCamError(`Video is ${Math.round(meta.d)}s. Please record at most ${maxSec} seconds.`); return; }
-      if (meta.d < minSec) { setCamError(`Video is only ${Math.round(meta.d)}s. Please record ${minSec} to ${maxSec} seconds.`); return; }
-      if (!(meta.h > meta.w)) { setCamError("Please hold your phone upright (vertical) and record again."); return; }
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      durationRef.current = Math.round(meta.d * 1000);
-      setBlob(file);
+      let stream: MediaStream | null = null;
+      let lastError: unknown = null;
+      for (const constraints of attempts) {
+        try { stream = await navigator.mediaDevices.getUserMedia(constraints); break; }
+        catch (e) {
+          lastError = e;
+          const name = (e as DOMException)?.name;
+          if (name !== "OverconstrainedError" && name !== "NotFoundError" && name !== "TypeError") throw e;
+        }
+      }
+      if (!stream) throw lastError || new Error("no camera");
+      if (myRequest !== requestRef.current) { stream.getTracks().forEach((t) => t.stop()); return; }
+      streamRef.current = stream;
+      setFacing(mode);
+      setStep("record");
+      const track = stream.getVideoTracks()[0];
+      if (track) void resetHelpMeCameraZoom(track);
+      const attach = (tries = 0) => {
+        const v = liveRef.current;
+        if (!v) { if (tries < 60) requestAnimationFrame(() => attach(tries + 1)); return; }
+        if (streamRef.current !== stream) return;
+        v.srcObject = stream;
+        v.muted = true;
+        void v.play().catch(() => undefined);
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(drawFrame);
+        if (track) void coaxPortrait(track);
+      };
+      requestAnimationFrame(() => attach());
+    } catch (e) {
+      const name = (e as DOMException)?.name;
+      setStep("record");
+      if (name === "NotAllowedError" || name === "SecurityError") setCamError("Camera or microphone permission was denied. Tap the lock icon in your browser's address bar, allow Camera and Microphone, then try again.");
+      else if (name === "NotFoundError") setCamError("No camera or microphone was found on this device.");
+      else if (name === "NotReadableError") setCamError("Your camera is being used by another app. Close it and try again.");
+      else setCamError("The camera could not be started. Please try again.");
+    }
+  }
+
+  function startRecording() {
+    const stream = streamRef.current;
+    const canvas = canvasRef.current;
+    if (!stream) return;
+    // Record the vertical canvas (with the microphone). If this browser cannot, record the camera directly.
+    let source: MediaStream = stream;
+    try {
+      if (canvas && typeof canvas.captureStream === "function") {
+        const cs = canvas.captureStream(30);
+        stream.getAudioTracks().forEach((t) => cs.addTrack(t));
+        if (cs.getVideoTracks().length) source = cs;
+      }
+    } catch { source = stream; }
+    const mime = pickRecorderMime();
+    let rec: MediaRecorder;
+    try {
+      rec = new MediaRecorder(source, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 64_000 });
+    } catch {
+      try { rec = new MediaRecorder(source); } catch { setCamError("Recording is not supported on this browser."); return; }
+    }
+    chunksRef.current = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
+    rec.onstop = () => {
+      clearTimer();
+      const type = (rec.mimeType || mime || "video/mp4").split(";")[0];
+      const out = new Blob(chunksRef.current, { type: type.startsWith("video/webm") ? "video/webm" : "video/mp4" });
+      durationRef.current = Math.min(Math.max(elapsedRef.current, minStopMs), maxMs);
+      setRecording(false);
+      setPaused(false);
+      stopStream();
+      if (out.size < 2000) { setCamError("Nothing was recorded. Please try again."); setStep("record"); return; }
+      setBlob(out);
       setUploadId("");
       setPreviewPlaying(false);
-      setPreviewUrl(URL.createObjectURL(file));
+      setPreviewUrl(URL.createObjectURL(out));
       setStep("preview");
-    } catch {
-      setCamError("This video could not be read. Please record it again.");
-    } finally {
-      URL.revokeObjectURL(probeUrl);
-    }
+    };
+    recRef.current = rec;
+    elapsedRef.current = 0;
+    setElapsed(0);
+    lastTickRef.current = performance.now();
+    rec.start(1000);
+    setRecording(true);
+    setPaused(false);
+    clearTimer();
+    timerRef.current = window.setInterval(() => {
+      const now = performance.now();
+      if (recRef.current?.state === "recording") elapsedRef.current += now - lastTickRef.current;
+      lastTickRef.current = now;
+      setElapsed(elapsedRef.current);
+      if (elapsedRef.current >= maxMs) stopRecording(true);
+    }, 100);
+  }
+
+  function stopRecording(force = false) {
+    if (!force && elapsedRef.current < minStopMs) return;
+    const rec = recRef.current;
+    if (rec && rec.state !== "inactive") rec.stop();
+  }
+
+  function togglePause() {
+    const rec = recRef.current;
+    if (!rec) return;
+    if (rec.state === "recording") { rec.pause(); setPaused(true); }
+    else if (rec.state === "paused") { lastTickRef.current = performance.now(); rec.resume(); setPaused(false); }
   }
 
   async function togglePreviewPlayback() {
@@ -136,17 +282,15 @@ export default function HelpMeCreatePage() {
     setBlob(null);
     setUploadId("");
     setPreviewPlaying(false);
-    openCamera();
+    setElapsed(0);
+    void openCamera();
   }
 
-  const methods = PAY_METHODS[country] || PAY_METHODS.default;
-  useEffect(() => { setMethod(methods[0]); }, [country]); // eslint-disable-line react-hooks/exhaustive-deps
   const currency = cfg?.country_currency[country] || "USD";
   const goal = useMemo(() => {
     const rate = currency === "USD" ? 1 : cfg?.rates.find((r) => r.currency === currency)?.per_usd;
     return cfg && rate ? niceGoal(cfg.goal_usd_cents, rate) : null;
   }, [cfg, currency]);
-  const countries = useMemo(() => Object.keys(cfg?.country_currency || {}).sort((a, b) => regionName(a).localeCompare(regionName(b))), [cfg]);
 
   async function submit() {
     setFormError("");
@@ -155,7 +299,7 @@ export default function HelpMeCreatePage() {
     if (desc.trim().length < 10) return setFormError("Please describe your need in 2-3 short lines (at least 10 characters).");
     if (CONTACT_RE.test(desc)) return setFormError("Please remove phone numbers, e-mail and links from the description. Payment details go in the boxes below.");
     if (bankName.trim().length < 2) return setFormError("Enter the bank name.");
-    if (title.trim().length < 2 || !isValidHelpMeAccountIdentifier(number)) return setFormError("Enter the account title and a valid account, IBAN or wallet identifier.");
+    if (title.trim().length < 2 || !isValidHelpMeAccountIdentifier(number)) return setFormError("Enter the account title and a valid account number.");
     setBusy(true);
     try {
       let uid = uploadId;
@@ -171,7 +315,7 @@ export default function HelpMeCreatePage() {
         console.warn("Help Me poster could not be uploaded; the appeal will still be submitted.", thumbnailError);
       }
       await helpme.createAppeal({
-        upload_id: uid, description: desc.trim(), account_country: country, pay_method: method,
+        upload_id: uid, description: desc.trim(), account_country: country, pay_method: bankName.trim(),
         pay_bank_name: bankName.trim(), pay_account_title: title.trim(), pay_account_number: number.trim(), duration_ms: Math.round(durationRef.current),
       });
       setStep("done");
@@ -186,7 +330,9 @@ export default function HelpMeCreatePage() {
     }
   }
 
-  const leave = () => navigate({ to: "/helpme" });
+  const leave = () => { clearTimer(); stopStream(); navigate({ to: "/helpme" }); };
+  const seconds = Math.floor(elapsed / 1000);
+  const canStop = elapsed >= minStopMs;
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-black text-white" style={{ height: "100dvh" }}>
@@ -215,13 +361,47 @@ export default function HelpMeCreatePage() {
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 ring-2 ring-emerald-400/50"><Camera className="h-9 w-9 text-emerald-300" /></div>
             <h2 className="text-xl font-extrabold">Record your appeal</h2>
             <ul className="max-w-[300px] space-y-1.5 text-left text-sm text-gray-200">
-              <li>• Record {minSec} to {maxSec} seconds, with your phone upright.</li>
+              <li>• Record live, up to {maxSec} seconds (stop is possible after {minSec}s).</li>
               <li>• Speak clearly: who you are and what you need.</li>
-              <li>• Your normal phone camera will open. Record, then tap the tick to use the video.</li>
+              <li>• When your browser asks, tap <b>Allow</b> for camera and microphone.</li>
             </ul>
-            {camError && <p className="max-w-[300px] text-sm text-amber-300">{camError}</p>}
-            <button type="button" onClick={openCamera} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 px-7 py-3.5 text-sm font-extrabold shadow-lg active:scale-95"><Video className="h-4 w-4" /> Open camera</button>
-            <input ref={fileRef} type="file" accept="video/*" capture="user" onChange={onVideoPicked} className="hidden" />
+            <button type="button" onClick={() => void openCamera()} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 px-7 py-3.5 text-sm font-extrabold shadow-lg active:scale-95"><Video className="h-4 w-4" /> Open camera</button>
+          </div>
+        )}
+
+        {step === "record" && (
+          <div className="relative flex flex-1 items-center justify-center">
+            {camError ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
+                <ShieldAlert className="h-10 w-10 text-amber-400" />
+                <p className="text-sm text-gray-200">{camError}</p>
+                <button type="button" onClick={() => void openCamera()} className="rounded-xl bg-emerald-500 px-6 py-3 text-sm font-extrabold">Try again</button>
+              </div>
+            ) : (
+              <div className="relative mx-auto flex w-full shrink-0 flex-col overflow-hidden bg-black" style={{ aspectRatio: "9 / 16", maxHeight: "calc(100dvh - 64px)", maxWidth: "calc((100dvh - 64px) * 9 / 16)" }}>
+                <video ref={liveRef} playsInline muted autoPlay className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0" />
+                <canvas ref={canvasRef} width={REEL_W} height={REEL_H} className={`absolute inset-0 h-full w-full bg-black ${facing === "user" ? "-scale-x-100" : ""}`} />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
+                <div className="relative z-10 mt-2 flex justify-center">
+                  <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-extrabold tabular-nums">{recording && <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />}{seconds}s / {maxSec}s</span>
+                </div>
+                <div className="relative z-10 mt-auto flex items-center justify-center gap-6 pb-8">
+                  {!recording ? (
+                    <>
+                      <button type="button" onClick={() => void openCamera(facing === "user" ? "environment" : "user")} aria-label="Flip camera" className="flex h-12 w-12 items-center justify-center rounded-full bg-black/55 active:scale-95"><RefreshCw className="h-5 w-5" /></button>
+                      <button type="button" onClick={startRecording} aria-label="Start recording" className="flex h-[74px] w-[74px] items-center justify-center rounded-full border-4 border-white active:scale-95"><span className="h-14 w-14 rounded-full bg-red-500" /></button>
+                      <div className="w-12" />
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" onClick={togglePause} aria-label={paused ? "Resume" : "Pause"} className="flex h-12 w-12 items-center justify-center rounded-full bg-black/55 active:scale-95">{paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}</button>
+                      <button type="button" disabled={!canStop} onClick={() => stopRecording()} aria-label="Stop recording" className={`flex h-[74px] w-[74px] items-center justify-center rounded-full border-4 border-white active:scale-95 ${canStop ? "" : "opacity-50"}`}><Square className="h-7 w-7 fill-red-500 text-red-500" /></button>
+                      <div className="w-12 text-center text-[10px] font-bold text-white/80">{canStop ? "" : `${Math.ceil((minStopMs - elapsed) / 1000)}s`}</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -246,19 +426,12 @@ export default function HelpMeCreatePage() {
             <Field label="Your need (2–3 short lines)" hint={`${desc.length}/300 · no phone numbers, e-mail or links`}>
               <textarea value={desc} onChange={(e) => setDesc(e.target.value.slice(0, 300))} rows={3} className="w-full resize-none rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" placeholder="Example: I need help to pay my child's school fee this month." />
             </Field>
-            <Field label="Country of your payment account">
-              <select value={country} onChange={(e) => setCountry(e.target.value)} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none">
-                {countries.map((c) => <option key={c} value={c}>{regionName(c)}</option>)}
-              </select>
+            <Field label="Your country (detected automatically)">
+              <div className="rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm font-semibold">{regionName(country)} · {currency}</div>
             </Field>
-            <Field label="Preferred transfer type">
-              <div className="flex flex-wrap gap-2">
-                {methods.map((m) => <button key={m} type="button" onClick={() => setMethod(m)} className={`rounded-full border px-3.5 py-1.5 text-xs font-bold ${method === m ? "border-emerald-400 bg-emerald-500 text-white" : "border-white/20 bg-white/5 text-gray-200"}`}>{m}</button>)}
-              </div>
-            </Field>
-            <Field label="Bank name"><input value={bankName} onChange={(e) => setBankName(e.target.value.slice(0, 60))} maxLength={60} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" placeholder="Enter the bank name" /></Field>
-            <Field label="Account title"><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" /></Field>
-            <Field label="Account number, IBAN or wallet ID"><input value={number} onChange={(e) => setNumber(e.target.value)} maxLength={40} inputMode="text" className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 font-mono text-sm outline-none focus:border-emerald-400" /></Field>
+            <Field label="Bank name"><input value={bankName} onChange={(e) => setBankName(e.target.value.slice(0, 60))} maxLength={60} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" placeholder="Write your bank name" /></Field>
+            <Field label="Account title (name on the account)"><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm outline-none focus:border-emerald-400" /></Field>
+            <Field label="Account number"><input value={number} onChange={(e) => setNumber(e.target.value)} maxLength={40} inputMode="text" className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 font-mono text-sm outline-none focus:border-emerald-400" /></Field>
             {goal !== null && cfg && (
               <div className="rounded-xl bg-lime-500 px-3 py-2 text-center text-xs font-extrabold text-black">Goal: {formatMoney(goal, currency)}{currency !== "USD" && ` (≈ $${(cfg.goal_usd_cents / 100).toFixed(2)})`}</div>
             )}
