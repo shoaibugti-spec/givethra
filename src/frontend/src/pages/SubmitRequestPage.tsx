@@ -1,6 +1,6 @@
 // src/frontend/src/pages/SubmitRequestPage.tsx
-// Premium Redesign: Modern, easy-to-use, step-by-step UI.
-// 🔥 100% Logic, State, and API calls preserved. Only UI/UX is upgraded.
+// Fully refactored, Premium UI, and Global Country Profiles Integrated.
+// 🔥 FIXED: Imported motion from 'motion/react', fixed JSX typo causing crash, integrated countryProfiles.
 
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -31,8 +31,6 @@ import {
   getFeedbacks,
   insertCaseSubmission,
   uploadFileToStorage,
-  updateWalletBalance,
-  getUnreadNotificationsCount,
 } from "@/lib/api";
 import { sendNotification } from "@/lib/notify";
 import { getCategoryConfig } from "@/lib/categoryFields";
@@ -82,10 +80,11 @@ import {
   Sparkles,
   Shield,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
-// 🔥 NEW: Import shared credit gate
+// 🔥 Correctly using motion/react
+import { motion, AnimatePresence } from "motion/react"; 
 import { checkCreditGate } from "@/lib/creditGate";
+import { getCountryProfile, CURRENCY_SYMBOLS, CURRENCY_CODES } from "@/lib/countryProfiles";
 
 // ============================================================
 //  CATEGORY ASSISTANCE LIMITS POLICY
@@ -133,8 +132,6 @@ const CATEGORIES = [
 ];
 
 const STEPS = ["Basic Info", "Category Details", "Verification", "Review"];
-const CASE_CURRENCIES = ["PKR", "USD", "SAR", "AED", "GBP", "EUR", "INR", "BDT", "TRY"];
-const CURRENCY_SYMBOLS: Record<string, string> = { USD: "$", PKR: "Rs", SAR: "SAR", AED: "AED", GBP: "£", EUR: "€", INR: "₹", TRY: "₺", BDT: "৳", NPR: "Rs", LKR: "Rs" };
 const SS_KEY = "givethra_submit_draft_v4";
 
 const COMMON_GUIDE_TAIL = [
@@ -206,21 +203,24 @@ const EDUCATION_FEE_FIELDS = {
   ],
 };
 
-function getEducationDocs(type: string, subType: string) {
+function getEducationDocs(type: string, subType: string, profile: any) {
   const docs: { key: string; label: string; required: boolean; hint?: string }[] = [];
+  const idLabel = profile?.idLabel || "ID Card";
+  const childIdLabel = profile?.childIdLabel || "Child ID";
+  
   if (type === "admission") {
     docs.push({ key: "admission_proof", label: "Admission / Selection Proof (Offer Letter / Merit List)", required: true, hint: "Clear photo of offer letter or merit list" });
     docs.push({ key: "fee_challan", label: "Fee Challan / Voucher (with amount & due date)", required: true, hint: "Challan should clearly show amount and due date" });
-    docs.push({ key: "student_id_proof", label: "Student B-Form / CNIC / School ID", required: true, hint: "Clear proof of student identity" });
+    docs.push({ key: "student_id_proof", label: `Student ${childIdLabel} / ${idLabel} / School ID`, required: true, hint: "Clear proof of student identity" });
   } else if (type === "fee") {
     docs.push({ key: "fee_challan", label: "Fee Challan / Voucher (with amount & due date)", required: true, hint: "Challan should clearly show amount and due date" });
-    docs.push({ key: "student_id_proof", label: "Student B-Form / CNIC / School ID", required: true, hint: "Clear proof of student identity" });
+    docs.push({ key: "student_id_proof", label: `Student ${childIdLabel} / ${idLabel} / School ID`, required: true, hint: "Clear proof of student identity" });
   } else if (type === "books") {
     docs.push({ key: "books_quotation", label: "Books List / Quotation from Shop", required: true, hint: "Clear photo of book list and price quotation" });
-    docs.push({ key: "student_id_proof", label: "Student B-Form / School/College ID", required: true, hint: "Student identity proof" });
+    docs.push({ key: "student_id_proof", label: `Student ${childIdLabel} / School ID`, required: true, hint: "Student identity proof" });
   } else if (type === "uniform") {
     docs.push({ key: "uniform_quotation", label: "Uniform List / Quotation from Shop", required: true, hint: "Clear photo of uniform items and price quotation" });
-    docs.push({ key: "student_id_proof", label: "Student B-Form / School/College ID", required: true, hint: "Student identity proof" });
+    docs.push({ key: "student_id_proof", label: `Student ${childIdLabel} / School ID`, required: true, hint: "Student identity proof" });
     docs.push({ key: "uniform_items", label: "Items Needed (List photo or written)", required: true, hint: "List of uniform items (shoes, bag, winter uniform etc.)" });
   }
   return docs;
@@ -238,7 +238,7 @@ const LIST_CATS: Record<string, any> = {
     ],
     billLabel: "Fee Challan / Voucher Photo", isEducationCategory: true, subOptions: FEE_SUB_OPTIONS,
     getSubFields: (subType: string) => subType === "school" ? EDUCATION_FEE_FIELDS.School : subType === "college" ? EDUCATION_FEE_FIELDS.College : subType === "university" ? EDUCATION_FEE_FIELDS.University : [],
-    getSubDocs: (subType: string) => getEducationDocs("fee", subType),
+    getSubDocs: (subType: string, profile: any) => getEducationDocs("fee", subType, profile),
   },
   "Education, Books & Admission": {
     list: EDUCATION_INSTITUTES, refLabel: "Challan / Reference Number", refHint: "If available, enter the challan or quotation reference number",
@@ -255,7 +255,7 @@ const LIST_CATS: Record<string, any> = {
       }
       return [];
     },
-    getSubDocs: (subType: string, subValue: string) => getEducationDocs(subType, subValue),
+    getSubDocs: (subType: string, subValue: string, profile: any) => getEducationDocs(subType, subValue, profile),
   },
   "Medical & Treatment": {
     list: HEALTH_INSTITUTES, refLabel: "Bill / Invoice / MR Number", refHint: HEALTH_REF_HINT,
@@ -461,6 +461,16 @@ export default function SubmitRequestPage() {
   const cfgGuide = config?.guide ?? [];
   const cfgOneCase = config?.oneCaseNote ?? "";
 
+  // 🔥 Country Profile Integration
+  const profile = getCountryProfile(country);
+  
+  // Set default currency based on selected country
+  useEffect(() => {
+    if (country && profile.currency) {
+      setCurrency(profile.currency);
+    }
+  }, [country, profile.currency]);
+
   const selectedCompany = utilCfg?.companies.find((c) => c.name === instituteName);
   const autoUrgency = easy ? urgencyFromDue(deadline) : "";
   const treatmentAutoUrgency = treatmentExpiry ? urgencyFromDue(treatmentExpiry) : "";
@@ -580,12 +590,12 @@ export default function SubmitRequestPage() {
     }
     if (category === "Funeral Expenses") {
       const rel = catFields.deceased_relation;
-      if (rel === "My husband" || rel === "My wife") list.push({ key: "nikah_nama", label: "Nikah Nama (Marriage Certificate)", hint: "Proof of relation to spouse" });
-      else if (rel === "My father" || rel === "My mother" || rel === "My child") list.push({ key: "relation_proof", label: "B-Form / FRC (Proof of Relation)", hint: "Proof of relation to parent/child" });
+      if (rel === "My husband" || rel === "My wife") list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Proof of relation to spouse" });
+      else if (rel === "My father" || rel === "My mother" || rel === "My child") list.push({ key: "relation_proof", label: `Proof of Relation (${profile.familyProofLabel})`, hint: "Proof of relation to parent/child" });
     }
     if (category === "Home Repair" && catFields.contractor_name?.trim()) list.push({ key: "contractor_agreement", label: "Contractor Agreement / Work Order", hint: "If you have a contractor, attach the agreement" });
     if (category === "Marriage Support") {
-      if (catFields.relation && catFields.relation !== "Myself") list.push({ key: "relation_proof", label: "Proof of Relation (B-Form / FRC)", hint: "Proof that you are related to the person getting married" });
+      if (catFields.relation && catFields.relation !== "Myself") list.push({ key: "relation_proof", label: `Proof of Relation (${profile.familyProofLabel})`, hint: "Proof that you are related to the person getting married" });
       list.push({ key: "marriage_quotation", label: "Marriage Expenses Quotation / List", hint: "List of items needed for the marriage" });
     }
     if (category === "Business / Work Help") {
@@ -597,22 +607,22 @@ export default function SubmitRequestPage() {
       list.push({ key: "livestock_proof", label: "Proof of Livestock / Farming", hint: "Photo or document showing your livestock/farming" });
     }
     if (gender === "Male") {
-      if (maritalStatus === "Single") list.push({ key: "frc", label: "Family Registration Certificate (FRC)", hint: "Required for single male" });
-      if (maritalStatus === "Married") { list.push({ key: "nikah_nama", label: "Nikah Nama (Marriage Certificate)", hint: "Required for married male" }); list.push({ key: "frc", label: "Family Registration Certificate (FRC)", hint: "Required for married male" }); }
-      if (maritalStatus === "Widow") { list.push({ key: "wife_death_cert", label: "Wife's Death Certificate", hint: "Required for widow" }); list.push({ key: "nikah_nama", label: "Nikah Nama", hint: "Marriage certificate" }); list.push({ key: "frc", label: "FRC", hint: "Family registration" }); }
-      if (maritalStatus === "Divorced") { list.push({ key: "divorce_cert", label: "Divorce Certificate (Court issued)", hint: "Court issued" }); list.push({ key: "nikah_nama", label: "Nikah Nama", hint: "Marriage certificate" }); list.push({ key: "frc", label: "FRC", hint: "Family registration" }); }
+      if (maritalStatus === "Single") list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required for single male" });
+      if (maritalStatus === "Married") { list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Required for married male" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required for married male" }); }
+      if (maritalStatus === "Widow") { list.push({ key: "wife_death_cert", label: "Wife's Death Certificate", hint: "Required for widow" }); list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Marriage certificate" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Family registration" }); }
+      if (maritalStatus === "Divorced") { list.push({ key: "divorce_cert", label: "Divorce Certificate (Court issued)", hint: "Court issued" }); list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Marriage certificate" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Family registration" }); }
     }
     if (gender === "Female") {
-      if (maritalStatus === "Single") list.push({ key: "frc", label: "Family Registration Certificate (FRC)", hint: "Required for single female" });
-      if (maritalStatus === "Married") { list.push({ key: "nikah_nama", label: "Nikah Nama (Marriage Certificate)", hint: "Required" }); list.push({ key: "frc", label: "Family Registration Certificate (FRC)", hint: "Required" }); }
-      if (maritalStatus === "Widow") { list.push({ key: "husband_death_cert", label: "Husband's Death Certificate", hint: "Required" }); list.push({ key: "nikah_nama", label: "Nikah Nama", hint: "Required" }); list.push({ key: "frc", label: "FRC", hint: "Required" }); }
-      if (maritalStatus === "Divorced") { list.push({ key: "divorce_cert", label: "Divorce Certificate (Court issued)", hint: "Required" }); list.push({ key: "nikah_nama", label: "Nikah Nama", hint: "Required" }); list.push({ key: "frc", label: "FRC", hint: "Required" }); }
+      if (maritalStatus === "Single") list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required for single female" });
+      if (maritalStatus === "Married") { list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
+      if (maritalStatus === "Widow") { list.push({ key: "husband_death_cert", label: "Husband's Death Certificate", hint: "Required" }); list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
+      if (maritalStatus === "Divorced") { list.push({ key: "divorce_cert", label: "Divorce Certificate (Court issued)", hint: "Required" }); list.push({ key: "nikah_nama", label: profile.marriageCertLabel, hint: "Required" }); list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required" }); }
       if (isOrphan === "Yes") list.push({ key: "orphan_proof", label: "Orphan Proof (Parent's Death Certificate)", hint: "Required since you selected orphan" });
     }
     if (gender === "Child") {
       if (isOrphan === "Yes") list.push({ key: "orphan_proof", label: "Orphan Proof (Parent's Death Certificate)", hint: "Required since child is orphan" });
-      list.push({ key: "b_form", label: "B-Form (Child's ID)", hint: "Required for child" });
-      list.push({ key: "frc", label: "Family Registration Certificate (FRC)", hint: "Required for child" });
+      list.push({ key: "b_form", label: profile.childIdLabel, hint: "Required for child" });
+      list.push({ key: "frc", label: profile.familyProofLabel, hint: "Required for child" });
     }
     return list;
   }
@@ -832,8 +842,8 @@ export default function SubmitRequestPage() {
       }
       if (isOtherInstitute) { if (!otherName.trim()) return "Please enter the institute name."; if (!otherContact.trim()) return "Please enter the institute contact number."; if (!otherAddress.trim()) return "Please enter the institute address (city, area, street)."; }
       let subDocs: { key: string; label: string; required: boolean; hint?: string }[] = [];
-      if (category === "Education, Books & Admission") subDocs = listCfg.getSubDocs?.(eduSubType, eduSubType === "admission" ? eduAdmissionLevel : "") || [];
-      else if (category === "School, College & University Fees") subDocs = listCfg.getSubDocs?.(eduSubType, "") || [];
+      if (category === "Education, Books & Admission") subDocs = listCfg.getSubDocs?.(eduSubType, eduSubType === "admission" ? eduAdmissionLevel : "", profile) || [];
+      else if (category === "School, College & University Fees") subDocs = listCfg.getSubDocs?.(eduSubType, "", profile) || [];
       for (const doc of subDocs) if (doc.required && !catDocUrls[doc.key]) return `Please attach: ${doc.label}`;
       if (!catDocUrls["student_id_proof"] && !catDocUrls["student_id"]) { const hasStudentId = subDocs.some((d) => d.key === "student_id_proof" || d.key === "student_id"); if (!hasStudentId) if (!catDocUrls["student_id"]) return "Please attach student's B-Form / ID card."; }
       if (!isFixedAmount(category)) { if (!amount.trim() || parseFloat(amount) <= 0) return "Please enter the amount needed."; const maxLimit = getMaxLimit(category); if (maxLimit && parseFloat(amount) > maxLimit) return `Amount cannot exceed Rs ${maxLimit.toLocaleString()}.`; }
@@ -1050,7 +1060,7 @@ export default function SubmitRequestPage() {
           {!isUploaded && !isUploading && <span className="mt-3 text-xs font-semibold text-teal-600 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-slate-100 dark:bg-slate-800 dark:border-slate-700">Tap to browse</span>}
         </label>
         {tried2 && required && !catDocUrls[key] && !isUploading && (
-          <div className="absolute top-2 right-2 text-red-500 bg-white rounded-full p-1 shadow-sm"><AlertCircle className="h-4 w-4" /></p>
+          <div className="absolute top-2 right-2 text-red-500 bg-white rounded-full p-1 shadow-sm"><AlertCircle className="h-4 w-4" /></div>
         )}
       </div>
     );
@@ -1064,7 +1074,7 @@ export default function SubmitRequestPage() {
         </h3>
         <div className="max-h-60 overflow-y-auto rounded-xl border border-teal-200/50 bg-white p-4 text-xs space-y-3 leading-relaxed text-slate-600 dark:border-teal-900/50 dark:bg-slate-900 dark:text-slate-400 custom-scrollbar">
           <p><strong className="text-slate-900 dark:text-white">1. Truthfulness & Accuracy</strong><br />I confirm that all information, documents, and statements provided in my case are completely true and accurate. Any falsehood or fraud will result in permanent account closure.</p>
-          <p><strong className="text-slate-900 dark:text-white">2. Video Privacy & Access</strong><br />a. My identity documents (CNIC, bills, etc.) and my selfie will <strong className="text-teal-600">never</strong> be shown to any contributor. They are only for Givethra's verification team.<br />b. My verification video (the appeal video I record) will be shown only to the Hero who unlocks my case.<br />c. The video is provided in stream-only mode — it cannot be downloaded.<br />d. Once my case is completed, the video will be permanently hidden.</p>
+          <p><strong className="text-slate-900 dark:text-white">2. Video Privacy & Access</strong><br />a. My identity documents ({profile.idLabel}) and my selfie will <strong className="text-teal-600">never</strong> be shown to any contributor. They are only for Givethra's verification team.<br />b. My verification video (the appeal video I record) will be shown only to the Hero who unlocks my case.<br />c. The video is provided in stream-only mode — it cannot be downloaded.<br />d. Once my case is completed, the video will be permanently hidden.</p>
           <p><strong className="text-slate-900 dark:text-white">3. Feedback Mandate</strong><br />If my case is successfully completed, I must submit a feedback video (min 60s) + written caption within 24 hours. Failure will result in suspension. Unlocking costs 5 credits.</p>
           <p><strong className="text-slate-900 dark:text-white">4. Public Usage Rights</strong><br />I grant Givethra the right to use my case description, feedback video, and caption as public property on social media.</p>
           <p><strong className="text-slate-900 dark:text-white">5. Listing Fee</strong><br />I understand that if my case is not free, a 1 credit non-refundable fee applies.</p>
@@ -1281,7 +1291,7 @@ export default function SubmitRequestPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-bold text-slate-700 dark:text-slate-300">City *</Label>
-                    <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Karachi" className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
+                    <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder={profile.cityExample || "e.g. Karachi"} className="h-14 rounded-xl border-slate-200 bg-slate-50 text-base focus:bg-white focus:border-teal-500 focus:ring-teal-500" />
                   </div>
                 </div>
 
@@ -1418,7 +1428,7 @@ export default function SubmitRequestPage() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2"><Label className="text-sm font-bold">{getReceiverLabel()} Name *</Label><Input value={receiverName} onChange={(e) => setReceiverName(e.target.value)} placeholder={`Enter ${getReceiverLabel()} name`} className="h-12 rounded-xl bg-slate-50" /></div>
                         <div className="space-y-2"><Label className="text-sm font-bold">{getReceiverLabel()} Contact *</Label><Input value={receiverContact} onChange={(e) => setReceiverContact(e.target.value)} placeholder="Phone number" className="h-12 rounded-xl bg-slate-50" /></div>
-                        <div className="space-y-2"><Label className="text-sm font-bold">Bank Name *</Label><Input value={receiverBank} onChange={(e) => setReceiverBank(e.target.value)} placeholder="Bank name" className="h-12 rounded-xl bg-slate-50" /></div>
+                        <div className="space-y-2"><Label className="text-sm font-bold">Bank Name *</Label><Input value={receiverBank} onChange={(e) => setReceiverBank(e.target.value)} placeholder={profile.walletHint ? `Bank or ${profile.walletHint}` : "Bank name"} className="h-12 rounded-xl bg-slate-50" /></div>
                         <div className="space-y-2"><Label className="text-sm font-bold">Account Number *</Label><Input value={receiverAccount} onChange={(e) => setReceiverAccount(e.target.value)} placeholder="Account number" className="h-12 rounded-xl bg-slate-50" /></div>
                         {["Food & Groceries", "Medicines", "Home Repair"].includes(category) && (
                           <div className="space-y-2 sm:col-span-2"><Label className="text-sm font-bold">Shop / Business Name *</Label><Input value={receiverShopName} onChange={(e) => setReceiverShopName(e.target.value)} placeholder="Shop name" className="h-12 rounded-xl bg-slate-50" /></div>
@@ -1650,7 +1660,7 @@ export default function SubmitRequestPage() {
 
                           {((category === "Education, Books & Admission" && eduSubType === "admission" && eduAdmissionLevel) || (category === "School, College & University Fees" && eduSubType)) && (
                             <div className="grid gap-3 sm:grid-cols-2 pt-2">
-                              {listCfg.getSubDocs?.(eduSubType, category === "Education, Books & Admission" ? eduAdmissionLevel : "")?.map((doc: any) => docBox(doc.key, doc.label, doc.required, doc.hint))}
+                              {listCfg.getSubDocs?.(eduSubType, category === "Education, Books & Admission" ? eduAdmissionLevel : "", profile)?.map((doc: any) => docBox(doc.key, doc.label, doc.required, doc.hint))}
                             </div>
                           )}
                         </div>
@@ -1675,7 +1685,7 @@ export default function SubmitRequestPage() {
                   {category === "Disability Support" && (
                     <div className="space-y-5 pt-4 border-t border-slate-100 dark:border-slate-800">
                       <div className="grid gap-3 sm:grid-cols-2">
-                        {docBox("disability_cnic", "CNIC showing Disability / Certificate", true, "REQUIRED — CNIC that marks the person as disabled")}
+                        {docBox("disability_cnic", `CNIC showing Disability / ${profile.idLabel}`, true, "REQUIRED — CNIC that marks the person as disabled")}
                         {docBox("disability_photo", "Clear Photo of Disability", true, "A clear photo showing the disability")}
                       </div>
 
@@ -1816,7 +1826,7 @@ export default function SubmitRequestPage() {
                           <div className="flex gap-2">
                             <Select value={currency} onValueChange={setCurrency}>
                               <SelectTrigger className="h-14 w-28 rounded-xl bg-white"><SelectValue /></SelectTrigger>
-                              <SelectContent>{CASE_CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                              <SelectContent>{CURRENCY_CODES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                             </Select>
                             <div className="relative flex-1">
                               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-slate-500 pointer-events-none">{sym}</span>
@@ -1840,7 +1850,7 @@ export default function SubmitRequestPage() {
                         <div className="flex gap-2">
                           <Select value={currency} onValueChange={setCurrency}>
                             <SelectTrigger className="h-14 w-28 rounded-xl bg-slate-50 font-bold text-base"><SelectValue /></SelectTrigger>
-                            <SelectContent>{CASE_CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                            <SelectContent>{CURRENCY_CODES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                           </Select>
                           <div className="relative flex-1">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-slate-500 pointer-events-none">{sym}</span>
