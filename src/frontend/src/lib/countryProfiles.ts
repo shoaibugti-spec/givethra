@@ -1,38 +1,15 @@
 // src/frontend/src/lib/countryProfiles.ts
-//
-// One place that describes how Givethra behaves in each country.
-// Adding a country = adding ONE entry to PROFILES below. Any country that is
-// not listed automatically gets GLOBAL_PROFILE, so no user is ever blocked.
-//
-// Amount policy (see CATEGORY_LIMITS in SubmitRequestPage.tsx) is written once
-// in PKR. scaleFromPKR() converts it into the user's currency using the
-// approximate rates in PER_PKR. REVIEW THESE RATES (and decide whether richer
-// countries need a higher multiplier) before launch — they are policy, not
-// just maths.
+// Givethra - Global Country Profiles & Currency Config
 
 export type CountryProfile = {
-  /** Default currency for this country (user can still change it). */
   currency: string;
-  /** Phone prefix, e.g. "+92". Empty when unknown. */
   dialCode: string;
-  /** Name of the main national ID document. Shown to the user. */
   idLabel: string;
-  /** Label for the "family proof" document (FRC in Pakistan). */
   familyProofLabel: string;
-  /** Label for a child's identity document (B-Form in Pakistan). */
   childIdLabel: string;
-  /** Label for the marriage certificate (Nikah Nama in Pakistan). */
   marriageCertLabel: string;
-  /** Mobile-wallet / instant-pay names that can appear next to "Bank account". */
   walletHint: string;
-  /** Example city used as input placeholder. */
   cityExample: string;
-  /**
-   * true  -> Givethra has curated lists of utility companies, schools and
-   *          hospitals for this country (today: Pakistan only).
-   * false -> user enters the company / school / hospital manually and the
-   *          Givethra team verifies it.
-   */
   hasLocalProviderLists: boolean;
 };
 
@@ -40,8 +17,7 @@ export const GLOBAL_PROFILE: CountryProfile = {
   currency: "USD",
   dialCode: "",
   idLabel: "National ID or passport",
-  familyProofLabel:
-    "Family proof (household / family registration, ration card, or any official document showing your family)",
+  familyProofLabel: "Family proof (household / family registration, ration card, or any official document showing your family)",
   childIdLabel: "Child's birth certificate or ID",
   marriageCertLabel: "Marriage certificate",
   walletHint: "",
@@ -53,19 +29,8 @@ function p(over: Partial<CountryProfile>): CountryProfile {
   return { ...GLOBAL_PROFILE, ...over };
 }
 
-// Keys are lowercase country names as they appear in COUNTRIES (or an alias below).
 const PROFILES: Record<string, CountryProfile> = {
-  pakistan: p({
-    currency: "PKR",
-    dialCode: "+92",
-    idLabel: "CNIC",
-    familyProofLabel: "Family Registration Certificate (FRC)",
-    childIdLabel: "B-Form (child's ID)",
-    marriageCertLabel: "Nikah Nama (marriage certificate)",
-    walletHint: "EasyPaisa / JazzCash",
-    cityExample: "Karachi",
-    hasLocalProviderLists: true,
-  }),
+  pakistan: p({ currency: "PKR", dialCode: "+92", idLabel: "CNIC", familyProofLabel: "Family Registration Certificate (FRC)", childIdLabel: "B-Form (child's ID)", marriageCertLabel: "Nikah Nama (marriage certificate)", walletHint: "EasyPaisa / JazzCash", cityExample: "Karachi", hasLocalProviderLists: true }),
   india: p({ currency: "INR", dialCode: "+91", idLabel: "Aadhaar or voter ID", walletHint: "UPI ID", cityExample: "Mumbai" }),
   bangladesh: p({ currency: "BDT", dialCode: "+880", idLabel: "NID", walletHint: "bKash / Nagad", cityExample: "Dhaka" }),
   nepal: p({ currency: "NPR", dialCode: "+977", idLabel: "Citizenship certificate", cityExample: "Kathmandu" }),
@@ -90,17 +55,7 @@ const PROFILES: Record<string, CountryProfile> = {
   malaysia: p({ currency: "MYR", dialCode: "+60", idLabel: "MyKad", cityExample: "Kuala Lumpur" }),
 };
 
-const ALIASES: Record<string, string> = {
-  uae: "united arab emirates",
-  uk: "united kingdom",
-  "great britain": "united kingdom",
-  england: "united kingdom",
-  usa: "united states",
-  "united states of america": "united states",
-  türkiye: "turkey",
-  turkiye: "turkey",
-  "ksa": "saudi arabia",
-};
+const ALIASES: Record<string, string> = { uae: "united arab emirates", uk: "united kingdom", "great britain": "united kingdom", england: "united kingdom", usa: "united states", "united states of america": "united states", türkiye: "turkey", turkiye: "turkey", ksa: "saudi arabia" };
 
 export function getCountryProfile(countryName: string | null | undefined): CountryProfile {
   const key = (countryName ?? "").trim().toLowerCase();
@@ -108,61 +63,10 @@ export function getCountryProfile(countryName: string | null | undefined): Count
   return PROFILES[ALIASES[key] ?? key] ?? GLOBAL_PROFILE;
 }
 
-// ------------------------------------------------------------
-//  Currency
-// ------------------------------------------------------------
-
-/** Approximate: how many units of each currency equal 1 PKR. REVIEW BEFORE LAUNCH. */
-const PER_PKR: Record<string, number> = {
-  PKR: 1,
-  USD: 0.0036,
-  EUR: 0.0031,
-  GBP: 0.0027,
-  CAD: 0.005,
-  AUD: 0.0055,
-  SAR: 0.0135,
-  AED: 0.0131,
-  TRY: 0.15,
-  INR: 0.3,
-  BDT: 0.43,
-  NPR: 0.48,
-  LKR: 1.07,
-  AFN: 0.25,
-  NGN: 5.5,
-  KES: 0.46,
-  EGP: 0.18,
-  IDR: 58,
-  MYR: 0.016,
-};
-
+const PER_PKR: Record<string, number> = { PKR: 1, USD: 0.0036, EUR: 0.0031, GBP: 0.0027, CAD: 0.005, AUD: 0.0055, SAR: 0.0135, AED: 0.0131, TRY: 0.15, INR: 0.3, BDT: 0.43, NPR: 0.48, LKR: 1.07, AFN: 0.25, NGN: 5.5, KES: 0.46, EGP: 0.18, IDR: 58, MYR: 0.016 };
 export const CURRENCY_CODES = Object.keys(PER_PKR);
+export const CURRENCY_SYMBOLS: Record<string, string> = { USD: "$", PKR: "Rs", SAR: "SAR", AED: "AED", GBP: "£", EUR: "€", INR: "₹", TRY: "₺", BDT: "৳", NPR: "Rs", LKR: "Rs", AFN: "AFN", CAD: "CA$", AUD: "A$", NGN: "₦", KES: "KSh", EGP: "E£", IDR: "Rp", MYR: "RM" };
 
-export const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: "$",
-  PKR: "Rs",
-  SAR: "SAR",
-  AED: "AED",
-  GBP: "£",
-  EUR: "€",
-  INR: "₹",
-  TRY: "₺",
-  BDT: "৳",
-  NPR: "Rs",
-  LKR: "Rs",
-  AFN: "AFN",
-  CAD: "CA$",
-  AUD: "A$",
-  NGN: "₦",
-  KES: "KSh",
-  EGP: "E£",
-  IDR: "Rp",
-  MYR: "RM",
-};
-
-/**
- * Converts an amount written in PKR (the base policy) into `currency`,
- * rounded to a friendly number (5, 10, 15, 20 ... 50, 100 ...).
- */
 export function scaleFromPKR(amountPKR: number, currency: string): number {
   if (!amountPKR) return 0;
   if (currency === "PKR") return amountPKR;
@@ -173,11 +77,6 @@ export function scaleFromPKR(amountPKR: number, currency: string): number {
   return Math.round(raw / step) * step;
 }
 
-// ------------------------------------------------------------
-//  Phone
-// ------------------------------------------------------------
-
-/** Loose, country-agnostic check: 7–15 digits after removing spaces, dashes, brackets and "+". */
 export function isPhoneValid(raw: string): boolean {
   const digits = raw.replace(/[\s\-()+.]/g, "");
   return /^\d{7,15}$/.test(digits);
