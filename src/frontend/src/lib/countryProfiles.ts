@@ -1,6 +1,6 @@
 // src/frontend/src/lib/countryProfiles.ts
 // Givethra - Global Country Profiles & Currency Config
-// 🌍 100% Global, covering all 197 countries. Fallback to GLOBAL_PROFILE.
+// 🌍 100% Global, covering all 195+ countries. Fallback to GLOBAL_PROFILE.
 
 export type CountryProfile = {
   currency: string;
@@ -30,8 +30,7 @@ function p(over: Partial<CountryProfile>): CountryProfile {
   return { ...GLOBAL_PROFILE, ...over };
 }
 
-// Curated profiles for major countries.
-// All other countries automatically fall back to GLOBAL_PROFILE (USD).
+// Curated profiles for countries where Givethra has specific document names or local provider lists.
 const PROFILES: Record<string, CountryProfile> = {
   pakistan: p({ currency: "PKR", dialCode: "+92", idLabel: "CNIC", familyProofLabel: "Family Registration Certificate (FRC)", childIdLabel: "B-Form", marriageCertLabel: "Nikah Nama", walletHint: "EasyPaisa / JazzCash", cityExample: "Karachi", hasLocalProviderLists: true }),
   india: p({ currency: "INR", dialCode: "+91", idLabel: "Aadhaar / Voter ID", walletHint: "UPI ID", cityExample: "Mumbai" }),
@@ -56,7 +55,7 @@ const PROFILES: Record<string, CountryProfile> = {
   egypt: p({ currency: "EGP", dialCode: "+20", idLabel: "National ID", cityExample: "Cairo" }),
   indonesia: p({ currency: "IDR", dialCode: "+62", idLabel: "KTP", cityExample: "Jakarta" }),
   malaysia: p({ currency: "MYR", dialCode: "+60", idLabel: "MyKad", cityExample: "Kuala Lumpur" }),
-  // Add more as needed, rest fallback to USD
+  // Add more as needed; rest fallback to USD
 };
 
 const ALIASES: Record<string, string> = { uae: "united arab emirates", uk: "united kingdom", "great britain": "united kingdom", england: "united kingdom", usa: "united states", "united states of america": "united states", türkiye: "turkey", turkiye: "turkey", ksa: "saudi arabia" };
@@ -78,6 +77,7 @@ const PER_PKR: Record<string, number> = {
   THB: 0.13, VND: 90, TWD: 0.12, HKD: 0.028, SGD: 0.0048, MMK: 7.5, KHR: 14.5, LAK: 75,
   MNT: 12.5, KZT: 1.7, UZS: 45, AZN: 0.0061, GEL: 0.0095, AMD: 1.4, BYN: 0.012,
   ETB: 0.2, GHS: 0.02, UGX: 13.5, TZS: 9, RWF: 4.7, MWK: 6.3, ZMW: 0.1, BWP: 0.05,
+  MAD: 0.036, DZD: 0.48, TND: 0.011, LYD: 0.017, SDG: 2, MUR: 0.16, SCR: 0.05,
 };
 
 export const CURRENCY_CODES = Object.keys(PER_PKR);
@@ -91,7 +91,8 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   JOD: "JD", BGN: "лв", HRK: "kn", RSD: "дин", PHP: "₱", THB: "฿", VND: "₫", TWD: "NT$",
   HKD: "HK$", SGD: "S$", MMK: "K", KHR: "៛", LAK: "₭", MNT: "₮", KZT: "₸", UZS: "so'm",
   AZN: "₼", GEL: "₾", AMD: "֏", BYN: "Br", ETB: "Br", GHS: "₵", UGX: "USh", TZS: "TSh",
-  RWF: "FRw", MWK: "MK", ZMW: "ZK", BWP: "P",
+  RWF: "FRw", MWK: "MK", ZMW: "ZK", BWP: "P", MAD: "DH", DZD: "دج", TND: "د.ت", LYD: "ل.د", SDG: "ج.س",
+  MUR: "₨", SCR: "₨",
 };
 
 export function scaleFromPKR(amountPKR: number, currency: string): number {
