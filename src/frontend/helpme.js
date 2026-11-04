@@ -13,9 +13,6 @@ const DEFAULTS = {
 };
 const MAX_SECONDS = 20;
 const MIN_STOP_SECONDS = 12;
-// Mobile browsers can ignore MediaRecorder's bitrate hint and emit a larger
-// 720p file. Keep a bounded ceiling that accepts those valid 20-second
-// recordings without allowing unrestricted uploads.
 const MAX_VIDEO_BYTES = 16 * 1024 * 1024;
 const MAX_THUMBNAIL_BYTES = 1024 * 1024;
 const VIDEO_TYPES = { "video/webm": "webm", "video/mp4": "mp4" };
@@ -23,13 +20,7 @@ const DAY = 86400000;
 const FEED_PAGE = 8;
 const PROOF_PREFIX = "https://givethra.org/uploads/helpme-proofs/";
 
-function pendingPosterKey(videoKey) {
-  return typeof videoKey === "string" && videoKey.startsWith("pending/") && /\.(mp4|webm)$/i.test(videoKey)
-    ? videoKey.replace(/\.(mp4|webm)$/i, ".jpg")
-    : null;
-}
-
-// Account country -> currency. Unknown countries fall back to USD.
+// ISO country → currency. Used as a fallback when helpme_fx has no row yet.
 const COUNTRY_CURRENCY = {
   PK: "PKR", IN: "INR", BD: "BDT", LK: "LKR", NP: "NPR", AE: "AED", SA: "SAR", QA: "QAR", KW: "KWD",
   TR: "TRY", EG: "EGP", NG: "NGN", KE: "KES", GH: "GHS", ZA: "ZAR", ID: "IDR", MY: "MYR", PH: "PHP",
@@ -37,12 +28,27 @@ const COUNTRY_CURRENCY = {
   DE: "EUR", FR: "EUR", IT: "EUR", ES: "EUR", NL: "EUR", BE: "EUR", IE: "EUR", PT: "EUR", AT: "EUR", FI: "EUR", GR: "EUR",
 };
 
+// Approximate display/submit rates used ONLY when helpme_fx has no row for a currency
+// (e.g. right after a fresh deploy). The daily refresh job replaces these with real rates.
+const FALLBACK_RATES = {
+  PKR: 278, INR: 83, BDT: 120, LKR: 300, NPR: 160,
+  AED: 3.67, SAR: 3.75, QAR: 3.64, KWD: 0.31, TRY: 33,
+  EGP: 48, NGN: 1600, KES: 130, GHS: 15, ZAR: 18,
+  IDR: 16000, MYR: 4.7, PHP: 58,
+  GBP: 0.79, CAD: 1.36, AUD: 1.52, EUR: 0.92, USD: 1,
+};
+
 const dayMs = (n) => Number(n) * DAY;
 const clean = (v, max) => String(v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 const norm = (v) => String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const money = (n) => Math.round(Number(n) * 100) / 100;
 
-// Description is a public caption: no phone numbers, e-mail or links (those belong in the payment box).
+function pendingPosterKey(videoKey) {
+  return typeof videoKey === "string" && videoKey.startsWith("pending/") && /\.(mp4|webm)$/i.test(videoKey)
+    ? videoKey.replace(/\.(mp4|webm)$/i, ".jpg")
+    : null;
+}
+
 function hasPublicContact(value) {
   return /@|https?:\/\/|www\.|\d{7,}|whats?app|telegram|signal|wechat|\bimo\b|e-?mail/i.test(String(value || ""));
 }
@@ -53,6 +59,33 @@ function niceGoal(usdCents, perUsd) {
   return money(Math.max(step, Math.round(raw / step) * step));
 }
 
+/** Read the Cloudflare-derived country from the incoming request (CF-IPCountry). */
+function viewerCountry(request) {
+  const cc = String(request.headers.get("CF-IPCountry") || "").toUpperCase();
+  return /^[A-Z]{2}$/.test(cc) ? cc : "";
+}
+
+/** Best-effort: what currency is this viewer's device likely showing? */
+async function viewerCurrency(request, db) {
+  const country = viewerCountry(request);
+  if (!country) return "USD";
+  const currency = COUNTRY_CURRENCY[country];
+  if (!currency) return "USD";
+  return currency;
+}
+
+/** Fetch the live USD→currency rate, preferring helpme_fx, falling back to FALLBACK_RATES. */
+async function rateFor(db, currency) {
+  if (!currency || currency === "USD") return 1;
+  try {
+    const row = await db.prepare("SELECT per_usd FROM helpme_fx WHERE currency = ?").bind(currency).first();
+    if (row && Number(row.per_usd) > 0) return Number(row.per_usd);
+  } catch (e) {
+    console.error("HelpMe fx lookup failed for", currency, e);
+  }
+  return FALLBACK_RATES[currency] || null;
+}
+
 export async function handleHelpMe(request, env, ctx, user, url, parts, origin, h) {
   const { json, id, now, readJson, sendNotification, isAdmin, publicDisplayName, getActiveSuspension, suspendedActionResponse } = h;
   const method = request.method;
@@ -60,7 +93,10 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   const db = env.DB;
   if (!db) return json({ error: "Database unavailable" }, 503, origin);
 
-  // Videos are served from the SAME domain (givethra.org/api/helpme/media/...). No extra domain or subdomain is needed.
+  // What currency is this viewer's device likely showing? Used for feed ordering and card amounts.
+  const vCountry = viewerCountry(request);
+  const vCurrency = vCountry ? (COUNTRY_CURRENCY[vCountry] || "USD") : "USD";
+
   const videoBase = "/api/helpme/media";
   const need = () => (user ? null : json({ error: "Please sign in to continue", code: "AUTH_REQUIRED" }, 401, origin));
   const adminOnly = () => (isAdmin(user) ? null : json({ error: "Administrator access required" }, 403, origin));
@@ -76,8 +112,7 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   }
 
   async function fxRate(currency) {
-    const row = await db.prepare("SELECT per_usd FROM helpme_fx WHERE currency = ?").bind(currency).first();
-    return row ? Number(row.per_usd) : null;
+    return rateFor(db, currency);
   }
 
   const cardSelect = `a.id, a.user_id, a.status, a.description, a.currency, a.goal_local, a.raised_local, a.account_country,
@@ -88,10 +123,20 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
       CASE WHEN lower(COALESCE(u.kyc_status, '')) = 'approved' THEN 1 ELSE 0 END AS owner_verified`;
   const cardFrom = `FROM helpme_appeals a JOIN users u ON u.user_id = a.user_id LEFT JOIN profiles p ON p.user_id = a.user_id`;
 
-  function card(row) {
+  // Build a card. `raisedView` is the raised amount in the owner's currency (for the bar),
+  // but goal/remaining are ALWAYS shown in the viewer's currency so the number is meaningful
+  // to whoever is looking at the screen — not just to the appeal owner.
+  async function card(row, viewerCur, viewerRate) {
     const helped = row.status === "helped";
-    const goal = Number(row.goal_local || 0);
-    const raised = Math.min(Number(row.raised_local || 0), goal);
+    // The stored amounts are in the owner's currency. Convert to USD first, then to the viewer's currency.
+    const ownerCurrency = String(row.currency || "USD").toUpperCase();
+    const ownerRate = ownerCurrency === "USD" ? 1 : (await fxRate(ownerCurrency) || 1);
+    const ownerGoalUsd = Number(row.goal_local || 0) / ownerRate;
+    const ownerRaisedUsd = Math.min(Number(row.raised_local || 0), Number(row.goal_local || 0)) / ownerRate;
+    const viewerGoalLocal = money(ownerGoalUsd * viewerRate);
+    const viewerRaisedLocal = money(ownerRaisedUsd * viewerRate);
+    const viewerRemaining = money(Math.max(0, viewerGoalLocal - viewerRaisedLocal));
+    const percent = viewerGoalLocal > 0 ? Math.min(100, Math.round((viewerRaisedLocal / viewerGoalLocal) * 100)) : 0;
     return {
       id: row.id,
       status: row.status,
@@ -99,11 +144,17 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
       description: row.description,
       video_url: row.video_key && !row.video_deleted_at ? `${videoBase}/${row.video_key}` : null,
       thumbnail_url: row.video_key && !row.video_deleted_at ? `${videoBase.replace("/media", "/thumbnail")}/${row.id}` : null,
-      currency: row.currency,
-      goal_local: goal,
-      raised_local: money(raised),
-      remaining_local: money(Math.max(0, goal - raised)),
-      percent: goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0,
+      // Owner's native currency and goal — useful metadata, but the DISPLAYED money
+      // uses viewer_* fields below.
+      currency: ownerCurrency,
+      goal_local: money(Number(row.goal_local || 0)),
+      raised_local: money(Number(row.raised_local || 0)),
+      // Viewer-currency display fields (what the user actually sees):
+      viewer_currency: viewerCur,
+      viewer_goal: viewerGoalLocal,
+      viewer_raised: viewerRaisedLocal,
+      viewer_remaining: viewerRemaining,
+      percent,
       counts: { prays: row.prays_count, comments: row.comments_count, reposts: row.reposts_count, shares: row.shares_count, views: row.views_count },
       owner: { id: row.user_id, name: publicDisplayName(row.owner_name, "User"), username: row.owner_username || null, avatar_url: row.owner_avatar || null, verified: Boolean(row.owner_verified) },
       published_at: row.published_at, helped_at: row.helped_at, expires_at: row.expires_at,
@@ -111,6 +162,7 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
       prayed: Boolean(row.prayed), reposted: Boolean(row.reposted),
     };
   }
+
   const viewerCols = () => (user
     ? { sql: `, EXISTS(SELECT 1 FROM helpme_prays x WHERE x.appeal_id = a.id AND x.user_id = ?) AS prayed, EXISTS(SELECT 1 FROM helpme_reposts x WHERE x.appeal_id = a.id AND x.user_id = ?) AS reposted`, binds: [user.user_id, user.user_id] }
     : { sql: ", 0 AS prayed, 0 AS reposted", binds: [] });
@@ -118,32 +170,96 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   // ───────────── PUBLIC READS ─────────────
   if (method === "GET" && sub === "config") {
     const S = await settings();
-    const rates = await db.prepare("SELECT currency, per_usd FROM helpme_fx ORDER BY currency").all();
+    const rates = await db.prepare("SELECT currency, per_usd, updated_at FROM helpme_fx ORDER BY currency").all();
     const res = json({
       goal_usd_cents: S.goal_usd_cents, max_seconds: MAX_SECONDS, min_stop_seconds: MIN_STOP_SECONDS,
       max_bytes: MAX_VIDEO_BYTES, retention_days: S.retention_days, video_base: videoBase,
       country_currency: COUNTRY_CURRENCY, rates: rates.results || [],
+      // Sent to the browser so it can mirror the server's fallback behaviour when a
+      // currency is missing from helpme_fx (e.g. right after a fresh deploy).
+      fallback_rates: FALLBACK_RATES,
+      // Cloudflare-detected country for this request (may be "" on localhost / non-CF dev).
+      country_code: vCountry || null,
+      viewer_currency: vCurrency,
     }, 200, origin);
     res.headers.set("Cache-Control", "public, max-age=300");
     return res;
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  //  FEED: local-first ordering
+  //  1. Appeals from the viewer's own country (matching account_country)
+  //  2. Everything else, newest first
+  //  The returned `local_batch` / `global_batch` fields let the frontend show
+  //  a "Near you" divider without needing two separate requests.
+  // ─────────────────────────────────────────────────────────────────────────────
   if (method === "GET" && sub === "feed") {
     const tab = url.searchParams.get("tab") === "helped" ? "helped" : "need";
     const status = tab === "helped" ? "helped" : "published";
     const sortCol = tab === "helped" ? "a.helped_at" : "a.published_at";
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || FEED_PAGE), 1), 20);
-    const [curTs, curId] = String(url.searchParams.get("cursor") || "").split("|");
+    const cursor = String(url.searchParams.get("cursor") || "");
+    const [curTs, curId, curPhase] = cursor.split("|");
     const v = viewerCols();
-    const binds = [...v.binds, status];
-    let where = "a.status = ? AND a.video_deleted_at IS NULL";
-    if (curTs && curId) { where += ` AND (${sortCol} < ? OR (${sortCol} = ? AND a.id < ?))`; binds.push(curTs, curTs, curId); }
-    binds.push(limit + 1);
-    const rows = await db.prepare(`SELECT ${cardSelect}${v.sql} ${cardFrom} WHERE ${where} ORDER BY ${sortCol} DESC, a.id DESC LIMIT ?`).bind(...binds).all();
-    const list = rows.results || [];
-    const page = list.slice(0, limit);
-    const last = page[page.length - 1];
-    const res = json({ items: page.map(card), next_cursor: list.length > limit && last ? `${tab === "helped" ? last.helped_at : last.published_at}|${last.id}` : null }, 200, origin);
+    const viewerRate = await fxRate(vCurrency);
+
+    // "local" phase only applies when we know the country. If Cloudflare header is
+    // missing (e.g. local dev), skip straight to "global" so the app still works.
+    const localWhere = vCountry
+      ? "a.account_country = ?"
+      : "1 = 0";
+    const localParams = vCountry ? [vCountry] : [];
+
+    let items = [];
+    let nextPhase = "local";
+    let nextCursor = null;
+
+    if (curPhase !== "global") {
+      // Fetch local appeals first.
+      const binds = [...v.binds, status, ...localParams];
+      let where = `a.status = ? AND a.video_deleted_at IS NULL AND ${localWhere}`;
+      if (curPhase === "local" && curTs && curId) {
+        where += ` AND (${sortCol} < ? OR (${sortCol} = ? AND a.id < ?))`;
+        binds.push(curTs, curTs, curId);
+      }
+      binds.push(limit + 1);
+      const rows = await db.prepare(`SELECT ${cardSelect}${v.sql} ${cardFrom} WHERE ${where} ORDER BY ${sortCol} DESC, a.id DESC LIMIT ?`).bind(...binds).all();
+      const list = rows.results || [];
+      const page = list.slice(0, limit);
+      for (const r of page) items.push(await card(r, vCurrency, viewerRate));
+      if (list.length > limit) {
+        const last = page[page.length - 1];
+        nextCursor = `local|${tab === "helped" ? last.helped_at : last.published_at}|${last.id}`;
+        nextPhase = "local";
+      } else {
+        // Local exhausted; hand off to global on the next page.
+        nextPhase = "global";
+        nextCursor = page.length === limit ? `global||` : null;
+      }
+    } else {
+      // "global" phase — everything not from the viewer's country.
+      const binds = [...v.binds, status];
+      let where = "a.status = ? AND a.video_deleted_at IS NULL";
+      if (vCountry) { where += " AND (a.account_country IS NULL OR a.account_country <> ?)"; binds.push(vCountry); }
+      if (curTs && curId) { where += ` AND (${sortCol} < ? OR (${sortCol} = ? AND a.id < ?))`; binds.push(curTs, curTs, curId); }
+      binds.push(limit + 1);
+      const rows = await db.prepare(`SELECT ${cardSelect}${v.sql} ${cardFrom} WHERE ${where} ORDER BY ${sortCol} DESC, a.id DESC LIMIT ?`).bind(...binds).all();
+      const list = rows.results || [];
+      const page = list.slice(0, limit);
+      for (const r of page) items.push(await card(r, vCurrency, viewerRate));
+      if (list.length > limit) {
+        const last = page[page.length - 1];
+        nextCursor = `global|${tab === "helped" ? last.helped_at : last.published_at}|${last.id}`;
+      }
+    }
+
+    const res = json({
+      items,
+      next_cursor: nextCursor,
+      phase: nextPhase,
+      viewer_currency: vCurrency,
+      viewer_country: vCountry || null,
+    }, 200, origin);
     if (!user) res.headers.set("Cache-Control", "public, max-age=20");
     return res;
   }
@@ -151,10 +267,11 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   if (method === "GET" && sub === "appeals" && parts[3] && !parts[4]) {
     const v = viewerCols();
     const row = await db.prepare(`SELECT ${cardSelect}${v.sql} ${cardFrom} WHERE a.id = ? AND a.status IN ('published','helped')`).bind(...v.binds, parts[3]).first();
-    return row ? json(card(row), 200, origin) : json({ error: "This appeal is not available", code: "NOT_FOUND" }, 404, origin);
+    if (!row) return json({ error: "This appeal is not available", code: "NOT_FOUND" }, 404, origin);
+    const viewerRate = await fxRate(vCurrency);
+    return json(await card(row, vCurrency, viewerRate), 200, origin);
   }
 
-  // Posters are private while staged and are only served after the matching video is published.
   if (method === "GET" && sub === "thumbnail" && parts[3]) {
     const appealId = String(parts[3]);
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(appealId)) return json({ error: "Thumbnail not found" }, 404, origin);
@@ -172,12 +289,17 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
 
   if (method === "GET" && sub === "users" && parts[3]) {
     const v = viewerCols();
+    const viewerRate = await fxRate(vCurrency);
     const mine = await db.prepare(`SELECT ${cardSelect}${v.sql} ${cardFrom} WHERE a.user_id = ? AND a.status IN ('published','helped') AND a.video_deleted_at IS NULL ORDER BY COALESCE(a.helped_at, a.published_at) DESC LIMIT 50`).bind(...v.binds, parts[3]).all();
     const v2 = viewerCols();
     const reposts = await db.prepare(`SELECT ${cardSelect}${v2.sql} ${cardFrom} JOIN helpme_reposts r ON r.appeal_id = a.id WHERE r.user_id = ? AND a.status IN ('published','helped') AND a.video_deleted_at IS NULL ORDER BY r.created_at DESC LIMIT 50`).bind(...v2.binds, parts[3]).all();
     const who = await db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.full_name), ''), NULLIF(TRIM(u.full_name), ''), 'User') AS name, p.username, COALESCE(NULLIF(p.avatar_url, ''), u.avatar_url) AS avatar_url, CASE WHEN lower(COALESCE(u.kyc_status,''))='approved' THEN 1 ELSE 0 END AS verified FROM users u LEFT JOIN profiles p ON p.user_id = u.user_id WHERE u.user_id = ?`).bind(parts[3]).first();
     if (!who) return json({ error: "User not found" }, 404, origin);
-    return json({ user: { id: parts[3], name: publicDisplayName(who.name, "User"), username: who.username || null, avatar_url: who.avatar_url || null, verified: Boolean(who.verified) }, appeals: (mine.results || []).map(card), reposts: (reposts.results || []).map(card) }, 200, origin);
+    const mineCards = [];
+    for (const r of mine.results || []) mineCards.push(await card(r, vCurrency, viewerRate));
+    const repostCards = [];
+    for (const r of reposts.results || []) repostCards.push(await card(r, vCurrency, viewerRate));
+    return json({ user: { id: parts[3], name: publicDisplayName(who.name, "User"), username: who.username || null, avatar_url: who.avatar_url || null, verified: Boolean(who.verified) }, appeals: mineCards, reposts: repostCards, viewer_currency: vCurrency }, 200, origin);
   }
 
   if (method === "GET" && sub === "appeals" && parts[4] === "comments") {
@@ -187,8 +309,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return json((rows.results || []).map((r) => ({ id: r.id, user_id: r.user_id, body: r.body, created_at: r.created_at, name: publicDisplayName(r.name, "User"), avatar_url: r.avatar_url || null, mine: Boolean(user && user.user_id === r.user_id) })), 200, origin);
   }
 
-  // Public video stream (same domain). Only objects under v/ exist for approved appeals; rejected/removed/expired
-  // videos are deleted from R2, so they stop working here too. Range support is required for iPhone Safari.
   if (method === "GET" && sub === "media" && parts.length >= 5) {
     const key = parts.slice(3).join("/");
     if (!env.HELPME_VIDEOS || !/^v\/[A-Za-z0-9_-]+\.(mp4|webm)$/.test(key)) return json({ error: "Video not found" }, 404, origin);
@@ -213,9 +333,8 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return new Response(object.body, { status, headers });
   }
 
-  // Totals for a profile: what this person helped (hero) and what they received (appeal owner), in PKR-equivalent.
   if (method === "GET" && sub === "stats" && parts[3]) {
-    const pkr = Number((await db.prepare("SELECT per_usd FROM helpme_fx WHERE currency = 'PKR'").first())?.per_usd) || 278;
+    const pkr = await fxRate("PKR") || 278;
     const helped = await db.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(hh.amount_approved / a.fx_per_usd), 0) AS usd FROM helpme_help hh JOIN helpme_appeals a ON a.id = hh.appeal_id WHERE hh.helper_user_id = ? AND hh.status = 'approved'").bind(parts[3]).first();
     const got = await db.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(hh.amount_approved / a.fx_per_usd), 0) AS usd FROM helpme_help hh JOIN helpme_appeals a ON a.id = hh.appeal_id WHERE a.user_id = ? AND hh.status = 'approved'").bind(parts[3]).first();
     const res = json({
@@ -226,7 +345,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return res;
   }
 
-  // View counts are batched by the app (a few ids at a time) so D1 is not written on every swipe.
   if (method === "POST" && sub === "views") {
     const body = await readJson(request);
     const ids = [...new Set((Array.isArray(body?.ids) ? body.ids : []).map((x) => String(x).slice(0, 64)))].slice(0, 20);
@@ -242,7 +360,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   const denied = need();
   if (denied) return denied;
 
-  // Backfill: owner/admin can add the share poster for a LIVE appeal that has none (older videos). Never overwrites.
   if (method === "POST" && sub === "poster-backfill" && parts[3]) {
     const appealId = String(parts[3]);
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(appealId)) return json({ error: "Invalid appeal" }, 400, origin);
@@ -261,7 +378,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return json({ ok: true }, 201, origin);
   }
 
-  // Store a small poster next to the pending video. It stays inaccessible until admin approval.
   if (method === "POST" && sub === "upload-thumbnail" && parts[3]) {
     const uploadId = String(parts[3]);
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(uploadId)) return json({ error: "Invalid upload" }, 400, origin);
@@ -280,7 +396,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return json({ ok: true }, 201, origin);
   }
 
-  // ---- owner/admin private video stream (supports Range so seeking works) ----
   if (method === "GET" && sub === "video" && parts[3]) {
     const a = await db.prepare("SELECT user_id, video_key, video_content_type, video_deleted_at FROM helpme_appeals WHERE id = ?").bind(parts[3]).first();
     if (!a || a.video_deleted_at) return json({ error: "Video not found" }, 404, origin);
@@ -305,7 +420,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return new Response(object.body, { status, headers });
   }
 
-  // ---- eligibility ----
   async function eligibility() {
     const S = await settings();
     const base = { goal_usd_cents: S.goal_usd_cents };
@@ -323,7 +437,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   }
   if (method === "GET" && sub === "eligibility") return json(await eligibility(), 200, origin);
 
-  // ---- video upload: raw body straight into R2 (never buffered in the Worker) ----
   if (method === "POST" && sub === "upload") {
     const el = await eligibility();
     if (!el.can_post) return json({ error: el.reason, code: el.code, next_allowed_at: el.next_allowed_at }, el.code === "ACCOUNT_SUSPENDED" ? 403 : 409, origin);
@@ -342,7 +455,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return json({ upload_id: uploadId }, 201, origin);
   }
 
-  // ---- create appeal ----
   if (method === "POST" && sub === "appeals" && !parts[3]) {
     const el = await eligibility();
     if (!el.can_post) return json({ error: el.reason, code: el.code, next_allowed_at: el.next_allowed_at }, el.code === "ACCOUNT_SUSPENDED" ? 403 : 409, origin);
@@ -385,7 +497,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return json({ id: appealId, status: "pending_review", goal_local: goalLocal, currency }, 201, origin);
   }
 
-  // ---- reactions ----
   if (method === "POST" && sub === "appeals" && (parts[4] === "pray" || parts[4] === "repost")) {
     const table = parts[4] === "pray" ? "helpme_prays" : "helpme_reposts";
     const col = parts[4] === "pray" ? "prays_count" : "reposts_count";
@@ -403,7 +514,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return json({ active: true }, 200, origin);
   }
 
-  // ---- comments ----
   if (method === "POST" && sub === "appeals" && parts[4] === "comments") {
     const suspension = await getActiveSuspension(env, user.user_id);
     if (suspension) return suspendedActionResponse(origin, suspension);
@@ -432,7 +542,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return json({ ok: true }, 200, origin);
   }
 
-  // ---- report (auto-hides an appeal once enough different people report it) ----
   if (method === "POST" && sub === "reports") {
     const b = (await readJson(request)) || {};
     const type = b.target_type === "comment" ? "comment" : b.target_type === "appeal" ? "appeal" : "";
@@ -447,27 +556,48 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     return json({ ok: true }, 200, origin);
   }
 
-  // ---- payment details: only for signed-in users, only while the appeal still needs help ----
+  // ─────────────────────────────────────────────────────────────────────────────
+  //  PAYMENT INFO: always shown to the hero in the OWNER's currency so the hero
+  //  can send the exact amount. The hero's own currency equivalent is also
+  //  returned so the UI can say "Send Rs580 (≈ $2.10)".
+  // ─────────────────────────────────────────────────────────────────────────────
   if (method === "GET" && sub === "appeals" && parts[4] === "payment") {
     const a = await db.prepare("SELECT id, user_id, status, currency, goal_local, raised_local, pay_method, pay_bank_name, pay_account_title, pay_account_number, account_country FROM helpme_appeals WHERE id = ?").bind(parts[3]).first();
     if (!a || !["published", "helped"].includes(a.status)) return json({ error: "This appeal is not available", code: "NOT_FOUND" }, 404, origin);
     if (a.status === "helped") return json({ error: "This appeal has already been fully helped. Thank you!", code: "ALREADY_HELPED" }, 410, origin);
     if (a.user_id === user.user_id) return json({ error: "You cannot help your own appeal", code: "OWN_APPEAL" }, 400, origin);
+    const ownerCurrency = String(a.currency || "USD").toUpperCase();
+    const ownerRate = await fxRate(ownerCurrency);
+    const heroRate = await fxRate(vCurrency);
+    const remainingOwner = money(Math.max(0, Number(a.goal_local || 0) - Number(a.raised_local || 0)));
+    const remainingUsd = ownerRate ? remainingOwner / ownerRate : remainingOwner;
+    const remainingHero = heroRate ? money(remainingUsd * heroRate) : null;
     return json({
-      appeal_id: a.id, currency: a.currency, account_country: a.account_country,
-      pay_method: a.pay_method, bank_name: a.pay_bank_name || null, account_title: a.pay_account_title, account_number: a.pay_account_number,
-      goal_local: a.goal_local, raised_local: money(a.raised_local), remaining_local: money(Math.max(0, a.goal_local - a.raised_local)),
+      appeal_id: a.id,
+      // Owner's payment info — what the hero must actually send:
+      currency: ownerCurrency,
+      account_country: a.account_country,
+      pay_method: a.pay_method,
+      bank_name: a.pay_bank_name || null,
+      account_title: a.pay_account_title,
+      account_number: a.pay_account_number,
+      goal_local: a.goal_local,
+      raised_local: money(a.raised_local),
+      remaining_local: remainingOwner,
+      // Viewer-converted equivalents (for display convenience):
+      viewer_currency: vCurrency,
+      viewer_remaining: remainingHero,
     }, 200, origin);
   }
 
-  // ---- hero submits proof of payment ----
   if (method === "POST" && sub === "appeals" && parts[4] === "help") {
     const suspension = await getActiveSuspension(env, user.user_id);
     if (suspension) return suspendedActionResponse(origin, suspension);
     const b = (await readJson(request)) || {};
-    const a = await db.prepare("SELECT id, user_id, status, currency, goal_local, raised_local FROM helpme_appeals WHERE id = ?").bind(parts[3]).first();
+    const a = await db.prepare("SELECT id, user_id, status, currency, goal_local, raised_local, fx_per_usd FROM helpme_appeals WHERE id = ?").bind(parts[3]).first();
     if (!a || a.status !== "published") return json({ error: a?.status === "helped" ? "This appeal has already been fully helped. Thank you!" : "This appeal is not available", code: a?.status === "helped" ? "ALREADY_HELPED" : "NOT_FOUND" }, 409, origin);
     if (a.user_id === user.user_id) return json({ error: "You cannot help your own appeal", code: "OWN_APPEAL" }, 400, origin);
+    // amount is entered in the owner's currency (what was actually sent).
     const amount = money(b.amount);
     const remaining = money(Math.max(0, a.goal_local - a.raised_local));
     if (!Number.isFinite(amount) || amount <= 0) return json({ error: "Enter the amount you sent", code: "BAD_AMOUNT" }, 400, origin);
@@ -497,9 +627,21 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
       FROM helpme_help hh JOIN helpme_appeals a ON a.id = hh.appeal_id LEFT JOIN users u ON u.user_id = hh.helper_user_id LEFT JOIN profiles p ON p.user_id = hh.helper_user_id
       WHERE a.user_id = ? AND hh.status = 'approved' ORDER BY hh.reviewed_at DESC LIMIT 50`).bind(user.user_id).all();
     const given = await db.prepare("SELECT id, appeal_id, amount_claimed, amount_approved, currency, status, rejection_reason, created_at, reviewed_at FROM helpme_help WHERE helper_user_id = ? ORDER BY created_at DESC LIMIT 50").bind(user.user_id).all();
+    // My appeals list is shown to the owner — use their own currency (== appeal currency).
+    const rate = await fxRate(vCurrency);
+    const cards = [];
+    for (const a of appeals.results || []) {
+      cards.push({
+        id: a.id, status: a.status, description: a.description, currency: a.currency,
+        goal_local: a.goal_local, raised_local: money(a.raised_local), rejection_reason: a.rejection_reason,
+        created_at: a.created_at, published_at: a.published_at, helped_at: a.helped_at, expires_at: a.expires_at,
+        video_url: a.video_key && !a.video_deleted_at && ["published", "helped"].includes(a.status) ? `${videoBase}/${a.video_key}` : null,
+        counts: { prays: a.prays_count, comments: a.comments_count, reposts: a.reposts_count, shares: a.shares_count, views: a.views_count },
+      });
+    }
     return json({
       eligibility: el,
-      appeals: (appeals.results || []).map((a) => ({ id: a.id, status: a.status, description: a.description, currency: a.currency, goal_local: a.goal_local, raised_local: money(a.raised_local), rejection_reason: a.rejection_reason, created_at: a.created_at, published_at: a.published_at, helped_at: a.helped_at, expires_at: a.expires_at, video_url: a.video_key && !a.video_deleted_at && ["published", "helped"].includes(a.status) ? `${videoBase}/${a.video_key}` : null, counts: { prays: a.prays_count, comments: a.comments_count, reposts: a.reposts_count, shares: a.shares_count, views: a.views_count } })),
+      appeals: cards,
       helps_received: received.results || [],
       helps_given: given.results || [],
     }, 200, origin);
@@ -600,7 +742,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
       }
 
       if (action === "complete") {
-        // Admin decision when the remaining amount is too small to chase.
         if (a.status !== "published") return json({ error: "Only a live appeal can be marked as helped" }, 409, origin);
         const r = await db.prepare("UPDATE helpme_appeals SET status='helped', helped_at=? WHERE id=? AND status='published'").bind(ts, a.id).run();
         if (!Number(r?.meta?.changes || 0)) return json({ error: "Already updated" }, 409, origin);
@@ -649,7 +790,6 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
         }
         const after = await db.prepare("SELECT status, raised_local, goal_local, currency FROM helpme_appeals WHERE id = ?").bind(hh.appeal_id).first();
         await notify(hh.helper_user_id, "helpme_proof_approved", "Your help was verified", "Your payment was verified. Thank you for being a hero.", "/helpme/my");
-        // Kindness Wall: the existing community feed shows who helped, how much, and the short description.
         try {
           const who = await db.prepare("SELECT COALESCE(NULLIF(TRIM(p.full_name), ''), NULLIF(TRIM(u.full_name), ''), 'A hero') AS name FROM users u LEFT JOIN profiles p ON p.user_id = u.user_id WHERE u.user_id = ?").bind(hh.helper_user_id).first();
           const ap = await db.prepare("SELECT description FROM helpme_appeals WHERE id = ?").bind(hh.appeal_id).first();
@@ -686,7 +826,9 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
   return json({ error: "API route not found" }, 404, origin);
 }
 
-// Runs from the existing daily cron. Keeps R2 and D1 small so the bill stays flat.
+// ─────────────────────────────────────────────────────────────────────────────
+//  DAILY CRON: cleanup + live FX refresh
+// ─────────────────────────────────────────────────────────────────────────────
 export async function helpmeDailyCleanup(env) {
   if (!env.DB || !env.HELPME_VIDEOS) return;
   const ts = new Date().toISOString();
@@ -696,14 +838,12 @@ export async function helpmeDailyCleanup(env) {
     for (const r of rows.results || []) { if (r.key === "retention_days") retention = Number(r.value) || retention; if (r.key === "pending_expiry_days") pendingDays = Number(r.value) || pendingDays; }
   } catch {}
 
-  // 1. Videos older than the retention window (90 days): delete file, scrub payment details, keep the history row.
   const old = await env.DB.prepare("SELECT id, video_key FROM helpme_appeals WHERE status IN ('published','helped','under_review') AND expires_at IS NOT NULL AND expires_at <= ? AND video_deleted_at IS NULL LIMIT 100").bind(ts).all();
   for (const a of old.results || []) {
     try { await env.HELPME_VIDEOS.delete(a.video_key); } catch (e) { console.error("HelpMe expiry delete failed", a.id, e); continue; }
     try { await env.HELPME_VIDEOS.delete(`thumbs/${a.id}.jpg`); } catch {}
     await env.DB.prepare("UPDATE helpme_appeals SET status='expired', video_deleted_at=?, pay_account_number='', pay_account_title='' WHERE id=?").bind(ts, a.id).run();
   }
-  // 2. Appeals nobody reviewed in time.
   const stale = await env.DB.prepare("SELECT id, user_id, video_key FROM helpme_appeals WHERE status='pending_review' AND created_at <= ? LIMIT 100").bind(new Date(Date.now() - dayMs(pendingDays)).toISOString()).all();
   for (const a of stale.results || []) {
     try { await env.HELPME_VIDEOS.delete(a.video_key); } catch {}
@@ -711,25 +851,59 @@ export async function helpmeDailyCleanup(env) {
     if (posterKey) try { await env.HELPME_VIDEOS.delete(posterKey); } catch {}
     await env.DB.prepare("UPDATE helpme_appeals SET status='rejected', rejection_reason='Not reviewed in time. Please record again.', video_deleted_at=?, pay_account_number='', pay_account_title='' WHERE id=? AND status='pending_review'").bind(ts, a.id).run();
   }
-  // 3. Recordings that were never turned into an appeal.
   const orphans = await env.DB.prepare("SELECT id, video_key FROM helpme_uploads WHERE used_appeal_id IS NULL AND created_at <= ? LIMIT 200").bind(new Date(Date.now() - DAY).toISOString()).all();
   for (const o of orphans.results || []) {
     try { await env.HELPME_VIDEOS.delete(o.video_key); } catch {}
     try { await env.HELPME_VIDEOS.delete(`pending/${o.id}.jpg`); } catch {}
     await env.DB.prepare("DELETE FROM helpme_uploads WHERE id=?").bind(o.id).run();
   }
-  // 4. Old upload bookkeeping rows.
   await env.DB.prepare("DELETE FROM helpme_uploads WHERE used_appeal_id IS NOT NULL AND created_at <= ?").bind(new Date(Date.now() - dayMs(30)).toISOString()).run();
 }
 
-
-// ───────────── Used by the existing Hero Leaderboard and Heroes Wall (additive; callers fall back safely) ─────────────
-async function pkrPerUsd(db) {
-  const r = await db.prepare("SELECT per_usd FROM helpme_fx WHERE currency = 'PKR'").first();
-  return Number(r?.per_usd) || 278;
+// Live FX refresh, called from the same cron. Uses exchangerate.host (free, no key needed).
+// Falls back to er-api.com if the primary fails. Writes every supported currency into helpme_fx.
+export async function helpmeRefreshFxRates(env) {
+  if (!env.DB) return;
+  const supported = Object.keys(FALLBACK_RATES).filter((c) => c !== "USD");
+  const ts = new Date().toISOString();
+  let rates = null;
+  // Primary: exchangerate.host (free, base=USD).
+  try {
+    const res = await fetch(`https://api.exchangerate.host/latest?base=USD&symbols=${supported.join(",")}`, { headers: { "User-Agent": "Givethra/1.0" } });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.rates && Object.keys(data.rates).length > 5) rates = data.rates;
+    }
+  } catch (e) { console.error("HelpMe FX primary failed:", e); }
+  // Fallback: open.er-api.com (also free, no key).
+  if (!rates) {
+    try {
+      const res = await fetch("https://open.er-api.com/v6/latest/USD", { headers: { "User-Agent": "Givethra/1.0" } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.rates && Object.keys(data.rates).length > 5) rates = data.rates;
+      }
+    } catch (e) { console.error("HelpMe FX fallback failed:", e); }
+  }
+  if (!rates) return;
+  const stmts = supported
+    .filter((c) => Number(rates[c]) > 0)
+    .map((c) => env.DB.prepare("INSERT INTO helpme_fx (currency, per_usd, updated_at) VALUES (?,?,?) ON CONFLICT(currency) DO UPDATE SET per_usd=excluded.per_usd, updated_at=excluded.updated_at").bind(c, Number(rates[c]), ts));
+  if (stmts.length) {
+    try { await env.DB.batch(stmts); }
+    catch (e) { console.error("HelpMe FX batch write failed:", e); }
+  }
 }
 
-/** Same rows/ranking as the old leaderboard, plus verified Help Me payments (converted to PKR). */
+// ───────────── Used by the existing Hero Leaderboard and Heroes Wall ─────────────
+async function pkrPerUsd(db) {
+  try {
+    const r = await db.prepare("SELECT per_usd FROM helpme_fx WHERE currency = 'PKR'").first();
+    if (r && Number(r.per_usd) > 0) return Number(r.per_usd);
+  } catch {}
+  return FALLBACK_RATES.PKR;
+}
+
 export async function helpmeLeaderboardRows(env, limit) {
   const db = env.DB;
   const pkr = await pkrPerUsd(db);
@@ -765,7 +939,6 @@ export async function helpmeLeaderboardRows(env, limit) {
   return rows.results || [];
 }
 
-/** Helped appeals as Heroes Wall cards (amounts in PKR-equivalent, short text first, full text in `description`). */
 export async function helpmeWallRows(env, limit) {
   const db = env.DB;
   const pkr = await pkrPerUsd(db);
