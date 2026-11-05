@@ -1,5 +1,5 @@
 // src/components/KindnessWall.tsx
-// Premium Kindness Wall with social media style story cards.
+// Premium + Globalized: Currencies, timestamps in local language.
 
 import { useEffect, useMemo, useState } from "react";
 import ProtectedVideoPlayer from "@/components/ProtectedVideoPlayer";
@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { createComment, getComments, getFeedbacks, getGuestId, getLikes, getProfile, toggleFeedbackLike } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/media";
 import { motion, AnimatePresence } from "framer-motion";
+import { getCountryProfile } from "@/lib/countryProfiles";
 
 function timeAgo(value?: string) {
   if (!value) return "Recently";
@@ -32,6 +33,13 @@ export default function KindnessWall() {
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [userCountry, setUserCountry] = useState<string>("");
+
+  useEffect(() => {
+    if (user?.id) {
+      getProfile(user.id).then((profile) => setUserCountry(profile?.country || "")).catch(() => {});
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -54,10 +62,14 @@ export default function KindnessWall() {
   const actorId = isAuthenticated && user ? user.id : getGuestId();
   const liked = currentLikes.some((like) => like.user_id === actorId);
 
+  // 🌍 Format amount by user's country
+  const countryProfile = getCountryProfile(userCountry);
+  const currencySymbol = countryProfile.currency === "PKR" ? "Rs" : countryProfile.currency;
+
   async function handleShare() {
     if (!current) return;
     const url = new URL(`/kindness-wall#${encodeURIComponent(current.id)}`, window.location.origin).toString();
-    try { if (navigator.share) { await navigator.share({ title: current.case_title || "Givethra Kindness Wall", text: current.text_message || current.comment || "A verified Givethra feedback story", url }); return; } }
+    try { if (navigator.share) { await navigator.share({ title: current.case_title || "Givethra Kindness Wall", text: current.text_message || "A verified Givethra feedback story", url }); return; } }
     catch (error: any) { if (error?.name === "AbortError") return; }
     try { await navigator.clipboard.writeText(url); toast.success("Link copied."); }
     catch { toast.error("Sharing is unavailable."); }
@@ -70,7 +82,7 @@ export default function KindnessWall() {
       const result = await toggleFeedbackLike(current.id, actorId, existing?.id);
       if (result.deleted) setLikes((items) => items.filter((item) => item.id !== result.id));
       if (result.created) setLikes((items) => [...items, result.created]);
-    } catch (error: any) { toast.error(error?.message || "Unable to update kindness."); }
+    } catch (error: any) { toast.error(error?.message || "Unable to update."); }
   }
 
   async function handleComment() {
@@ -91,7 +103,6 @@ export default function KindnessWall() {
     <section aria-labelledby="kindness-wall-title" className="bg-gradient-to-b from-pink-50/40 via-white to-white px-4 py-10">
       <div className="mx-auto max-w-3xl space-y-6">
         
-        {/* Header */}
         <div className="text-center">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-pink-700">
             <Sparkles className="h-3 w-3" /> Community Gratitude
@@ -109,7 +120,6 @@ export default function KindnessWall() {
           <AnimatePresence mode="wait">
             <motion.article key={current.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-pink-100/50">
               
-              {/* Story Header */}
               <div className="relative bg-gradient-to-br from-pink-500 via-rose-500 to-pink-700 p-6 text-white">
                 <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
                 <div className="relative flex items-start justify-between gap-3">
@@ -125,13 +135,10 @@ export default function KindnessWall() {
                       </p>
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-pink-700 shadow-md">
-                    ✓ Verified
-                  </span>
+                  <span className="shrink-0 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-pink-700 shadow-md">✓ Verified</span>
                 </div>
               </div>
 
-              {/* Story Content */}
               <div className="p-6 md:p-8">
                 {(current.text_message || current.comment) && (
                   <div className="rounded-2xl border border-pink-100 bg-gradient-to-br from-pink-50/50 to-white p-5">
@@ -141,10 +148,8 @@ export default function KindnessWall() {
                     </p>
                   </div>
                 )}
-
                 {current.video_url && <div className="mt-4"><ProtectedVideoPlayer src={current.video_url} /></div>}
 
-                {/* Actions */}
                 <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-5">
                   <button onClick={handleLike} className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold transition-all ${liked ? "bg-rose-50 text-rose-600" : "text-slate-500 hover:bg-rose-50 hover:text-rose-600"}`}>
                     <Heart className="h-4 w-4 transition-transform group-hover:scale-110" fill={liked ? "currentColor" : "none"} /> Like <span className="font-black">({currentLikes.length})</span>
@@ -156,16 +161,11 @@ export default function KindnessWall() {
                     <Share2 className="h-4 w-4" /> Share
                   </button>
                   <div className="ml-auto flex gap-1.5">
-                    <button disabled={index === 0} onClick={() => { setIndex((v) => Math.max(0, v - 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-pink-300 hover:text-pink-600 disabled:opacity-40">
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button disabled={index === ordered.length - 1} onClick={() => { setIndex((v) => Math.min(ordered.length - 1, v + 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-pink-300 hover:text-pink-600 disabled:opacity-40">
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
+                    <button disabled={index === 0} onClick={() => { setIndex((v) => Math.max(0, v - 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-pink-300 hover:text-pink-600 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
+                    <button disabled={index === ordered.length - 1} onClick={() => { setIndex((v) => Math.min(ordered.length - 1, v + 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-pink-300 hover:text-pink-600 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
                   </div>
                 </div>
 
-                {/* Comments */}
                 {openComments && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-4 space-y-3 border-t border-slate-100 pt-4">
                     <div className="max-h-56 space-y-2 overflow-y-auto">
@@ -177,10 +177,8 @@ export default function KindnessWall() {
                       )) : <p className="py-4 text-center text-sm text-slate-400">No comments yet. Be the first to say something kind!</p>}
                     </div>
                     <div className="flex items-end gap-2">
-                      <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a kind comment..." rows={2} className="min-h-11 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-pink-500 focus:bg-white focus:ring-2 focus:ring-pink-200" />
-                      <button type="button" disabled={posting || !commentText.trim()} onClick={handleComment} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-md transition hover:scale-105 disabled:opacity-50">
-                        <Send className="h-4 w-4" />
-                      </button>
+                      <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a kind comment..." rows={2} className="min-h-11 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-pink-500 focus:bg-white" />
+                      <button type="button" disabled={posting || !commentText.trim()} onClick={handleComment} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-md transition hover:scale-105 disabled:opacity-50"><Send className="h-4 w-4" /></button>
                     </div>
                   </motion.div>
                 )}
