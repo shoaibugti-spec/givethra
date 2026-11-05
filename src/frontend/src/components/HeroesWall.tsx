@@ -1,5 +1,5 @@
 // src/components/HeroesWall.tsx
-// Premium + Globalized: Shows amounts in user's local currency.
+// Premium + Globalized: Real currency conversion for every user.
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Heart, MessageCircle, Send, Share2, Trophy, TrendingUp } from "lucide-react";
@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { addComment, getHeroesWall, getPostComments, toggleLike, getProfile } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { getCountryProfile, CURRENCY_SYMBOLS } from "@/lib/countryProfiles";
+import { getCountryProfile, CURRENCY_SYMBOLS, scaleFromPKR } from "@/lib/countryProfiles";
 
 type HeroCase = {
   id: string;
@@ -47,9 +47,9 @@ export default function HeroesWall() {
   const [posting, setPosting] = useState(false);
   const [loadError, setLoadError] = useState("");
   
-  // 🌍 Country-based currency
-  const [userCountry, setUserCountry] = useState<string>("");
+  // 🌍 User's local currency detection
   const [userCurrency, setUserCurrency] = useState<string>("USD");
+  const [userCountry, setUserCountry] = useState<string>("");
 
   useEffect(() => {
     if (user?.id) {
@@ -62,11 +62,19 @@ export default function HeroesWall() {
     }
   }, [user?.id]);
 
-  function money(currency: string | undefined, amount: number) {
-    // Show user's local currency symbol
+  // 💱 Real currency conversion
+  function money(currency: string | undefined, amountInPKR: number) {
     const displayCurrency = userCurrency || currency || "USD";
+    
+    // If user is in Pakistan, show raw PKR
+    if (displayCurrency === "PKR") {
+      return `Rs ${Number(amountInPKR || 0).toLocaleString()}`;
+    }
+    
+    // Otherwise, convert PKR → user's currency
+    const converted = scaleFromPKR(Number(amountInPKR || 0), displayCurrency);
     const symbol = CURRENCY_SYMBOLS[displayCurrency] ?? displayCurrency;
-    return `${symbol} ${Number(amount || 0).toLocaleString()}`;
+    return `${symbol} ${converted.toLocaleString()}`;
   }
 
   async function loadWall() {
@@ -141,7 +149,6 @@ export default function HeroesWall() {
     <section aria-labelledby="heroes-wall-title" className="bg-slate-50 px-4 py-10">
       <div className="mx-auto max-w-4xl space-y-6">
         
-        {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700">
@@ -156,8 +163,8 @@ export default function HeroesWall() {
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cases solved</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-teal-50 to-emerald-50 p-3 text-center shadow-sm">
-              <p className="text-2xl font-black text-emerald-700">{money(metrics.currency, Number(metrics.total_amount || 0))}</p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total help</p>
+              <p className="text-xl font-black text-emerald-700">{money(metrics.currency, Number(metrics.total_amount || 0))}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total help ({userCurrency})</p>
             </div>
           </div>
         </div>
@@ -184,7 +191,7 @@ export default function HeroesWall() {
 
               <div className="p-6 md:p-8">
                 <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5">
-                  <p className="text-sm leading-relaxed text-slate-700">{current.post_message || "A Givethra case was completed through verified help from Heroes."}</p>
+                  <p className="text-sm leading-relaxed text-slate-700">{current.post_message || "A Givethra case was completed through verified help."}</p>
                 </div>
 
                 <div className="mt-5">
@@ -195,6 +202,7 @@ export default function HeroesWall() {
                   <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
                     <div className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 shadow-sm" style={{ width: `${progress}%` }} />
                   </div>
+                  <p className="mt-1 text-right text-[10px] font-semibold text-slate-400">Showing in {userCurrency}</p>
                 </div>
 
                 <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-5">
