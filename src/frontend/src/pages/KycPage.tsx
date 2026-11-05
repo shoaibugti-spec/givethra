@@ -1,5 +1,5 @@
 // src/pages/KycPage.tsx
-// Givethra - Premium Globalized KYC Page (206+ countries)
+// Givethra - Premium Globalized KYC Page (240+ countries with search)
 // Camera, OCR, Selfie & Video Recording — All logic preserved.
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { sendNotification } from "@/lib/notify";
-import { Shield, CheckCircle2, Clock, AlertTriangle, Camera, Eye, RefreshCw, ArrowRight, X, Globe, User, FileText, Video, Sparkles, Lock, ChevronRight, Check } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { Shield, CheckCircle2, Clock, AlertTriangle, Camera, Eye, RefreshCw, ArrowRight, X, Globe, User, FileText, Video, Sparkles, Lock, ChevronRight, Check, Search } from "lucide-react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import Tesseract from "tesseract.js";
 import { formatCnicNumber, getKycOcrAssetPaths } from "@/lib/kycOcr";
 import { getCountryProfile, COUNTRIES_LIST } from "@/lib/countryProfiles";
+import { COUNTRIES } from "@/lib/countries";
 import {
   getKycSubmission,
   insertKycSubmission,
@@ -269,16 +270,8 @@ const VIDEO_STEPS = [
 ];
 
 // ---------------------------------------------------------------------------
-// STEPS for the new Wizard UI
+// Component
 // ---------------------------------------------------------------------------
-const STEPS = ["Identity", "Documents", "Face Video", "Review"];
-const GLOBAL_COUNTRY_CODES = [
-  "Pakistan", "India", "Bangladesh", "Sri Lanka", "Nepal", "Afghanistan", "Saudi Arabia", "United Arab Emirates",
-  "Turkey", "United Kingdom", "United States", "Canada", "Australia", "Germany", "France", "Italy", "Spain",
-  "Nigeria", "Kenya", "Egypt", "Indonesia", "Malaysia", "China", "Japan", "South Korea", "Brazil", "Mexico",
-  "South Africa", "Russia", "Philippines", "Vietnam", "Thailand", "Singapore", "New Zealand",
-];
-
 export default function KycPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -291,6 +284,8 @@ export default function KycPage() {
   const [step, setStep] = useState(1);
 
   const [countryName, setCountryName] = useState("Pakistan");
+  const [countrySearch, setCountrySearch] = useState("");
+  const [countryOpen, setCountryOpen] = useState(false);
   const [docType, setDocType] = useState<"cnic" | "passport">("cnic");
   const [reapplying, setReapplying] = useState(false);
 
@@ -353,6 +348,13 @@ export default function KycPage() {
 
   const countryProfile = getCountryProfile(countryName);
   const isPakistan = countryName.toLowerCase() === "pakistan";
+
+  // 🌍 All 240+ countries with search
+  const filteredCountries = useMemo(() => {
+    const q = countrySearch.trim().toLowerCase();
+    if (!q) return COUNTRIES;
+    return COUNTRIES.filter((c) => c.name.toLowerCase().includes(q));
+  }, [countrySearch]);
 
   useEffect(() => {
     if (user) {
@@ -820,7 +822,7 @@ export default function KycPage() {
     rejected: { icon: <AlertTriangle className="h-4 w-4" />, label: "Rejected", color: "bg-red-100 text-red-700" },
   };
 
-  // ---- FULL SCREEN VIDEO RECORDING VIEW ----
+  // ---- VIDEO RECORDING VIEW ----
   if (videoOpen) {
     const videoStep = VIDEO_STEPS.find((st) => videoTimer < st.until) ?? VIDEO_STEPS[VIDEO_STEPS.length - 1];
     return (
@@ -1009,7 +1011,6 @@ export default function KycPage() {
       )}
 
       <div className="mx-auto max-w-3xl px-4 py-6">
-        {/* Header */}
         <div className="mb-6 flex items-center gap-3">
           <Button variant="ghost" size="sm" className="-ml-2 rounded-lg" onClick={() => { try { sessionStorage.removeItem("givethra_kyc_return_to"); } catch {} navigate({ to: returnTo as any }); }}>← Back</Button>
         </div>
@@ -1034,7 +1035,6 @@ export default function KycPage() {
             <Button onClick={() => { setIsLoading(true); void loadSubmission(); }} className="bg-amber-600"><RefreshCw className="mr-2 h-4 w-4" /> Retry</Button>
           </div>
         ) : showStatusCard ? (
-          // STATUS CARD
           <div className="space-y-4">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className={`flex items-center gap-2 rounded-2xl px-4 py-3 ${statusConfig[submission.status]?.color || "bg-slate-100 text-slate-700"}`}>
@@ -1067,9 +1067,7 @@ export default function KycPage() {
             </div>
           </div>
         ) : (
-          // ⭐ PREMIUM KYC FORM WIZARD ⭐
           <div className="space-y-5">
-            
             {reapplying && (
               <div className="flex items-center justify-between rounded-2xl border border-teal-200 bg-teal-50 p-3 text-sm font-semibold text-teal-800">
                 <span>Re-submitting your KYC with new photos.</span>
@@ -1117,7 +1115,7 @@ export default function KycPage() {
               })}
             </div>
 
-            {/* STEP 1: IDENTITY + COUNTRY */}
+            {/* STEP 1: IDENTITY + COUNTRY (240+ COUNTRIES WITH SEARCH) */}
             {step === 1 && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 className="flex items-center gap-2 text-lg font-black text-slate-900"><Globe className="h-5 w-5 text-teal-600" /> Identity Information</h2>
@@ -1127,13 +1125,72 @@ export default function KycPage() {
                   <p className="mt-0.5">Please select your country and provide the ID type accepted there.</p>
                 </div>
 
+                {/* Country Selector with Search */}
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Your Country *</Label>
-                  <select value={countryName} onChange={(e) => { setCountryName(e.target.value); setDocType(e.target.value.toLowerCase() === "pakistan" ? "cnic" : "passport"); }} className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold">
-                    {GLOBAL_COUNTRY_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setCountryOpen(true)}
+                    className="flex h-12 w-full items-center justify-between rounded-xl border-2 border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 transition hover:border-teal-300"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-teal-600" />
+                      {countryName || "Select country"}
+                    </span>
+                    <ChevronRight className="h-4 w-4 rotate-90 text-slate-400" />
+                  </button>
                 </div>
 
+                {/* Country picker modal */}
+                <AnimatePresence>
+                  {countryOpen && (
+                    <>
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setCountryOpen(false); setCountrySearch(""); }} className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" />
+                      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed inset-x-4 top-1/2 z-[110] mx-auto max-h-[85vh] max-w-lg -translate-y-1/2 overflow-hidden rounded-3xl bg-white shadow-2xl">
+                        <div className="border-b border-slate-100 p-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-base font-black text-slate-900">Select your country</h3>
+                            <button onClick={() => { setCountryOpen(false); setCountrySearch(""); }} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                          </div>
+                          <div className="relative mt-3">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              autoFocus
+                              value={countrySearch}
+                              onChange={(e) => setCountrySearch(e.target.value)}
+                              placeholder="Search your country..."
+                              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-medium outline-none focus:border-teal-500 focus:bg-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-[60vh] overflow-y-auto">
+                          {filteredCountries.length === 0 ? (
+                            <p className="py-8 text-center text-sm font-medium text-slate-400">No country matches "{countrySearch}"</p>
+                          ) : filteredCountries.map((c) => (
+                            <button
+                              key={c.code}
+                              onClick={() => {
+                                setCountryName(c.name);
+                                setDocType(c.name.toLowerCase() === "pakistan" ? "cnic" : "passport");
+                                setCountryOpen(false);
+                                setCountrySearch("");
+                              }}
+                              className={`flex w-full items-center justify-between border-b border-slate-50 px-4 py-3 text-left text-sm font-semibold transition hover:bg-slate-50 ${countryName === c.name ? "bg-teal-50 text-teal-700" : "text-slate-700"}`}
+                            >
+                              <span>{c.name}</span>
+                              {countryName === c.name && <Check className="h-4 w-4 text-teal-600" />}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-center text-[11px] font-medium text-slate-500">
+                          {COUNTRIES.length} countries supported
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+
+                {/* Document Type */}
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Document Type *</Label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1144,6 +1201,7 @@ export default function KycPage() {
                       📘 Passport
                     </button>
                   </div>
+                  <p className="text-[11px] font-medium text-slate-500">Selected: {countryProfile.idLabel}</p>
                 </div>
 
                 <div className="space-y-2">
