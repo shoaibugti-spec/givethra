@@ -1,11 +1,13 @@
 // src/components/HeroLeaderboard.tsx
-// Premium 3D Leaderboard with Podium & Ranks.
+// Complete premium leaderboard with global currency conversion.
 
 import { useEffect, useMemo, useState } from "react";
-import { Award, BadgeCheck, Crown, Medal, Sparkles, Trophy, Users, TrendingUp, Zap } from "lucide-react";
+import { Award, Crown, Sparkles, Trophy } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { getHeroLeaderboard } from "@/lib/api";
+import { getHeroLeaderboard, getProfile } from "@/lib/api";
 import { handleImageError, resolveMediaUrl } from "@/lib/media";
+import { useAuth } from "@/contexts/AuthContext";
+import { getCountryProfile, CURRENCY_SYMBOLS, scaleFromPKR } from "@/lib/countryProfiles";
 import { motion, AnimatePresence } from "framer-motion";
 
 type LeaderboardHero = {
@@ -20,11 +22,11 @@ type LeaderboardHero = {
 
 type BadgeKey = "all" | "super" | "hero" | "young" | "new";
 
-const BADGES: Record<Exclude<BadgeKey, "all">, { label: string; description: string; icon: typeof Crown; className: string; gradient: string }> = {
-  super: { label: "Super Hero", description: "Ultimate Hero — unlocked, contributed, and provided direct help.", icon: Crown, className: "bg-amber-500/20 text-amber-400 ring-amber-500/30", gradient: "from-amber-400 to-orange-500" },
-  hero: { label: "Hero", description: "Paid directly for someone's need.", icon: Award, className: "bg-cyan-500/20 text-cyan-400 ring-cyan-500/30", gradient: "from-cyan-400 to-blue-500" },
-  young: { label: "Young Hero", description: "Contributed to a fundraising pool.", icon: Sparkles, className: "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30", gradient: "from-emerald-400 to-teal-500" },
-  new: { label: "Newborn Hero", description: "Unlocked a case but did not complete a payment yet.", icon: Sparkles, className: "bg-purple-500/20 text-purple-400 ring-purple-500/30", gradient: "from-purple-400 to-pink-500" },
+const BADGES: Record<Exclude<BadgeKey, "all">, { label: string; icon: typeof Crown; className: string }> = {
+  super: { label: "Super Hero", icon: Crown, className: "bg-amber-500/20 text-amber-400 ring-amber-500/30" },
+  hero: { label: "Hero", icon: Award, className: "bg-cyan-500/20 text-cyan-400 ring-cyan-500/30" },
+  young: { label: "Young Hero", icon: Sparkles, className: "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30" },
+  new: { label: "Newborn Hero", icon: Sparkles, className: "bg-purple-500/20 text-purple-400 ring-purple-500/30" },
 };
 
 function getBadge(hero: LeaderboardHero): Exclude<BadgeKey, "all"> {
@@ -41,11 +43,28 @@ function initials(name: string) {
 }
 
 export default function HeroLeaderboard() {
+  const { user } = useAuth();
   const [heroes, setHeroes] = useState<LeaderboardHero[]>([]);
-  const [filter, setFilter] = useState<BadgeKey>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<'region' | 'internal' | 'global'>('region');
+  const [userCurrency, setUserCurrency] = useState<string>("USD");
+
+  useEffect(() => {
+    if (user?.id) {
+      getProfile(user.id).then((profile) => {
+        const profileData = getCountryProfile(profile?.country || "");
+        setUserCurrency(profileData.currency || "USD");
+      }).catch(() => setUserCurrency("USD"));
+    }
+  }, [user?.id]);
+
+  function money(amountInPKR: number) {
+    if (userCurrency === "PKR") return `Rs ${Number(amountInPKR || 0).toLocaleString()}`;
+    const converted = scaleFromPKR(Number(amountInPKR || 0), userCurrency);
+    const symbol = CURRENCY_SYMBOLS[userCurrency] ?? userCurrency;
+    return `${symbol} ${converted.toLocaleString()}`;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -57,14 +76,13 @@ export default function HeroLeaderboard() {
   }, []);
 
   const visibleHeroes = useMemo(() => {
-    const filtered = heroes.filter((hero) => filter === "all" || getBadge(hero) === filter);
-    return [...filtered].sort((a, b) => {
+    return [...heroes].sort((a, b) => {
       const aValue = Number(a.cases_helped || 0);
       const bValue = Number(b.cases_helped || 0);
       if (aValue !== bValue) return bValue - aValue;
       return Number(b.cases_helped || 0) - Number(a.cases_helped || 0);
     });
-  }, [filter, heroes]);
+  }, [heroes]);
 
   const topFour = visibleHeroes.slice(0, 4);
   const remainingHeroes = visibleHeroes.slice(4);
@@ -81,21 +99,17 @@ export default function HeroLeaderboard() {
           <motion.h1 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="mt-3 font-display text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-white to-teal-200 sm:text-4xl">
             Givethra Heroes
           </motion.h1>
-          <p className="mx-auto mt-2 max-w-md text-sm font-medium text-slate-400">The legends changing lives, one case at a time.</p>
+          <p className="mx-auto mt-2 max-w-md text-sm font-medium text-slate-400">The legends changing lives, one case at a time. Amounts shown in <strong>{userCurrency}</strong>.</p>
         </div>
 
-        {/* Region/Internal/Global Toggle */}
+        {/* Region Tabs */}
         <div className="mx-auto mb-6 max-w-md px-2">
           <div className="flex rounded-2xl border border-slate-700/50 bg-slate-800/60 p-1 backdrop-blur-md">
             {(['region', 'internal', 'global'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`relative flex-1 rounded-xl py-2 text-xs font-black uppercase tracking-wider transition-all ${
-                  activeTab === tab
-                    ? 'text-slate-950'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={`relative flex-1 rounded-xl py-2 text-xs font-black uppercase tracking-wider transition-all ${activeTab === tab ? 'text-slate-950' : 'text-slate-400 hover:text-white'}`}
               >
                 {activeTab === tab && (
                   <motion.div layoutId="tab-bg" className="absolute inset-0 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 shadow-lg" transition={{ type: "spring", stiffness: 300, damping: 30 }} />
@@ -112,16 +126,16 @@ export default function HeroLeaderboard() {
         )}
 
         {!loading && error && <div className="rounded-2xl border border-red-800/50 bg-red-900/20 p-6 text-center text-sm font-medium text-red-300">{error}</div>}
-        {!loading && !error && !visibleHeroes.length && <div className="rounded-2xl border border-slate-700/50 bg-slate-800/30 p-6 text-center text-sm font-medium text-slate-400">Verified Hero rankings will appear here after approved help is confirmed.</div>}
+        {!loading && !error && !visibleHeroes.length && <div className="rounded-2xl border border-slate-700/50 bg-slate-800/30 p-6 text-center text-sm font-medium text-slate-400">Verified Hero rankings will appear here.</div>}
 
         {!loading && !error && visibleHeroes.length > 0 && (
           <div className="space-y-6">
 
-            {/* 🏆 3D PODIUM */}
+            {/* PODIUM */}
             <div className="relative pb-4 pt-6 px-1 sm:px-4">
               <div className="grid grid-cols-3 gap-1 sm:gap-4 max-w-2xl mx-auto items-end">
                 
-                {/* 2nd Place - Left */}
+                {/* 2nd Place */}
                 {topFour[1] && (
                   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col items-center">
                     <Link to="/profile/$id" params={{ id: topFour[1].user_id }} className="group flex flex-col items-center w-full">
@@ -138,12 +152,12 @@ export default function HeroLeaderboard() {
                         {BADGES[getBadge(topFour[1])].label}
                       </span>
                       <p className="mt-1 text-[10px] font-bold text-slate-400">{topFour[1].cases_helped || 0} Helps</p>
-                      <p className="text-[10px] font-black text-teal-400">Rs {Number(topFour[1].total_amount || 0).toLocaleString()}</p>
+                      <p className="text-[10px] font-black text-teal-400">{money(Number(topFour[1].total_amount || 0))}</p>
                     </Link>
                   </motion.div>
                 )}
 
-                {/* 1st Place - Center (Bigger) */}
+                {/* 1st Place */}
                 {topFour[0] && (
                   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center">
                     <Link to="/profile/$id" params={{ id: topFour[0].user_id }} className="group flex flex-col items-center w-full">
@@ -161,12 +175,12 @@ export default function HeroLeaderboard() {
                         {BADGES[getBadge(topFour[0])].label}
                       </span>
                       <p className="mt-1 text-[11px] font-bold text-slate-300">{topFour[0].cases_helped || 0} Helps</p>
-                      <p className="text-[11px] font-black text-teal-400">Rs {Number(topFour[0].total_amount || 0).toLocaleString()}</p>
+                      <p className="text-[11px] font-black text-teal-400">{money(Number(topFour[0].total_amount || 0))}</p>
                     </Link>
                   </motion.div>
                 )}
 
-                {/* 3rd Place - Right */}
+                {/* 3rd Place */}
                 {topFour[2] && (
                   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex flex-col items-center">
                     <Link to="/profile/$id" params={{ id: topFour[2].user_id }} className="group flex flex-col items-center w-full">
@@ -183,12 +197,12 @@ export default function HeroLeaderboard() {
                         {BADGES[getBadge(topFour[2])].label}
                       </span>
                       <p className="mt-1 text-[10px] font-bold text-slate-400">{topFour[2].cases_helped || 0} Helps</p>
-                      <p className="text-[10px] font-black text-teal-400">Rs {Number(topFour[2].total_amount || 0).toLocaleString()}</p>
+                      <p className="text-[10px] font-black text-teal-400">{money(Number(topFour[2].total_amount || 0))}</p>
                     </Link>
                   </motion.div>
                 )}
 
-                {/* 4th Place - Below 1st */}
+                {/* 4th Place */}
                 {topFour[3] && (
                   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="col-start-2 col-end-3 row-start-2 flex flex-col items-center mt-2">
                     <Link to="/profile/$id" params={{ id: topFour[3].user_id }} className="group flex flex-col items-center w-full">
@@ -205,14 +219,14 @@ export default function HeroLeaderboard() {
                         {BADGES[getBadge(topFour[3])].label}
                       </span>
                       <p className="mt-1 text-[10px] font-bold text-slate-400">{topFour[3].cases_helped || 0} Helps</p>
-                      <p className="text-[10px] font-black text-teal-400">Rs {Number(topFour[3].total_amount || 0).toLocaleString()}</p>
+                      <p className="text-[10px] font-black text-teal-400">{money(Number(topFour[3].total_amount || 0))}</p>
                     </Link>
                   </motion.div>
                 )}
               </div>
             </div>
 
-            {/* 📋 LIST (5+) */}
+            {/* LIST */}
             <div className="space-y-2">
               {remainingHeroes.map((hero, index) => {
                 const actualRank = index + 5;
@@ -240,7 +254,7 @@ export default function HeroLeaderboard() {
                     </div>
                     <div className="flex items-center gap-4 pl-11 sm:pl-0">
                       <div className="text-right"><p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Helps</p><p className="text-sm font-bold text-slate-200">{hero.cases_helped || 0}</p></div>
-                      <div className="min-w-[80px] text-right"><p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Amount</p><p className="text-sm font-black text-teal-400">Rs {Number(hero.total_amount || 0).toLocaleString()}</p></div>
+                      <div className="min-w-[80px] text-right"><p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Amount</p><p className="text-sm font-black text-teal-400">{money(Number(hero.total_amount || 0))}</p></div>
                     </div>
                   </motion.div>
                 );
