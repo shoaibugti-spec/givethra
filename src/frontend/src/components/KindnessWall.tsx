@@ -184,4 +184,32 @@ export default function KindnessWall() {
                     <Share2 className="h-4 w-4" /> Share
                   </button>
                   <div className="ml-auto flex gap-1.5">
-                    <button disabled={index === 0} onClick={() => { setIndex((v) => Math.max(0, v - 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white
+                    <button disabled={index === 0} onClick={() => { setIndex((v) => Math.max(0, v - 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-pink-300 hover:text-pink-600 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
+                    <button disabled={index === ordered.length - 1} onClick={() => { setIndex((v) => Math.min(ordered.length - 1, v + 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-pink-300 hover:text-pink-600 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
+                  </div>
+                </div>
+
+                {openComments && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+                    <div className="max-h-56 space-y-2 overflow-y-auto">
+                      {currentComments.length ? currentComments.map((comment) => (
+                        <div key={comment.id} className="rounded-xl bg-pink-50/50 px-3 py-2">
+                          <p className="text-xs font-black text-pink-700">{comment.first_name || comment.user_name || "A Givethra member"}</p>
+                          <p className="mt-0.5 text-sm text-slate-700">{comment.comment}</p>
+                        </div>
+                      )) : <p className="py-4 text-center text-sm text-slate-400">No comments yet. Be the first to say something kind!</p>}
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a kind comment..." rows={2} className="min-h-11 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-pink-500 focus:bg-white" />
+                      <button type="button" disabled={posting || !commentText.trim()} onClick={handleComment} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-md transition hover:scale-105 disabled:opacity-50"><Send className="h-4 w-4" /></button>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </motion.article>
+          </AnimatePresence>
+        )}
+      </div>
+    </section>
+  );
+}
