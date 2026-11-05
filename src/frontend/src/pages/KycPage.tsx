@@ -13,8 +13,7 @@ import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import Tesseract from "tesseract.js";
 import { formatCnicNumber, getKycOcrAssetPaths } from "@/lib/kycOcr";
-import { getCountryProfile, COUNTRIES_LIST } from "@/lib/countryProfiles";
-import { COUNTRIES } from "@/lib/countries";
+import { getCountryProfile, COUNTRIES_LIST, ALL_COUNTRIES as COUNTRIES } from "@/lib/countryProfiles";
 import {
   getKycSubmission,
   insertKycSubmission,
