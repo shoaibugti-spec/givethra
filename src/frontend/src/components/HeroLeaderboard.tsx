@@ -1,8 +1,12 @@
+// src/components/HeroLeaderboard.tsx
+// Premium 3D Leaderboard with Podium & Ranks.
+
 import { useEffect, useMemo, useState } from "react";
-import { Award, BadgeCheck, Crown, Medal, Sparkles, Trophy, Users } from "lucide-react";
+import { Award, BadgeCheck, Crown, Medal, Sparkles, Trophy, Users, TrendingUp, Zap } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { getHeroLeaderboard } from "@/lib/api";
 import { handleImageError, resolveMediaUrl } from "@/lib/media";
+import { motion, AnimatePresence } from "framer-motion";
 
 type LeaderboardHero = {
   user_id: string;
@@ -16,31 +20,11 @@ type LeaderboardHero = {
 
 type BadgeKey = "all" | "super" | "hero" | "young" | "new";
 
-const BADGES: Record<Exclude<BadgeKey, "all">, { label: string; description: string; icon: typeof Crown; className: string }> = {
-  super: {
-    label: "Super Hero",
-    description: "You have unlocked, contributed, and provided direct help. You are the ultimate Hero!",
-    icon: Crown,
-    className: "bg-amber-500/20 text-amber-400 ring-amber-500/30",
-  },
-  hero: {
-    label: "Hero",
-    description: "You paid directly for someone's need. You are a true Hero!",
-    icon: Award,
-    className: "bg-cyan-500/20 text-cyan-400 ring-cyan-500/30",
-  },
-  young: {
-    label: "Young Hero",
-    description: "You contributed to a fundraising pool. Every contribution counts!",
-    icon: Sparkles,
-    className: "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30",
-  },
-  new: {
-    label: "Newborn Hero",
-    description: "You unlocked a case but did not complete a payment. Take the next step!",
-    icon: Sparkles,
-    className: "bg-purple-500/20 text-purple-400 ring-purple-500/30",
-  },
+const BADGES: Record<Exclude<BadgeKey, "all">, { label: string; description: string; icon: typeof Crown; className: string; gradient: string }> = {
+  super: { label: "Super Hero", description: "Ultimate Hero — unlocked, contributed, and provided direct help.", icon: Crown, className: "bg-amber-500/20 text-amber-400 ring-amber-500/30", gradient: "from-amber-400 to-orange-500" },
+  hero: { label: "Hero", description: "Paid directly for someone's need.", icon: Award, className: "bg-cyan-500/20 text-cyan-400 ring-cyan-500/30", gradient: "from-cyan-400 to-blue-500" },
+  young: { label: "Young Hero", description: "Contributed to a fundraising pool.", icon: Sparkles, className: "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30", gradient: "from-emerald-400 to-teal-500" },
+  new: { label: "Newborn Hero", description: "Unlocked a case but did not complete a payment yet.", icon: Sparkles, className: "bg-purple-500/20 text-purple-400 ring-purple-500/30", gradient: "from-purple-400 to-pink-500" },
 };
 
 function getBadge(hero: LeaderboardHero): Exclude<BadgeKey, "all"> {
@@ -59,27 +43,17 @@ function initials(name: string) {
 export default function HeroLeaderboard() {
   const [heroes, setHeroes] = useState<LeaderboardHero[]>([]);
   const [filter, setFilter] = useState<BadgeKey>("all");
-  const [expandedBadge, setExpandedBadge] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
   const [activeTab, setActiveTab] = useState<'region' | 'internal' | 'global'>('region');
 
   useEffect(() => {
     let cancelled = false;
     getHeroLeaderboard(100)
-      .then((rows) => {
-        if (!cancelled) setHeroes(rows);
-      })
-      .catch((reason) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : "Hero rankings are temporarily unavailable.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((rows) => { if (!cancelled) setHeroes(rows); })
+      .catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Hero rankings are temporarily unavailable."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const visibleHeroes = useMemo(() => {
@@ -96,186 +70,184 @@ export default function HeroLeaderboard() {
   const remainingHeroes = visibleHeroes.slice(4);
 
   return (
-    <section className="bg-[#0B121F] text-white min-h-screen flex justify-center py-6 sm:py-10 px-0 sm:px-4">
-      <div className="w-full max-w-4xl flex flex-col bg-[#0B121F]">
+    <section className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 py-6 text-white sm:py-10">
+      <div className="mx-auto w-full max-w-4xl px-3 sm:px-4">
 
-        {/* Header Section */}
-        <div className="text-center px-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 drop-shadow-sm">
+        {/* Header */}
+        <div className="mb-6 text-center">
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full bg-amber-400/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 ring-1 ring-amber-400/30">
+            <Trophy className="h-3.5 w-3.5" /> Hall of Fame
+          </motion.div>
+          <motion.h1 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="mt-3 font-display text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-white to-teal-200 sm:text-4xl">
             Givethra Heroes
-          </h1>
+          </motion.h1>
+          <p className="mx-auto mt-2 max-w-md text-sm font-medium text-slate-400">The legends changing lives, one case at a time.</p>
         </div>
 
-        {/* Top Toggles (Region, Internal, Global) */}
-        <div className="px-4 sm:px-6 mb-6">
-          <div className="flex bg-[#151F32] p-1 rounded-xl border border-slate-800/60 max-w-md mx-auto">
+        {/* Region/Internal/Global Toggle */}
+        <div className="mx-auto mb-6 max-w-md px-2">
+          <div className="flex rounded-2xl border border-slate-700/50 bg-slate-800/60 p-1 backdrop-blur-md">
             {(['region', 'internal', 'global'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all capitalize ${
+                className={`relative flex-1 rounded-xl py-2 text-xs font-black uppercase tracking-wider transition-all ${
                   activeTab === tab
-                    ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'text-slate-950'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {tab === 'region' ? 'Region' : tab === 'internal' ? 'Internal' : 'Global'}
+                {activeTab === tab && (
+                  <motion.div layoutId="tab-bg" className="absolute inset-0 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 shadow-lg" transition={{ type: "spring", stiffness: 300, damping: 30 }} />
+                )}
+                <span className="relative">{tab === 'region' ? 'Region' : tab === 'internal' ? 'Internal' : 'Global'}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 w-full max-w-4xl mx-auto">
-          {loading && (
-            <div className="grid gap-3 px-4">{[1, 2, 3, 4].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-slate-800/50" />)}</div>
-          )}
+        {/* Content */}
+        {loading && (
+          <div className="grid gap-3 px-2">{[1, 2, 3, 4].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-slate-800/50" />)}</div>
+        )}
 
-          {!loading && error && <div className="rounded-2xl bg-slate-800/50 p-6 text-center text-sm text-gray-400 mx-4">{error}</div>}
+        {!loading && error && <div className="rounded-2xl border border-red-800/50 bg-red-900/20 p-6 text-center text-sm font-medium text-red-300">{error}</div>}
+        {!loading && !error && !visibleHeroes.length && <div className="rounded-2xl border border-slate-700/50 bg-slate-800/30 p-6 text-center text-sm font-medium text-slate-400">Verified Hero rankings will appear here after approved help is confirmed.</div>}
 
-          {!loading && !error && !visibleHeroes.length && <div className="rounded-2xl bg-slate-800/50 p-6 text-center text-sm text-gray-400 mx-4">Verified Hero rankings will appear here after approved help is confirmed.</div>}
+        {!loading && !error && visibleHeroes.length > 0 && (
+          <div className="space-y-6">
 
-          {!loading && !error && visibleHeroes.length > 0 && (
-            <div className="space-y-6">
-
-              {/* 🏆 ڈائمنڈ پوڈیم (1st, 2nd, 3rd, 4th) - اب کراؤن، بیج اور سائز کے ساتھ */}
-              <div className="relative pt-6 pb-4 px-2 sm:px-6">
-                <div className="grid grid-cols-3 gap-1 sm:gap-4 max-w-2xl mx-auto">
-
-                  {/* 1st Place - Center Top (Largest Size + Crown) */}
-                  {topFour[0] && (
-                    <div className="col-start-2 flex flex-col items-center z-20">
-                      <Link to="/profile/$id" params={{ id: topFour[0].user_id }} className="flex flex-col items-center group w-full">
-                        <span className="text-2xl mb-0.5 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]">👑</span>
-                        <span className="text-amber-400 font-bold text-xs mb-1 drop-shadow-md">1st</span>
-                        <div className="h-16 w-16 sm:h-24 sm:w-24 rounded-full overflow-hidden ring-4 ring-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.3)] group-hover:scale-105 transition-transform">
-                          {topFour[0].avatar_url ? <img src={resolveMediaUrl(topFour[0].avatar_url)} alt={topFour[0].full_name} onError={handleImageError} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-amber-900/50 text-amber-400 font-black text-lg">{initials(topFour[0].full_name || "Hero")}</div>}
+            {/* 🏆 3D PODIUM */}
+            <div className="relative pb-4 pt-6 px-1 sm:px-4">
+              <div className="grid grid-cols-3 gap-1 sm:gap-4 max-w-2xl mx-auto items-end">
+                
+                {/* 2nd Place - Left */}
+                {topFour[1] && (
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col items-center">
+                    <Link to="/profile/$id" params={{ id: topFour[1].user_id }} className="group flex flex-col items-center w-full">
+                      <span className="mb-1 text-xs font-black text-cyan-400">2nd</span>
+                      <div className="relative">
+                        <div className="h-14 w-14 overflow-hidden rounded-full ring-4 ring-cyan-400/50 shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-transform group-hover:scale-110 sm:h-20 sm:w-20">
+                          {topFour[1].avatar_url ? <img src={resolveMediaUrl(topFour[1].avatar_url)} alt={topFour[1].full_name} onError={handleImageError} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-cyan-900/50 text-sm font-black text-cyan-400">{initials(topFour[1].full_name || "Hero")}</div>}
                         </div>
-                        <p className="mt-2 text-xs sm:text-sm font-black text-center truncate w-full text-white">{topFour[0].full_name || "Givethra Hero"}</p>
-
-                        {/* Badge Below Name */}
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[0])].className}`}>
-                          {(() => { const Icon = BADGES[getBadge(topFour[0])].icon; return <Icon className="h-3 w-3" />; })()}
-                          {BADGES[getBadge(topFour[0])].label}
-                        </span>
-
-                        <p className="text-[10px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[0].cases_helped || 0} Cases helped</p>
-                        <p className="text-[10px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[0].total_amount || 0).toLocaleString()}</p>
-                      </Link>
-                    </div>
-                  )}
-
-                  {/* 2nd Place - Left (Normal Size) */}
-                  {topFour[1] && (
-                    <div className="col-start-1 row-start-2 flex flex-col items-center mt-[-10px] sm:mt-[-20px] z-10">
-                      <Link to="/profile/$id" params={{ id: topFour[1].user_id }} className="flex flex-col items-center group w-full">
-                        <span className="text-cyan-400 font-bold text-xs mb-1 drop-shadow-md">2nd</span>
-                        <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-full overflow-hidden ring-4 ring-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.3)] group-hover:scale-105 transition-transform">
-                          {topFour[1].avatar_url ? <img src={resolveMediaUrl(topFour[1].avatar_url)} alt={topFour[1].full_name} onError={handleImageError} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-cyan-900/50 text-cyan-400 font-black text-sm">{initials(topFour[1].full_name || "Hero")}</div>}
-                        </div>
-                        <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[1].full_name || "Givethra Hero"}</p>
-
-                        {/* Badge Below Name */}
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[1])].className}`}>
-                          {(() => { const Icon = BADGES[getBadge(topFour[1])].icon; return <Icon className="h-3 w-3" />; })()}
-                          {BADGES[getBadge(topFour[1])].label}
-                        </span>
-
-                        <p className="text-[9px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[1].cases_helped || 0} Cases</p>
-                        <p className="text-[9px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[1].total_amount || 0).toLocaleString()}</p>
-                      </Link>
-                    </div>
-                  )}
-
-                  {/* 3rd Place - Right (Normal Size) */}
-                  {topFour[2] && (
-                    <div className="col-start-3 row-start-2 flex flex-col items-center mt-[-10px] sm:mt-[-20px] z-10">
-                      <Link to="/profile/$id" params={{ id: topFour[2].user_id }} className="flex flex-col items-center group w-full">
-                        <span className="text-emerald-400 font-bold text-xs mb-1 drop-shadow-md">3rd</span>
-                        <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-full overflow-hidden ring-4 ring-emerald-400/50 shadow-[0_0_15px_rgba(52,211,153,0.3)] group-hover:scale-105 transition-transform">
-                          {topFour[2].avatar_url ? <img src={resolveMediaUrl(topFour[2].avatar_url)} alt={topFour[2].full_name} onError={handleImageError} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-emerald-900/50 text-emerald-400 font-black text-sm">{initials(topFour[2].full_name || "Hero")}</div>}
-                        </div>
-                        <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[2].full_name || "Givethra Hero"}</p>
-
-                        {/* Badge Below Name */}
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[2])].className}`}>
-                          {(() => { const Icon = BADGES[getBadge(topFour[2])].icon; return <Icon className="h-3 w-3" />; })()}
-                          {BADGES[getBadge(topFour[2])].label}
-                        </span>
-
-                        <p className="text-[9px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[2].cases_helped || 0} Cases</p>
-                        <p className="text-[9px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[2].total_amount || 0).toLocaleString()}</p>
-                      </Link>
-                    </div>
-                  )}
-
-                  {/* 4th Place - Bottom Center (Slightly Smaller Size) */}
-                  {topFour[3] && (
-                    <div className="col-start-2 row-start-3 flex flex-col items-center mt-[-10px] sm:mt-[-15px] z-0">
-                      <Link to="/profile/$id" params={{ id: topFour[3].user_id }} className="flex flex-col items-center group w-full">
-                        <span className="text-purple-400 font-bold text-xs mb-1 drop-shadow-md">4th</span>
-                        <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full overflow-hidden ring-4 ring-purple-400/50 shadow-[0_0_15px_rgba(192,132,252,0.3)] group-hover:scale-105 transition-transform">
-                          {topFour[3].avatar_url ? <img src={resolveMediaUrl(topFour[3].avatar_url)} alt={topFour[3].full_name} onError={handleImageError} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-purple-900/50 text-purple-400 font-black text-xs">{initials(topFour[3].full_name || "Hero")}</div>}
-                        </div>
-                        <p className="mt-2 text-[10px] sm:text-xs font-black text-center truncate w-full text-white">{topFour[3].full_name || "Givethra Hero"}</p>
-
-                        {/* Badge Below Name */}
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 mt-1 ${BADGES[getBadge(topFour[3])].className}`}>
-                          {(() => { const Icon = BADGES[getBadge(topFour[3])].icon; return <Icon className="h-3 w-3" />; })()}
-                          {BADGES[getBadge(topFour[3])].label}
-                        </span>
-
-                        <p className="text-[9px] sm:text-xs font-bold text-gray-300 mt-1">{topFour[3].cases_helped || 0} Case</p>
-                        <p className="text-[9px] sm:text-xs font-black text-teal-400 mt-0.5">Rs {Number(topFour[3].total_amount || 0).toLocaleString()}</p>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 📋 Rank 5 to 100 - Clean Dark Mode List */}
-              <div className="mt-4 border-t border-slate-800/80">
-                {remainingHeroes.map((hero, index) => {
-                  const actualRank = index + 5;
-                  const name = hero.full_name || "Givethra Hero";
-                  const rowBg = actualRank % 2 === 0 ? "bg-[#111929]" : "bg-[#0B121F]";
-
-                  return (
-                    <div key={hero.user_id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 sm:p-4 border-b border-slate-800/50 transition-colors hover:bg-slate-800/30 ${rowBg}`}>
-
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="flex w-8 shrink-0 items-center justify-center text-sm font-black text-gray-400">
-                          {actualRank}
-                        </div>
-                        <Link to="/profile/$id" params={{ id: hero.user_id }} className="h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-slate-700 block">
-                          {hero.avatar_url ? <img src={resolveMediaUrl(hero.avatar_url)} alt={name} onError={handleImageError} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center bg-slate-800 text-xs font-black text-gray-300">{initials(name)}</div>}
-                        </Link>
-                        <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                          <Link to="/profile/$id" params={{ id: hero.user_id }} className="truncate text-sm font-bold text-white hover:text-teal-400 transition-colors">{name}</Link>
-                          <span className={`inline-flex w-max items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ${BADGES[getBadge(hero)].className}`}>
-                            {(() => { const Icon = BADGES[getBadge(hero)].icon; return <Icon className="h-3 w-3" />; })()}
-                            {BADGES[getBadge(hero)].label}
-                          </span>
-                        </div>
+                        <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-black text-slate-950 shadow-md">2</div>
                       </div>
+                      <p className="mt-2 w-full truncate text-center text-xs font-black text-white">{topFour[1].full_name || "Hero"}</p>
+                      <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black ring-1 ${BADGES[getBadge(topFour[1])].className}`}>
+                        {(() => { const Icon = BADGES[getBadge(topFour[1])].icon; return <Icon className="h-2.5 w-2.5" />; })()}
+                        {BADGES[getBadge(topFour[1])].label}
+                      </span>
+                      <p className="mt-1 text-[10px] font-bold text-slate-400">{topFour[1].cases_helped || 0} Helps</p>
+                      <p className="text-[10px] font-black text-teal-400">Rs {Number(topFour[1].total_amount || 0).toLocaleString()}</p>
+                    </Link>
+                  </motion.div>
+                )}
 
-                      <div className="flex items-center justify-between sm:justify-end gap-6 pl-11 sm:pl-0 border-t border-slate-800/50 sm:border-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
-                        <div className="text-left sm:text-right">
-                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Help</p>
-                          <p className="text-xs font-bold text-gray-300">{hero.cases_helped || 0} Helps</p>
+                {/* 1st Place - Center (Bigger) */}
+                {topFour[0] && (
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center">
+                    <Link to="/profile/$id" params={{ id: topFour[0].user_id }} className="group flex flex-col items-center w-full">
+                      <span className="mb-1 text-xl drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]">👑</span>
+                      <span className="mb-1 text-xs font-black text-amber-400">1st</span>
+                      <div className="relative">
+                        <div className="h-20 w-20 overflow-hidden rounded-full ring-4 ring-amber-400/60 shadow-[0_0_30px_rgba(251,191,36,0.5)] transition-transform group-hover:scale-110 sm:h-28 sm:w-28">
+                          {topFour[0].avatar_url ? <img src={resolveMediaUrl(topFour[0].avatar_url)} alt={topFour[0].full_name} onError={handleImageError} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-amber-900/50 text-lg font-black text-amber-400">{initials(topFour[0].full_name || "Hero")}</div>}
                         </div>
-                        <div className="text-right min-w-[80px]">
-                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Amount</p>
-                          <p className="text-xs sm:text-sm font-black text-teal-400">Rs {Number(hero.total_amount || 0).toLocaleString()}</p>
-                        </div>
+                        <div className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-slate-950 shadow-lg">1</div>
                       </div>
-                    </div>
-                  );
-                })}
+                      <p className="mt-2 w-full truncate text-center text-sm font-black text-white sm:text-base">{topFour[0].full_name || "Hero"}</p>
+                      <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black ring-1 ${BADGES[getBadge(topFour[0])].className}`}>
+                        {(() => { const Icon = BADGES[getBadge(topFour[0])].icon; return <Icon className="h-3 w-3" />; })()}
+                        {BADGES[getBadge(topFour[0])].label}
+                      </span>
+                      <p className="mt-1 text-[11px] font-bold text-slate-300">{topFour[0].cases_helped || 0} Helps</p>
+                      <p className="text-[11px] font-black text-teal-400">Rs {Number(topFour[0].total_amount || 0).toLocaleString()}</p>
+                    </Link>
+                  </motion.div>
+                )}
+
+                {/* 3rd Place - Right */}
+                {topFour[2] && (
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex flex-col items-center">
+                    <Link to="/profile/$id" params={{ id: topFour[2].user_id }} className="group flex flex-col items-center w-full">
+                      <span className="mb-1 text-xs font-black text-emerald-400">3rd</span>
+                      <div className="relative">
+                        <div className="h-14 w-14 overflow-hidden rounded-full ring-4 ring-emerald-400/50 shadow-[0_0_20px_rgba(52,211,153,0.4)] transition-transform group-hover:scale-110 sm:h-20 sm:w-20">
+                          {topFour[2].avatar_url ? <img src={resolveMediaUrl(topFour[2].avatar_url)} alt={topFour[2].full_name} onError={handleImageError} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-emerald-900/50 text-sm font-black text-emerald-400">{initials(topFour[2].full_name || "Hero")}</div>}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-black text-slate-950 shadow-md">3</div>
+                      </div>
+                      <p className="mt-2 w-full truncate text-center text-xs font-black text-white">{topFour[2].full_name || "Hero"}</p>
+                      <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black ring-1 ${BADGES[getBadge(topFour[2])].className}`}>
+                        {(() => { const Icon = BADGES[getBadge(topFour[2])].icon; return <Icon className="h-2.5 w-2.5" />; })()}
+                        {BADGES[getBadge(topFour[2])].label}
+                      </span>
+                      <p className="mt-1 text-[10px] font-bold text-slate-400">{topFour[2].cases_helped || 0} Helps</p>
+                      <p className="text-[10px] font-black text-teal-400">Rs {Number(topFour[2].total_amount || 0).toLocaleString()}</p>
+                    </Link>
+                  </motion.div>
+                )}
+
+                {/* 4th Place - Below 1st */}
+                {topFour[3] && (
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="col-start-2 col-end-3 row-start-2 flex flex-col items-center mt-2">
+                    <Link to="/profile/$id" params={{ id: topFour[3].user_id }} className="group flex flex-col items-center w-full">
+                      <span className="mb-1 text-[10px] font-black text-purple-400">4th</span>
+                      <div className="relative">
+                        <div className="h-12 w-12 overflow-hidden rounded-full ring-4 ring-purple-400/50 shadow-[0_0_15px_rgba(192,132,252,0.4)] transition-transform group-hover:scale-110 sm:h-16 sm:w-16">
+                          {topFour[3].avatar_url ? <img src={resolveMediaUrl(topFour[3].avatar_url)} alt={topFour[3].full_name} onError={handleImageError} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-purple-900/50 text-xs font-black text-purple-400">{initials(topFour[3].full_name || "Hero")}</div>}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-purple-500 text-[9px] font-black text-slate-950 shadow-md">4</div>
+                      </div>
+                      <p className="mt-2 w-full truncate text-center text-[11px] font-black text-white">{topFour[3].full_name || "Hero"}</p>
+                      <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black ring-1 ${BADGES[getBadge(topFour[3])].className}`}>
+                        {(() => { const Icon = BADGES[getBadge(topFour[3])].icon; return <Icon className="h-2.5 w-2.5" />; })()}
+                        {BADGES[getBadge(topFour[3])].label}
+                      </span>
+                      <p className="mt-1 text-[10px] font-bold text-slate-400">{topFour[3].cases_helped || 0} Helps</p>
+                      <p className="text-[10px] font-black text-teal-400">Rs {Number(topFour[3].total_amount || 0).toLocaleString()}</p>
+                    </Link>
+                  </motion.div>
+                )}
               </div>
             </div>
-          )}
-        </div>
+
+            {/* 📋 LIST (5+) */}
+            <div className="space-y-2">
+              {remainingHeroes.map((hero, index) => {
+                const actualRank = index + 5;
+                const name = hero.full_name || "Givethra Hero";
+                return (
+                  <motion.div
+                    key={hero.user_id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(index * 0.03, 0.3) }}
+                    className="flex flex-col gap-2 rounded-2xl border border-slate-700/40 bg-slate-800/40 p-3 backdrop-blur-sm transition hover:border-teal-500/40 hover:bg-slate-800/60 sm:flex-row sm:items-center sm:justify-between sm:p-4"
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <div className="flex w-8 shrink-0 items-center justify-center text-sm font-black text-slate-500">#{actualRank}</div>
+                      <Link to="/profile/$id" params={{ id: hero.user_id }} className="h-11 w-11 shrink-0 overflow-hidden rounded-full ring-2 ring-slate-700 block">
+                        {hero.avatar_url ? <img src={resolveMediaUrl(hero.avatar_url)} alt={name} onError={handleImageError} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center bg-slate-700 text-xs font-black text-slate-300">{initials(name)}</div>}
+                      </Link>
+                      <div className="min-w-0 flex-1">
+                        <Link to="/profile/$id" params={{ id: hero.user_id }} className="block truncate text-sm font-black text-white hover:text-teal-400">{name}</Link>
+                        <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ring-1 ${BADGES[getBadge(hero)].className}`}>
+                          {(() => { const Icon = BADGES[getBadge(hero)].icon; return <Icon className="h-2.5 w-2.5" />; })()}
+                          {BADGES[getBadge(hero)].label}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 pl-11 sm:pl-0">
+                      <div className="text-right"><p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Helps</p><p className="text-sm font-bold text-slate-200">{hero.cases_helped || 0}</p></div>
+                      <div className="min-w-[80px] text-right"><p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Amount</p><p className="text-sm font-black text-teal-400">Rs {Number(hero.total_amount || 0).toLocaleString()}</p></div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
