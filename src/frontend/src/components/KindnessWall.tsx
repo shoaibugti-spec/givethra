@@ -1,5 +1,5 @@
 // src/components/KindnessWall.tsx
-// Premium + Globalized: Currencies, timestamps in local language.
+// Complete premium kindness wall with global currency conversion.
 
 import { useEffect, useMemo, useState } from "react";
 import ProtectedVideoPlayer from "@/components/ProtectedVideoPlayer";
@@ -8,8 +8,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { createComment, getComments, getFeedbacks, getGuestId, getLikes, getProfile, toggleFeedbackLike } from "@/lib/api";
 import { resolveMediaUrl } from "@/lib/media";
+import { getCountryProfile, CURRENCY_SYMBOLS, scaleFromPKR } from "@/lib/countryProfiles";
 import { motion, AnimatePresence } from "framer-motion";
-import { getCountryProfile } from "@/lib/countryProfiles";
 
 function timeAgo(value?: string) {
   if (!value) return "Recently";
@@ -33,13 +33,24 @@ export default function KindnessWall() {
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
-  const [userCountry, setUserCountry] = useState<string>("");
+  const [userCurrency, setUserCurrency] = useState<string>("USD");
 
   useEffect(() => {
     if (user?.id) {
-      getProfile(user.id).then((profile) => setUserCountry(profile?.country || "")).catch(() => {});
+      getProfile(user.id).then((profile) => {
+        const profileData = getCountryProfile(profile?.country || "");
+        setUserCurrency(profileData.currency || "USD");
+      }).catch(() => setUserCurrency("USD"));
     }
   }, [user?.id]);
+
+  function money(amountInPKR: number) {
+    if (!amountInPKR) return "";
+    if (userCurrency === "PKR") return `Rs ${Number(amountInPKR).toLocaleString()}`;
+    const converted = scaleFromPKR(Number(amountInPKR), userCurrency);
+    const symbol = CURRENCY_SYMBOLS[userCurrency] ?? userCurrency;
+    return `${symbol} ${converted.toLocaleString()}`;
+  }
 
   useEffect(() => {
     let active = true;
@@ -62,15 +73,15 @@ export default function KindnessWall() {
   const actorId = isAuthenticated && user ? user.id : getGuestId();
   const liked = currentLikes.some((like) => like.user_id === actorId);
 
-  // 🌍 Format amount by user's country
-  const countryProfile = getCountryProfile(userCountry);
-  const currencySymbol = countryProfile.currency === "PKR" ? "Rs" : countryProfile.currency;
-
   async function handleShare() {
     if (!current) return;
     const url = new URL(`/kindness-wall#${encodeURIComponent(current.id)}`, window.location.origin).toString();
-    try { if (navigator.share) { await navigator.share({ title: current.case_title || "Givethra Kindness Wall", text: current.text_message || "A verified Givethra feedback story", url }); return; } }
-    catch (error: any) { if (error?.name === "AbortError") return; }
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: current.case_title || "Givethra Kindness Wall", text: current.text_message || current.comment || "A verified Givethra feedback story", url });
+        return;
+      }
+    } catch (error: any) { if (error?.name === "AbortError") return; }
     try { await navigator.clipboard.writeText(url); toast.success("Link copied."); }
     catch { toast.error("Sharing is unavailable."); }
   }
@@ -82,17 +93,21 @@ export default function KindnessWall() {
       const result = await toggleFeedbackLike(current.id, actorId, existing?.id);
       if (result.deleted) setLikes((items) => items.filter((item) => item.id !== result.id));
       if (result.created) setLikes((items) => [...items, result.created]);
-    } catch (error: any) { toast.error(error?.message || "Unable to update."); }
+    } catch (error: any) { toast.error(error?.message || "Unable to update kindness."); }
   }
 
   async function handleComment() {
     if (!current || !commentText.trim() || !actorId) return;
     setPosting(true);
     try {
-      const firstName = isAuthenticated && user ? ((await getProfile(user.id))?.full_name || "User").split(" ")[0] : `Guest ${getGuestId().slice(-6)}`;
+      const firstName = isAuthenticated && user
+        ? ((await getProfile(user.id))?.full_name || "User").split(" ")[0]
+        : `Guest ${getGuestId().slice(-6)}`;
       const created = await createComment({ feedback_id: current.id, user_id: actorId, first_name: firstName, comment: commentText.trim() });
-      if (created?.id) { setComments((items) => [...items, created]); setCommentText(""); }
-      else throw new Error("Comment could not be posted");
+      if (created?.id) {
+        setComments((items) => [...items, created]);
+        setCommentText("");
+      } else throw new Error("Comment could not be posted");
     } catch (error: any) { toast.error(error?.message || "Unable to post comment."); }
     finally { setPosting(false); }
   }
@@ -148,6 +163,14 @@ export default function KindnessWall() {
                     </p>
                   </div>
                 )}
+
+                {(current.amount_paid || current.amount_needed) && (
+                  <div className="mt-4 rounded-xl border border-pink-100 bg-pink-50/40 px-4 py-2.5 text-center">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-pink-500">Verified Help Received</p>
+                    <p className="text-lg font-black text-pink-700">{money(Number(current.amount_paid || current.amount_needed || 0))}</p>
+                  </div>
+                )}
+
                 {current.video_url && <div className="mt-4"><ProtectedVideoPlayer src={current.video_url} /></div>}
 
                 <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-5">
@@ -161,32 +184,4 @@ export default function KindnessWall() {
                     <Share2 className="h-4 w-4" /> Share
                   </button>
                   <div className="ml-auto flex gap-1.5">
-                    <button disabled={index === 0} onClick={() => { setIndex((v) => Math.max(0, v - 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-pink-300 hover:text-pink-600 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
-                    <button disabled={index === ordered.length - 1} onClick={() => { setIndex((v) => Math.min(ordered.length - 1, v + 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-pink-300 hover:text-pink-600 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
-                  </div>
-                </div>
-
-                {openComments && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-4 space-y-3 border-t border-slate-100 pt-4">
-                    <div className="max-h-56 space-y-2 overflow-y-auto">
-                      {currentComments.length ? currentComments.map((comment) => (
-                        <div key={comment.id} className="rounded-xl bg-pink-50/50 px-3 py-2">
-                          <p className="text-xs font-black text-pink-700">{comment.first_name || comment.user_name || "A Givethra member"}</p>
-                          <p className="mt-0.5 text-sm text-slate-700">{comment.comment}</p>
-                        </div>
-                      )) : <p className="py-4 text-center text-sm text-slate-400">No comments yet. Be the first to say something kind!</p>}
-                    </div>
-                    <div className="flex items-end gap-2">
-                      <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a kind comment..." rows={2} className="min-h-11 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-pink-500 focus:bg-white" />
-                      <button type="button" disabled={posting || !commentText.trim()} onClick={handleComment} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-md transition hover:scale-105 disabled:opacity-50"><Send className="h-4 w-4" /></button>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            </motion.article>
-          </AnimatePresence>
-        )}
-      </div>
-    </section>
-  );
-}
+                    <button disabled={index === 0} onClick={() => { setIndex((v) => Math.max(0, v - 1)); setOpenComments(false); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white
