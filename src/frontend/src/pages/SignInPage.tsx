@@ -8,7 +8,7 @@ import { useEffect } from "react";
 
 export default function SignInPage() {
   const navigate = useNavigate();
-  const { loginWithGoogle, showOneTap, googleFallbackVisible, isLoggingIn, isAuthenticated, isInitializing, setRole: setAuthRole } = useAuth();
+  const { loginWithGoogle, googleFallbackVisible, isLoggingIn, isAuthenticated, setRole: setAuthRole } = useAuth();
   const { setRole: setSelectedRole } = useRole();
   const redirect = new URLSearchParams(window.location.search).get("redirect");
 
@@ -19,14 +19,6 @@ export default function SignInPage() {
       setAuthRole(selected === "requester" ? "help_seeker" : "hero");
     }
   }, [setAuthRole, setSelectedRole]);
-
-  // Google's bottom sheet with the browser's own Google accounts appears by
-  // itself 3 seconds after this page opens (auto-selects when only one account).
-  useEffect(() => {
-    if (isInitializing || isAuthenticated) return;
-    const timer = window.setTimeout(() => showOneTap(), 3000);
-    return () => window.clearTimeout(timer);
-  }, [isInitializing, isAuthenticated, showOneTap]);
 
   useEffect(() => {
     if (isAuthenticated) {

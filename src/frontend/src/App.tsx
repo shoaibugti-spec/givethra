@@ -7,6 +7,7 @@
 // routes so users aren't redirected to "/" when role hasn't loaded yet.
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import KycGateSheet, { type KycGateStatus } from "@/components/KycGateSheet";
 import { Toaster } from "@/components/ui/sonner";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -20,9 +21,9 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
-import { getProfile } from "@/lib/api";
+import { getKycSubmission, getProfile } from "@/lib/api";
 
 // Lazy imports
 const HomePage = lazy(() =>
@@ -336,11 +337,68 @@ const ROLE_OPTIONAL_PREFIXES = [
 import BottomNav from "@/components/BottomNav";
 
 function RootLayout() {
-  const { isAuthenticated, isInitializing, user, role: authRole, isAdmin } = useAuth();
+  const { isAuthenticated, isInitializing, user, role: authRole, isAdmin, showOneTap } = useAuth();
   const { role, setRole } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
   const [checking, setChecking] = useState(false);
+  const [kycSheetOpen, setKycSheetOpen] = useState(false);
+  const [kycSheetStatus, setKycSheetStatus] = useState<KycGateStatus>("none");
+  const [kycRejectionReason, setKycRejectionReason] = useState<string | null>(null);
+  const kycCheckedUserRef = useRef<string | null>(null);
+
+  // One Tap belongs to the app root, not only the Sign In route: anonymous
+  // visitors may arrive on any public page. Wait until session restore settles.
+  useEffect(() => {
+    if (isInitializing || isAuthenticated) return;
+    const timer = window.setTimeout(() => showOneTap(), 5000);
+    return () => window.clearTimeout(timer);
+  }, [isAuthenticated, isInitializing, showOneTap]);
+
+  // After sign-in, check the user's own KYC status and show the existing
+  // bottom sheet once for a missing or rejected submission.
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || isAdmin) {
+      if (!isAuthenticated) kycCheckedUserRef.current = null;
+      setKycSheetOpen(false);
+      return;
+    }
+    if (["/kyc", "/edit-profile", "/sign-in"].includes(location.pathname)) {
+      setKycSheetOpen(false);
+      return;
+    }
+    if (kycCheckedUserRef.current === user.id) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          let submission;
+          try {
+            submission = await getKycSubmission(user.id);
+          } catch {
+            await new Promise((resolve) => window.setTimeout(resolve, 1000));
+            if (cancelled) return;
+            submission = await getKycSubmission(user.id);
+          }
+          if (cancelled) return;
+          const status = String(submission?.status || "none").trim().toLowerCase();
+          kycCheckedUserRef.current = user.id;
+          if (status === "none" || status === "rejected") {
+            setKycSheetStatus(status);
+            setKycRejectionReason(typeof submission?.rejection_reason === "string" ? submission.rejection_reason : null);
+            setKycSheetOpen(true);
+          }
+        } catch {
+          // A transient KYC status read must not block the rest of the app.
+        }
+      })();
+    }, 5000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [isAdmin, isAuthenticated, location.pathname, user?.id]);
 
   useEffect(() => {
     if (authRole === "hero" && role !== "hero") setRole("hero");
@@ -412,6 +470,13 @@ function RootLayout() {
   return (
     <>
       <Outlet />
+      <KycGateSheet
+        open={kycSheetOpen}
+        status={kycSheetStatus}
+        rejectionReason={kycRejectionReason}
+        onClose={() => setKycSheetOpen(false)}
+        onStart={() => { setKycSheetOpen(false); navigate({ to: "/kyc" }); }}
+      />
       <ErrorBoundary fallback={<BottomNavFallback />}>
         <BottomNav />
       </ErrorBoundary>
