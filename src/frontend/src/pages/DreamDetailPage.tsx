@@ -1,3 +1,6 @@
+// src/pages/DreamDetailPage.tsx
+// Premium E-Commerce Style Product Detail & Participation Form
+
 import Layout from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -6,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Link, useParams } from "@tanstack/react-router";
 import {
   CheckCircle2, ChevronRight, Clock3, Copy, FileCheck2, Info, Link2, Lock,
-  MapPin, Share2, Shield, ShieldCheck, Sparkles, Upload, User, Wallet,
+  MapPin, Share2, Shield, ShieldCheck, Sparkles, Upload, User, Wallet, Star, TrendingUp, Users, Package, BadgeCheck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -14,7 +17,7 @@ import {
   createDreamParticipation, getDream, getDreamParticipationHistory, getDreamPaymentAccounts, uploadFileToStorage,
 } from "@/lib/api";
 import { handleImageError, resolveMediaUrl } from "@/lib/media";
-import { Dream, money, marketValue } from "@/pages/DreamsPage";
+import { Dream, money, marketValue, fundingPercent } from "@/pages/DreamsPage";
 
 type Account = { id: string; label: string; method: string; account_title?: string; account_number: string; instructions?: string };
 const PROVINCES = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad Capital Territory", "Gilgit-Baltistan", "Azad Jammu and Kashmir"];
@@ -36,264 +39,205 @@ export default function DreamDetailPage() {
   const [tab, setTab] = useState<"story" | "how" | "trust">("story");
 
   useEffect(() => {
-    getDream(id)
-      .then((row) => {
-        setDream(row);
-        setForm((f) => ({ ...f, contribution_amount: row.contribution_amount ? String(row.contribution_amount) : f.contribution_amount }));
-      })
-      .catch(() => setDream(null));
+    getDream(id).then((row) => { setDream(row); setForm((f) => ({ ...f, contribution_amount: row.contribution_amount ? String(row.contribution_amount) : f.contribution_amount })); }).catch(() => setDream(null));
     getDreamPaymentAccounts().then(setAccounts).catch(() => setAccounts([]));
   }, [id]);
 
   useEffect(() => {
-    if (!user?.id) {
-      setHistory([]);
-      return;
-    }
+    if (!user?.id) { setHistory([]); return; }
     getDreamParticipationHistory(id).then(setHistory).catch(() => setHistory([]));
   }, [id, user?.id]);
 
   if (!dream) {
-    return <Layout><main className="mx-auto max-w-4xl p-10 text-center">Dream product not found or is not published yet.</main></Layout>;
+    return <Layout><main className="mx-auto max-w-4xl p-10 text-center text-slate-500">Dream product not found or is not published yet.</main></Layout>;
   }
 
   const mv = marketValue(dream);
   const contribution = Number(dream.contribution_amount || 0);
   const imageUrl = resolveMediaUrl(dream.image_url);
+  const progress = fundingPercent(dream);
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
   const uploadProof = async (file: File | null) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      update("proof_url", await uploadFileToStorage(file, `dream-receipts/${dream.id}/${Date.now()}-${file.name.replace(/[^a-z0-9._-]/gi, "-")}`));
-      toast.success("Payment receipt uploaded");
-    } catch (e: any) {
-      toast.error(e?.message || "Receipt upload failed");
-    } finally {
-      setUploading(false);
-    }
+    if (!file) return; setUploading(true);
+    try { update("proof_url", await uploadFileToStorage(file, `dream-receipts/${dream.id}/${Date.now()}-${file.name.replace(/[^a-z0-9._-]/gi, "-")}`)); toast.success("Receipt uploaded"); }
+    catch (e: any) { toast.error(e?.message || "Upload failed"); }
+    finally { setUploading(false); }
   };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const required = ["full_name", "father_husband_name", "cnic_number", "province", "city", "address", "postal_code", "mobile_number", "payment_method", "transaction_id", "proof_url"];
-    if (required.some((key) => !String((form as any)[key] || "").trim())) {
-      toast.error("Complete all identity, address, payment and receipt fields.");
-      return;
-    }
+    if (required.some((key) => !String((form as any)[key] || "").trim())) { toast.error("Complete all required fields."); return; }
     setBusy(true);
     try {
       await createDreamParticipation({ dream_id: dream.id, ...form, contribution_amount: Number(dream.contribution_amount || 0) });
-      setSubmitted(true);
-      getDreamParticipationHistory(dream.id).then(setHistory).catch(() => undefined);
-      toast.success("Dream submission received for Givethra review.");
-    } catch (e: any) {
-      toast.error(e?.message || "Dream submission failed");
-    } finally {
-      setBusy(false);
-    }
+      setSubmitted(true); getDreamParticipationHistory(dream.id).then(setHistory).catch(() => undefined);
+      toast.success("Dream submission received!");
+    } catch (e: any) { toast.error(e?.message || "Submission failed"); }
+    finally { setBusy(false); }
   };
 
-  const copyAccount = (value: string) => {
-    navigator.clipboard?.writeText(value);
-    toast.success("Account number copied");
-  };
+  const copyAccount = (value: string) => { navigator.clipboard?.writeText(value); toast.success("Copied"); };
 
   const shareProduct = async () => {
     const shareUrl = new URL(`/dreams/${dream.id}`, window.location.origin).toString();
-    const shareData = {
-      title: `${dream.name} | Givethra Dreams`,
-      text: `${dream.name} — fixed contribution ${money(contribution)}. View this product on Givethra.`,
-      url: shareUrl,
-    };
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-        return;
-      }
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Product link copied — share it anywhere");
-    } catch (error: any) {
-      if (error?.name !== "AbortError") toast.error("Could not share this product");
-    }
+    const shareData = { title: `${dream.name} | Givethra Dreams`, text: `${dream.name} — fixed contribution ${money(contribution)}.`, url: shareUrl };
+    try { if (navigator.share) { await navigator.share(shareData); return; } await navigator.clipboard.writeText(shareUrl); toast.success("Link copied"); }
+    catch (error: any) { if (error?.name !== "AbortError") toast.error("Failed to share"); }
   };
 
   return (
     <Layout>
-      <main className="min-h-screen bg-[#f7fafb] pb-36 md:pb-12">
+      <main className="min-h-screen bg-slate-50 pb-36 md:pb-12">
+        
         {/* BREADCRUMB */}
-        <div className="border-b border-border bg-white">
-          <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-hidden px-4 py-2.5 text-[11px] text-muted-foreground md:px-8 md:text-xs">
+        <div className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-hidden px-4 py-3 text-xs text-slate-500 md:px-8">
             <Link to="/" className="shrink-0 hover:text-teal-700">Home</Link>
             <ChevronRight className="h-3 w-3 shrink-0" />
             <Link to="/dreams" className="shrink-0 hover:text-teal-700">Dreams</Link>
             <ChevronRight className="h-3 w-3 shrink-0" />
-            <span className="truncate font-semibold text-foreground">{dream.name}</span>
+            <span className="truncate font-bold text-slate-900">{dream.name}</span>
           </div>
         </div>
 
-        {/* HERO */}
-        <section className="mx-auto max-w-7xl px-4 py-4 md:px-8 md:py-8">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6">
-            <div className="min-w-0 space-y-5 md:space-y-6">
-              <div className="overflow-hidden rounded-2xl border border-border bg-white p-2.5 shadow-sm md:rounded-3xl md:p-3">
-                <div className="relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-teal-50 via-white to-amber-50 md:min-h-[420px] md:rounded-2xl">
+        <section className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-10">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-10">
+            
+            {/* LEFT COLUMN: IMAGE & TABS */}
+            <div className="min-w-0 space-y-6">
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="relative flex min-h-[280px] items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 via-white to-slate-50 md:min-h-[500px]">
                   {dream.image_url ? (
-                    <img
-                      src={imageUrl}
-                      alt={dream.name}
-                      onError={handleImageError}
-                      className="h-full max-h-[480px] w-full object-contain"
-                    />
-                  ) : (
-                    <span className="text-sm font-semibold text-teal-700">Product image coming soon</span>
-                  )}
-                  <span className="absolute left-2 top-2 max-w-[calc(100%-100px)] truncate rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-teal-700 shadow md:left-4 md:top-4 md:max-w-[60%] md:px-3 md:py-1.5 md:text-[11px]">{dream.category}</span>
-                  <span className="absolute right-2 top-2 shrink-0 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow md:right-4 md:top-4 md:px-3 md:py-1.5 md:text-[11px]">{dream.status}</span>
+                    <img src={imageUrl} alt={dream.name} onError={handleImageError} className="h-full max-h-[600px] w-full object-contain p-4" />
+                  ) : (<span className="text-sm font-semibold text-slate-400">Product image coming soon</span>)}
+                  <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-teal-700 shadow-sm backdrop-blur">{dream.category}</span>
+                  <span className="absolute right-4 top-4 rounded-full bg-emerald-500 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">{dream.status}</span>
                 </div>
               </div>
 
-              {/* TABS */}
-              <div className="rounded-2xl border border-border bg-white shadow-sm md:rounded-3xl">
-                <div className="flex overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {[
-                    { k: "story", label: "Product story" },
-                    { k: "how", label: "How it works" },
-                    { k: "trust", label: "Trust & review" },
-                  ].map((t) => (
-                    <button
-                      key={t.k}
-                      onClick={() => setTab(t.k as any)}
-                      className={`shrink-0 whitespace-nowrap px-4 py-3 text-xs font-bold transition md:px-5 md:text-sm ${tab === t.k ? "border-b-2 border-teal-600 text-teal-700" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                      {t.label}
-                    </button>
+              <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="flex overflow-x-auto border-b border-slate-100 [scrollbar-width:none]">
+                  {[{ k: "story", label: "Product Story" }, { k: "how", label: "How it works" }, { k: "trust", label: "Trust & Review" }].map((t) => (
+                    <button key={t.k} onClick={() => setTab(t.k as any)} className={`shrink-0 whitespace-nowrap px-6 py-4 text-sm font-bold transition ${tab === t.k ? "border-b-2 border-teal-600 text-teal-700" : "text-slate-500 hover:text-slate-800"}`}>{t.label}</button>
                   ))}
                 </div>
-                <div className="p-4 text-sm leading-7 text-muted-foreground md:p-6">
-                  {tab === "story" && <p>{dream.description}</p>}
+                <div className="p-6 text-sm leading-7 text-slate-600">
+                  {tab === "story" && <p className="whitespace-pre-line">{dream.description}</p>}
                   {tab === "how" && (
-                    <ol className="space-y-3">
-                      {[
-                        "Choose your Dream and enter your identity & address details.",
-                        "Transfer the fixed contribution to the Givethra account shown.",
-                        "Upload the payment receipt and submit your transaction ID.",
-                        "Our review team verifies and activates your participation.",
-                      ].map((step, i) => (
-                        <li key={i} className="flex gap-3">
-                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-600 text-xs font-bold text-white">{i + 1}</span>
-                          <span className="text-foreground">{step}</span>
+                    <ol className="space-y-4">
+                      {["Choose your Dream and enter your identity & address details.", "Transfer the fixed contribution to the Givethra account shown.", "Upload the payment receipt and submit your transaction ID.", "Our review team verifies and activates your participation."].map((step, i) => (
+                        <li key={i} className="flex gap-4">
+                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-black text-teal-700">{i + 1}</span>
+                          <span className="text-slate-700 font-medium">{step}</span>
                         </li>
                       ))}
                     </ol>
                   )}
                   {tab === "trust" && (
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border bg-muted/40 p-3 md:p-4"><ShieldCheck className="h-5 w-5 text-teal-700" /><p className="mt-2 text-sm font-bold text-foreground">Manual verification</p><p className="text-xs">Every payment is checked by our team.</p></div>
-                      <div className="rounded-2xl border bg-muted/40 p-3 md:p-4"><FileCheck2 className="h-5 w-5 text-teal-700" /><p className="mt-2 text-sm font-bold text-foreground">Proof required</p><p className="text-xs">Receipt screenshot is mandatory.</p></div>
-                      <div className="rounded-2xl border bg-muted/40 p-3 md:p-4"><Lock className="h-5 w-5 text-teal-700" /><p className="mt-2 text-sm font-bold text-foreground">Secure data</p><p className="text-xs">Your information is stored safely.</p></div>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><ShieldCheck className="h-6 w-6 text-teal-600" /><p className="mt-3 text-sm font-bold text-slate-900">Manual verification</p><p className="text-xs text-slate-500 mt-1">Every payment is checked by our team.</p></div>
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><FileCheck2 className="h-6 w-6 text-teal-600" /><p className="mt-3 text-sm font-bold text-slate-900">Proof required</p><p className="text-xs text-slate-500 mt-1">Receipt screenshot is mandatory.</p></div>
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><Lock className="h-6 w-6 text-teal-600" /><p className="mt-3 text-sm font-bold text-slate-900">Secure data</p><p className="text-xs text-slate-500 mt-1">Your information is stored safely.</p></div>
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* RIGHT STICKY */}
+            {/* RIGHT COLUMN: STICKY PRODUCT SUMMARY */}
             <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-              <div className="space-y-3 md:space-y-4">
-                <div className="rounded-2xl border border-border bg-white p-4 shadow-sm md:rounded-3xl md:p-5">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">{dream.status}</span>
-                    <span className="max-w-[60%] truncate rounded-full bg-teal-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-700">{dream.category}</span>
+              <div className="space-y-5">
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/50">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-600 ring-1 ring-emerald-200">{dream.status}</span>
+                    <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-teal-700 ring-1 ring-teal-200">{dream.category}</span>
                   </div>
-                  <h1 className="mt-2.5 font-display text-xl font-black leading-tight md:text-2xl">{dream.name}</h1>
-                  <p className="mt-1.5 line-clamp-3 text-xs text-muted-foreground md:text-sm">{dream.description}</p>
+                  <h1 className="mt-4 font-display text-2xl font-black leading-tight text-slate-900 md:text-3xl">{dream.name}</h1>
+                  
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="flex items-center gap-1 text-amber-500"><Star className="h-4 w-4 fill-current" /><Star className="h-4 w-4 fill-current" /><Star className="h-4 w-4 fill-current" /><Star className="h-4 w-4 fill-current" /><Star className="h-4 w-4 fill-current" /></div>
+                    <span className="text-xs font-semibold text-slate-500">Verified Product</span>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={shareProduct}
-                    className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 text-sm font-bold text-teal-800 transition hover:border-teal-300 hover:bg-teal-100 active:scale-[0.98]"
-                    aria-label={`Share ${dream.name}`}
-                  >
-                    <Share2 className="h-4 w-4" />
-                    Share this product
-                    <Link2 className="h-3.5 w-3.5 opacity-60" />
+                  <button onClick={shareProduct} className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700">
+                    <Share2 className="h-4 w-4" /> Share this product
                   </button>
 
-                  {/* PRICE BLOCK */}
-                  <div className="mt-4 rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-amber-50 p-3.5 md:p-4">
+                  {/* PRICE BOX */}
+                  <div className="mt-6 rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-emerald-50/50 p-5">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 md:text-[11px]">Your contribution</span>
-                      {mv > 0 && (
-                        <span className="shrink-0 text-[10px] font-semibold text-muted-foreground line-through md:text-xs">{money(mv)}</span>
-                      )}
+                      <span className="text-[11px] font-black uppercase tracking-wider text-teal-800">Your Contribution</span>
+                      {mv > 0 && (<span className="text-xs font-semibold text-slate-400 line-through">{money(mv)}</span>)}
                     </div>
-                    <p className="mt-1 font-display text-3xl font-black text-teal-700 md:text-4xl">{money(contribution)}</p>
-                    {mv > 0 ? (
-                      <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">Market value {money(mv)} — you pay a fixed share.</p>
-                    ) : (
-                      <p className="mt-1 text-[10px] text-teal-800/80 md:text-[11px]">One fixed amount — same for every contribution.</p>
-                    )}
+                    <p className="mt-1 font-display text-4xl font-black text-teal-800">{money(contribution)}</p>
+                    {mv > 0 && <p className="mt-1 text-[11px] font-medium text-teal-700/80">Market value {money(mv)} — you pay a fixed share.</p>}
+                    
+                    <div className="mt-4">
+                      <div className="flex justify-between text-[10px] font-bold text-teal-800"><span>Funded</span><span>{progress}%</span></div>
+                      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-teal-200/50">
+                        <div className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 transition-all duration-1000" style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-3 rounded-xl border bg-muted/30 p-2.5 md:p-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quantity</p>
-                    <p className="mt-1 text-sm font-bold text-foreground md:text-base">{dream.quantity}</p>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center"><Package className="mx-auto h-4 w-4 text-slate-400" /><p className="mt-1 text-[10px] font-bold uppercase text-slate-500">Quantity</p><p className="text-base font-black text-slate-900">{dream.quantity}</p></div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center"><Users className="mx-auto h-4 w-4 text-slate-400" /><p className="mt-1 text-[10px] font-bold uppercase text-slate-500">Participants</p><p className="text-base font-black text-slate-900">{dream.approved_participants}</p></div>
                   </div>
 
-                  <a href="#participate" className="mt-4 hidden md:block">
-                    <Button disabled={!contribution || submitted} className="h-12 w-full rounded-xl bg-teal-700 text-base font-bold hover:bg-teal-800">
-                      {submitted ? "Submission received" : "Participate Now"}
+                  <a href="#participate" className="mt-6 hidden md:block">
+                    <Button disabled={!contribution || submitted} className="h-14 w-full rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 text-base font-black text-white shadow-lg transition-transform hover:scale-[1.02]">
+                      {submitted ? "Submission Received" : "Participate Now"} <ChevronRight className="ml-1 h-5 w-5" />
                     </Button>
                   </a>
 
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[9px] font-semibold text-muted-foreground md:mt-4 md:text-[10px]">
-                    <div><Shield className="mx-auto h-4 w-4 text-teal-700" /><p className="mt-1">Verified</p></div>
-                    <div><Clock3 className="mx-auto h-4 w-4 text-teal-700" /><p className="mt-1">Reviewed</p></div>
-                    <div><FileCheck2 className="mx-auto h-4 w-4 text-teal-700" /><p className="mt-1">Proof needed</p></div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-bold text-slate-500">
+                    <div><Shield className="mx-auto h-4 w-4 text-teal-600" /><p className="mt-1">Verified</p></div>
+                    <div><Clock3 className="mx-auto h-4 w-4 text-teal-600" /><p className="mt-1">Fast Review</p></div>
+                    <div><FileCheck2 className="mx-auto h-4 w-4 text-teal-600" /><p className="mt-1">Proof Needed</p></div>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-900 md:text-xs">
+                <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>Dreams are separate from Givethra Help cases and do not change your existing Credit wallet rules.</p>
+                  <p>Dreams are separate from Givethra Help cases and do not change your Credit wallet rules.</p>
                 </div>
               </div>
             </aside>
           </div>
         </section>
 
-        {/* FORM */}
+        {/* PARTICIPATION FORM SECTION */}
         <section id="participate" className="mx-auto max-w-7xl px-4 md:px-8">
           {submitted ? (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center shadow-sm md:rounded-3xl md:p-8">
-              <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
-              <h2 className="mt-4 font-display text-xl font-bold text-emerald-900 md:text-2xl">Submission received</h2>
+            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-10 text-center shadow-sm">
+              <BadgeCheck className="mx-auto h-16 w-16 text-emerald-600" />
+              <h2 className="mt-4 font-display text-2xl font-black text-emerald-900">Submission Received</h2>
               <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-emerald-800">
-                Your payment proof is with the Givethra review team. A registration number will be generated after approval.
+                Your payment proof is with our review team. A registration number will be generated after approval.
               </p>
-              <Link to="/dreams" className="mt-6 inline-flex">
-                <Button variant="outline" className="rounded-xl border-emerald-300">Explore more Dreams</Button>
-              </Link>
+              <Link to="/dreams" className="mt-6 inline-flex"><Button variant="outline" className="rounded-xl border-emerald-300 font-bold text-emerald-700">Explore More Dreams</Button></Link>
             </div>
           ) : (
-            <div className="rounded-2xl border border-border bg-white shadow-sm md:rounded-3xl">
-              <div className="border-b border-border p-4 md:p-6">
-                <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-teal-700">
-                  <Sparkles className="h-3.5 w-3.5" /> Participation form
+            <div className="rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40">
+              <div className="border-b border-slate-100 bg-slate-50/50 p-6 md:p-8 rounded-t-3xl">
+                <div className="inline-flex items-center gap-2 rounded-full bg-teal-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-teal-700">
+                  <Sparkles className="h-3 w-3" /> Participation Form
                 </div>
-                <h2 className="mt-2 font-display text-xl font-black md:text-2xl">Reserve your spot in this Dream</h2>
-                <p className="mt-1 text-xs text-muted-foreground md:text-sm">Fill in your identity and payment details. Our team verifies every submission manually.</p>
+                <h2 className="mt-3 font-display text-2xl font-black text-slate-900">Reserve your spot in this Dream</h2>
+                <p className="mt-1 text-sm font-medium text-slate-500">Fill in your identity and payment details. Our team verifies every submission manually.</p>
               </div>
 
-              <form onSubmit={submit} className="grid gap-5 p-4 md:gap-6 md:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="min-w-0 space-y-5 md:space-y-6">
+              <form onSubmit={submit} className="grid gap-8 p-6 md:p-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="min-w-0 space-y-8">
+                  
                   {/* IDENTITY */}
-                  <fieldset className="space-y-3.5 md:space-y-4">
-                    <legend className="flex items-center gap-2 text-sm font-bold text-foreground"><User className="h-4 w-4 text-teal-700" /> Identity</legend>
-                    <div className="grid gap-3.5 sm:grid-cols-2 md:gap-4">
+                  <fieldset className="space-y-4">
+                    <legend className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-slate-800"><User className="h-4 w-4 text-teal-600" /> Personal Identity</legend>
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <Field label="Full Name" required value={form.full_name} onChange={(v) => update("full_name", v)} />
                       <Field label="Father / Husband Name" required value={form.father_husband_name} onChange={(v) => update("father_husband_name", v)} />
                       <Field label="CNIC Number" required placeholder="00000-0000000-0" value={form.cnic_number} onChange={(v) => update("cnic_number", v)} />
@@ -302,13 +246,13 @@ export default function DreamDetailPage() {
                   </fieldset>
 
                   {/* ADDRESS */}
-                  <fieldset className="space-y-3.5 border-t pt-5 md:space-y-4 md:pt-6">
-                    <legend className="flex items-center gap-2 text-sm font-bold text-foreground"><MapPin className="h-4 w-4 text-teal-700" /> Address</legend>
-                    <div className="grid gap-3.5 sm:grid-cols-2 md:gap-4">
-                      <div>
-                        <Label>Province *</Label>
-                        <select value={form.province} onChange={(e) => update("province", e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border bg-background px-3 text-sm" required>
-                          <option value="">Select province / region</option>
+                  <fieldset className="space-y-4 border-t border-slate-100 pt-6">
+                    <legend className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-slate-800"><MapPin className="h-4 w-4 text-teal-600" /> Shipping Address</legend>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-600">Province *</Label>
+                        <select value={form.province} onChange={(e) => update("province", e.target.value)} className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium outline-none focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-200" required>
+                          <option value="">Select region</option>
                           {PROVINCES.map((p) => <option key={p}>{p}</option>)}
                         </select>
                       </div>
@@ -319,49 +263,39 @@ export default function DreamDetailPage() {
                   </fieldset>
 
                   {/* PAYMENT */}
-                  <fieldset className="space-y-3.5 border-t pt-5 md:space-y-4 md:pt-6">
-                    <legend className="flex items-center gap-2 text-sm font-bold text-foreground"><Wallet className="h-4 w-4 text-teal-700" /> Payment details</legend>
+                  <fieldset className="space-y-4 border-t border-slate-100 pt-6">
+                    <legend className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-slate-800"><Wallet className="h-4 w-4 text-teal-600" /> Payment Details</legend>
 
                     {accounts.length > 0 && (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 md:p-4">
-                        <p className="text-xs font-bold text-amber-900 md:text-sm">
-                          Send <span className="text-teal-700">{money(contribution)}</span> to any Givethra account
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+                        <p className="text-sm font-black text-amber-900">
+                          Please send exactly <span className="text-teal-700">{money(contribution)}</span> to any account:
                         </p>
-                        <div className="mt-3 space-y-2.5">
+                        <div className="mt-3 space-y-3">
                           {accounts.map((a) => (
-                            <div key={a.id} className="rounded-xl border border-amber-200 bg-white/80 p-3">
-                              <div className="flex items-start justify-between gap-2">
+                            <div key={a.id} className="rounded-xl border border-amber-200 bg-white p-3 shadow-sm">
+                              <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-bold text-foreground">{a.label}</p>
-                                  <p className="truncate text-xs font-semibold text-teal-700">{a.method}</p>
-                                  {a.account_title && (
-                                    <p className="mt-1 truncate text-[11px] text-muted-foreground">Title: {a.account_title}</p>
-                                  )}
+                                  <p className="truncate text-sm font-bold text-slate-900">{a.label}</p>
+                                  <p className="truncate text-xs font-bold text-teal-600">{a.method}</p>
+                                  {a.account_title && <p className="mt-0.5 truncate text-[11px] text-slate-500">Title: {a.account_title}</p>}
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => copyAccount(a.account_number)}
-                                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[10px] font-bold text-amber-900 hover:bg-amber-100"
-                                >
+                                <button type="button" onClick={() => copyAccount(a.account_number)} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-amber-100 px-2.5 py-1.5 text-[10px] font-black text-amber-900 hover:bg-amber-200">
                                   <Copy className="h-3 w-3" /> Copy
                                 </button>
                               </div>
-                              <p className="mt-2 break-all rounded-lg bg-amber-50 px-2 py-1.5 font-mono text-xs font-bold text-foreground md:text-sm">
-                                {a.account_number}
-                              </p>
-                              {a.instructions && (
-                                <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">{a.instructions}</p>
-                              )}
+                              <p className="mt-2 break-all rounded-lg bg-slate-50 px-3 py-2 font-mono text-sm font-black text-slate-800">{a.account_number}</p>
+                              {a.instructions && <p className="mt-1.5 text-[11px] leading-5 text-slate-500">{a.instructions}</p>}
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    <div className="grid gap-3.5 sm:grid-cols-2 md:gap-4">
-                      <div className="min-w-0">
-                        <Label>Payment method *</Label>
-                        <select value={form.payment_method} onChange={(e) => update("payment_method", e.target.value)} className="mt-1.5 h-11 w-full truncate rounded-xl border bg-background px-3 text-sm" required>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-600">Payment Method *</Label>
+                        <select value={form.payment_method} onChange={(e) => update("payment_method", e.target.value)} className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium outline-none focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-200" required>
                           <option value="">Select account</option>
                           {accounts.map((a) => <option key={a.id} value={`${a.method} · ${a.account_number}`}>{a.label} — {a.account_number}</option>)}
                         </select>
@@ -369,103 +303,79 @@ export default function DreamDetailPage() {
                       <Field label="Transaction ID / T.N.X" required placeholder="Enter transaction number" value={form.transaction_id} onChange={(v) => update("transaction_id", v)} />
                     </div>
 
-                    <div>
-                      <Label>Payment proof / receipt screenshot *</Label>
-                      <label className="mt-1.5 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/40 p-4 text-center text-xs font-semibold text-teal-700 transition hover:bg-teal-50 md:p-5 md:text-sm">
-                        <Upload className="h-4 w-4 shrink-0" />
-                        <span className="truncate">
-                          {uploading ? "Uploading receipt…" : form.proof_url ? "Receipt uploaded — replace" : "Attach payment screenshot"}
-                        </span>
-                        <input type="file" accept="image/*,.pdf" capture="environment" className="hidden" onChange={(e) => void uploadProof(e.target.files?.[0] || null)} />
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-600">Payment Proof *</Label>
+                      <label className="flex h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50/30 text-center transition hover:border-teal-500 hover:bg-teal-50">
+                        <Upload className="h-6 w-6 text-teal-600" />
+                        <span className="text-sm font-bold text-teal-700">{uploading ? "Uploading…" : form.proof_url ? "Receipt uploaded — replace" : "Attach receipt"}</span>
+                        <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => void uploadProof(e.target.files?.[0] || null)} />
                       </label>
-                      {form.proof_url && (
-                        <a href={form.proof_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-teal-700 underline">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> View uploaded receipt
-                        </a>
-                      )}
+                      {form.proof_url && <a href={form.proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-teal-600 underline"><CheckCircle2 className="h-3.5 w-3.5" /> View uploaded receipt</a>}
                     </div>
 
-                    <div>
-                      <Label>Additional note (optional)</Label>
-                      <textarea value={form.note} onChange={(e) => update("note", e.target.value)} className="mt-1.5 min-h-24 w-full rounded-xl border bg-background px-3 py-2 text-sm" />
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-600">Additional Note (Optional)</Label>
+                      <textarea value={form.note} onChange={(e) => update("note", e.target.value)} className="min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-teal-500 focus:bg-white" />
                     </div>
                   </fieldset>
                 </div>
 
                 {/* DESKTOP STICKY SUMMARY */}
                 <aside className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
-                  <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-teal-800">Order summary</p>
-                    <p className="mt-2 font-display text-lg font-bold">{dream.name}</p>
-                      <div className="mt-3 space-y-1.5 text-sm">
-                        {mv > 0 && <Row label="Market value" value={money(mv)} muted />}
-                        <Row label="Your contribution" value={money(contribution)} strong />
-                      </div>
-                    <div className="mt-4 border-t border-teal-200 pt-4">
-                      <Button
-                        type="submit"
-                        disabled={busy || uploading || !accounts.length || !contribution}
-                        className="h-12 w-full rounded-xl bg-teal-700 font-bold hover:bg-teal-800"
-                      >
-                        {busy ? "Submitting…" : "Submit Dream Participation"}
-                      </Button>
-                      {!accounts.length && <p className="mt-2 text-[11px] text-rose-700">Payment accounts are not configured yet.</p>}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Order Summary</p>
+                    <p className="mt-2 font-display text-lg font-black text-slate-900">{dream.name}</p>
+                    <div className="mt-4 space-y-2 text-sm">
+                      {mv > 0 && <Row label="Market Value" value={money(mv)} muted />}
+                      <Row label="Your Contribution" value={money(contribution)} strong />
                     </div>
-                    <ul className="mt-4 space-y-1.5 text-[11px] text-teal-900/80">
-                      <li className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Verified manual review</li>
-                      <li className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" /> Approval usually within 48 hours</li>
-                      <li className="flex items-center gap-1.5"><FileCheck2 className="h-3.5 w-3.5" /> Receipt proof required</li>
+                    <div className="mt-6 border-t border-slate-200 pt-5">
+                      <Button type="submit" disabled={busy || uploading || !accounts.length || !contribution} className="h-14 w-full rounded-xl bg-slate-900 text-base font-black text-white hover:bg-teal-700">
+                        {busy ? "Submitting…" : "Submit Participation"}
+                      </Button>
+                      {!accounts.length && <p className="mt-2 text-center text-[11px] font-bold text-rose-600">Payment accounts not configured.</p>}
+                    </div>
+                    <ul className="mt-5 space-y-2 text-[11px] font-medium text-slate-500">
+                      <li className="flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-teal-600" /> Verified manual review</li>
+                      <li className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5 text-teal-600" /> Approval within 48 hours</li>
+                      <li className="flex items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 text-teal-600" /> Receipt proof required</li>
                     </ul>
                   </div>
                 </aside>
 
-                {/* MOBILE submit */}
+                {/* MOBILE SUBMIT */}
                 <div className="lg:hidden">
-                  <Button
-                    type="submit"
-                    disabled={busy || uploading || !accounts.length || !contribution}
-                    className="h-12 w-full rounded-xl bg-teal-700 text-base font-bold hover:bg-teal-800"
-                  >
-                    {busy ? "Submitting…" : "Submit Dream Participation"}
+                  <Button type="submit" disabled={busy || uploading || !accounts.length || !contribution} className="h-14 w-full rounded-2xl bg-slate-900 text-base font-black text-white hover:bg-teal-700">
+                    {busy ? "Submitting…" : "Submit Participation"}
                   </Button>
-                  {!accounts.length && <p className="mt-2 text-center text-[11px] text-rose-700">Payment accounts are not configured yet.</p>}
                 </div>
               </form>
             </div>
           )}
         </section>
 
+        {/* HISTORY */}
         {user?.id && (
-          <section className="mx-auto mt-5 max-w-7xl px-4 md:px-8">
-            <div className="rounded-2xl border border-border bg-white p-4 shadow-sm md:rounded-3xl md:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="font-display text-lg font-black md:text-xl">Your participation history</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">Submission, approval, rejection, and registration updates for this product.</p>
-                </div>
-                {history.length > 0 && <span className="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-bold text-teal-800">{history.length} update{history.length === 1 ? "" : "s"}</span>}
-              </div>
+          <section className="mx-auto mt-10 max-w-7xl px-4 md:px-8">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="font-display text-xl font-black text-slate-900">Your History</h2>
+              <p className="mt-1 text-sm font-medium text-slate-500">Submission & approval updates for this product.</p>
               {history.length === 0 ? (
-                <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">You have not submitted a participation for this product yet.</p>
+                <p className="mt-4 rounded-xl border border-dashed border-slate-200 p-5 text-sm font-medium text-slate-400">No submissions yet.</p>
               ) : (
                 <div className="mt-4 space-y-3">
                   {history.map((entry) => {
                     const status = String(entry.to_status || "").toLowerCase();
-                    const rejected = status === "rejected";
-                    const approved = ["approved", "active", "completed"].includes(status);
+                    const isRej = status === "rejected"; const isApp = ["approved", "active", "completed"].includes(status);
                     return (
-                      <div key={entry.id} className={`rounded-xl border p-3 ${rejected ? "border-red-200 bg-red-50/60" : approved ? "border-emerald-200 bg-emerald-50/60" : "border-border bg-muted/20"}`}>
+                      <div key={entry.id} className={`rounded-xl border p-4 ${isRej ? "border-red-200 bg-red-50/60" : isApp ? "border-emerald-200 bg-emerald-50/60" : "border-slate-200 bg-slate-50"}`}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className={`text-sm font-bold capitalize ${rejected ? "text-red-700" : approved ? "text-emerald-700" : "text-foreground"}`}>{status.replaceAll("_", " ")}</p>
-                          <time className="text-xs text-muted-foreground">{entry.changed_at ? new Date(entry.changed_at).toLocaleString() : "—"}</time>
+                          <p className={`text-sm font-black capitalize ${isRej ? "text-red-700" : isApp ? "text-emerald-700" : "text-slate-800"}`}>{status.replaceAll("_", " ")}</p>
+                          <time className="text-xs font-medium text-slate-500">{entry.changed_at ? new Date(entry.changed_at).toLocaleString() : "—"}</time>
                         </div>
-                        {entry.note && <p className="mt-1 text-sm text-muted-foreground">{entry.note}</p>}
-                        {(entry.registration_number || entry.rejection_reason) && (
-                          <div className="mt-2 space-y-1 text-sm">
-                            {entry.registration_number && <p className="font-bold text-emerald-700">Registration number: {entry.registration_number}</p>}
-                            {entry.rejection_reason && <p className="font-semibold text-red-700">Rejection reason: {entry.rejection_reason}</p>}
-                          </div>
-                        )}
+                        {entry.note && <p className="mt-1 text-sm text-slate-600">{entry.note}</p>}
+                        {entry.registration_number && <p className="mt-2 font-bold text-emerald-700">Reg No: {entry.registration_number}</p>}
+                        {entry.rejection_reason && <p className="mt-2 font-bold text-red-700">Reason: {entry.rejection_reason}</p>}
                       </div>
                     );
                   })}
@@ -477,15 +387,10 @@ export default function DreamDetailPage() {
 
         {/* MOBILE STICKY CTA */}
         {!submitted && (
-          <div className="fixed inset-x-0 bottom-16 z-40 border-t border-border bg-white/95 p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:hidden">
+          <div className="fixed inset-x-0 bottom-16 z-40 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
             <div className="mx-auto flex max-w-7xl items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Your contribution</p>
-                <p className="truncate text-lg font-black text-teal-700">{money(contribution)}</p>
-              </div>
-              <a href="#participate" className="shrink-0">
-                <Button className="h-11 rounded-xl bg-teal-700 px-5 font-bold">Participate</Button>
-              </a>
+              <div className="min-w-0 flex-1"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Contribution</p><p className="truncate text-xl font-black text-teal-700">{money(contribution)}</p></div>
+              <a href="#participate" className="shrink-0"><Button className="h-12 rounded-xl bg-slate-900 px-6 font-black text-white hover:bg-teal-700">Participate</Button></a>
             </div>
           </div>
         )}
@@ -494,13 +399,11 @@ export default function DreamDetailPage() {
   );
 }
 
-function Field({
-  label, value, onChange, placeholder, required,
-}: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean }) {
+function Field({ label, value, onChange, placeholder, required }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean }) {
   return (
-    <div className="min-w-0">
-      <Label>{label}{required ? " *" : ""}</Label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} className="mt-1.5 h-11 rounded-xl" />
+    <div className="space-y-1.5">
+      <Label className="text-xs font-bold text-slate-600">{label} {required && "*"}</Label>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} className="h-12 rounded-xl border-slate-200 bg-slate-50 text-sm font-medium outline-none focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-200" />
     </div>
   );
 }
@@ -508,8 +411,8 @@ function Field({
 function Row({ label, value, strong, muted }: { label: string; value: string; strong?: boolean; muted?: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={strong ? "text-base font-black text-teal-700" : muted ? "text-muted-foreground line-through" : "font-semibold text-foreground"}>{value}</span>
+      <span className="font-medium text-slate-500">{label}</span>
+      <span className={strong ? "text-lg font-black text-teal-700" : muted ? "text-sm font-semibold text-slate-400 line-through" : "font-bold text-slate-900"}>{value}</span>
     </div>
   );
 }
