@@ -1,5 +1,5 @@
 // src/frontend/src/pages/HomePage.tsx
-// Givethra - Premium redesigned HomePage (Logic preserved, footer gap fixed for logged-in users)
+// Givethra - Premium HomePage with KYC Verified badge under user name.
 
 import InstallButton from "@/components/InstallButton";
 import CompletionCooldownBanner from "@/components/CompletionCooldownBanner";
@@ -12,11 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/contexts/RoleContext";
@@ -26,75 +22,25 @@ import { getCaseCalendarDate, isCasePastDeadline, isExpiredCaseRecord, daysUntil
 import { handleImageError, resolveMediaUrl } from "@/lib/media";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
-  BadgeCheck,
-  Briefcase,
-  Building2,
-  MailCheck,
-  Phone,
-  Search,
-  SlidersHorizontal,
-  X,
-  MapPin,
-  Bell,
-  Heart,
-  FileText,
-  Mail,
-  ChevronRight,
-  MessageCircle,
-  ShieldCheck,
-  Gift,
-  Battery,
-  Flame,
-  Droplets,
-  GraduationCap,
-  Stethoscope,
-  ShoppingCart,
-  Share2,
-  Home,
-  BookOpen,
-  Pill,
-  Apple,
-  Baby,
-  Accessibility,
-  Gem,
-  Wrench,
-  Tractor,
-  CreditCard,
-  Siren,
-  MoreHorizontal,
-  Sparkles,
-  TrendingUp,
-  Zap,
+  BadgeCheck, Briefcase, Building2, MailCheck, Phone, Search, SlidersHorizontal, X,
+  MapPin, Bell, Heart, FileText, Mail, ChevronRight, MessageCircle, ShieldCheck, Gift,
+  Battery, Flame, Droplets, GraduationCap, Stethoscope, ShoppingCart, Share2, Home,
+  BookOpen, Pill, Apple, Baby, Accessibility, Gem, Wrench, Tractor, CreditCard, Siren,
+  MoreHorizontal, Sparkles, TrendingUp, Zap, CheckCircle2, Clock, AlertTriangle,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  getApprovedCases,
-  getCategoryCounts,
-  getKycStatus,
-  getWallet,
-  getUnlockCount,
-  getUnreadNotificationsCount,
-  getProfile,
-  searchUsers,
-  getCommunityPosts,
-  createCommunityPost,
-  getUserSupports,
-  getEarningsSummary,
-  requestWithdrawal,
-  supportPost,
-  followUser,
-  unfollowUser,
+  getApprovedCases, getCategoryCounts, getKycStatus, getWallet, getUnlockCount,
+  getUnreadNotificationsCount, getProfile, searchUsers, getCommunityPosts,
+  createCommunityPost, getUserSupports, getEarningsSummary, requestWithdrawal,
+  supportPost, followUser, unfollowUser,
 } from "@/lib/api";
 import SlidingHomePanel from "@/components/SlidingHomePanel";
 
-// Support earnings conversion: 10,000 = $1.
-
-const WHATSAPP_URL =
-  "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
-const SUPPORT_WHATSAPP_URL =
-  "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
+const WHATSAPP_URL = "https://whatsapp.com/channel/0029Vb8k4u02v1IyortPNw2J";
+const SUPPORT_WHATSAPP_URL = "https://wa.me/message/42CJXLUYEI2KM1?src=qr";
 const WELCOME_POPUP_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const CONTACT_EMAIL = "info@givethra.org";
 
@@ -109,9 +55,7 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   QAR: "QAR", KWD: "KWD", BHD: "BHD", OMR: "OMR", JOD: "JOD", MAD: "MAD",
 };
 
-function sym(cur?: string) {
-  return CURRENCY_SYMBOLS[cur || "USD"] ?? (cur || "$");
-}
+function sym(cur?: string) { return CURRENCY_SYMBOLS[cur || "USD"] ?? (cur || "$"); }
 
 function normalizePublishedCategory(value: unknown): string {
   const category = String(value ?? "").trim();
@@ -203,6 +147,53 @@ function relativePostTime(value: unknown) {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
+// ============================================================
+// KYC Verified Badge Component
+// ============================================================
+function KycBadge({ kycStatus }: { kycStatus: string }) {
+  const navigate = useNavigate();
+  const status = String(kycStatus || "none").toLowerCase();
+
+  if (status === "approved") {
+    return (
+      <Link
+        to="/kyc"
+        className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-emerald-100 to-teal-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition hover:from-emerald-200 hover:to-teal-200"
+      >
+        <BadgeCheck className="h-3 w-3" fill="currentColor" />
+        Verified
+      </Link>
+    );
+  }
+
+  if (status === "pending") {
+    return (
+      <Link
+        to="/kyc"
+        className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-700 shadow-sm ring-1 ring-amber-200 transition hover:from-amber-200 hover:to-yellow-200"
+      >
+        <Clock className="h-3 w-3" />
+        Pending
+      </Link>
+    );
+  }
+
+  // "none" or "rejected" or "re_kyc"
+  return (
+    <button
+      type="button"
+      onClick={() => navigate({ to: "/kyc" })}
+      className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-rose-100 to-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-rose-700 shadow-sm ring-1 ring-rose-200 transition hover:from-rose-200 hover:to-red-200"
+    >
+      <AlertTriangle className="h-3 w-3" />
+      Unverified
+    </button>
+  );
+}
+
+// ============================================================
+// Home Social Dashboard
+// ============================================================
 function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: number }) {
   const { user } = useAuth();
   const { role } = useRole();
@@ -211,6 +202,7 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
   const [supportsGiven, setSupportsGiven] = useState(0);
   const [supportEarningsUsd, setSupportEarningsUsd] = useState(0);
   const [earningsSummary, setEarningsSummary] = useState<any>(null);
+  const [kycStatus, setKycStatus] = useState<string>("none");
   const [activeMoneyTab, setActiveMoneyTab] = useState<"earning" | "support" | "wallet">(() => {
     if (typeof window === "undefined") return "support";
     try {
@@ -238,9 +230,9 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
     if (!user?.id) return;
     const requestId = ++homeLoadRequestRef.current;
     setLoading(true);
-    const [walletResult, supportResult, earningsResult, postsResult, ownPostsResult] = await Promise.allSettled([
+    const [walletResult, supportResult, earningsResult, postsResult, ownPostsResult, kycResult] = await Promise.allSettled([
       getWallet(user.id), getUserSupports(user.id), getEarningsSummary(),
-      getCommunityPosts(feedTab), getCommunityPosts("my-posts"),
+      getCommunityPosts(feedTab), getCommunityPosts("my-posts"), getKycStatus(user.id),
     ]);
     if (requestId !== homeLoadRequestRef.current) return;
     if (walletResult.status === "fulfilled") setWalletBalance(Number(walletResult.value?.balance || 0));
@@ -252,6 +244,7 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
     }
     if (earningsResult.status === "fulfilled") setEarningsSummary(earningsResult.value);
     if (postsResult.status === "fulfilled") setPosts(Array.isArray(postsResult.value) ? postsResult.value : []);
+    if (kycResult.status === "fulfilled") setKycStatus(String(kycResult.value?.status || "none").toLowerCase());
     if (ownPostsResult.status === "fulfilled") {
       const latest = ownPostsResult.value
         .filter((post: any) => post.user_id === user.id && post.created_at)
@@ -361,13 +354,26 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
             <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-gradient-to-br from-yellow-200/40 to-amber-300/30 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-gradient-to-br from-blue-200/40 to-sky-300/30 blur-3xl" />
             <div className="relative flex items-center justify-between gap-4">
-              <div>
+              <div className="min-w-0 flex-1">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-950 shadow-sm">
                   <Sparkles className="h-3 w-3" /> Givethra Home
                 </span>
                 <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-900 md:text-3xl">
                   Welcome {role === "hero" ? "Hero" : "Requester"}
                 </h1>
+
+                {/* ⭐ KYC Verified Badge under name */}
+                <div className="mt-2 flex items-center gap-2">
+                  <KycBadge kycStatus={kycStatus} />
+                  <span className="text-xs font-medium text-slate-500">
+                    {kycStatus === "approved"
+                      ? "Your identity is verified."
+                      : kycStatus === "pending"
+                        ? "Verification under review."
+                        : "Complete KYC to start helping or requesting."}
+                  </span>
+                </div>
+
                 <p className="mt-1 text-sm text-slate-500">
                   {role === "hero" ? "Your kindness creates real impact." : "Share your journey and connect with support."}
                 </p>
@@ -523,6 +529,9 @@ function HomeSocialDashboard({ notificationCount = 0 }: { notificationCount?: nu
   );
 }
 
+// ============================================================
+// Main HomePage
+// ============================================================
 export default function HomePage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
@@ -630,7 +639,7 @@ export default function HomePage() {
     if (!user?.id) return;
     try {
       const kyc = await getKycStatus(user.id);
-      setKycStatus(kyc?.status ?? "none");
+      setKycStatus(String(kyc?.status || "none").toLowerCase());
       const wallet = await getWallet(user.id);
       setBalance(wallet?.balance ?? 0);
     } catch {}
@@ -753,13 +762,11 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* HERO ROW — Become a Hero (Yellow) + Request Help (Blue) + Category cards */}
           <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-50">
             <div className="pointer-events-none absolute -left-32 top-0 h-64 w-64 rounded-full bg-gradient-to-br from-yellow-200/40 to-amber-300/20 blur-3xl" />
             <div className="pointer-events-none absolute -right-32 bottom-0 h-64 w-64 rounded-full bg-gradient-to-br from-blue-200/40 to-sky-300/20 blur-3xl" />
             <div className="relative mx-auto max-w-7xl space-y-3 px-3 py-3.5">
               <div className="flex h-[228px] gap-2.5">
-                {/* Left stacked action buttons — Yellow Hero + Blue Help */}
                 <div className="flex w-[112px] shrink-0 flex-col gap-2.5 sm:w-[148px]">
                   <button
                     type="button"
@@ -787,7 +794,6 @@ export default function HomePage() {
                   </button>
                 </div>
 
-                {/* Right: horizontal category cards */}
                 <div className="flex min-w-0 flex-1 snap-x snap-mandatory gap-2.5 overflow-x-auto scrollbar-hide">
                   {FILTER_CATEGORIES.map((category) => {
                     const image = CATEGORY_SLIDE_MEDIA[category] || "/assets/generated/help-livelihood.jpg";
@@ -802,14 +808,13 @@ export default function HomePage() {
                       >
                         <img src={resolveMediaUrl(image)} alt="" loading="lazy" draggable={false} onError={handleImageError} className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover transition-transform duration-500 group-hover:scale-110" />
                         <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
-                        <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-yellow-500/0 via-transparent to-blue-600/0 opacity-0 transition-opacity duration-300 group-hover:from-yellow-500/10 group-hover:to-blue-600/20 group-hover:opacity-100" />
                         <span className="absolute inset-x-0 bottom-0 flex flex-col gap-1 p-2.5">
                           <span className="inline-flex w-fit items-center gap-1 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-amber-950 shadow-sm">
                             <Zap className="h-2.5 w-2.5" fill="currentColor" /> Help Now
                           </span>
                           <span className="text-[15px] font-black leading-tight drop-shadow-md">{category}</span>
                           <span className="line-clamp-2 text-[10px] leading-snug text-white/85">{CATEGORY_APPEAL[category]}</span>
-                          <span className="mt-1 inline-flex w-fit items-center gap-0.5 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-slate-900 shadow-md transition-transform group-hover:translate-x-0.5">
+                          <span className="mt-1 inline-flex w-fit items-center gap-0.5 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-slate-900 shadow-md">
                             Submit this <ChevronRight className="h-3 w-3" />
                           </span>
                         </span>
@@ -819,7 +824,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Shop Dream banner */}
               <button
                 type="button"
                 aria-label="Shop Dream Now — Givethra Dreams"
@@ -832,14 +836,13 @@ export default function HomePage() {
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 text-amber-950 shadow-md sm:h-9 sm:w-9"><Sparkles className="h-4 w-4 sm:h-5 sm:w-5" fill="currentColor" /></span>
                   <span>Shop Dream Now</span>
                 </span>
-                <span className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-black text-teal-800 shadow-md transition-transform group-hover:translate-x-0.5 sm:text-xs">
+                <span className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-black text-teal-800 shadow-md sm:text-xs">
                   Givethra Dreams <ChevronRight className="h-3 w-3" />
                 </span>
               </button>
             </div>
           </section>
 
-          {/* Search + Filter + Category chips */}
           <section className="border-b border-slate-200 bg-background px-3 py-2.5">
             <div className="mx-auto max-w-7xl space-y-2.5">
               <div className="flex items-center gap-2">
@@ -943,7 +946,6 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* Case listings */}
           <section ref={resultsRef} className="scroll-mt-28 bg-gradient-to-b from-slate-50 to-white px-3 py-3.5">
             <div className="mx-auto max-w-7xl space-y-3">
               <div className="flex items-center justify-between">
@@ -1070,7 +1072,6 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* WhatsApp links */}
           <section className="border-b border-slate-200 bg-white px-4 py-4">
             <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-6">
               <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm font-semibold text-slate-800 transition-colors hover:text-green-600">
@@ -1085,7 +1086,6 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* Footer: HIDDEN for logged-in users to remove the gap, shown only to visitors */}
           {!isAuthenticated && (
             <section className="border-t border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-8">
               <div className="mx-auto max-w-2xl space-y-5 text-center">
