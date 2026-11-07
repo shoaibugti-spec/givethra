@@ -46,6 +46,15 @@ const clean = (v, max) => String(v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ")
 const norm = (v) => String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const money = (n) => Math.round(Number(n) * 100) / 100;
 
+function markEligibilityPrivate(response) {
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  const vary = new Set((response.headers.get("Vary") || "").split(",").map((v) => v.trim()).filter(Boolean));
+  vary.add("Authorization");
+  vary.add("Cookie");
+  response.headers.set("Vary", [...vary].join(", "));
+  return response;
+}
+
 function pendingPosterKey(videoKey) {
   return typeof videoKey === "string" && videoKey.startsWith("pending/") && /\.(mp4|webm)$/i.test(videoKey)
     ? videoKey.replace(/\.(mp4|webm)$/i, ".jpg")
@@ -365,7 +374,7 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
 
   // ───────────── EVERYTHING BELOW NEEDS SIGN-IN ─────────────
   const denied = need();
-  if (denied) return denied;
+  if (denied) return method === "GET" && sub === "eligibility" ? markEligibilityPrivate(denied) : denied;
 
   // Backfill: owner/admin can add the share poster for a LIVE appeal that has none (older videos). Never overwrites.
   if (method === "POST" && sub === "poster-backfill" && parts[3]) {
@@ -439,14 +448,33 @@ export async function handleHelpMe(request, env, ctx, user, url, parts, origin, 
     if (suspension) return { ...base, can_post: false, code: "ACCOUNT_SUSPENDED", reason: "Your account is suspended.", suspension };
     const live = await db.prepare("SELECT id, status FROM helpme_appeals WHERE user_id = ? AND status IN ('pending_review','published','under_review') LIMIT 1").bind(user.user_id).first();
     if (live) return { ...base, can_post: false, code: "ACTIVE_APPEAL", reason: live.status === "pending_review" ? "Your appeal is waiting for admin review." : "You already have a live appeal.", appeal_id: live.id };
-    const last = await db.prepare("SELECT MAX(created_at) AS c, MAX(helped_at) AS h FROM helpme_appeals WHERE user_id = ? AND status NOT IN ('rejected')").bind(user.user_id).first();
-    const gapAt = last?.c ? new Date(last.c).getTime() + dayMs(S.post_gap_days) : 0;
-    const coolAt = last?.h ? new Date(last.h).getTime() + dayMs(S.helped_cooldown_days) : 0;
-    const nextAt = Math.max(gapAt, coolAt);
+    // Start the cooldown from this user's latest terminal outcome only.
+    // A rejection waits post_gap_days from the admin decision; completed help waits
+    // helped_cooldown_days from helped_at. Never aggregate dates across users.
+    const last = await db.prepare(`SELECT status, created_at, reviewed_at, helped_at
+      FROM helpme_appeals
+      WHERE user_id = ? AND status IN ('helped','rejected')
+      ORDER BY CASE WHEN status = 'helped'
+        THEN COALESCE(helped_at, reviewed_at, created_at)
+        ELSE COALESCE(reviewed_at, created_at)
+      END DESC
+      LIMIT 1`).bind(user.user_id).first();
+    const isHelped = last?.status === "helped";
+    const lastAt = isHelped
+      ? (last.helped_at || last.reviewed_at || last.created_at)
+      : (last?.reviewed_at || last?.created_at);
+    const lastAtMs = lastAt ? new Date(lastAt).getTime() : 0;
+    const cooldownDays = isHelped ? S.helped_cooldown_days : S.post_gap_days;
+    const nextAt = Number.isFinite(lastAtMs) && lastAtMs > 0
+      ? lastAtMs + dayMs(cooldownDays)
+      : 0;
     if (nextAt > Date.now()) return { ...base, can_post: false, code: "COOLDOWN", reason: "You can post your next appeal after the waiting period.", next_allowed_at: new Date(nextAt).toISOString() };
     return { ...base, can_post: true };
   }
-  if (method === "GET" && sub === "eligibility") return json(await eligibility(), 200, origin);
+  if (method === "GET" && sub === "eligibility") {
+    // Eligibility contains account-specific state; never reuse it across users.
+    return markEligibilityPrivate(json(await eligibility(), 200, origin));
+  }
 
   // ---- video upload: raw body straight into R2 (never buffered in the Worker) ----
   if (method === "POST" && sub === "upload") {

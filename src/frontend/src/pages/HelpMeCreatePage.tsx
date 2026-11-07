@@ -170,7 +170,7 @@ function useCountdown(iso?: string) {
 
 export default function HelpMeCreatePage() {
   const navigate = useNavigate();
-  const { isAuthenticated, isInitializing } = useAuth();
+  const { isAuthenticated, isInitializing, user } = useAuth();
   const [step, setStep] = useState<Step>("check");
   const [elig, setElig] = useState<Eligibility | null>(null);
   const [cfg, setCfg] = useState<HelpMeConfig | null>(null);
@@ -243,6 +243,8 @@ export default function HelpMeCreatePage() {
       return;
     }
     let live = true;
+    setStep("check");
+    setElig(null);
     Promise.all([helpme.eligibility(), helpme.config()])
       .then(([e, c]) => {
         if (!live) return;
@@ -255,7 +257,7 @@ export default function HelpMeCreatePage() {
       })
       .catch((e) => { if (live) { setElig({ can_post: false, reason: e.message || "Could not check your account. Please try again." }); setStep("blocked"); } });
     return () => { live = false; };
-  }, [isAuthenticated, isInitializing, navigate]);
+  }, [isAuthenticated, isInitializing, navigate, user?.id]);
 
   // Draw the camera picture into a vertical 9:16 canvas WITHOUT cropping or
   // zooming — the whole sensor view is shown (letterboxed if the source aspect

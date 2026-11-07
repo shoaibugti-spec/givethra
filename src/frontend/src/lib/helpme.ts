@@ -211,7 +211,7 @@ export const helpme = {
   payment: (id: string) => call<PaymentInfo>(`appeals/${encodeURIComponent(id)}/payment`),
   submitHelp: (id: string, data: { amount: number; trx_id: string; proof_url: string }) =>
     call(`appeals/${encodeURIComponent(id)}/help`, { method: "POST", json: data }),
-  eligibility: () => call<Eligibility>("eligibility"),
+  eligibility: () => call<Eligibility>("eligibility", { cache: "no-store" }),
   createAppeal: (data: Record<string, unknown>) => call<{ id: string; goal_local: number; currency: string }>("appeals", { method: "POST", json: data }),
   my: () => call<any>("my"),
   stats: (userId: string) => call<{ helped_count: number; helped_pkr: number; received_count: number; received_pkr: number }>(`stats/${encodeURIComponent(userId)}`),
